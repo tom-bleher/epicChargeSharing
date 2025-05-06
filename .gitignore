@@ -1,0 +1,37 @@
+# Ignore build directory
+build/
+
+# Compiled Object files
+*.o
+*.obj
+*.slo
+*.lo
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.cmake
+!CMakeLists.txt
+
+# Root files
+*.root
+
+# Editor/IDE specific files
+.vscode/
+.idea/
+*.swp
+*~
