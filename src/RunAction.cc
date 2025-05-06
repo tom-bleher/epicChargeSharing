@@ -12,7 +12,10 @@ RunAction::RunAction()
   fEdep(0),
   fPosX(0),
   fPosY(0),
-  fPosZ(0)
+  fPosZ(0),
+  fInitX(0),
+  fInitY(0),
+  fInitZ(0)
 { 
 }
 
@@ -37,7 +40,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree = new TTree("Hits", "Energy Deposits");
     if (!fTree) {
       G4cerr << "Error creating ROOT tree!" << G4endl;
-      delete fRootFile; // Properly delete the file if tree creation fails
+      delete fRootFile;
       fRootFile = nullptr;
       return;
     }
@@ -47,6 +50,11 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("PosX", &fPosX, "PosX/D");
     fTree->Branch("PosY", &fPosY, "PosY/D");
     fTree->Branch("PosZ", &fPosZ, "PosZ/D");
+    
+    // Add branches for initial particle position
+    fTree->Branch("InitX", &fInitX, "InitX/D");
+    fTree->Branch("InitY", &fInitY, "InitY/D");
+    fTree->Branch("InitZ", &fInitZ, "InitZ/D");
     
     G4cout << "Created ROOT file and tree successfully" << G4endl;
   }

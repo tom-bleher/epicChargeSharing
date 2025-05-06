@@ -28,6 +28,8 @@ void ActionInitialization::Build() const
     
     // Create and register EventAction
     EventAction* eventAction = new EventAction(runAction);
+    // Set the initial position from the particle gun
+    eventAction->SetInitialPosition(generator->GetParticlePosition());
     SetUserAction(eventAction);
     
     // Create and register SteppingAction

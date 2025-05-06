@@ -9,6 +9,7 @@ EventAction::EventAction(RunAction* runAction)
   fRunAction(runAction),
   fEdep(0.),
   fPosition(G4ThreeVector(0.,0.,0.)),
+  fInitialPosition(G4ThreeVector(0.,0.,0.)),
   fHasHit(false)
 { 
 }
@@ -31,6 +32,8 @@ void EventAction::EndOfEventAction(const G4Event*)
   if (fHasHit) {
     // Store data in the RunAction (which will be saved to ROOT)
     fRunAction->SetEventData(fEdep, fPosition.x(), fPosition.y(), fPosition.z());
+    // Also store the initial position
+    fRunAction->SetInitialPosition(fInitialPosition.x(), fInitialPosition.y(), fInitialPosition.z());
     fRunAction->FillTree();
   }
 }
@@ -49,4 +52,10 @@ void EventAction::AddEdep(G4double edep, G4ThreeVector position)
       fEdep += edep;
     }
   }
+}
+
+// Implementation of the new method to set the initial position
+void EventAction::SetInitialPosition(const G4ThreeVector& position)
+{
+  fInitialPosition = position;
 }

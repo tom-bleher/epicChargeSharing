@@ -7,7 +7,7 @@ PrimaryGenerator::PrimaryGenerator()
     // Particle Position - place it at a distance from the detector
     G4double x = 0.0*um;
     G4double y = 0.0*um;
-    G4double z = 2.0*cm; // Place it further away from the detector for better visualization
+    G4double z = 5.0*cm; // Place it further away from the detector for better visualization
 
     G4ThreeVector pos(x, y, z);
     G4double px = 0.0;
@@ -18,11 +18,11 @@ PrimaryGenerator::PrimaryGenerator()
 
     // Particle Type
     G4ParticleTable *particleTable = G4ParticleTable::GetParticleTable();
-    G4ParticleDefinition *particle = particleTable->FindParticle("e+");
+    G4ParticleDefinition *particle = particleTable->FindParticle("e-");
 
     fParticleGun->SetParticlePosition(pos);
     fParticleGun->SetParticleMomentumDirection(mom);
-    fParticleGun->SetParticleEnergy(10.0*GeV);
+    fParticleGun->SetParticleEnergy(2.0*GeV);
     fParticleGun->SetParticleDefinition(particle);
 }
 
@@ -35,4 +35,10 @@ void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
 {
     // Create Vertex
     fParticleGun->GeneratePrimaryVertex(anEvent);
+}
+
+// Implementation of the new access method
+G4ThreeVector PrimaryGenerator::GetParticlePosition() const
+{
+    return fParticleGun->GetParticlePosition();
 }

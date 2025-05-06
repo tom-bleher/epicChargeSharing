@@ -30,6 +30,13 @@ public:
         fPosZ = z;
     }
     
+    // New method to set initial particle gun position
+    void SetInitialPosition(G4double x, G4double y, G4double z) {
+        fInitX = x;
+        fInitY = y;
+        fInitZ = z;
+    }
+    
     void FillTree() { if (fTree) fTree->Fill(); }
 
 private:
@@ -41,6 +48,11 @@ private:
     G4double fPosX;
     G4double fPosY;
     G4double fPosZ;
+    
+    // New variables for initial particle gun position
+    G4double fInitX;
+    G4double fInitY;
+    G4double fInitZ;
 };
 
 #endif

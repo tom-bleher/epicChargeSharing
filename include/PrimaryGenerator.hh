@@ -14,6 +14,9 @@ public:
     ~PrimaryGenerator();
 
     virtual void GeneratePrimaries(G4Event* anEvent);
+    
+    // Access methods for initial particle position
+    G4ThreeVector GetParticlePosition() const;
 
 private:
     G4ParticleGun* fParticleGun;

@@ -3,17 +3,20 @@
 
 DetectorConstruction::DetectorConstruction()
 {
+    // ————————————————————————
+    // Parameters (all lengths are center–to–center except fPixelCornerOffset)
+    // ————————————————————————
     // Pixels
-    fPixelSize = 100*um; // length and height of each pixel
-    fPixelWidth = 1*um;
-    fPixelSpacing = 500*um;   // spacing between center of pixels
-    fPixelCornerOffset = 1*um;     // edge-most pixel distance from edge of detector
+    fPixelSize = 100*um;        // "pixel" side‐length
+    fPixelWidth = 1*um;         // Width/thickness of each pixel
+    fPixelSpacing = 500*um;     // (blue) center–to–center pitch
+    fPixelCornerOffset = 100*um;  // (purple) from inner detector edge to first pixel edge
 
     // Detector 
-    fdetSize = 3*cm; // length and height of each pixel
-    fdetWidth = 50*um;
+    fdetSize = 3*cm;           // (green) outer‐square side length
+    fdetWidth = 50*um;         // Width/thickness of the detector
     
-    // Will be calculated in Construct()
+    // Will be calculated in Construct() based on symmetry constraint
     fNumBlocksPerSide = 0;
     
     // Create the messenger
@@ -27,10 +30,14 @@ DetectorConstruction::~DetectorConstruction()
 
 void DetectorConstruction::SetGridParameters(G4double pixelSize, G4double pixelSpacing, G4double pixelCornerOffset, G4int numPixels)
 {
+    // Update the parameters for pixel grid placement
     fPixelSize = pixelSize;
     fPixelSpacing = pixelSpacing;
     fPixelCornerOffset = pixelCornerOffset;
-    fNumBlocksPerSide = numPixels;
+
+    // Always compute N as the nearest integer, then adjust offset for perfect centering
+    fNumBlocksPerSide = static_cast<G4int>(std::round((fdetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
+    fPixelCornerOffset = (fdetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
 }
 
 G4VPhysicalVolume* DetectorConstruction::Construct()
@@ -66,45 +73,47 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4Box *pixelBlock = new G4Box("pixelBlock", fPixelSize/2, fPixelSize/2, fPixelWidth/2);
     G4LogicalVolume *logicBlock = new G4LogicalVolume(pixelBlock, aluminumMat, "logicBlock");
 
-    // Calculate the available space for the grid, subtracting corner offsets from both sides
-    G4double availableSpace = fdetSize - 2 * fPixelCornerOffset;
-    
-    // Calculate how many blocks can fit in the available space based on fixed spacing
-    // Number of blocks = available space / spacing + 1
-    fNumBlocksPerSide = static_cast<G4int>(availableSpace / fPixelSpacing) + 1;
+    // Calculate number of pixels using the symmetry constraint formula
+    // N = (fdetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1
+    fNumBlocksPerSide = static_cast<G4int>(std::round((fdetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
+    fPixelCornerOffset = (fdetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
     
     // Function to place blocks on a face
     auto placeBlocksOnFace = [&](G4double x, G4double y, G4double z, G4int normalAxis) {
         G4int copyNo = 0;
         
-        // Starting position for the grid, adjusted by corner offset
-        G4double startPos = -fdetSize/2 + fPixelCornerOffset;
+        // First pixel's center coordinates calculation
+        G4double firstPixelPos = -fdetSize/2 + fPixelCornerOffset + fPixelSize/2;
         
         for (G4int i = 0; i < fNumBlocksPerSide; i++) {
             for (G4int j = 0; j < fNumBlocksPerSide; j++) {
-                // Calculate positions based on fPixelSpacing
-                G4double xPos = (normalAxis == 1) ? x : startPos + i * fPixelSpacing;
-                G4double yPos = (normalAxis == 2) ? y : startPos + j * fPixelSpacing;
-                G4double zPos = (normalAxis == 3) ? z : startPos + i * fPixelSpacing;
+                // Default positions (will be overwritten based on normalAxis)
+                G4double xPos = x;
+                G4double yPos = y;
+                G4double zPos = z;
+                
+                // Calculate pixel center positions based on the specified formula:
+                // x_i = -fdetSize/2 + fPixelCornerOffset + fPixelSize/2 + i*fPixelSpacing
+                // y_j = -fdetSize/2 + fPixelCornerOffset + fPixelSize/2 + j*fPixelSpacing
                 
                 // For the z-normal faces (top/bottom), use i for x and j for y
                 if (normalAxis == 3) {
-                    xPos = startPos + i * fPixelSpacing;
-                    yPos = startPos + j * fPixelSpacing;
+                    xPos = firstPixelPos + i * fPixelSpacing;
+                    yPos = firstPixelPos + j * fPixelSpacing;
                 }
                 // For the y-normal faces (front/back), use i for x and j for z
                 else if (normalAxis == 2) {
-                    xPos = startPos + i * fPixelSpacing;
-                    zPos = startPos + j * fPixelSpacing;
+                    xPos = firstPixelPos + i * fPixelSpacing;
+                    zPos = firstPixelPos + j * fPixelSpacing;
                 }
                 // For the x-normal faces (left/right), use i for y and j for z
                 else if (normalAxis == 1) {
-                    yPos = startPos + i * fPixelSpacing;
-                    zPos = startPos + j * fPixelSpacing;
+                    yPos = firstPixelPos + i * fPixelSpacing;
+                    zPos = firstPixelPos + j * fPixelSpacing;
                 }
                 
                 new G4PVPlacement(0, G4ThreeVector(xPos, yPos, zPos),
-                                  logicBlock, "physBlock", logicWorld, false, copyNo++, checkOverlaps);
+                                 logicBlock, "physBlock", logicWorld, false, copyNo++, checkOverlaps);
             }
         }
     };

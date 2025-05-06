@@ -19,10 +19,14 @@ public:
     // Method to accumulate energy deposition and position
     void AddEdep(G4double edep, G4ThreeVector position);
     
+    // Method to set initial particle position
+    void SetInitialPosition(const G4ThreeVector& position);
+    
 private:
     RunAction* fRunAction;
     G4double fEdep;   // Total energy deposit in the event
     G4ThreeVector fPosition;  // Position of energy deposit (weighted average)
+    G4ThreeVector fInitialPosition; // Initial particle position
     G4bool fHasHit;   // Flag to indicate if any energy was deposited
 };
 
