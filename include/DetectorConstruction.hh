@@ -1,0 +1,47 @@
+#ifndef DetectorConstruction_h
+#define DetectorConstruction_h 1
+
+#include "G4VUserDetectorConstruction.hh"
+#include "G4VPhysicalVolume.hh"
+#include "G4LogicalVolume.hh"
+#include "G4Box.hh"
+#include "G4Sphere.hh"
+#include "G4Tubs.hh"
+#include "G4SystemOfUnits.hh"
+#include "G4NistManager.hh"
+#include "G4RotationMatrix.hh"
+#include "G4ThreeVector.hh"
+#include "G4PVPlacement.hh"
+#include "G4VisAttributes.hh"
+
+class DetectorMessenger;
+
+class DetectorConstruction : public G4VUserDetectorConstruction
+{
+public:
+    DetectorConstruction();
+    virtual ~DetectorConstruction();
+    
+    virtual G4VPhysicalVolume* Construct();
+    
+    // Method to set the grid parameters
+    void SetGridParameters(G4double pixelSize, G4double pixelSpacing, G4double pixelCornerOffset, G4int numPixels);
+    
+private:
+    // Pixel parameters
+    G4double fPixelSize;         // Size of each pixel
+    G4double fPixelWidth;        // Width/thickness of each pixel
+    G4double fPixelSpacing;      // Center-to-center spacing between pixels
+    G4double fPixelCornerOffset; // Edge-most pixel distance from edge of detector
+    
+    // Detector parameters
+    G4double fdetSize;           // Size of the detector
+    G4double fdetWidth;          // Width/thickness of the detector
+    
+    G4int fNumBlocksPerSide;     // Number of pixels per row/column
+    
+    // Messenger for UI commands
+    DetectorMessenger* fMessenger;
+};
+
+#endif

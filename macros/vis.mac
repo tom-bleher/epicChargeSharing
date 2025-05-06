@@ -1,0 +1,46 @@
+/run/initialize 
+
+# Detector configuration
+# Set the grid parameters 
+# Parameter A: Size of each block - increased for better visibility
+/epicToy/detector/setBlockSize 2 um
+# Parameter B: Distance between blocks - reduced for better visibility
+/epicToy/detector/setBlockSpacing 2 um
+# Parameter C: Distance from corner to cube edge
+/epicToy/detector/setCornerOffset 0.5 um
+
+# Visualization settings
+/vis/open OGL 800x800-0+0
+
+#/vis/viewer/set/viewpointVector 1 1 1
+/vis/viewer/set/autoRefresh true
+
+/vis/drawVolume
+
+# Enhanced trajectory visualization
+/vis/scene/add/trajectories smooth
+/vis/scene/endOfEventAction accumulate
+
+# Set up a single axis at the particle gun position (0,0,0) with 1 cm length
+# Removed the scale display
+#/vis/scene/add/axes 0 0 5 1 um
+#/vis/scene/add/axes -1.5 -1.5 0 3 cm
+#/vis/scene/add/eventID
+
+# Improve visibility of trajectories
+/vis/modeling/trajectories/drawByCharge-0/default/setDrawStepPts true
+/vis/modeling/trajectories/drawByCharge-0/default/setStepPtsSize 2
+/vis/scene/add/hits
+
+# Adjust colors and styles
+/vis/viewer/set/background white
+/vis/viewer/set/style surface
+/vis/viewer/set/hiddenEdge true
+/vis/viewer/set/auxiliaryEdge true
+
+# Adjust view for better visibility
+#/vis/viewer/zoom 1.5
+#/vis/viewer/set/targetPoint 0 0 0 mm
+
+# Force redraw
+/vis/viewer/flush

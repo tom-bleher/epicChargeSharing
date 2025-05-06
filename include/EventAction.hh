@@ -1,0 +1,29 @@
+#ifndef EVENTACTION_HH
+#define EVENTACTION_HH
+
+#include "G4UserEventAction.hh"
+#include "globals.hh"
+#include "G4ThreeVector.hh"
+
+class RunAction;
+
+class EventAction : public G4UserEventAction
+{
+public:
+    EventAction(RunAction* runAction);
+    virtual ~EventAction();
+
+    virtual void BeginOfEventAction(const G4Event* event);
+    virtual void EndOfEventAction(const G4Event* event);
+    
+    // Method to accumulate energy deposition and position
+    void AddEdep(G4double edep, G4ThreeVector position);
+    
+private:
+    RunAction* fRunAction;
+    G4double fEdep;   // Total energy deposit in the event
+    G4ThreeVector fPosition;  // Position of energy deposit (weighted average)
+    G4bool fHasHit;   // Flag to indicate if any energy was deposited
+};
+
+#endif
