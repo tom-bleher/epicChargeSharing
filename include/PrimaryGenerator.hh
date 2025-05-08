@@ -6,11 +6,14 @@
 #include "G4ParticleGun.hh"
 #include "G4ParticleTable.hh"
 #include "G4SystemOfUnits.hh"
+#include "G4RandomTools.hh"
+
+class DetectorConstruction;
 
 class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
 {
 public:
-    PrimaryGenerator();
+    PrimaryGenerator(DetectorConstruction* detector);
     ~PrimaryGenerator();
 
     virtual void GeneratePrimaries(G4Event* anEvent);
@@ -20,6 +23,10 @@ public:
 
 private:
     G4ParticleGun* fParticleGun;
+    DetectorConstruction* fDetector;
+    
+    // Method to generate random particle position
+    void GenerateRandomPosition();
 };
 
 #endif
