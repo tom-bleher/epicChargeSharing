@@ -17,18 +17,24 @@ int main(int argc, char** argv)
 
     #ifdef G4MULTITHREADED
         G4MTRunManager *runManager = new G4MTRunManager;
+        // Reduce number of threads to 2 to reduce memory pressure
+        G4int nThreads = 5; // Lower from 4 to reduce memory pressure
+        runManager->SetNumberOfThreads(nThreads);
+        G4cout << "Running in multithreaded mode with " << nThreads << " threads" << G4endl;
     #else
         G4RunManager *runManager = new G4RunManager;
+        G4cout << "Running in single-threaded mode" << G4endl;
     #endif
     
     // Physics List
     runManager->SetUserInitialization(new PhysicsList());
 
     // Detector Construction
-    runManager->SetUserInitialization(new DetectorConstruction());
+    DetectorConstruction* detConstruction = new DetectorConstruction();
+    runManager->SetUserInitialization(detConstruction);
 
-    // Action Initialization
-    runManager->SetUserInitialization(new ActionInitialization());
+    // Action Initialization with detector construction
+    runManager->SetUserInitialization(new ActionInitialization(detConstruction));
 
     G4VisManager *visManager = new G4VisExecutive();
     visManager->Initialize();
@@ -44,6 +50,10 @@ int main(int argc, char** argv)
     }
 
     ui->SessionStart();
+
+    delete ui;
+    delete visManager;
+    delete runManager;
 
     return 0;
 }

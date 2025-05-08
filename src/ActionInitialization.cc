@@ -1,7 +1,8 @@
 #include "ActionInitialization.hh"
 
 
-ActionInitialization::ActionInitialization()
+ActionInitialization::ActionInitialization(DetectorConstruction* detector)
+: fDetector(detector)
 {
 }
 
@@ -18,18 +19,17 @@ void ActionInitialization::BuildForMaster() const
 
 void ActionInitialization::Build() const
 {
-    // Create and register the primary generator
-    PrimaryGenerator *generator = new PrimaryGenerator();
+    // Create and register the primary generator with detector information
+    PrimaryGenerator *generator = new PrimaryGenerator(fDetector);
     SetUserAction(generator);
     
     // Create and register RunAction
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
     
-    // Create and register EventAction
-    EventAction* eventAction = new EventAction(runAction);
-    // Set the initial position from the particle gun
-    eventAction->SetInitialPosition(generator->GetParticlePosition());
+    // Create and register EventAction with detector information
+    EventAction* eventAction = new EventAction(runAction, fDetector);
+    // Don't set initial position here - it will be set for each event
     SetUserAction(eventAction);
     
     // Create and register SteppingAction

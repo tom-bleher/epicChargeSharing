@@ -27,6 +27,14 @@ public:
     // Method to set the grid parameters
     void SetGridParameters(G4double pixelSize, G4double pixelSpacing, G4double pixelCornerOffset, G4int numPixels);
     
+    // Getter methods for parameters needed to calculate nearest pixel
+    G4double GetPixelSize() const { return fPixelSize; }
+    G4double GetPixelSpacing() const { return fPixelSpacing; }
+    G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
+    G4double GetDetSize() const { return fdetSize; }
+    G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
+    G4ThreeVector GetDetectorPosition() const { return G4ThreeVector(0., 0., -1.0*cm); } // Fixed position from Construct()
+    
 private:
     // Pixel parameters
     G4double fPixelSize;         // Size of each pixel

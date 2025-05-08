@@ -1,12 +1,15 @@
 #include "EventAction.hh"
 #include "RunAction.hh"
+#include "DetectorConstruction.hh"
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
+#include <cmath>
 
-EventAction::EventAction(RunAction* runAction)
+EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
 : G4UserEventAction(),
   fRunAction(runAction),
+  fDetector(detector),
   fEdep(0.),
   fPosition(G4ThreeVector(0.,0.,0.)),
   fInitialPosition(G4ThreeVector(0.,0.,0.)),
@@ -18,24 +21,35 @@ EventAction::~EventAction()
 { 
 }
 
-void EventAction::BeginOfEventAction(const G4Event*)
+void EventAction::BeginOfEventAction(const G4Event* event)
 {
   // Reset per-event variables
   fEdep = 0.;
   fPosition = G4ThreeVector(0.,0.,0.);
   fHasHit = false;
+  
+  // Initialize particle position - this will be updated when the primary vertex is created
+  fInitialPosition = G4ThreeVector(0.,0.,0.);
 }
 
-void EventAction::EndOfEventAction(const G4Event*)
+void EventAction::EndOfEventAction(const G4Event* event)
 {
-  // If there was an energy deposit in this event, store it in the ROOT file
-  if (fHasHit) {
-    // Store data in the RunAction (which will be saved to ROOT)
-    fRunAction->SetEventData(fEdep, fPosition.x(), fPosition.y(), fPosition.z());
-    // Also store the initial position
-    fRunAction->SetInitialPosition(fInitialPosition.x(), fInitialPosition.y(), fInitialPosition.z());
-    fRunAction->FillTree();
+  // Get the primary vertex position from the event
+  if (event->GetPrimaryVertex()) {
+    G4ThreeVector primaryPos = event->GetPrimaryVertex()->GetPosition();
+    // Update the initial position
+    fInitialPosition = primaryPos;
   }
+  
+  // Always record event data, even if no energy was deposited
+  fRunAction->SetEventData(fEdep, fPosition.x(), fPosition.y(), fPosition.z());
+  fRunAction->SetInitialPosition(fInitialPosition.x(), fInitialPosition.y(), fInitialPosition.z());
+  
+  // Calculate and store nearest pixel position
+  G4ThreeVector nearestPixel = CalculateNearestPixel(fPosition);
+  fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y(), nearestPixel.z());
+  
+  fRunAction->FillTree();
 }
 
 void EventAction::AddEdep(G4double edep, G4ThreeVector position)
@@ -58,4 +72,38 @@ void EventAction::AddEdep(G4double edep, G4ThreeVector position)
 void EventAction::SetInitialPosition(const G4ThreeVector& position)
 {
   fInitialPosition = position;
+}
+
+// Implementation of the nearest pixel calculation method
+G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
+{
+  // Get detector parameters
+  G4double pixelSize = fDetector->GetPixelSize();
+  G4double pixelSpacing = fDetector->GetPixelSpacing();
+  G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
+  G4double detSize = fDetector->GetDetSize();
+  G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
+  G4ThreeVector detectorPosition = fDetector->GetDetectorPosition();
+  
+  // Calculate the position relative to the detector face (which is at z=-1.0*cm)
+  G4ThreeVector relativePos = position - detectorPosition;
+  
+  // For the z-normal face (top/bottom), only x and y matter for pixel position
+  // Calculate the first pixel position (corner)
+  G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
+  
+  // Calculate which pixel grid position is closest (i and j indices)
+  G4int i = std::round((relativePos.x() - firstPixelPos) / pixelSpacing);
+  G4int j = std::round((relativePos.y() - firstPixelPos) / pixelSpacing);
+  
+  // Clamp i and j to valid pixel indices
+  i = std::max(0, std::min(i, numBlocksPerSide - 1));
+  j = std::max(0, std::min(j, numBlocksPerSide - 1));
+  
+  // Calculate the actual pixel center position
+  G4double pixelX = firstPixelPos + i * pixelSpacing;
+  G4double pixelY = firstPixelPos + j * pixelSpacing;
+  G4double pixelZ = detectorPosition.z(); // Z position is the detector face
+  
+  return G4ThreeVector(pixelX, pixelY, pixelZ);
 }

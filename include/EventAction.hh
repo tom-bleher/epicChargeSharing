@@ -6,11 +6,12 @@
 #include "G4ThreeVector.hh"
 
 class RunAction;
+class DetectorConstruction;
 
 class EventAction : public G4UserEventAction
 {
 public:
-    EventAction(RunAction* runAction);
+    EventAction(RunAction* runAction, DetectorConstruction* detector);
     virtual ~EventAction();
 
     virtual void BeginOfEventAction(const G4Event* event);
@@ -22,8 +23,12 @@ public:
     // Method to set initial particle position
     void SetInitialPosition(const G4ThreeVector& position);
     
+    // Method to calculate the nearest pixel position
+    G4ThreeVector CalculateNearestPixel(const G4ThreeVector& position);
+    
 private:
     RunAction* fRunAction;
+    DetectorConstruction* fDetector;
     G4double fEdep;   // Total energy deposit in the event
     G4ThreeVector fPosition;  // Position of energy deposit (weighted average)
     G4ThreeVector fInitialPosition; // Initial particle position
