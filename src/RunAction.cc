@@ -15,7 +15,10 @@ RunAction::RunAction()
   fPosZ(0),
   fInitX(0),
   fInitY(0),
-  fInitZ(0)
+  fInitZ(0),
+  fPixelX(0),
+  fPixelY(0),
+  fPixelZ(0)
 { 
 }
 
@@ -55,6 +58,11 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("InitX", &fInitX, "InitX/D");
     fTree->Branch("InitY", &fInitY, "InitY/D");
     fTree->Branch("InitZ", &fInitZ, "InitZ/D");
+    
+    // Add branches for nearest pixel center position
+    fTree->Branch("PixelX", &fPixelX, "PixelX/D");
+    fTree->Branch("PixelY", &fPixelY, "PixelY/D");
+    fTree->Branch("PixelZ", &fPixelZ, "PixelZ/D");
     
     G4cout << "Created ROOT file and tree successfully" << G4endl;
   }

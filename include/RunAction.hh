@@ -37,6 +37,13 @@ public:
         fInitZ = z;
     }
     
+    // New method to set nearest pixel position
+    void SetNearestPixelPosition(G4double x, G4double y, G4double z) {
+        fPixelX = x;
+        fPixelY = y;
+        fPixelZ = z;
+    }
+    
     void FillTree() { if (fTree) fTree->Fill(); }
 
 private:
@@ -53,6 +60,11 @@ private:
     G4double fInitX;
     G4double fInitY;
     G4double fInitZ;
+    
+    // New variables for nearest pixel center position
+    G4double fPixelX;
+    G4double fPixelY;
+    G4double fPixelZ;
 };
 
 #endif
