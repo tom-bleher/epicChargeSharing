@@ -8,6 +8,8 @@
 // ROOT includes
 #include "TFile.h"
 #include "TTree.h"
+#include "G4Threading.hh"
+#include <mutex>
 
 class RunAction : public G4UserRunAction
 {
@@ -49,6 +51,9 @@ public:
 private:
     TFile* fRootFile;
     TTree* fTree;
+    
+    // Thread-safety mutex for ROOT operations
+    static std::mutex fRootMutex;
     
     // Variables for data storage
     G4double fEdep;

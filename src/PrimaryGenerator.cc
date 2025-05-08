@@ -44,8 +44,8 @@ void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
 
     // Set the primary vertex position in the event for EventAction to access
     if (anEvent->GetPrimaryVertex()) {
-        // Use the actual vertex position which has been created
-        // This is more reliable than using the gun position directly
+        // The vertex has been created and can be accessed by EventAction
+        // No additional code needed here as EventAction already reads the position
     }
 }
 
