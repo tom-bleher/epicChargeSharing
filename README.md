@@ -1,6 +1,6 @@
 # epicToy: ePIC Toy Detector Simulation
 
-A Geant4-based simulation of a pixel silicon detector. This project provides a simple simulation of particle interactions with the silicon detector to create a testing playground.
+A Geant4-based toy simulation of the ePIC detector. The project provides a simple framework to test particle interactions with silicon detectors.
 
 ## Prerequisites
 
