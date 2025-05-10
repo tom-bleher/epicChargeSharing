@@ -48,8 +48,9 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4NistManager *nist = G4NistManager::Instance();
     G4Material *worldMat = nist->FindOrBuildMaterial("G4_Galactic"); // World material
     G4Material *siliconMat = nist->FindOrBuildMaterial("G4_Si"); // Detector material
+    G4Material* SiliconO2Mat = nist->FindOrBuildMaterial("G4_SILICON_DIOXIDE"); // Detector material
     G4Material *aluminumMat = nist->FindOrBuildMaterial("G4_Al"); // Pixel material
-
+    
     // Create world volume
     G4Box *solidWorld = new G4Box("solidWorld", 5*cm, 5*cm, 5*cm);
     G4LogicalVolume *logicWorld = new G4LogicalVolume(solidWorld, worldMat, "logicWorld");
