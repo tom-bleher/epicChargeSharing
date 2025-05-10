@@ -9,6 +9,9 @@
 #include "TTree.h"
 #include "TChain.h"
 #include "TError.h" // Added for gErrorIgnoreLevel and kWarning
+#include <chrono>
+#include <thread>
+#include <cstdio> // For std::remove
 
 // Initialize the static mutex
 std::mutex RunAction::fRootMutex;
@@ -171,12 +174,14 @@ void RunAction::EndOfRunAction(const G4Run* run)
       TChain chain("Hits");
       G4int validFiles = 0;
       G4int nThreads = G4Threading::GetNumberOfRunningWorkerThreads();
+      std::vector<G4String> workerFileNames; // Store filenames for later deletion
       
       // Add files from worker threads
       for (G4int i = 0; i < nThreads; i++) {
         std::ostringstream oss;
         oss << "epicToyOutput_t" << i << ".root";
         G4String workerFile = oss.str();
+        workerFileNames.push_back(workerFile); // Store filename
         
         // Check if the file exists and is valid before adding
         TFile *testFile = TFile::Open(workerFile.c_str(), "READ");
@@ -232,6 +237,17 @@ void RunAction::EndOfRunAction(const G4Run* run)
           
           mergedFile->Close();
           delete mergedFile;
+          
+          // Now delete all worker thread files
+          for (const auto& file : workerFileNames) {
+            if (std::remove(file.c_str()) == 0) {
+              G4cout << "Deleted temporary file: " << file << G4endl;
+            } else {
+              G4cerr << "Failed to delete temporary file: " << file << G4endl;
+            }
+          }
+          
+          G4cout << "Finished merging files. Only epicToyOutput.root is kept." << G4endl;
         } else {
           G4cout << "Error creating merged output file!" << G4endl;
           if (mergedFile) delete mergedFile;
