@@ -20,9 +20,12 @@ int main(int argc, char** argv)
     // Parse command line arguments
     for (G4int i = 1; i < argc; i++) {
         G4String arg = argv[i];
-        if (arg == "-m" || arg == "--macro") {
+        if (arg == "-m" || arg == "--macro" || arg == "batch") {
             isBatch = true;
-            if (i + 1 < argc) {
+            if (i + 1 < argc && arg != "batch") {
+                macroFile = argv[++i];
+            } else if (arg == "batch" && i + 1 < argc) {
+                // Handle the case when "batch" is directly used as an argument
                 macroFile = argv[++i];
             }
         }
@@ -31,17 +34,28 @@ int main(int argc, char** argv)
     // Only create UI executive if we're not in batch mode
     G4UIExecutive *ui = nullptr;
     if (!isBatch) {
-        ui = new G4UIExecutive(argc, argv);
+        ui = new G4UIExecutive(argc, argv, "Qt");
     }
 
+    // Create the appropriate run manager
+    G4RunManager* runManager = nullptr;
+    
     #ifdef G4MULTITHREADED
-        G4MTRunManager *runManager = new G4MTRunManager;
+    if (!isBatch) {
+        // Use multithreaded mode only for interactive sessions
+        G4MTRunManager* mtRunManager = new G4MTRunManager;
         // Use all available cores on the machine by default
         G4int nThreads = G4Threading::G4GetNumberOfCores();
-        runManager->SetNumberOfThreads(nThreads);
+        mtRunManager->SetNumberOfThreads(nThreads);
         G4cout << "Running in multithreaded mode with " << nThreads << " threads" << G4endl;
+        runManager = mtRunManager;
+    } else {
+        // Use single-threaded mode for batch processing
+        runManager = new G4RunManager;
+        G4cout << "Running in batch mode (single-threaded)" << G4endl;
+    }
     #else
-        G4RunManager *runManager = new G4RunManager;
+        runManager = new G4RunManager;
         G4cout << "Running in single-threaded mode" << G4endl;
     #endif
     
@@ -58,9 +72,11 @@ int main(int argc, char** argv)
     // Get pointer to UI manager
     G4UImanager *uiManager = G4UImanager::GetUIpointer();
     
-    // Handle visualization only in interactive mode
+    // Initialize visualization only in interactive mode
     G4VisManager *visManager = nullptr;
+    
     if (!isBatch) {
+        // Only in interactive mode, set up visualization
         visManager = new G4VisExecutive();
         visManager->Initialize();
         
@@ -75,7 +91,8 @@ int main(int argc, char** argv)
         ui->SessionStart();
         delete ui;
     } else {
-        // Batch mode - execute the specified macro
+        // Batch mode - execute the specified macro without visualization
+        G4cout << "Running in batch mode with macro: " << macroFile << G4endl;
         G4String command = "/control/execute ";
         command += macroFile;
         uiManager->ApplyCommand(command);
