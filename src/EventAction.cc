@@ -16,7 +16,8 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fHasHit(false),
   fPixelIndexI(-1),
   fPixelIndexJ(-1),
-  fPixelDistance(-1.)
+  fPixelDistance(-1.),
+  fPixelHit(false)
 { 
 }
 
@@ -38,6 +39,7 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fPixelIndexI = -1;
   fPixelIndexJ = -1;
   fPixelDistance = -1.;
+  fPixelHit = false;
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -60,6 +62,9 @@ void EventAction::EndOfEventAction(const G4Event* event)
   
   // Pass pixel indices and distance information to RunAction
   fRunAction->SetPixelIndices(fPixelIndexI, fPixelIndexJ, fPixelDistance);
+  
+  // Pass pixel hit status to RunAction
+  fRunAction->SetPixelHit(fPixelHit);
   
   fRunAction->FillTree();
 }
@@ -124,6 +129,9 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
   // Calculate and store distance from hit to pixel center
   fPixelDistance = std::sqrt(std::pow(position.x() - pixelX, 2) + 
                             std::pow(position.y() - pixelY, 2));
+  
+  // Determine if the hit was on a pixel using the detector's method
+  fPixelHit = fDetector->IsPositionOnPixel(position);
   
   return G4ThreeVector(pixelX, pixelY, pixelZ);
 }

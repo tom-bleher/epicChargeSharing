@@ -32,7 +32,8 @@ RunAction::RunAction()
   fPixelZ(0),
   fPixelI(-1),
   fPixelJ(-1),
-  fPixelDist(0)
+  fPixelDist(0),
+  fPixelHit(false)
 { 
 }
 
@@ -107,6 +108,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("PixelI", &fPixelI, "PixelI/I")->SetTitle("Pixel Index X");
     fTree->Branch("PixelJ", &fPixelJ, "PixelJ/I")->SetTitle("Pixel Index Y");
     fTree->Branch("PixelDist", &fPixelDist, "PixelDist/D")->SetTitle("Distance to Pixel Center [mm]");
+    fTree->Branch("PixelHit", &fPixelHit, "PixelHit/O")->SetTitle("Hit on Pixel (Boolean)");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -308,6 +310,12 @@ void RunAction::SetPixelIndices(G4int i, G4int j, G4double distance)
     fPixelI = i;
     fPixelJ = j;
     fPixelDist = distance;
+}
+
+void RunAction::SetPixelHit(G4bool hit)
+{
+    // Store whether the hit was on a pixel
+    fPixelHit = hit;
 }
 
 void RunAction::FillTree()
