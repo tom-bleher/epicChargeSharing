@@ -13,7 +13,10 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fEdep(0.),
   fPosition(G4ThreeVector(0.,0.,0.)),
   fInitialPosition(G4ThreeVector(0.,0.,0.)),
-  fHasHit(false)
+  fHasHit(false),
+  fPixelIndexI(-1),
+  fPixelIndexJ(-1),
+  fPixelDistance(-1.)
 { 
 }
 
@@ -30,6 +33,11 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   
   // Initialize particle position - this will be updated when the primary vertex is created
   fInitialPosition = G4ThreeVector(0.,0.,0.);
+  
+  // Reset pixel mapping variables
+  fPixelIndexI = -1;
+  fPixelIndexJ = -1;
+  fPixelDistance = -1.;
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -49,6 +57,9 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Calculate and store nearest pixel position (in mm)
   G4ThreeVector nearestPixel = CalculateNearestPixel(fPosition);
   fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y(), nearestPixel.z());
+  
+  // Pass pixel indices and distance information to RunAction
+  fRunAction->SetPixelIndices(fPixelIndexI, fPixelIndexJ, fPixelDistance);
   
   fRunAction->FillTree();
 }
@@ -105,6 +116,14 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
   G4double pixelX = firstPixelPos + i * pixelSpacing;
   G4double pixelY = firstPixelPos + j * pixelSpacing;
   G4double pixelZ = detectorPosition.z(); // Z position is the detector face
+  
+  // Store the pixel indices for later use
+  fPixelIndexI = i;
+  fPixelIndexJ = j;
+  
+  // Calculate and store distance from hit to pixel center
+  fPixelDistance = std::sqrt(std::pow(position.x() - pixelX, 2) + 
+                            std::pow(position.y() - pixelY, 2));
   
   return G4ThreeVector(pixelX, pixelY, pixelZ);
 }

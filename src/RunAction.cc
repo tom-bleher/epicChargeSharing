@@ -29,7 +29,10 @@ RunAction::RunAction()
   fInitZ(0),
   fPixelX(0),
   fPixelY(0),
-  fPixelZ(0)
+  fPixelZ(0),
+  fPixelI(-1),
+  fPixelJ(-1),
+  fPixelDist(0)
 { 
 }
 
@@ -99,6 +102,11 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("PixelX", &fPixelX, "PixelX/D")->SetTitle("Nearest Pixel X [mm]");
     fTree->Branch("PixelY", &fPixelY, "PixelY/D")->SetTitle("Nearest Pixel Y [mm]");
     fTree->Branch("PixelZ", &fPixelZ, "PixelZ/D")->SetTitle("Nearest Pixel Z [mm]");
+    
+    // Add branches for pixel mapping information
+    fTree->Branch("PixelI", &fPixelI, "PixelI/I")->SetTitle("Pixel Index X");
+    fTree->Branch("PixelJ", &fPixelJ, "PixelJ/I")->SetTitle("Pixel Index Y");
+    fTree->Branch("PixelDist", &fPixelDist, "PixelDist/D")->SetTitle("Distance to Pixel Center [mm]");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -292,6 +300,14 @@ void RunAction::SetNearestPixelPosition(G4double x, G4double y, G4double z)
     fPixelX = x;
     fPixelY = y;
     fPixelZ = z;
+}
+
+void RunAction::SetPixelIndices(G4int i, G4int j, G4double distance)
+{
+    // Store pixel indices and distance to center
+    fPixelI = i;
+    fPixelJ = j;
+    fPixelDist = distance;
 }
 
 void RunAction::FillTree()
