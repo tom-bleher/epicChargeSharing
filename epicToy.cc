@@ -17,6 +17,10 @@ int main(int argc, char** argv)
     G4bool isBatch = false;
     G4String macroFile = "";
     
+    // Set QT_QPA_PLATFORM environment variable to avoid Qt issues in batch mode
+    char* oldQtPlatform = getenv("QT_QPA_PLATFORM");
+    std::string oldQtPlatformValue = oldQtPlatform ? oldQtPlatform : "";
+    
     // Parse command line arguments
     for (G4int i = 1; i < argc; i++) {
         G4String arg = argv[i];
@@ -31,9 +35,16 @@ int main(int argc, char** argv)
         }
     }
     
+    // Set QT_QPA_PLATFORM=offscreen in batch mode to avoid Qt issues
+    if (isBatch) {
+        G4cout << "Setting batch mode environment variables..." << G4endl;
+        setenv("QT_QPA_PLATFORM", "offscreen", 1);
+    }
+    
     // Only create UI executive if we're not in batch mode
     G4UIExecutive *ui = nullptr;
     if (!isBatch) {
+        // Use Qt session for interactive mode
         ui = new G4UIExecutive(argc, argv, "Qt");
     }
 
@@ -101,6 +112,15 @@ int main(int argc, char** argv)
     // Clean up
     if (visManager) delete visManager;
     delete runManager;
+    
+    // Restore original environment variable if it was changed
+    if (isBatch) {
+        if (!oldQtPlatformValue.empty()) {
+            setenv("QT_QPA_PLATFORM", oldQtPlatformValue.c_str(), 1);
+        } else {
+            unsetenv("QT_QPA_PLATFORM");
+        }
+    }
 
     return 0;
 }
