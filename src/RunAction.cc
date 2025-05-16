@@ -314,31 +314,3 @@ void RunAction::FillTree()
         G4cerr << "Exception in FillTree: " << e.what() << G4endl;
     }
 }
-
-void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z) 
-{
-    // Convert to desired units for storage
-    // Edep to MeV (Geant4 internal unit for energy is MeV)
-    fEdep = edep;
-    
-    // Positions to mm (Geant4 internal unit for length is mm)
-    fPosX = x;
-    fPosY = y;
-    fPosZ = z;
-}
-
-void RunAction::SetInitialPosition(G4double x, G4double y, G4double z) 
-{
-    // Convert to mm (Geant4 internal unit for length is mm)
-    fInitX = x;
-    fInitY = y;
-    fInitZ = z;
-}
-
-void RunAction::SetNearestPixelPosition(G4double x, G4double y, G4double z) 
-{
-    // Convert to mm (Geant4 internal unit for length is mm)
-    fPixelX = x;
-    fPixelY = y;
-    fPixelZ = z;
-}
