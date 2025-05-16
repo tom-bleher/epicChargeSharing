@@ -13,7 +13,26 @@
 
 int main(int argc, char** argv)
 {
-    G4UIExecutive *ui = new G4UIExecutive(argc, argv);
+    // Check if we're running in batch mode
+    G4bool isBatch = false;
+    G4String macroFile = "";
+    
+    // Parse command line arguments
+    for (G4int i = 1; i < argc; i++) {
+        G4String arg = argv[i];
+        if (arg == "-m" || arg == "--macro") {
+            isBatch = true;
+            if (i + 1 < argc) {
+                macroFile = argv[++i];
+            }
+        }
+    }
+    
+    // Only create UI executive if we're not in batch mode
+    G4UIExecutive *ui = nullptr;
+    if (!isBatch) {
+        ui = new G4UIExecutive(argc, argv);
+    }
 
     #ifdef G4MULTITHREADED
         G4MTRunManager *runManager = new G4MTRunManager;
@@ -36,23 +55,34 @@ int main(int argc, char** argv)
     // Action Initialization with detector construction
     runManager->SetUserInitialization(new ActionInitialization(detConstruction));
 
-    G4VisManager *visManager = new G4VisExecutive();
-    visManager->Initialize();
-
+    // Get pointer to UI manager
     G4UImanager *uiManager = G4UImanager::GetUIpointer();
-
-    // Execute the visualization macro
-    // Use the macro from macros directory with fallback
-    G4String command = "/control/execute macros/vis.mac";
-    G4int status = uiManager->ApplyCommand(command);
-    if (status != 0) {
-        uiManager->ApplyCommand("/control/execute vis.mac");
+    
+    // Handle visualization only in interactive mode
+    G4VisManager *visManager = nullptr;
+    if (!isBatch) {
+        visManager = new G4VisExecutive();
+        visManager->Initialize();
+        
+        // Execute the visualization macro
+        // Use the macro from macros directory with fallback
+        G4String command = "/control/execute macros/vis.mac";
+        G4int status = uiManager->ApplyCommand(command);
+        if (status != 0) {
+            uiManager->ApplyCommand("/control/execute vis.mac");
+        }
+        
+        ui->SessionStart();
+        delete ui;
+    } else {
+        // Batch mode - execute the specified macro
+        G4String command = "/control/execute ";
+        command += macroFile;
+        uiManager->ApplyCommand(command);
     }
-
-    ui->SessionStart();
-
-    delete ui;
-    delete visManager;
+    
+    // Clean up
+    if (visManager) delete visManager;
     delete runManager;
 
     return 0;
