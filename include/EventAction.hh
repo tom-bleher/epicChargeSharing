@@ -38,6 +38,7 @@ private:
     G4int fPixelIndexI;    // Pixel index in the X direction
     G4int fPixelIndexJ;    // Pixel index in the Y direction
     G4double fPixelDistance; // Distance from hit to pixel center
+    G4bool fPixelHit;     // Flag to indicate if the hit was on a pixel
 };
 
 #endif

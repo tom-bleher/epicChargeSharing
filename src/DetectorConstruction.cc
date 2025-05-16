@@ -1,5 +1,11 @@
 #include "DetectorConstruction.hh"
 #include "DetectorMessenger.hh"
+#include <fstream>
+#include <iomanip>
+#include <ctime>
+#include <sstream>
+#include <string>
+#include <unistd.h> // For getcwd
 
 DetectorConstruction::DetectorConstruction()
 {
@@ -128,7 +134,133 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     
     // Set the world volume to be invisible
     logicWorld->SetVisAttributes(G4VisAttributes::GetInvisible());
+    
+    // Calculate and print the ratio of pixel area to detector area
+    G4double totalPixelArea = fNumBlocksPerSide * fNumBlocksPerSide * fPixelSize * fPixelSize;
+    G4double detectorArea = fdetSize * fdetSize;
+    G4double pixelAreaRatio = totalPixelArea / detectorArea;
+    G4cout << "\nDetector Statistics:" << G4endl;
+    G4cout << "  Total number of pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << G4endl;
+    G4cout << "  Single pixel area: " << fPixelSize * fPixelSize / (mm*mm) << " mm²" << G4endl;
+    G4cout << "  Total pixel area: " << totalPixelArea / (mm*mm) << " mm²" << G4endl;
+    G4cout << "  Detector area: " << detectorArea / (mm*mm) << " mm²" << G4endl;
+    G4cout << "  Pixel area / Detector area ratio: " << pixelAreaRatio << G4endl;
+
+    // Save all simulation parameters to a log file
+    SaveSimulationParameters(totalPixelArea, detectorArea, pixelAreaRatio);
 
     return physWorld;
+}
+
+// Implementation of IsPositionOnPixel method
+G4bool DetectorConstruction::IsPositionOnPixel(const G4ThreeVector& position) const
+{
+    // Get the detector position
+    G4ThreeVector detectorPosition = GetDetectorPosition();
+    
+    // Calculate the position relative to the detector face
+    G4ThreeVector relativePos = position - detectorPosition;
+    
+    // For the z-normal face (top/bottom), only x and y matter for pixel position
+    // Calculate the first pixel position (corner)
+    G4double firstPixelPos = -fdetSize/2 + fPixelCornerOffset + fPixelSize/2;
+    
+    // Calculate which pixel grid position is closest (i and j indices)
+    G4double normX = (relativePos.x() - firstPixelPos) / fPixelSpacing;
+    G4double normY = (relativePos.y() - firstPixelPos) / fPixelSpacing;
+    
+    // Convert to pixel indices
+    G4int i = std::round(normX);
+    G4int j = std::round(normY);
+    
+    // Clamp i and j to valid pixel indices
+    i = std::max(0, std::min(i, fNumBlocksPerSide - 1));
+    j = std::max(0, std::min(j, fNumBlocksPerSide - 1));
+    
+    // Calculate the actual pixel center position
+    G4double pixelX = firstPixelPos + i * fPixelSpacing;
+    G4double pixelY = firstPixelPos + j * fPixelSpacing;
+    
+    // Calculate distance from hit to pixel center
+    G4double distanceX = std::abs(relativePos.x() - pixelX);
+    G4double distanceY = std::abs(relativePos.y() - pixelY);
+    
+    // Check if the hit is within the pixel boundary (half the size in each direction)
+    return (distanceX <= fPixelSize/2 && distanceY <= fPixelSize/2);
+}
+
+// Implementation of SaveSimulationParameters method
+void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const
+{
+    // Get current time for file naming and log entry
+    std::time_t now = std::time(nullptr);
+    char timestamp[20];
+    std::strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", std::localtime(&now));
+    
+    // Get the absolute path for logs directory
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        G4cerr << "ERROR: Could not get current working directory" << G4endl;
+        return;
+    }
+    
+    // Create logs directory with absolute path
+    std::string logsDir = std::string(cwd) + "/logs";
+    G4cout << "Creating logs directory at: " << logsDir << G4endl;
+    system(("mkdir -p " + logsDir).c_str());
+    
+    // Create filename with timestamp in logs directory
+    std::string filename = logsDir + "/simulation_params_" + std::string(timestamp) + ".log";
+    
+    // Open file for writing
+    std::ofstream paramFile(filename);
+    
+    if (paramFile.is_open()) {
+        // Write header with timestamp in human-readable format
+        char dateStr[100];
+        std::strftime(dateStr, sizeof(dateStr), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+        
+        paramFile << "=========================================================" << std::endl;
+        paramFile << "EPIC TOY SIMULATION PARAMETERS" << std::endl;
+        paramFile << "Generated on: " << dateStr << std::endl;
+        paramFile << "=========================================================" << std::endl << std::endl;
+        
+        // Write detector parameters
+        paramFile << "DETECTOR PARAMETERS" << std::endl;
+        paramFile << "-----------------" << std::endl;
+        paramFile << "Detector Size: " << fdetSize/mm << " mm" << std::endl;
+        paramFile << "Detector Width/Thickness: " << fdetWidth/mm << " mm" << std::endl;
+        paramFile << "Detector Area: " << detectorArea/(mm*mm) << " mm²" << std::endl << std::endl;
+        
+        // Write pixel parameters 
+        paramFile << "PIXEL PARAMETERS" << std::endl;
+        paramFile << "---------------" << std::endl;
+        paramFile << "Pixel Size: " << fPixelSize/mm << " mm" << std::endl;
+        paramFile << "Pixel Width/Thickness: " << fPixelWidth/mm << " mm" << std::endl;
+        paramFile << "Pixel Spacing (center-to-center): " << fPixelSpacing/mm << " mm" << std::endl;
+        paramFile << "Pixel Corner Offset: " << fPixelCornerOffset/mm << " mm" << std::endl;
+        paramFile << "Number of Pixels per Side: " << fNumBlocksPerSide << std::endl;
+        paramFile << "Total Number of Pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << std::endl;
+        paramFile << "Single Pixel Area: " << (fPixelSize * fPixelSize)/(mm*mm) << " mm²" << std::endl;
+        paramFile << "Total Pixel Area: " << totalPixelArea/(mm*mm) << " mm²" << std::endl << std::endl;
+        
+        // Write detector statistics
+        paramFile << "DETECTOR STATISTICS" << std::endl;
+        paramFile << "------------------" << std::endl;
+        paramFile << "Pixel Area / Detector Area Ratio: " << pixelAreaRatio << std::endl;
+        paramFile << "Pixel Coverage Percentage: " << pixelAreaRatio * 100.0 << " %" << std::endl;
+        paramFile << "Pixel Area Fraction: " << pixelAreaRatio << std::endl;
+        
+        // Write footer
+        paramFile << std::endl;
+        paramFile << "=========================================================" << std::endl;
+        
+        // Close file
+        paramFile.close();
+        
+        G4cout << "Simulation parameters saved to: " << filename << G4endl;
+    } else {
+        G4cerr << "ERROR: Could not open file for saving simulation parameters: " << filename << G4endl;
+    }
 }
 

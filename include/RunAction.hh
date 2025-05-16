@@ -36,6 +36,9 @@ public:
     // Method to set pixel indices and distance
     void SetPixelIndices(G4int i, G4int j, G4double distance);
     
+    // Method to set pixel hit flag
+    void SetPixelHit(G4bool hit);
+    
     // Fill the ROOT tree with current event data
     void FillTree();
 
@@ -66,6 +69,7 @@ private:
     G4int fPixelI;    // Pixel index in X direction
     G4int fPixelJ;    // Pixel index in Y direction
     G4double fPixelDist; // Distance from hit to pixel center [mm]
+    G4bool fPixelHit;  // Flag to indicate if hit was on a pixel
 };
 
 #endif

@@ -35,6 +35,12 @@ public:
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
     G4ThreeVector GetDetectorPosition() const { return G4ThreeVector(0., 0., -1.0*cm); } // Fixed position from Construct()
     
+    // Method to check if a position is within a pixel area
+    G4bool IsPositionOnPixel(const G4ThreeVector& position) const;
+    
+    // Method to save simulation parameters to a log file
+    void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
+    
 private:
     // Pixel parameters
     G4double fPixelSize;         // Size of each pixel
