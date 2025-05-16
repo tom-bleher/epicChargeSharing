@@ -1,5 +1,6 @@
 # Ignore build directory
 build/
+geant4_env/
 
 # Compiled Object files
 *.o

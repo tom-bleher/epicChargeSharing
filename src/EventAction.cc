@@ -42,10 +42,11 @@ void EventAction::EndOfEventAction(const G4Event* event)
   }
   
   // Always record event data, even if no energy was deposited
+  // Values are passed in Geant4's internal units (MeV for energy, mm for length)
   fRunAction->SetEventData(fEdep, fPosition.x(), fPosition.y(), fPosition.z());
   fRunAction->SetInitialPosition(fInitialPosition.x(), fInitialPosition.y(), fInitialPosition.z());
   
-  // Calculate and store nearest pixel position
+  // Calculate and store nearest pixel position (in mm)
   G4ThreeVector nearestPixel = CalculateNearestPixel(fPosition);
   fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y(), nearestPixel.z());
   

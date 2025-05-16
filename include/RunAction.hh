@@ -24,29 +24,17 @@ public:
     TFile* GetRootFile() const { return fRootFile; }
     TTree* GetTree() const { return fTree; }
     
-    // Variables for the branch
-    void SetEventData(G4double edep, G4double x, G4double y, G4double z) {
-        fEdep = edep;
-        fPosX = x;
-        fPosY = y;
-        fPosZ = z;
-    }
+    // Variables for the branch (edep [MeV], positions [mm])
+    void SetEventData(G4double edep, G4double x, G4double y, G4double z);
     
-    // New method to set initial particle gun position
-    void SetInitialPosition(G4double x, G4double y, G4double z) {
-        fInitX = x;
-        fInitY = y;
-        fInitZ = z;
-    }
+    // Method to set initial particle gun position [mm]
+    void SetInitialPosition(G4double x, G4double y, G4double z);
     
-    // New method to set nearest pixel position
-    void SetNearestPixelPosition(G4double x, G4double y, G4double z) {
-        fPixelX = x;
-        fPixelY = y;
-        fPixelZ = z;
-    }
+    // Method to set nearest pixel position [mm]
+    void SetNearestPixelPosition(G4double x, G4double y, G4double z);
     
-    void FillTree() { if (fTree) fTree->Fill(); }
+    // Fill the ROOT tree with current event data
+    void FillTree();
 
 private:
     TFile* fRootFile;
@@ -55,21 +43,21 @@ private:
     // Thread-safety mutex for ROOT operations
     static std::mutex fRootMutex;
     
-    // Variables for data storage
-    G4double fEdep;
-    G4double fPosX;
-    G4double fPosY;
-    G4double fPosZ;
+    // Variables for data storage with fixed units
+    G4double fEdep;   // Energy deposit [MeV]
+    G4double fPosX;   // Position X [mm]
+    G4double fPosY;   // Position Y [mm]
+    G4double fPosZ;   // Position Z [mm]
     
-    // New variables for initial particle gun position
-    G4double fInitX;
-    G4double fInitY;
-    G4double fInitZ;
+    // Variables for initial particle gun position
+    G4double fInitX;  // Initial X [mm]
+    G4double fInitY;  // Initial Y [mm]
+    G4double fInitZ;  // Initial Z [mm]
     
-    // New variables for nearest pixel center position
-    G4double fPixelX;
-    G4double fPixelY;
-    G4double fPixelZ;
+    // Variables for nearest pixel center position
+    G4double fPixelX; // Nearest pixel X [mm]
+    G4double fPixelY; // Nearest pixel Y [mm]
+    G4double fPixelZ; // Nearest pixel Z [mm]
 };
 
 #endif
