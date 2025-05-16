@@ -33,6 +33,9 @@ public:
     // Method to set nearest pixel position [mm]
     void SetNearestPixelPosition(G4double x, G4double y, G4double z);
     
+    // Method to set pixel indices and distance
+    void SetPixelIndices(G4int i, G4int j, G4double distance);
+    
     // Fill the ROOT tree with current event data
     void FillTree();
 
@@ -58,6 +61,11 @@ private:
     G4double fPixelX; // Nearest pixel X [mm]
     G4double fPixelY; // Nearest pixel Y [mm]
     G4double fPixelZ; // Nearest pixel Z [mm]
+    
+    // Variables for pixel mapping
+    G4int fPixelI;    // Pixel index in X direction
+    G4int fPixelJ;    // Pixel index in Y direction
+    G4double fPixelDist; // Distance from hit to pixel center [mm]
 };
 
 #endif

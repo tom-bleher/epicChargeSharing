@@ -33,6 +33,11 @@ private:
     G4ThreeVector fPosition;  // Position of energy deposit (weighted average)
     G4ThreeVector fInitialPosition; // Initial particle position
     G4bool fHasHit;   // Flag to indicate if any energy was deposited
+    
+    // Pixel mapping information
+    G4int fPixelIndexI;    // Pixel index in the X direction
+    G4int fPixelIndexJ;    // Pixel index in the Y direction
+    G4double fPixelDistance; // Distance from hit to pixel center
 };
 
 #endif
