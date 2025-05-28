@@ -13,7 +13,17 @@ ActionInitialization::~ActionInitialization()
 void ActionInitialization::BuildForMaster() const 
 {
     // Create RunAction for the master thread
-    SetUserAction(new RunAction());
+    RunAction* runAction = new RunAction();
+    SetUserAction(runAction);
+    
+    // Set detector grid parameters in RunAction for saving to ROOT metadata
+    runAction->SetDetectorGridParameters(
+        fDetector->GetPixelSize(),
+        fDetector->GetPixelSpacing(), 
+        fDetector->GetPixelCornerOffset(),
+        fDetector->GetDetSize(),
+        fDetector->GetNumBlocksPerSide()
+    );
 }
 
 
@@ -26,6 +36,15 @@ void ActionInitialization::Build() const
     // Create and register RunAction
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
+    
+    // Set detector grid parameters in RunAction for saving to ROOT metadata
+    runAction->SetDetectorGridParameters(
+        fDetector->GetPixelSize(),
+        fDetector->GetPixelSpacing(), 
+        fDetector->GetPixelCornerOffset(),
+        fDetector->GetDetSize(),
+        fDetector->GetNumBlocksPerSide()
+    );
     
     // Create and register EventAction with detector information
     EventAction* eventAction = new EventAction(runAction, fDetector);

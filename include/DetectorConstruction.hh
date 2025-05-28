@@ -27,6 +27,9 @@ public:
     // Method to set the grid parameters
     void SetGridParameters(G4double pixelSize, G4double pixelSpacing, G4double pixelCornerOffset, G4int numPixels);
     
+    // Method to set the corner offset directly (requires geometry rebuild)
+    void SetPixelCornerOffset(G4double cornerOffset);
+    
     // Getter methods for parameters needed to calculate nearest pixel
     G4double GetPixelSize() const { return fPixelSize; }
     G4double GetPixelSpacing() const { return fPixelSpacing; }
@@ -40,6 +43,9 @@ public:
     
     // Method to save simulation parameters to a log file
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
+    
+    // Method to save grid parameters to a file for ROOT merging
+    void SaveGridParametersToFile() const;
     
 private:
     // Pixel parameters

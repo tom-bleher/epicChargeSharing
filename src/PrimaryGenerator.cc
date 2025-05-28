@@ -14,7 +14,7 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     G4double pz = -1.0;
     G4ThreeVector mom(px, py, pz);
 
-    // Particle Type
+    // Particle Type - using electrons for AC-LGAD simulation
     G4ParticleTable *particleTable = G4ParticleTable::GetParticleTable();
     G4ParticleDefinition *particle = particleTable->FindParticle("e-");
 
@@ -22,7 +22,8 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     GenerateRandomPosition();
     
     fParticleGun->SetParticleMomentumDirection(mom);
-    fParticleGun->SetParticleEnergy(2.0*GeV);
+    // Use more realistic energy for AC-LGAD testing (10-120 keV typical for MIPs)
+    fParticleGun->SetParticleEnergy(120*keV); // Minimum Ionizing Particle equivalent
     fParticleGun->SetParticleDefinition(particle);
 }
 
@@ -68,12 +69,12 @@ void PrimaryGenerator::GenerateRandomPosition()
     G4double ymin = -halfSize;
     G4double ymax = halfSize;
     
-    // Generate random position within the square
+    // Generate random position within the detector area
     G4double x = G4UniformRand() * (xmax - xmin) + xmin;
     G4double y = G4UniformRand() * (ymax - ymin) + ymin;
     
-    // Fixed z position (in front of the detector)
-    G4double z = 5.0*cm; // Place it away from the detector for visualization
+    // Fixed z position in front of the detector
+    G4double z = 2.0*cm; // Place source close enough for good statistics
     
     // Set the new position
     G4ThreeVector pos(x, y, z);

@@ -4,6 +4,7 @@
 #include "G4UserRunAction.hh"
 #include "G4Run.hh"
 #include "globals.hh"
+#include <vector>
 
 // ROOT includes
 #include "TFile.h"
@@ -36,8 +37,21 @@ public:
     // Method to set pixel indices and distance
     void SetPixelIndices(G4int i, G4int j, G4double distance);
     
+    // Method to set pixel alpha angle
+    void SetPixelAlpha(G4double alpha);
+    
     // Method to set pixel hit flag
     void SetPixelHit(G4bool hit);
+    
+    // Method to set 9x9 grid angle data
+    void Set9x9GridData(const std::vector<G4double>& angles, 
+                        const std::vector<G4int>& pixelI, 
+                        const std::vector<G4int>& pixelJ);
+    
+    // Method to set detector grid parameters for saving to ROOT
+    void SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, 
+                                   G4double pixelCornerOffset, G4double detSize, 
+                                   G4int numBlocksPerSide);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -69,7 +83,20 @@ private:
     G4int fPixelI;    // Pixel index in X direction
     G4int fPixelJ;    // Pixel index in Y direction
     G4double fPixelDist; // Distance from hit to pixel center [mm]
+    G4double fPixelAlpha; // Angular size of pixel from hit position [deg]
     G4bool fPixelHit;  // Flag to indicate if hit was on a pixel
+    
+    // Variables for 9x9 grid angle data
+    std::vector<G4double> fGrid9x9Angles; // Angles from hit to 9x9 grid pixels [deg]
+    std::vector<G4int> fGrid9x9PixelI;     // I indices of 9x9 grid pixels
+    std::vector<G4int> fGrid9x9PixelJ;     // J indices of 9x9 grid pixels
+    
+    // Variables for detector grid parameters (stored as ROOT metadata)
+    G4double fGridPixelSize;        // Pixel size [mm]
+    G4double fGridPixelSpacing;     // Pixel spacing [mm]  
+    G4double fGridPixelCornerOffset; // Pixel corner offset [mm]
+    G4double fGridDetSize;          // Detector size [mm]
+    G4int fGridNumBlocksPerSide;    // Number of blocks per side
 };
 
 #endif
