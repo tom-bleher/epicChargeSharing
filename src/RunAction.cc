@@ -5,13 +5,18 @@
 #include "G4UnitsTable.hh"
 #include <iostream>
 #include <sstream>
+#include <vector>
 #include "TFile.h"
 #include "TTree.h"
 #include "TChain.h"
 #include "TError.h" // Added for gErrorIgnoreLevel and kWarning
+#include "TNamed.h"
+#include "TString.h"
+#include "TROOT.h"  // Added for ROOT dictionary loading
 #include <chrono>
 #include <thread>
 #include <cstdio> // For std::remove
+#include <fstream>
 
 // Initialize the static mutex
 std::mutex RunAction::fRootMutex;
@@ -34,8 +39,14 @@ RunAction::RunAction()
   fPixelJ(-1),
   fPixelDist(0),
   fPixelAlpha(0),
-  fPixelHit(false)
+  fPixelHit(false),
+  fGridPixelSize(0),
+  fGridPixelSpacing(0),
+  fGridPixelCornerOffset(0),
+  fGridDetSize(0),
+  fGridNumBlocksPerSide(0)
 { 
+  // Initialize 9x9 grid vectors (they are automatically initialized empty)
 }
 
 RunAction::~RunAction()
@@ -112,6 +123,14 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("PixelAlpha", &fPixelAlpha, "PixelAlpha/D")->SetTitle("Angular Size of Pixel [deg]");
     fTree->Branch("PixelHit", &fPixelHit, "PixelHit/O")->SetTitle("Hit on Pixel (Boolean)");
     
+    // Load vector dictionaries for ROOT to properly handle std::vector branches
+    gROOT->ProcessLine("#include <vector>");
+    
+    // Add branches for 9x9 grid angle data
+    fTree->Branch("Grid9x9Angles", &fGrid9x9Angles)->SetTitle("Angles from Hit to 9x9 Grid Pixels [deg]");
+    fTree->Branch("Grid9x9PixelI", &fGrid9x9PixelI)->SetTitle("I Indices of 9x9 Grid Pixels");
+    fTree->Branch("Grid9x9PixelJ", &fGrid9x9PixelJ)->SetTitle("J Indices of 9x9 Grid Pixels");
+    
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
   catch (std::exception& e) {
@@ -147,6 +166,57 @@ void RunAction::EndOfRunAction(const G4Run* run)
             try {
                 G4cout << "Writing ROOT file with " << nEntries 
                        << " entries from " << nofEvents << " events" << G4endl;
+                
+                // Save detector grid parameters as metadata before writing the tree
+                // Read from grid_parameters.txt file to get the final correct values
+                std::ifstream gridFile("grid_parameters.txt");
+                if (gridFile.is_open()) {
+                    fRootFile->cd();
+                    
+                    G4double pixelSize, pixelSpacing, pixelCornerOffset, detSize;
+                    G4int numBlocksPerSide;
+                    
+                    if (gridFile >> pixelSize >> pixelSpacing >> pixelCornerOffset >> detSize >> numBlocksPerSide) {
+                        // Create TNamed objects to store grid parameters as metadata
+                        TNamed *pixelSizeMeta = new TNamed("GridPixelSize", Form("%.6f", pixelSize));
+                        TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing", Form("%.6f", pixelSpacing));  
+                        TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", pixelCornerOffset));
+                        TNamed *detSizeMeta = new TNamed("GridDetectorSize", Form("%.6f", detSize));
+                        TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", numBlocksPerSide));
+                        
+                        // Write metadata to the ROOT file
+                        pixelSizeMeta->Write();
+                        pixelSpacingMeta->Write();
+                        pixelCornerOffsetMeta->Write();
+                        detSizeMeta->Write();
+                        numBlocksMeta->Write();
+                        
+                        G4cout << "Saved detector grid metadata to ROOT file from grid_parameters.txt" << G4endl;
+                        G4cout << "  Final parameters used: " << pixelSize << ", " << pixelSpacing 
+                               << ", " << pixelCornerOffset << ", " << detSize << ", " << numBlocksPerSide << G4endl;
+                    } else {
+                        G4cerr << "Could not read grid parameters from file" << G4endl;
+                    }
+                    gridFile.close();
+                } else if (fGridPixelSize > 0) {  // Fallback to member variables
+                    fRootFile->cd();
+                    
+                    // Create TNamed objects to store grid parameters as metadata
+                    TNamed *pixelSizeMeta = new TNamed("GridPixelSize", Form("%.6f", fGridPixelSize));
+                    TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing", Form("%.6f", fGridPixelSpacing));  
+                    TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", fGridPixelCornerOffset));
+                    TNamed *detSizeMeta = new TNamed("GridDetectorSize", Form("%.6f", fGridDetSize));
+                    TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
+                    
+                    // Write metadata to the ROOT file
+                    pixelSizeMeta->Write();
+                    pixelSpacingMeta->Write();
+                    pixelCornerOffsetMeta->Write();
+                    detSizeMeta->Write();
+                    numBlocksMeta->Write();
+                    
+                    G4cout << "Saved detector grid metadata to ROOT file (fallback)" << G4endl;
+                }
                 
                 // Write tree to file and close file
                 if (fRootFile->IsOpen()) {
@@ -246,6 +316,52 @@ void RunAction::EndOfRunAction(const G4Run* run)
                             mergedTree->SetDirectory(mergedFile);
                             mergedFile->cd();
                             mergedTree->Write();
+                            
+                            // Save detector grid parameters as metadata to merged file
+                            // Read from grid_parameters.txt file to get the final correct values
+                            std::ifstream gridFile("grid_parameters.txt");
+                            if (gridFile.is_open()) {
+                                G4double pixelSize, pixelSpacing, pixelCornerOffset, detSize;
+                                G4int numBlocksPerSide;
+                                
+                                if (gridFile >> pixelSize >> pixelSpacing >> pixelCornerOffset >> detSize >> numBlocksPerSide) {
+                                    TNamed *pixelSizeMeta = new TNamed("GridPixelSize", Form("%.6f", pixelSize));
+                                    TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing", Form("%.6f", pixelSpacing));  
+                                    TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", pixelCornerOffset));
+                                    TNamed *detSizeMeta = new TNamed("GridDetectorSize", Form("%.6f", detSize));
+                                    TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", numBlocksPerSide));
+                                    
+                                    // Write metadata to the merged ROOT file
+                                    pixelSizeMeta->Write();
+                                    pixelSpacingMeta->Write();
+                                    pixelCornerOffsetMeta->Write();
+                                    detSizeMeta->Write();
+                                    numBlocksMeta->Write();
+                                    
+                                    G4cout << "Saved detector grid metadata to merged ROOT file from grid_parameters.txt" << G4endl;
+                                    G4cout << "  Final parameters used: " << pixelSize << ", " << pixelSpacing 
+                                           << ", " << pixelCornerOffset << ", " << detSize << ", " << numBlocksPerSide << G4endl;
+                                } else {
+                                    G4cerr << "Could not read grid parameters from file" << G4endl;
+                                }
+                                gridFile.close();
+                            } else if (fGridPixelSize > 0) {  // Fallback to member variables
+                                TNamed *pixelSizeMeta = new TNamed("GridPixelSize", Form("%.6f", fGridPixelSize));
+                                TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing", Form("%.6f", fGridPixelSpacing));  
+                                TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", fGridPixelCornerOffset));
+                                TNamed *detSizeMeta = new TNamed("GridDetectorSize", Form("%.6f", fGridDetSize));
+                                TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
+                                
+                                // Write metadata to the merged ROOT file
+                                pixelSizeMeta->Write();
+                                pixelSpacingMeta->Write();
+                                pixelCornerOffsetMeta->Write();
+                                detSizeMeta->Write();
+                                numBlocksMeta->Write();
+                                
+                                G4cout << "Saved detector grid metadata to merged ROOT file (fallback)" << G4endl;
+                            }
+                            
                             mergedFile->Flush();
                             
                             G4cout << "Successfully merged " << validFiles << " files with " 
@@ -326,6 +442,16 @@ void RunAction::SetPixelHit(G4bool hit)
     fPixelHit = hit;
 }
 
+void RunAction::Set9x9GridData(const std::vector<G4double>& angles, 
+                               const std::vector<G4int>& pixelI, 
+                               const std::vector<G4int>& pixelJ)
+{
+    // Store the 9x9 grid angle data
+    fGrid9x9Angles = angles;
+    fGrid9x9PixelI = pixelI;
+    fGrid9x9PixelJ = pixelJ;
+}
+
 void RunAction::FillTree()
 {
     if (!fTree || !fRootFile || fRootFile->IsZombie()) {
@@ -345,4 +471,23 @@ void RunAction::FillTree()
     catch (const std::exception& e) {
         G4cerr << "Exception in FillTree: " << e.what() << G4endl;
     }
+}
+
+void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, 
+                                           G4double pixelCornerOffset, G4double detSize, 
+                                           G4int numBlocksPerSide)
+{
+    // Store the detector grid parameters for saving to ROOT metadata
+    fGridPixelSize = pixelSize;
+    fGridPixelSpacing = pixelSpacing;
+    fGridPixelCornerOffset = pixelCornerOffset;
+    fGridDetSize = detSize;
+    fGridNumBlocksPerSide = numBlocksPerSide;
+    
+    G4cout << "RunAction: Detector grid parameters set:" << G4endl;
+    G4cout << "  Pixel Size: " << fGridPixelSize << " mm" << G4endl;
+    G4cout << "  Pixel Spacing: " << fGridPixelSpacing << " mm" << G4endl;
+    G4cout << "  Pixel Corner Offset: " << fGridPixelCornerOffset << " mm" << G4endl;
+    G4cout << "  Detector Size: " << fGridDetSize << " mm" << G4endl;
+    G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
 }

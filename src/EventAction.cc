@@ -7,6 +7,7 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <limits>
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
 : G4UserEventAction(),
@@ -42,6 +43,11 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fPixelIndexJ = -1;
   fPixelDistance = -1.;
   fPixelHit = false;
+  
+  // Reset 9x9 grid angle data
+  fGrid9x9Angles.clear();
+  fGrid9x9PixelI.clear();
+  fGrid9x9PixelJ.clear();
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -68,6 +74,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Calculate and pass pixel angular size to RunAction
   G4double pixelAlpha = CalculatePixelAlpha(fPosition, fPixelIndexI, fPixelIndexJ);
   fRunAction->SetPixelAlpha(pixelAlpha);
+  
+  // Calculate 9x9 grid angles and pass to RunAction
+  Calculate9x9GridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
+  fRunAction->Set9x9GridData(fGrid9x9Angles, fGrid9x9PixelI, fGrid9x9PixelJ);
   
   // Pass pixel hit status to RunAction
   fRunAction->SetPixelHit(fPixelHit);
@@ -108,10 +118,10 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
   G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
   G4ThreeVector detectorPosition = fDetector->GetDetectorPosition();
   
-  // Calculate the position relative to the detector face (which is at z=-1.0*cm)
+  // Calculate the position relative to the detector face
   G4ThreeVector relativePos = position - detectorPosition;
   
-  // For the z-normal face (top/bottom), only x and y matter for pixel position
+  // For the AC-LGAD, pixels are on the front surface (z > detector z)
   // Calculate the first pixel position (corner)
   G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
   
@@ -126,13 +136,14 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
   // Calculate the actual pixel center position
   G4double pixelX = firstPixelPos + i * pixelSpacing;
   G4double pixelY = firstPixelPos + j * pixelSpacing;
-  G4double pixelZ = detectorPosition.z(); // Z position is the detector face
+  // Pixels are on the detector front surface
+  G4double pixelZ = detectorPosition.z() + 50*um/2 + 1*um/2; // detector half-width + pixel half-width
   
   // Store the pixel indices for later use
   fPixelIndexI = i;
   fPixelIndexJ = j;
   
-  // Calculate and store distance from hit to pixel center
+  // Calculate and store distance from hit to pixel center (2D distance in detector plane)
   fPixelDistance = std::sqrt(std::pow(position.x() - pixelX, 2) + 
                             std::pow(position.y() - pixelY, 2));
   
@@ -145,10 +156,10 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
 // Calculate the angular size of pixel from hit position
 G4double EventAction::CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4int pixelI, G4int pixelJ)
 {
-  // Check if the hit is inside the pixel. If so, set alpha to 0
+  // Check if the hit is inside the pixel. If so, return NaN to indicate no alpha calculation
   G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
   if (isInsidePixel) {
-    return 0.0; // Temporarily set to zero for hits inside pixels
+    return std::numeric_limits<G4double>::quiet_NaN(); // Return NaN for hits inside pixels (no alpha calculation needed)
   }
 
   // Get detector parameters
@@ -264,4 +275,154 @@ G4double EventAction::CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4in
   G4double alphaInDegrees = alpha * (180.0 / CLHEP::pi);
   
   return alphaInDegrees;
+}
+
+// Calculate angles from hit position to all pixels in a 9x9 grid around the hit pixel
+void EventAction::Calculate9x9GridAngles(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ)
+{
+  // Clear previous data
+  fGrid9x9Angles.clear();
+  fGrid9x9PixelI.clear();
+  fGrid9x9PixelJ.clear();
+  
+  // Check if hit is inside a pixel - if so, all angles should be invalid
+  G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
+  if (isInsidePixel) {
+    // Fill all 81 positions with NaN for inside-pixel hits
+    for (G4int di = -4; di <= 4; di++) {
+      for (G4int dj = -4; dj <= 4; dj++) {
+        // Calculate the pixel indices for this grid position
+        G4int gridPixelI = hitPixelI + di;
+        G4int gridPixelJ = hitPixelJ + dj;
+        
+        // Store pixel indices and NaN angle
+        fGrid9x9PixelI.push_back(gridPixelI);
+        fGrid9x9PixelJ.push_back(gridPixelJ);
+        fGrid9x9Angles.push_back(std::numeric_limits<G4double>::quiet_NaN()); // Use same NaN as elsewhere
+      }
+    }
+    return; // Exit early for inside-pixel hits
+  }
+  
+  // Get detector parameters
+  G4double pixelSize = fDetector->GetPixelSize();
+  G4double pixelSpacing = fDetector->GetPixelSpacing();
+  G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
+  G4double detSize = fDetector->GetDetSize();
+  G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
+  G4ThreeVector detectorPosition = fDetector->GetDetectorPosition();
+  
+  // Calculate the first pixel position (corner)
+  G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
+  
+  // Define the 9x9 grid: 4 pixels in each direction from the center
+  for (G4int di = -4; di <= 4; di++) {
+    for (G4int dj = -4; dj <= 4; dj++) {
+      // Calculate the pixel indices for this grid position
+      G4int gridPixelI = hitPixelI + di;
+      G4int gridPixelJ = hitPixelJ + dj;
+      
+      // Check if this pixel is within the detector bounds
+      if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
+          gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
+        // Store invalid data for out-of-bounds pixels
+        fGrid9x9PixelI.push_back(gridPixelI);
+        fGrid9x9PixelJ.push_back(gridPixelJ);
+        fGrid9x9Angles.push_back(-999.0); // Invalid angle marker
+        continue;
+      }
+      
+      // Calculate the center position of this grid pixel
+      G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
+      G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
+      
+      // Calculate the alpha angle for this pixel using the same algorithm as the Python demo
+      G4double alpha = CalculatePixelAlphaSubtended(hitPosition.x(), hitPosition.y(), 
+                                                   pixelCenterX, pixelCenterY, 
+                                                   pixelSize, pixelSize);
+      
+      // Convert to degrees
+      G4double alphaInDegrees = alpha * (180.0 / CLHEP::pi);
+      
+      // Store the results
+      fGrid9x9PixelI.push_back(gridPixelI);
+      fGrid9x9PixelJ.push_back(gridPixelJ);
+      fGrid9x9Angles.push_back(alphaInDegrees);
+    }
+  }
+}
+
+// Calculate the angular size subtended by a pixel as seen from a hit point (2D calculation)
+// This matches the algorithm used in the Python alpha_demo.py
+G4double EventAction::CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
+                                                  G4double pixelCenterX, G4double pixelCenterY,
+                                                  G4double pixelWidth, G4double pixelHeight)
+{
+  // Calculate the four corners of the pixel
+  G4double halfWidth = pixelWidth / 2.0;
+  G4double halfHeight = pixelHeight / 2.0;
+  
+  G4ThreeVector corners[4];
+  // Bottom-left (0)
+  corners[0] = G4ThreeVector(pixelCenterX - halfWidth, pixelCenterY - halfHeight, 0);
+  // Bottom-right (1)
+  corners[1] = G4ThreeVector(pixelCenterX + halfWidth, pixelCenterY - halfHeight, 0);
+  // Top-right (2)
+  corners[2] = G4ThreeVector(pixelCenterX + halfWidth, pixelCenterY + halfHeight, 0);
+  // Top-left (3)
+  corners[3] = G4ThreeVector(pixelCenterX - halfWidth, pixelCenterY + halfHeight, 0);
+  
+  // Calculate angles to each corner from the hit point (2D only - XY plane)
+  struct AngleInfo {
+    G4double angle;
+    G4int cornerIndex;
+    
+    // Custom comparison operator for sorting
+    bool operator<(const AngleInfo& other) const {
+      return angle < other.angle;
+    }
+  };
+  
+  std::vector<AngleInfo> angles;
+  
+  for (G4int i = 0; i < 4; i++) {
+    // Calculate relative position vector from hit to corner (2D only)
+    G4double dx = corners[i].x() - hitX;
+    G4double dy = corners[i].y() - hitY;
+    
+    // Calculate angle using atan2 (this gives angle in XY plane)
+    G4double angle = std::atan2(dy, dx);
+    angles.push_back({angle, i});
+  }
+  
+  // Sort by angle
+  std::sort(angles.begin(), angles.end());
+  
+  // Calculate differences between consecutive angles
+  std::vector<G4double> angleDiffs;
+  for (size_t i = 0; i < angles.size(); i++) {
+    size_t nextI = (i + 1) % angles.size();
+    G4double diff = angles[nextI].angle - angles[i].angle;
+    
+    // Handle wrap-around (angles close to 2π)
+    if (diff < 0) {
+      diff += 2.0 * CLHEP::pi;
+    }
+    
+    angleDiffs.push_back(diff);
+  }
+  
+  // Find the largest angle difference
+  G4double maxDiff = angleDiffs[0];
+  for (size_t i = 1; i < angleDiffs.size(); i++) {
+    if (angleDiffs[i] > maxDiff) {
+      maxDiff = angleDiffs[i];
+    }
+  }
+  
+  // Calculate alpha as 2π minus the largest difference
+  // This gives the angular size subtended by the pixel as seen from the hit point
+  G4double alpha = 2.0 * CLHEP::pi - maxDiff;
+  
+  return alpha; // Return in radians
 }

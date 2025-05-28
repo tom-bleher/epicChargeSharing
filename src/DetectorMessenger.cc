@@ -32,7 +32,8 @@ DetectorMessenger::DetectorMessenger(DetectorConstruction* detector)
     fBlockSpacingCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
     
     fCornerOffsetCmd = new G4UIcmdWithADoubleAndUnit("/epicToy/detector/setCornerOffset", this);
-    fCornerOffsetCmd->SetGuidance("Set the offset from the corner");
+    fCornerOffsetCmd->SetGuidance("Set the fixed offset from detector edge to first pixel edge");
+    fCornerOffsetCmd->SetGuidance("NOTE: Changing this will adjust detector size to maintain pixel grid");
     fCornerOffsetCmd->SetParameterName("Offset", false);
     fCornerOffsetCmd->SetUnitCategory("Length");
     fCornerOffsetCmd->SetRange("Offset>=0.");
@@ -53,29 +54,31 @@ DetectorMessenger::~DetectorMessenger()
 void DetectorMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
 {
     // Get the current parameters from detector
-    G4double currentSize = 100*um; // Default values, could be retrieved from detector if needed
-    G4double currentSpacing = 500*um;
-    G4double currentOffset = 1*um;
-    G4int currentNumBlocks = 4;
+    G4double currentSize = fDetector->GetPixelSize();
+    G4double currentSpacing = fDetector->GetPixelSpacing();
+    G4double currentOffset = fDetector->GetPixelCornerOffset();
+    G4int currentNumBlocks = fDetector->GetNumBlocksPerSide();
     
     if (command == fBlockSizeCmd) {
-        // Only update the size parameter
+        // Update the size parameter
         G4double newSize = fBlockSizeCmd->GetNewDoubleValue(newValue);
+        G4cout << "Setting pixel size to: " << newSize/um << " μm" << G4endl;
         fDetector->SetGridParameters(newSize, currentSpacing, currentOffset, currentNumBlocks);
     }
     else if (command == fBlockSpacingCmd) {
-        // Only update the spacing parameter
+        // Update the spacing parameter
         G4double newSpacing = fBlockSpacingCmd->GetNewDoubleValue(newValue);
+        G4cout << "Setting pixel spacing to: " << newSpacing/um << " μm" << G4endl;
         fDetector->SetGridParameters(currentSize, newSpacing, currentOffset, currentNumBlocks);
     }
     else if (command == fCornerOffsetCmd) {
-        // Only update the offset parameter
+        // Update the offset parameter (this may cause detector size adjustment)
         G4double newOffset = fCornerOffsetCmd->GetNewDoubleValue(newValue);
-        fDetector->SetGridParameters(currentSize, currentSpacing, newOffset, currentNumBlocks);
+        fDetector->SetPixelCornerOffset(newOffset);
     }
     else if (command == fNumBlocksCmd) {
-        // Only update the number of blocks parameter
-        G4int newNumBlocks = fNumBlocksCmd->GetNewIntValue(newValue);
-        fDetector->SetGridParameters(currentSize, currentSpacing, currentOffset, newNumBlocks);
+        // Number of blocks is now calculated automatically, warn user
+        G4cerr << "WARNING: Number of blocks is now calculated automatically based on pixel size, spacing, and detector size." << G4endl;
+        G4cerr << "This parameter is read-only." << G4endl;
     }
 }
