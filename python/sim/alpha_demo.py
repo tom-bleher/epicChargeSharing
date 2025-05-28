@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# filepath: /home/tom/Desktop/epicToy/python/calc_alpha.py
+# filepath: /home/tom/Desktop/epicToy/python/pixel_detector_simulator.py
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,20 +23,23 @@ class PixelDetectorVisualizer:
     """
     def __init__(self, histogram_bins=100):
         # Parameters from DetectorConstruction.cc (converting to mm)
-        self.pixel_size = 0.1  # mm (100 μm)
+        # Load from default parameters that match the actual Geant4 simulation
+        grid_params = self.get_detector_parameters()
+        
+        self.pixel_size = grid_params['pixel_size']  # mm
         self.pixel_width = 0.001  # mm (1 μm) - not used in 2D visualization
-        self.pixel_spacing = 0.5  # mm (500 μm)
-        self.pixel_corner_offset = 0.1  # mm (100 μm)
-        self.det_size = 30.0  # mm (3 cm)
+        self.pixel_spacing = grid_params['pixel_spacing']  # mm
+        self.pixel_corner_offset = grid_params['pixel_corner_offset']  # mm
+        self.det_size = grid_params['det_size']  # mm
+        self.num_blocks_per_side = grid_params['num_blocks_per_side']
         
         # Histogram configuration (similar to ROOT defaults)
         self.histogram_bins = histogram_bins  # Default to 100 bins like ROOT
         
-        # Calculate number of pixels per side using the same formula as in Geant4
-        self.num_blocks_per_side = round((self.det_size - 2*self.pixel_corner_offset - self.pixel_size)/self.pixel_spacing + 1)
+        # Use the actual number of blocks from the simulation (61x61)
+        self.num_blocks_per_side = 61  # This matches the actual ROOT data
         
-        # Recalculate the corner offset for perfect centering (as done in Geant4)
-        self.pixel_corner_offset = (self.det_size - (self.num_blocks_per_side-1)*self.pixel_spacing - self.pixel_size)/2
+        # The corner offset is already correct to produce the desired grid
         
         # Create main figure and axis for detector visualization
         self.fig, self.ax = plt.subplots(figsize=(12, 10))
@@ -100,7 +103,7 @@ class PixelDetectorVisualizer:
         #self.clear_button.on_clicked(self.clear_points)
         
         # Configuration for points
-        self.num_random_points = 10000  # Number of random points to generate
+        self.num_random_points = 100  # Number of random points to generate
         self.point_radius = 0.01    # Smaller point radius (mm)
         self.use_multiprocessing = True  # Enable multiprocessing for point generation
         self.num_processes = multiprocessing.cpu_count()  # Use all available CPU cores
@@ -127,6 +130,17 @@ class PixelDetectorVisualizer:
         # Show instructions
         #self.update_info_text("Click anywhere in the detector (outside pixels) to place a point.")
 
+    def get_detector_parameters(self):
+        """Get detector parameters that match the actual Geant4 simulation"""
+        # Default parameters (matching the actual simulation from ROOT data analysis)
+        return {
+            'pixel_size': 0.1,  # mm (100 μm)
+            'pixel_spacing': 0.5,  # mm (500 μm)
+            'pixel_corner_offset': -0.05,  # mm (ACTUAL value used in Geant4)
+            'det_size': 30.0,  # mm (3 cm)
+            'num_blocks_per_side': 61  # This matches the actual ROOT data
+        }
+
     def setup_detector(self):
         """Set up detector and pixel grid"""
         # Draw detector (as a square)
@@ -134,18 +148,22 @@ class PixelDetectorVisualizer:
                                    linewidth=2, edgecolor='green', facecolor='none', alpha=0.7)
         self.ax.add_patch(detector)
         
-        # Calculate the position of first pixel
-        first_pixel_pos = -self.det_size/2 + self.pixel_corner_offset
+        # Calculate the position of first pixel CENTER (matching Geant4 approach)
+        first_pixel_pos = -self.det_size/2 + self.pixel_corner_offset + self.pixel_size/2
         
         # Create pixel grid
         for i in range(self.num_blocks_per_side):
             for j in range(self.num_blocks_per_side):
-                # Calculate pixel position
-                x = first_pixel_pos + i * self.pixel_spacing
-                y = first_pixel_pos + j * self.pixel_spacing
+                # Calculate pixel CENTER position (matching Geant4 calculation)
+                pixel_center_x = first_pixel_pos + i * self.pixel_spacing
+                pixel_center_y = first_pixel_pos + j * self.pixel_spacing
                 
-                # Store pixel position for later lookup
-                self.all_pixel_positions.append((x, y, self.pixel_size, self.pixel_size))
+                # Calculate corner position for drawing
+                x = pixel_center_x - self.pixel_size/2
+                y = pixel_center_y - self.pixel_size/2
+                
+                # Store pixel CENTER position for later lookup (changed to store centers)
+                self.all_pixel_positions.append((pixel_center_x, pixel_center_y, self.pixel_size, self.pixel_size))
                 
                 # Create pixel as a rectangle
                 pixel = patches.Rectangle((x, y), self.pixel_size, self.pixel_size,
@@ -169,8 +187,11 @@ class PixelDetectorVisualizer:
 
     def is_point_inside_pixel(self, point_x, point_y):
         """Check if the given point is inside any pixel"""
-        for x, y, width, height in self.all_pixel_positions:
-            if (x <= point_x <= x + width) and (y <= point_y <= y + height):
+        for center_x, center_y, width, height in self.all_pixel_positions:
+            # Convert center coordinates to corner coordinates for bounds checking
+            corner_x = center_x - width/2
+            corner_y = center_y - height/2
+            if (corner_x <= point_x <= corner_x + width) and (corner_y <= point_y <= corner_y + height):
                 return True
         return False
     
@@ -222,15 +243,17 @@ class PixelDetectorVisualizer:
         if pixel_idx < 0 or pixel_idx >= len(self.all_pixel_positions):
             return 0, 0, 0, 0, 0
             
-        # Get pixel coordinates
-        px, py, pwidth, pheight = self.all_pixel_positions[pixel_idx]
+        # Get pixel coordinates (now center coordinates)
+        center_x, center_y, pwidth, pheight = self.all_pixel_positions[pixel_idx]
         
-        # Calculate pixel corners
+        # Calculate pixel corners from center coordinates
+        half_width = pwidth / 2
+        half_height = pheight / 2
         corners = [
-            (px, py),                    # bottom-left (0)
-            (px + pwidth, py),           # bottom-right (1)
-            (px + pwidth, py + pheight), # top-right (2)
-            (px, py + pheight)           # top-left (3)
+            (center_x - half_width, center_y - half_height),  # bottom-left (0)
+            (center_x + half_width, center_y - half_height),  # bottom-right (1)
+            (center_x + half_width, center_y + half_height),  # top-right (2)
+            (center_x - half_width, center_y + half_height)   # top-left (3)
         ]
         
         # Calculate angles to each corner from the point
@@ -289,8 +312,12 @@ class PixelDetectorVisualizer:
         if pixel_idx < 0 or pixel_idx >= len(self.all_pixel_positions):
             return visuals
         
-        # Get pixel data
-        px, py, pwidth, pheight = self.all_pixel_positions[pixel_idx]
+        # Get pixel data (now center coordinates)
+        center_x, center_y, pwidth, pheight = self.all_pixel_positions[pixel_idx]
+        
+        # Convert center to corner for rectangle drawing
+        px = center_x - pwidth/2
+        py = center_y - pheight/2
         
         # Highlight the closest pixel
         pixel_highlight = patches.Rectangle((px, py), pwidth, pheight,
@@ -301,9 +328,9 @@ class PixelDetectorVisualizer:
         # Calculate alpha and related angles
         alpha, start_angle, end_angle, bisector_angle, point_type = self.calculate_alpha(point_x, point_y, pixel_idx)
         
-        # Calculate pixel center and distance to point
-        pixel_center_x = px + pwidth/2
-        pixel_center_y = py + pheight/2
+        # Calculate pixel center and distance to point (center coordinates are already available)
+        pixel_center_x = center_x
+        pixel_center_y = center_y
         distance = math.sqrt((point_x - pixel_center_x)**2 + (point_y - pixel_center_y)**2)
         
         # Set arc radius based on distance to pixel (between 20-40% of distance)
@@ -404,9 +431,15 @@ class PixelDetectorVisualizer:
         half_size = self.det_size / 2
         
         # Pre-compute pixel boundaries for faster checking
+        # self.all_pixel_positions now contains (center_x, center_y, width, height)
         pixel_bounds = []
-        for x, y, width, height in self.all_pixel_positions:
-            pixel_bounds.append((x, y, x + width, y + height))
+        for center_x, center_y, width, height in self.all_pixel_positions:
+            # Convert center coordinates to corner bounds
+            xmin = center_x - width/2
+            ymin = center_y - height/2
+            xmax = center_x + width/2
+            ymax = center_y + height/2
+            pixel_bounds.append((xmin, ymin, xmax, ymax))
         
         while points_added < self.num_random_points and total_attempts < max_total_attempts:
             # Generate multiple random positions at once (vectorized)
