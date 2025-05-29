@@ -48,6 +48,14 @@ public:
     void AddTrajectoryPoint(G4double x, G4double y, G4double z, G4double time);
     void SetFinalParticleEnergy(G4double finalEnergy);
     
+    // Method to add step-by-step energy deposition information
+    void AddStepEnergyDeposition(G4double edep, G4double z, G4double time, 
+                                G4double stepLength, G4int stepNumber);
+    
+    // Method to add ALL step information (including non-energy depositing steps)
+    void AddAllStepInfo(G4double edep, G4double z, G4double time, 
+                       G4double stepLength, G4int stepNumber);
+    
 private:
     RunAction* fRunAction;
     DetectorConstruction* fDetector;
@@ -92,10 +100,10 @@ private:
     G4double fProperTime;              // Proper time of first hit
     
     // Physics process information
-    G4String fPhysicsProcess;          // Dominant physics process
+    std::string fPhysicsProcess;          // Dominant physics process
     G4int fTrackID;                    // Primary track ID
     G4int fParentID;                   // Parent track ID
-    G4int fStepNumber;                 // Total number of steps
+    G4int fStepCount;                  // Total number of steps (renamed to avoid conflict)
     G4double fTotalStepLength;         // Total step length
     
     // Track trajectory information
@@ -103,6 +111,20 @@ private:
     std::vector<G4double> fTrajectoryY;    // Y positions along track
     std::vector<G4double> fTrajectoryZ;    // Z positions along track
     std::vector<G4double> fTrajectoryTime; // Time at each point
+    
+    // Step-by-step energy deposition information
+    std::vector<G4double> fStepEdepVec;    // Energy deposited per step
+    std::vector<G4double> fStepZVec;       // Z position of each energy deposit
+    std::vector<G4double> fStepTimeVec;    // Time of each energy deposit
+    std::vector<G4double> fStepLenVec;     // Length of each step
+    std::vector<G4int> fStepNumVec;        // Step number for each energy deposit
+    
+    // ALL step information (including non-energy depositing steps)
+    std::vector<G4double> fAllStepEdepVec;    // Energy deposited per step (including 0)
+    std::vector<G4double> fAllStepZVec;       // Z position of each step
+    std::vector<G4double> fAllStepTimeVec;    // Time of each step
+    std::vector<G4double> fAllStepLenVec;     // Length of each step
+    std::vector<G4int> fAllStepNumVec;        // Step number for each step
 };
 
 #endif

@@ -35,7 +35,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fPhysicsProcess(""),
   fTrackID(-1),
   fParentID(-1),
-  fStepNumber(0),
+  fStepCount(0),
   fTotalStepLength(0.)
 { 
 }
@@ -83,7 +83,7 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fPhysicsProcess = "";
   fTrackID = -1;
   fParentID = -1;
-  fStepNumber = 0;
+  fStepCount = 0;
   fTotalStepLength = 0.;
   
   // Reset trajectory data
@@ -91,6 +91,22 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fTrajectoryY.clear();
   fTrajectoryZ.clear();
   fTrajectoryTime.clear();
+  
+  // Reset step energy deposition data
+  fStepEdepVec.clear();
+  fStepZVec.clear();
+  fStepTimeVec.clear();
+  fStepLenVec.clear();
+  fStepNumVec.clear();
+  fStepLenVec.clear();
+  fStepNumVec.clear();
+  
+  // Reset ALL step data
+  fAllStepEdepVec.clear();
+  fAllStepZVec.clear();
+  fAllStepTimeVec.clear();
+  fAllStepLenVec.clear();
+  fAllStepNumVec.clear();
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -153,10 +169,18 @@ void EventAction::EndOfEventAction(const G4Event* event)
   fRunAction->SetTimingInfo(fGlobalTime, fLocalTime, fProperTime);
   
   // Pass physics information to RunAction
-  fRunAction->SetPhysicsInfo(fPhysicsProcess, fTrackID, fParentID, fStepNumber, fTotalStepLength);
+  fRunAction->SetPhysicsInfo(fPhysicsProcess, fTrackID, fParentID, fStepCount, fTotalStepLength);
   
   // Pass trajectory information to RunAction
   fRunAction->SetTrajectoryInfo(fTrajectoryX, fTrajectoryY, fTrajectoryZ, fTrajectoryTime);
+  
+  // Pass step energy deposition information to RunAction
+  fRunAction->SetStepEnergyDeposition(fStepEdepVec, fStepZVec, fStepTimeVec, 
+                                     fStepLenVec, fStepNumVec);
+  
+  // Pass ALL step information to RunAction
+  fRunAction->SetAllStepInfo(fAllStepEdepVec, fAllStepZVec, fAllStepTimeVec, 
+                            fAllStepLenVec, fAllStepNumVec);
   
   fRunAction->FillTree();
 }
@@ -601,14 +625,69 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   // Calculate the first pixel position (corner)
   G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
   
+  G4double d0_mm = fD0 * 1e-3; // Convert microns to mm
+  
+  // Check if the distance from hit to the identified pixel center (fPixelIndexI, fPixelIndexJ) is <= D0
+  G4double pixelCenterX = firstPixelPos + fPixelIndexI * pixelSpacing;
+  G4double pixelCenterY = firstPixelPos + fPixelIndexJ * pixelSpacing;
+  G4double distanceToIdentifiedPixel = std::sqrt(std::pow(fPosition.x() - pixelCenterX, 2) + 
+                                                 std::pow(fPosition.y() - pixelCenterY, 2));
+  
+  // If the distance to the identified pixel center is <= D0, assign all charge to that pixel
+  // This ensures consistency with the inside-pixel case
+  if (distanceToIdentifiedPixel <= d0_mm) {
+    // Calculate the charge without charge sharing
+    G4double totalChargeValue = totalCharge;
+    
+    // Fill all 81 positions, giving all charge to the identified pixel (fPixelIndexI, fPixelIndexJ) and zero to others
+    for (G4int di = -4; di <= 4; di++) {
+      for (G4int dj = -4; dj <= 4; dj++) {
+        G4int gridPixelI = fPixelIndexI + di;
+        G4int gridPixelJ = fPixelIndexJ + dj;
+        
+        // Check if this pixel is within bounds
+        if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
+            gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
+          // Store invalid data for out-of-bounds pixels
+          fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
+          fGridNeighborhoodDistances.push_back(-999.0);
+          fGridNeighborhoodChargeValues.push_back(0.0);
+          fGridNeighborhoodChargeCoulombs.push_back(0.0);
+          continue;
+        }
+        
+        // Calculate the center position and distance for this pixel
+        G4double currentPixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
+        G4double currentPixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
+        G4double distance = std::sqrt(std::pow(fPosition.x() - currentPixelCenterX, 2) + 
+                                     std::pow(fPosition.y() - currentPixelCenterY, 2));
+        
+        // Check if this is the identified pixel (center of the 9x9 grid)
+        if (di == 0 && dj == 0) {
+          // This is the identified pixel (fPixelIndexI, fPixelIndexJ) - assign all charge here
+          fGridNeighborhoodChargeFractions.push_back(1.0);
+          fGridNeighborhoodChargeValues.push_back(totalChargeValue);
+          fGridNeighborhoodChargeCoulombs.push_back(totalChargeValue * fElementaryCharge);
+          fGridNeighborhoodDistances.push_back(distance);
+        } else {
+          // All other pixels get zero charge
+          fGridNeighborhoodChargeFractions.push_back(0.0);
+          fGridNeighborhoodChargeValues.push_back(0.0);
+          fGridNeighborhoodChargeCoulombs.push_back(0.0);
+          fGridNeighborhoodDistances.push_back(distance);
+        }
+      }
+    }
+    return; // Exit early, no need for normal charge sharing calculation
+  }
+  
+  // If distance > D0, proceed with normal charge sharing calculation
   // First pass: collect valid pixels and calculate weights
   std::vector<G4double> weights;
   std::vector<G4double> distances;
   std::vector<G4double> angles;
   std::vector<G4int> validPixelI;
   std::vector<G4int> validPixelJ;
-  
-  G4double d0_mm = fD0 * 1e-3; // Convert microns to mm
   
   // Define the 9x9 grid: 4 pixels in each direction from the center
   for (G4int di = -4; di <= 4; di++) {
@@ -716,7 +795,7 @@ void EventAction::SetTimingInfo(G4double globalTime, G4double localTime, G4doubl
 }
 
 void EventAction::SetPhysicsProcessInfo(const G4String& processName, G4int trackID, G4int parentID, 
-                                       G4int stepNumber, G4double stepLength)
+                                       G4int stepCount, G4double stepLength)
 {
   // Store the dominant physics process (first one or most significant)
   if (fPhysicsProcess.empty()) {
@@ -725,7 +804,7 @@ void EventAction::SetPhysicsProcessInfo(const G4String& processName, G4int track
   
   fTrackID = trackID;
   fParentID = parentID;
-  fStepNumber = stepNumber;
+  fStepCount = stepCount;
   fTotalStepLength += stepLength;
 }
 
@@ -740,4 +819,29 @@ void EventAction::AddTrajectoryPoint(G4double x, G4double y, G4double z, G4doubl
 void EventAction::SetFinalParticleEnergy(G4double finalEnergy)
 {
   fFinalParticleEnergy = finalEnergy;
+}
+
+void EventAction::AddStepEnergyDeposition(G4double edep, G4double z, G4double time, 
+                                         G4double stepLength, G4int stepCount)
+{
+  // Only store steps that actually deposit energy
+  if (edep > 0.) {
+    fStepEdepVec.push_back(edep);
+    fStepZVec.push_back(z);
+    fStepTimeVec.push_back(time / CLHEP::ns); // Convert to ns
+    fStepLenVec.push_back(stepLength);
+    fStepNumVec.push_back(stepCount);
+  }
+  
+}
+
+void EventAction::AddAllStepInfo(G4double edep, G4double z, G4double time, 
+                                G4double stepLength, G4int stepCount)
+{
+  // Store ALL steps, including those with zero energy deposition
+  fAllStepEdepVec.push_back(edep);
+  fAllStepZVec.push_back(z);
+  fAllStepTimeVec.push_back(time / CLHEP::ns); // Convert to ns
+  fAllStepLenVec.push_back(stepLength);
+  fAllStepNumVec.push_back(stepCount);
 }

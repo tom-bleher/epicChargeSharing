@@ -9,7 +9,21 @@
 #include <string>
 #include <unistd.h> // For getcwd
 
+// Add step limiter includes
+#include "G4UserLimits.hh"
+#include "G4StepLimiter.hh"
+
 DetectorConstruction::DetectorConstruction()
+    : G4VUserDetectorConstruction(),
+      fPixelSize(0.1*mm),      // 100 microns - default value
+      fPixelSpacing(0.5*mm),   // 500 microns - default value  
+      fPixelCornerOffset(0.1*mm), // 100 microns - default value (FIXED - no auto-adjustment)
+      fdetSize(30*mm),         // 30 mm - default value (may be adjusted)
+      fdetWidth(0.05*mm),      // 50 microns thickness
+      fPixelWidth(0.001*mm),   // 1 micron thickness
+      fNumBlocksPerSide(0),    // Will be calculated
+      fCheckOverlaps(true),
+      fDetectorMessenger(nullptr)
 {
     // ————————————————————————
     // Parameters (all lengths are center–to–center except fPixelCornerOffset)
@@ -28,12 +42,12 @@ DetectorConstruction::DetectorConstruction()
     fNumBlocksPerSide = 0;
     
     // Create the messenger
-    fMessenger = new DetectorMessenger(this);
+    fDetectorMessenger = new DetectorMessenger(this);
 };
 
 DetectorConstruction::~DetectorConstruction()
 {
-    delete fMessenger;
+    delete fDetectorMessenger;
 }
 
 void DetectorConstruction::SetGridParameters(G4double pixelSize, G4double pixelSpacing, G4double pixelCornerOffset, G4int numPixels)
@@ -160,6 +174,14 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     // Create aluminum pixels on the detector surface
     G4Box *pixelBlock = new G4Box("pixelBlock", fPixelSize/2, fPixelSize/2, fPixelWidth/2);
     G4LogicalVolume *logicBlock = new G4LogicalVolume(pixelBlock, aluminumMat, "logicBlock");
+    
+    // Add step limiting for fine tracking - force steps to be at most 10 micrometers
+    G4UserLimits* stepLimit = new G4UserLimits(10.0*micrometer);  // Max step size
+    logicCube->SetUserLimits(stepLimit);   // Apply to detector volume
+    logicBlock->SetUserLimits(stepLimit);  // Apply to pixel volumes
+    logicWorld->SetUserLimits(stepLimit);  // Apply to world volume
+    
+    G4cout << "✓ Step limiting enabled: maximum step size = 10 micrometers" << G4endl;
     
     // Place pixels on the detector surface (front face)
     G4int copyNo = 0;

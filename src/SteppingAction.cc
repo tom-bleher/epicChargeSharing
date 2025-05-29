@@ -29,6 +29,19 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
   G4double time = postPoint->GetGlobalTime();
   fEventAction->AddTrajectoryPoint(position.x(), position.y(), position.z(), time);
   
+  // Calculate position of this step (middle of step) - CONSISTENT with AddEdep calculation
+  G4ThreeVector stepPosition = 0.5 * (step->GetPreStepPoint()->GetPosition() +
+                                     step->GetPostStepPoint()->GetPosition());
+  
+  // Get step information for ALL steps
+  G4double stepLength = step->GetStepLength();
+  G4int stepNumber = track->GetCurrentStepNumber();
+  G4double stepTime = postPoint->GetGlobalTime();
+  G4double zPosition = stepPosition.z();  // Use same position calculation
+  
+  // Record ALL step information (including zero energy deposition)
+  fEventAction->AddAllStepInfo(edep, zPosition, stepTime, stepLength, stepNumber);
+  
   // Get timing information from the first step that deposits energy
   if (edep > 0.) {
     // Set timing information (EventAction will only accept first call)
@@ -42,23 +55,22 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
       G4String processName = process->GetProcessName();
       G4int trackID = track->GetTrackID();
       G4int parentID = track->GetParentID();
-      G4int stepNumber = track->GetCurrentStepNumber();
-      G4double stepLength = step->GetStepLength();
       
       fEventAction->SetPhysicsProcessInfo(processName, trackID, parentID, stepNumber, stepLength);
     }
     
     // Update final particle energy
     fEventAction->SetFinalParticleEnergy(track->GetKineticEnergy());
+    
+    // IMPORTANT: Use consistent position calculation for both step tracking and total Edep
+    // Get position of the energy deposit (middle of step) - CONSISTENT with AddEdep calculation
+    G4ThreeVector edepPosition = 0.5 * (step->GetPreStepPoint()->GetPosition() +
+                                       step->GetPostStepPoint()->GetPosition());
+    
+    // Add step-by-step energy deposition information using SAME position as AddEdep
+    fEventAction->AddStepEnergyDeposition(edep, edepPosition.z(), stepTime, stepLength, stepNumber);
+    
+    // Add this energy deposit to the event using the SAME position
+    fEventAction->AddEdep(edep, edepPosition);
   }
-  
-  // Skip steps with no energy deposit for energy tracking
-  if (edep <= 0.) return;
-  
-  // Get position of the energy deposit (middle of step)
-  G4ThreeVector edepPosition = 0.5 * (step->GetPreStepPoint()->GetPosition() +
-                                     step->GetPostStepPoint()->GetPosition());
-  
-  // Add this energy deposit to the event
-  fEventAction->AddEdep(edep, edepPosition);
 }
