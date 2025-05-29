@@ -30,16 +30,16 @@ public:
     // Method to calculate the pixel alpha angle
     G4double CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4int pixelI, G4int pixelJ);
     
-    // Method to calculate angles from hit to 9x9 grid around hit pixel
-    void Calculate9x9GridAngles(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ);
+    // Method to calculate angles from hit to neighborhood (9x9) grid around hit pixel
+    void CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ);
     
     // Method to calculate the angular size subtended by a pixel as seen from a hit point (2D calculation)
     G4double CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
                                          G4double pixelCenterX, G4double pixelCenterY,
                                          G4double pixelWidth, G4double pixelHeight);
     
-    // Method to calculate charge sharing in the 9x9 grid
-    void CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ, G4double edep);
+    // Method to calculate charge sharing in the neighborhood (9x9) grid
+    void CalculateNeighborhoodChargeSharing();
     
 private:
     RunAction* fRunAction;
@@ -55,16 +55,16 @@ private:
     G4double fPixelDistance; // Distance from hit to pixel center
     G4bool fPixelHit;     // Flag to indicate if the hit was on a pixel
     
-    // 9x9 grid angle information
-    std::vector<G4double> fGrid9x9Angles; // Angles from hit to each pixel in 9x9 grid
-    std::vector<G4int> fGrid9x9PixelI;     // I indices of pixels in 9x9 grid
-    std::vector<G4int> fGrid9x9PixelJ;     // J indices of pixels in 9x9 grid
+    // Neighborhood (9x9) grid angle information
+    std::vector<G4double> fGridNeighborhoodAngles; // Angles from hit to each pixel in neighborhood grid
+    std::vector<G4int> fGridNeighborhoodPixelI;     // I indices of pixels in neighborhood grid
+    std::vector<G4int> fGridNeighborhoodPixelJ;     // J indices of pixels in neighborhood grid
     
-    // 9x9 grid charge sharing information
-    std::vector<G4double> fGrid9x9ChargeFractions; // Charge fraction for each pixel in 9x9 grid
-    std::vector<G4double> fGrid9x9Distances;       // Distance from hit to each pixel center in 9x9 grid
-    std::vector<G4double> fGrid9x9ChargeValues;    // Actual charge value for each pixel in 9x9 grid (electrons)
-    std::vector<G4double> fGrid9x9ChargeCoulombs;  // Actual charge value for each pixel in 9x9 grid (Coulombs)
+    // Neighborhood (9x9) grid charge sharing information
+    std::vector<G4double> fGridNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid
+    std::vector<G4double> fGridNeighborhoodDistances;       // Distance from hit to each pixel center in neighborhood grid
+    std::vector<G4double> fGridNeighborhoodChargeValues;    // Actual charge value for each pixel in neighborhood grid (electrons)
+    std::vector<G4double> fGridNeighborhoodChargeCoulombs;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
     
     // Constants for charge sharing calculation
     static constexpr G4double fIonizationEnergy = 3.6; // eV - typical for silicon

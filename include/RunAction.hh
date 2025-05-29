@@ -43,13 +43,13 @@ public:
     // Method to set pixel hit flag
     void SetPixelHit(G4bool hit);
     
-    // Method to set 9x9 grid angle data
-    void Set9x9GridData(const std::vector<G4double>& angles, 
+    // Method to set neighborhood (9x9) grid angle data
+    void SetNeighborhoodGridData(const std::vector<G4double>& angles, 
                         const std::vector<G4int>& pixelI, 
                         const std::vector<G4int>& pixelJ);
     
-    // Method to set 9x9 grid charge sharing data
-    void Set9x9ChargeData(const std::vector<G4double>& chargeFractions,
+    // Method to set neighborhood (9x9) grid charge sharing data
+    void SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
                           const std::vector<G4double>& distances,
                           const std::vector<G4double>& chargeValues,
                           const std::vector<G4double>& chargeCoulombs);
@@ -71,9 +71,9 @@ private:
     
     // Variables for data storage with fixed units
     G4double fEdep;   // Energy deposit [MeV]
-    G4double fPosX;   // Position X [mm]
-    G4double fPosY;   // Position Y [mm]
-    G4double fPosZ;   // Position Z [mm]
+    G4double fTrueX;   // True Hit position X [mm]
+    G4double fTrueY;   // True Hit position Y [mm]
+    G4double fTrueZ;   // True Hit position Z [mm]
     
     // Variables for initial particle gun position
     G4double fInitX;  // Initial X [mm]
@@ -81,9 +81,9 @@ private:
     G4double fInitZ;  // Initial Z [mm]
     
     // Variables for nearest pixel center position
-    G4double fPixelX; // Nearest pixel X [mm]
-    G4double fPixelY; // Nearest pixel Y [mm]
-    G4double fPixelZ; // Nearest pixel Z [mm]
+    G4double fPixelX; // Nearest to hit pixel center X [mm]
+    G4double fPixelY; // Nearest to hit pixel center Y [mm]
+    G4double fPixelZ; // Nearest to hit pixel center Z [mm]
     
     // Variables for pixel mapping
     G4int fPixelI;    // Pixel index in X direction
@@ -92,16 +92,16 @@ private:
     G4double fPixelAlpha; // Angular size of pixel from hit position [deg]
     G4bool fPixelHit;  // Flag to indicate if hit was on a pixel
     
-    // Variables for 9x9 grid angle data
-    std::vector<G4double> fGrid9x9Angles; // Angles from hit to 9x9 grid pixels [deg]
-    std::vector<G4int> fGrid9x9PixelI;     // I indices of 9x9 grid pixels
-    std::vector<G4int> fGrid9x9PixelJ;     // J indices of 9x9 grid pixels
+    // Variables for neighborhood (9x9) grid angle data
+    std::vector<G4double> fGridNeighborhoodAngles; // Angles from hit to neighborhood grid pixels [deg]
+    std::vector<G4int> fGridNeighborhoodPixelI;     // I indices of neighborhood grid pixels
+    std::vector<G4int> fGridNeighborhoodPixelJ;     // J indices of neighborhood grid pixels
     
-    // Variables for 9x9 grid charge sharing data
-    std::vector<G4double> fGrid9x9ChargeFractions; // Charge fractions for 9x9 grid pixels
-    std::vector<G4double> fGrid9x9Distances;         // Distances from hit to 9x9 grid pixels [mm]
-    std::vector<G4double> fGrid9x9ChargeValues;        // Charge values for 9x9 grid pixels (electrons)
-    std::vector<G4double> fGrid9x9ChargeCoulombs;       // Charge values in Coulombs for 9x9 grid pixels
+    // Variables for neighborhood (9x9) grid charge sharing data
+    std::vector<G4double> fGridNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels
+    std::vector<G4double> fGridNeighborhoodDistances;         // Distances from hit to neighborhood grid pixels [mm]
+    std::vector<G4double> fGridNeighborhoodChargeValues;        // Charge values for neighborhood grid pixels (electrons)
+    std::vector<G4double> fGridNeighborhoodChargeCoulombs;       // Charge values in Coulombs for neighborhood grid pixels
     
     // Variables for detector grid parameters (stored as ROOT metadata)
     G4double fGridPixelSize;        // Pixel size [mm]

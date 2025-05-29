@@ -26,9 +26,9 @@ RunAction::RunAction()
   fRootFile(nullptr),
   fTree(nullptr),
   fEdep(0),
-  fPosX(0),
-  fPosY(0),
-  fPosZ(0),
+  fTrueX(0),
+  fTrueY(0),
+  fTrueZ(0),
   fInitX(0),
   fInitY(0),
   fInitZ(0),
@@ -46,7 +46,7 @@ RunAction::RunAction()
   fGridDetSize(0),
   fGridNumBlocksPerSide(0)
 { 
-  // Initialize 9x9 grid vectors (they are automatically initialized empty)
+  // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
 }
 
 RunAction::~RunAction()
@@ -102,9 +102,9 @@ void RunAction::BeginOfRunAction(const G4Run*)
     // Create branches for the tree with explicit units in the titles
     // Note: Values are stored in Geant4's internal units (MeV for energy, mm for length)
     fTree->Branch("Edep", &fEdep, "Edep/D")->SetTitle("Energy Deposit [MeV]");
-    fTree->Branch("PosX", &fPosX, "PosX/D")->SetTitle("Position X [mm]");
-    fTree->Branch("PosY", &fPosY, "PosY/D")->SetTitle("Position Y [mm]");
-    fTree->Branch("PosZ", &fPosZ, "PosZ/D")->SetTitle("Position Z [mm]");
+    fTree->Branch("TrueX", &fTrueX, "TrueX/D")->SetTitle("True Position X [mm]");
+    fTree->Branch("TrueY", &fTrueY, "TrueY/D")->SetTitle("True Position Y [mm]");
+    fTree->Branch("TrueZ", &fTrueZ, "TrueZ/D")->SetTitle("True Position Z [mm]");
     
     // Add branches for initial particle position with explicit units
     fTree->Branch("InitX", &fInitX, "InitX/D")->SetTitle("Initial X [mm]");
@@ -126,16 +126,16 @@ void RunAction::BeginOfRunAction(const G4Run*)
     // Load vector dictionaries for ROOT to properly handle std::vector branches
     gROOT->ProcessLine("#include <vector>");
     
-    // Add branches for 9x9 grid angle data
-    fTree->Branch("Grid9x9Angles", &fGrid9x9Angles)->SetTitle("Angles from Hit to 9x9 Grid Pixels [deg]");
-    fTree->Branch("Grid9x9PixelI", &fGrid9x9PixelI)->SetTitle("I Indices of 9x9 Grid Pixels");
-    fTree->Branch("Grid9x9PixelJ", &fGrid9x9PixelJ)->SetTitle("J Indices of 9x9 Grid Pixels");
+    // Add branches for neighborhood (9x9) grid angle data
+    fTree->Branch("GridNeighborhoodAngles", &fGridNeighborhoodAngles)->SetTitle("Angles from Hit to Neighborhood Grid Pixels [deg]");
+    fTree->Branch("GridNeighborhoodPixelI", &fGridNeighborhoodPixelI)->SetTitle("I Indices of Neighborhood Grid Pixels");
+    fTree->Branch("GridNeighborhoodPixelJ", &fGridNeighborhoodPixelJ)->SetTitle("J Indices of Neighborhood Grid Pixels");
     
-    // Add branches for 9x9 grid charge sharing data
-    fTree->Branch("Grid9x9ChargeFractions", &fGrid9x9ChargeFractions)->SetTitle("Charge Fractions for 9x9 Grid Pixels");
-    fTree->Branch("Grid9x9Distances", &fGrid9x9Distances)->SetTitle("Distances from Hit to 9x9 Grid Pixels [mm]");
-    fTree->Branch("Grid9x9ChargeValues", &fGrid9x9ChargeValues)->SetTitle("Charge Values for 9x9 Grid Pixels");
-    fTree->Branch("Grid9x9ChargeCoulombs", &fGrid9x9ChargeCoulombs)->SetTitle("Charge Coulombs for 9x9 Grid Pixels");
+    // Add branches for neighborhood (9x9) grid charge sharing data
+    fTree->Branch("GridNeighborhoodChargeFractions", &fGridNeighborhoodChargeFractions)->SetTitle("Charge Fractions for Neighborhood Grid Pixels");
+    fTree->Branch("GridNeighborhoodDistances", &fGridNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm]");
+    fTree->Branch("GridNeighborhoodChargeValues", &fGridNeighborhoodChargeValues)->SetTitle("Charge Values for Neighborhood Grid Pixels");
+    fTree->Branch("GridNeighborhoodChargeCoulombs", &fGridNeighborhoodChargeCoulombs)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -407,9 +407,9 @@ void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
     fEdep = edep;
     
     // Store positions in mm (Geant4 internal length unit is mm)
-    fPosX = x;
-    fPosY = y;
-    fPosZ = z;
+    fTrueX = x;
+    fTrueY = y;
+    fTrueZ = z;
 }
 
 void RunAction::SetInitialPosition(G4double x, G4double y, G4double z) 
@@ -448,26 +448,26 @@ void RunAction::SetPixelHit(G4bool hit)
     fPixelHit = hit;
 }
 
-void RunAction::Set9x9GridData(const std::vector<G4double>& angles, 
+void RunAction::SetNeighborhoodGridData(const std::vector<G4double>& angles, 
                                const std::vector<G4int>& pixelI, 
                                const std::vector<G4int>& pixelJ)
 {
-    // Store the 9x9 grid angle data
-    fGrid9x9Angles = angles;
-    fGrid9x9PixelI = pixelI;
-    fGrid9x9PixelJ = pixelJ;
+    // Store the neighborhood (9x9) grid angle data
+    fGridNeighborhoodAngles = angles;
+    fGridNeighborhoodPixelI = pixelI;
+    fGridNeighborhoodPixelJ = pixelJ;
 }
 
-void RunAction::Set9x9ChargeData(const std::vector<G4double>& chargeFractions,
+void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
                                  const std::vector<G4double>& distances,
                                  const std::vector<G4double>& chargeValues,
                                  const std::vector<G4double>& chargeCoulombs)
 {
-    // Store the 9x9 grid charge sharing data
-    fGrid9x9ChargeFractions = chargeFractions;
-    fGrid9x9Distances = distances;
-    fGrid9x9ChargeValues = chargeValues;
-    fGrid9x9ChargeCoulombs = chargeCoulombs;
+    // Store the neighborhood (9x9) grid charge sharing data
+    fGridNeighborhoodChargeFractions = chargeFractions;
+    fGridNeighborhoodDistances = distances;
+    fGridNeighborhoodChargeValues = chargeValues;
+    fGridNeighborhoodChargeCoulombs = chargeCoulombs;
 }
 
 void RunAction::FillTree()

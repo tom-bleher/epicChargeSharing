@@ -44,16 +44,16 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fPixelDistance = -1.;
   fPixelHit = false;
   
-  // Reset 9x9 grid angle data
-  fGrid9x9Angles.clear();
-  fGrid9x9PixelI.clear();
-  fGrid9x9PixelJ.clear();
+  // Reset neighborhood (9x9) grid angle data
+  fGridNeighborhoodAngles.clear();
+  fGridNeighborhoodPixelI.clear();
+  fGridNeighborhoodPixelJ.clear();
   
-  // Reset 9x9 grid charge sharing data
-  fGrid9x9ChargeFractions.clear();
-  fGrid9x9Distances.clear();
-  fGrid9x9ChargeValues.clear();
-  fGrid9x9ChargeCoulombs.clear();
+  // Reset neighborhood (9x9) grid charge sharing data
+  fGridNeighborhoodChargeFractions.clear();
+  fGridNeighborhoodDistances.clear();
+  fGridNeighborhoodChargeValues.clear();
+  fGridNeighborhoodChargeCoulombs.clear();
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -81,13 +81,13 @@ void EventAction::EndOfEventAction(const G4Event* event)
   G4double pixelAlpha = CalculatePixelAlpha(fPosition, fPixelIndexI, fPixelIndexJ);
   fRunAction->SetPixelAlpha(pixelAlpha);
   
-  // Calculate 9x9 grid angles and pass to RunAction
-  Calculate9x9GridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
-  fRunAction->Set9x9GridData(fGrid9x9Angles, fGrid9x9PixelI, fGrid9x9PixelJ);
+  // Calculate neighborhood (9x9) grid angles and pass to RunAction
+  CalculateNeighborhoodGridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
+  fRunAction->SetNeighborhoodGridData(fGridNeighborhoodAngles, fGridNeighborhoodPixelI, fGridNeighborhoodPixelJ);
   
-  // Calculate 9x9 grid charge sharing and pass to RunAction
-  CalculateChargeSharing(fPosition, fPixelIndexI, fPixelIndexJ, fEdep);
-  fRunAction->Set9x9ChargeData(fGrid9x9ChargeFractions, fGrid9x9Distances, fGrid9x9ChargeValues, fGrid9x9ChargeCoulombs);
+  // Calculate neighborhood (9x9) grid charge sharing and pass to RunAction
+  CalculateNeighborhoodChargeSharing();
+  fRunAction->SetNeighborhoodChargeData(fGridNeighborhoodChargeFractions, fGridNeighborhoodDistances, fGridNeighborhoodChargeValues, fGridNeighborhoodChargeCoulombs);
   
   // Pass pixel hit status to RunAction
   fRunAction->SetPixelHit(fPixelHit);
@@ -288,12 +288,12 @@ G4double EventAction::CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4in
 }
 
 // Calculate angles from hit position to all pixels in a 9x9 grid around the hit pixel
-void EventAction::Calculate9x9GridAngles(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ)
+void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ)
 {
   // Clear previous data
-  fGrid9x9Angles.clear();
-  fGrid9x9PixelI.clear();
-  fGrid9x9PixelJ.clear();
+  fGridNeighborhoodAngles.clear();
+  fGridNeighborhoodPixelI.clear();
+  fGridNeighborhoodPixelJ.clear();
   
   // Check if hit is inside a pixel - if so, all angles should be invalid
   G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
@@ -306,9 +306,9 @@ void EventAction::Calculate9x9GridAngles(const G4ThreeVector& hitPosition, G4int
         G4int gridPixelJ = hitPixelJ + dj;
         
         // Store pixel indices and NaN angle
-        fGrid9x9PixelI.push_back(gridPixelI);
-        fGrid9x9PixelJ.push_back(gridPixelJ);
-        fGrid9x9Angles.push_back(std::numeric_limits<G4double>::quiet_NaN()); // Use same NaN as elsewhere
+        fGridNeighborhoodPixelI.push_back(gridPixelI);
+        fGridNeighborhoodPixelJ.push_back(gridPixelJ);
+        fGridNeighborhoodAngles.push_back(std::numeric_limits<G4double>::quiet_NaN()); // Use same NaN as elsewhere
       }
     }
     return; // Exit early for inside-pixel hits
@@ -336,9 +336,9 @@ void EventAction::Calculate9x9GridAngles(const G4ThreeVector& hitPosition, G4int
       if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
           gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
         // Store invalid data for out-of-bounds pixels
-        fGrid9x9PixelI.push_back(gridPixelI);
-        fGrid9x9PixelJ.push_back(gridPixelJ);
-        fGrid9x9Angles.push_back(-999.0); // Invalid angle marker
+        fGridNeighborhoodPixelI.push_back(gridPixelI);
+        fGridNeighborhoodPixelJ.push_back(gridPixelJ);
+        fGridNeighborhoodAngles.push_back(-999.0); // Invalid angle marker
         continue;
       }
       
@@ -355,9 +355,9 @@ void EventAction::Calculate9x9GridAngles(const G4ThreeVector& hitPosition, G4int
       G4double alphaInDegrees = alpha * (180.0 / CLHEP::pi);
       
       // Store the results
-      fGrid9x9PixelI.push_back(gridPixelI);
-      fGrid9x9PixelJ.push_back(gridPixelJ);
-      fGrid9x9Angles.push_back(alphaInDegrees);
+      fGridNeighborhoodPixelI.push_back(gridPixelI);
+      fGridNeighborhoodPixelJ.push_back(gridPixelJ);
+      fGridNeighborhoodAngles.push_back(alphaInDegrees);
     }
   }
 }
@@ -438,58 +438,58 @@ G4double EventAction::CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
 }
 
 // Calculate charge sharing for pixels in a 9x9 grid around the hit pixel
-void EventAction::CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ, G4double edep)
+void EventAction::CalculateNeighborhoodChargeSharing()
 {
   // Clear previous data
-  fGrid9x9ChargeFractions.clear();
-  fGrid9x9Distances.clear();
-  fGrid9x9ChargeValues.clear();
-  fGrid9x9ChargeCoulombs.clear();
+  fGridNeighborhoodChargeFractions.clear();
+  fGridNeighborhoodDistances.clear();
+  fGridNeighborhoodChargeValues.clear();
+  fGridNeighborhoodChargeCoulombs.clear();
   
   // Check if no energy was deposited
-  if (edep <= 0) {
+  if (fEdep <= 0) {
     // Fill all 81 positions with zero for no-energy events
     for (G4int di = -4; di <= 4; di++) {
       for (G4int dj = -4; dj <= 4; dj++) {
-        G4int gridPixelI = hitPixelI + di;
-        G4int gridPixelJ = hitPixelJ + dj;
+        G4int gridPixelI = fPixelIndexI + di;
+        G4int gridPixelJ = fPixelIndexJ + dj;
         
-        fGrid9x9ChargeFractions.push_back(0.0);
-        fGrid9x9Distances.push_back(-999.0);
-        fGrid9x9ChargeValues.push_back(0.0);
-        fGrid9x9ChargeCoulombs.push_back(0.0);
+        fGridNeighborhoodChargeFractions.push_back(0.0);
+        fGridNeighborhoodDistances.push_back(-999.0);
+        fGridNeighborhoodChargeValues.push_back(0.0);
+        fGridNeighborhoodChargeCoulombs.push_back(0.0);
       }
     }
     return;
   }
   
   // Check if hit is inside a pixel - if so, assign all charge to that pixel
-  G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
+  G4bool isInsidePixel = fDetector->IsPositionOnPixel(fPosition);
   if (isInsidePixel) {
     // Convert energy deposit to number of electrons and apply amplification
-    G4double edepInEV = edep * 1e6; // Convert MeV to eV
+    G4double edepInEV = fEdep * 1e6; // Convert MeV to eV
     G4double numElectrons = edepInEV / fIonizationEnergy;
     G4double totalCharge = numElectrons * fAmplificationFactor;
     
     // Fill all 81 positions, giving all charge to the hit pixel and zero to others
     for (G4int di = -4; di <= 4; di++) {
       for (G4int dj = -4; dj <= 4; dj++) {
-        G4int gridPixelI = hitPixelI + di;
-        G4int gridPixelJ = hitPixelJ + dj;
+        G4int gridPixelI = fPixelIndexI + di;
+        G4int gridPixelJ = fPixelIndexJ + dj;
         
         // Check if this is the pixel that was hit
         if (di == 0 && dj == 0) {
           // This is the center pixel (the one that was hit)
-          fGrid9x9ChargeFractions.push_back(1.0);
-          fGrid9x9ChargeValues.push_back(totalCharge);
-          fGrid9x9ChargeCoulombs.push_back(totalCharge * fElementaryCharge);
-          fGrid9x9Distances.push_back(0.0); // Distance to center of hit pixel is effectively zero
+          fGridNeighborhoodChargeFractions.push_back(1.0);
+          fGridNeighborhoodChargeValues.push_back(totalCharge);
+          fGridNeighborhoodChargeCoulombs.push_back(totalCharge * fElementaryCharge);
+          fGridNeighborhoodDistances.push_back(0.0); // Distance to center of hit pixel is effectively zero
         } else if (gridPixelI >= 0 && gridPixelI < fDetector->GetNumBlocksPerSide() && 
                    gridPixelJ >= 0 && gridPixelJ < fDetector->GetNumBlocksPerSide()) {
           // This is a valid pixel in the detector but not the hit pixel
-          fGrid9x9ChargeFractions.push_back(0.0);
-          fGrid9x9ChargeValues.push_back(0.0);
-          fGrid9x9ChargeCoulombs.push_back(0.0);
+          fGridNeighborhoodChargeFractions.push_back(0.0);
+          fGridNeighborhoodChargeValues.push_back(0.0);
+          fGridNeighborhoodChargeCoulombs.push_back(0.0);
           
           // Calculate distance to this pixel center for completeness
           G4double pixelSize = fDetector->GetPixelSize();
@@ -500,15 +500,15 @@ void EventAction::CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int
           
           G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
           G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
-          G4double distance = std::sqrt(std::pow(hitPosition.x() - pixelCenterX, 2) + 
-                                       std::pow(hitPosition.y() - pixelCenterY, 2));
-          fGrid9x9Distances.push_back(distance);
+          G4double distance = std::sqrt(std::pow(fPosition.x() - pixelCenterX, 2) + 
+                                       std::pow(fPosition.y() - pixelCenterY, 2));
+          fGridNeighborhoodDistances.push_back(distance);
         } else {
           // This pixel is outside the detector bounds
-          fGrid9x9ChargeFractions.push_back(-999.0); // Invalid marker
-          fGrid9x9Distances.push_back(-999.0);
-          fGrid9x9ChargeValues.push_back(0.0);
-          fGrid9x9ChargeCoulombs.push_back(0.0);
+          fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
+          fGridNeighborhoodDistances.push_back(-999.0);
+          fGridNeighborhoodChargeValues.push_back(0.0);
+          fGridNeighborhoodChargeCoulombs.push_back(0.0);
         }
       }
     }
@@ -516,9 +516,9 @@ void EventAction::CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int
   }
   
   // Convert energy deposit to number of electrons
-  // edep is in MeV, fIonizationEnergy is in eV
+  // fEdep is in MeV, fIonizationEnergy is in eV
   // Convert MeV to eV: 1 MeV = 1e6 eV
-  G4double edepInEV = edep * 1e6; // Convert MeV to eV
+  G4double edepInEV = fEdep * 1e6; // Convert MeV to eV
   G4double numElectrons = edepInEV / fIonizationEnergy;
   
   // Apply AC-LGAD amplification
@@ -548,17 +548,17 @@ void EventAction::CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int
   for (G4int di = -4; di <= 4; di++) {
     for (G4int dj = -4; dj <= 4; dj++) {
       // Calculate the pixel indices for this grid position
-      G4int gridPixelI = hitPixelI + di;
-      G4int gridPixelJ = hitPixelJ + dj;
+      G4int gridPixelI = fPixelIndexI + di;
+      G4int gridPixelJ = fPixelIndexJ + dj;
       
       // Check if this pixel is within the detector bounds
       if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
           gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
         // Store invalid data for out-of-bounds pixels
-        fGrid9x9ChargeFractions.push_back(-999.0); // Invalid marker
-        fGrid9x9Distances.push_back(-999.0);
-        fGrid9x9ChargeValues.push_back(0.0);
-        fGrid9x9ChargeCoulombs.push_back(0.0);
+        fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
+        fGridNeighborhoodDistances.push_back(-999.0);
+        fGridNeighborhoodChargeValues.push_back(0.0);
+        fGridNeighborhoodChargeCoulombs.push_back(0.0);
         continue;
       }
       
@@ -567,11 +567,11 @@ void EventAction::CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int
       G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
       
       // Calculate the distance from the hit to the pixel center (in mm)
-      G4double distance = std::sqrt(std::pow(hitPosition.x() - pixelCenterX, 2) + 
-                                   std::pow(hitPosition.y() - pixelCenterY, 2));
+      G4double distance = std::sqrt(std::pow(fPosition.x() - pixelCenterX, 2) + 
+                                   std::pow(fPosition.y() - pixelCenterY, 2));
       
       // Calculate the alpha angle for this pixel using the same algorithm as elsewhere
-      G4double alpha = CalculatePixelAlphaSubtended(hitPosition.x(), hitPosition.y(), 
+      G4double alpha = CalculatePixelAlphaSubtended(fPosition.x(), fPosition.y(), 
                                                    pixelCenterX, pixelCenterY, 
                                                    pixelSize, pixelSize);
       
@@ -609,8 +609,8 @@ void EventAction::CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int
   for (G4int di = -4; di <= 4; di++) {
     for (G4int dj = -4; dj <= 4; dj++) {
       // Calculate the pixel indices for this grid position
-      G4int gridPixelI = hitPixelI + di;
-      G4int gridPixelJ = hitPixelJ + dj;
+      G4int gridPixelI = fPixelIndexI + di;
+      G4int gridPixelJ = fPixelIndexJ + dj;
       
       // Check if this pixel is within bounds
       if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
@@ -628,10 +628,10 @@ void EventAction::CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int
         chargeValue = chargeFraction * totalCharge;
       }
       
-      fGrid9x9ChargeFractions.push_back(chargeFraction);
-      fGrid9x9Distances.push_back(distances[validIndex]);
-      fGrid9x9ChargeValues.push_back(chargeValue);
-      fGrid9x9ChargeCoulombs.push_back(chargeValue * fElementaryCharge);
+      fGridNeighborhoodChargeFractions.push_back(chargeFraction);
+      fGridNeighborhoodDistances.push_back(distances[validIndex]);
+      fGridNeighborhoodChargeValues.push_back(chargeValue);
+      fGridNeighborhoodChargeCoulombs.push_back(chargeValue * fElementaryCharge);
       
       validIndex++;
     }
