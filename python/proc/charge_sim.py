@@ -302,7 +302,7 @@ class RandomHitChargeGridGenerator:
             plt.savefig(filename, dpi=300, bbox_inches='tight')
             print(f"Event {event_idx} charge {charge_type} plot saved to {filename}")
         
-        plt.show()
+        #plt.show()
         
         # Print statistics for this event
         if len(valid_data) > 0:
@@ -571,7 +571,7 @@ class RandomHitChargeGridGenerator:
             plt.savefig(filename, dpi=300, bbox_inches='tight')
             print(f"Mean charge {charge_type} grid plot saved to {filename}")
         
-        plt.show()
+        #plt.show()
         
         # Print statistics
         if len(valid_mean_data) > 0:
@@ -841,7 +841,7 @@ if __name__ == "__main__":
     NUM_EVENTS = 3  # Change this to control number of random events to visualize
     CHARGE_TYPES = ['fraction', 'coulomb']  # Generate both fraction and coulomb plots
     OUTPUT_DIR = "neighborhood_charge_plots"  # Directory to save plots (empty string for current directory)
-    RANDOM_SEED = 42  # For reproducible results
+    RANDOM_SEED = 2  # For reproducible results
     INCLUDE_MEAN = True  # Whether to include mean plot of all valid events
     INCLUDE_EDGE_CASE = True  # Whether to include edge case where neighborhood (9x9) grid is incomplete
     
