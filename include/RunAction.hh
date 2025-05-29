@@ -48,6 +48,12 @@ public:
                         const std::vector<G4int>& pixelI, 
                         const std::vector<G4int>& pixelJ);
     
+    // Method to set 9x9 grid charge sharing data
+    void Set9x9ChargeData(const std::vector<G4double>& chargeFractions,
+                          const std::vector<G4double>& distances,
+                          const std::vector<G4double>& chargeValues,
+                          const std::vector<G4double>& chargeCoulombs);
+    
     // Method to set detector grid parameters for saving to ROOT
     void SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, 
                                    G4double pixelCornerOffset, G4double detSize, 
@@ -90,6 +96,12 @@ private:
     std::vector<G4double> fGrid9x9Angles; // Angles from hit to 9x9 grid pixels [deg]
     std::vector<G4int> fGrid9x9PixelI;     // I indices of 9x9 grid pixels
     std::vector<G4int> fGrid9x9PixelJ;     // J indices of 9x9 grid pixels
+    
+    // Variables for 9x9 grid charge sharing data
+    std::vector<G4double> fGrid9x9ChargeFractions; // Charge fractions for 9x9 grid pixels
+    std::vector<G4double> fGrid9x9Distances;         // Distances from hit to 9x9 grid pixels [mm]
+    std::vector<G4double> fGrid9x9ChargeValues;        // Charge values for 9x9 grid pixels (electrons)
+    std::vector<G4double> fGrid9x9ChargeCoulombs;       // Charge values in Coulombs for 9x9 grid pixels
     
     // Variables for detector grid parameters (stored as ROOT metadata)
     G4double fGridPixelSize;        // Pixel size [mm]

@@ -131,6 +131,12 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("Grid9x9PixelI", &fGrid9x9PixelI)->SetTitle("I Indices of 9x9 Grid Pixels");
     fTree->Branch("Grid9x9PixelJ", &fGrid9x9PixelJ)->SetTitle("J Indices of 9x9 Grid Pixels");
     
+    // Add branches for 9x9 grid charge sharing data
+    fTree->Branch("Grid9x9ChargeFractions", &fGrid9x9ChargeFractions)->SetTitle("Charge Fractions for 9x9 Grid Pixels");
+    fTree->Branch("Grid9x9Distances", &fGrid9x9Distances)->SetTitle("Distances from Hit to 9x9 Grid Pixels [mm]");
+    fTree->Branch("Grid9x9ChargeValues", &fGrid9x9ChargeValues)->SetTitle("Charge Values for 9x9 Grid Pixels");
+    fTree->Branch("Grid9x9ChargeCoulombs", &fGrid9x9ChargeCoulombs)->SetTitle("Charge Coulombs for 9x9 Grid Pixels");
+    
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
   catch (std::exception& e) {
@@ -450,6 +456,18 @@ void RunAction::Set9x9GridData(const std::vector<G4double>& angles,
     fGrid9x9Angles = angles;
     fGrid9x9PixelI = pixelI;
     fGrid9x9PixelJ = pixelJ;
+}
+
+void RunAction::Set9x9ChargeData(const std::vector<G4double>& chargeFractions,
+                                 const std::vector<G4double>& distances,
+                                 const std::vector<G4double>& chargeValues,
+                                 const std::vector<G4double>& chargeCoulombs)
+{
+    // Store the 9x9 grid charge sharing data
+    fGrid9x9ChargeFractions = chargeFractions;
+    fGrid9x9Distances = distances;
+    fGrid9x9ChargeValues = chargeValues;
+    fGrid9x9ChargeCoulombs = chargeCoulombs;
 }
 
 void RunAction::FillTree()
