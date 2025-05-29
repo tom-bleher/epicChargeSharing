@@ -48,6 +48,12 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fGrid9x9Angles.clear();
   fGrid9x9PixelI.clear();
   fGrid9x9PixelJ.clear();
+  
+  // Reset 9x9 grid charge sharing data
+  fGrid9x9ChargeFractions.clear();
+  fGrid9x9Distances.clear();
+  fGrid9x9ChargeValues.clear();
+  fGrid9x9ChargeCoulombs.clear();
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -78,6 +84,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Calculate 9x9 grid angles and pass to RunAction
   Calculate9x9GridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
   fRunAction->Set9x9GridData(fGrid9x9Angles, fGrid9x9PixelI, fGrid9x9PixelJ);
+  
+  // Calculate 9x9 grid charge sharing and pass to RunAction
+  CalculateChargeSharing(fPosition, fPixelIndexI, fPixelIndexJ, fEdep);
+  fRunAction->Set9x9ChargeData(fGrid9x9ChargeFractions, fGrid9x9Distances, fGrid9x9ChargeValues, fGrid9x9ChargeCoulombs);
   
   // Pass pixel hit status to RunAction
   fRunAction->SetPixelHit(fPixelHit);
@@ -425,4 +435,205 @@ G4double EventAction::CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
   G4double alpha = 2.0 * CLHEP::pi - maxDiff;
   
   return alpha; // Return in radians
+}
+
+// Calculate charge sharing for pixels in a 9x9 grid around the hit pixel
+void EventAction::CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ, G4double edep)
+{
+  // Clear previous data
+  fGrid9x9ChargeFractions.clear();
+  fGrid9x9Distances.clear();
+  fGrid9x9ChargeValues.clear();
+  fGrid9x9ChargeCoulombs.clear();
+  
+  // Check if no energy was deposited
+  if (edep <= 0) {
+    // Fill all 81 positions with zero for no-energy events
+    for (G4int di = -4; di <= 4; di++) {
+      for (G4int dj = -4; dj <= 4; dj++) {
+        G4int gridPixelI = hitPixelI + di;
+        G4int gridPixelJ = hitPixelJ + dj;
+        
+        fGrid9x9ChargeFractions.push_back(0.0);
+        fGrid9x9Distances.push_back(-999.0);
+        fGrid9x9ChargeValues.push_back(0.0);
+        fGrid9x9ChargeCoulombs.push_back(0.0);
+      }
+    }
+    return;
+  }
+  
+  // Check if hit is inside a pixel - if so, assign all charge to that pixel
+  G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
+  if (isInsidePixel) {
+    // Convert energy deposit to number of electrons and apply amplification
+    G4double edepInEV = edep * 1e6; // Convert MeV to eV
+    G4double numElectrons = edepInEV / fIonizationEnergy;
+    G4double totalCharge = numElectrons * fAmplificationFactor;
+    
+    // Fill all 81 positions, giving all charge to the hit pixel and zero to others
+    for (G4int di = -4; di <= 4; di++) {
+      for (G4int dj = -4; dj <= 4; dj++) {
+        G4int gridPixelI = hitPixelI + di;
+        G4int gridPixelJ = hitPixelJ + dj;
+        
+        // Check if this is the pixel that was hit
+        if (di == 0 && dj == 0) {
+          // This is the center pixel (the one that was hit)
+          fGrid9x9ChargeFractions.push_back(1.0);
+          fGrid9x9ChargeValues.push_back(totalCharge);
+          fGrid9x9ChargeCoulombs.push_back(totalCharge * fElementaryCharge);
+          fGrid9x9Distances.push_back(0.0); // Distance to center of hit pixel is effectively zero
+        } else if (gridPixelI >= 0 && gridPixelI < fDetector->GetNumBlocksPerSide() && 
+                   gridPixelJ >= 0 && gridPixelJ < fDetector->GetNumBlocksPerSide()) {
+          // This is a valid pixel in the detector but not the hit pixel
+          fGrid9x9ChargeFractions.push_back(0.0);
+          fGrid9x9ChargeValues.push_back(0.0);
+          fGrid9x9ChargeCoulombs.push_back(0.0);
+          
+          // Calculate distance to this pixel center for completeness
+          G4double pixelSize = fDetector->GetPixelSize();
+          G4double pixelSpacing = fDetector->GetPixelSpacing();
+          G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
+          G4double detSize = fDetector->GetDetSize();
+          G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
+          
+          G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
+          G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
+          G4double distance = std::sqrt(std::pow(hitPosition.x() - pixelCenterX, 2) + 
+                                       std::pow(hitPosition.y() - pixelCenterY, 2));
+          fGrid9x9Distances.push_back(distance);
+        } else {
+          // This pixel is outside the detector bounds
+          fGrid9x9ChargeFractions.push_back(-999.0); // Invalid marker
+          fGrid9x9Distances.push_back(-999.0);
+          fGrid9x9ChargeValues.push_back(0.0);
+          fGrid9x9ChargeCoulombs.push_back(0.0);
+        }
+      }
+    }
+    return;
+  }
+  
+  // Convert energy deposit to number of electrons
+  // edep is in MeV, fIonizationEnergy is in eV
+  // Convert MeV to eV: 1 MeV = 1e6 eV
+  G4double edepInEV = edep * 1e6; // Convert MeV to eV
+  G4double numElectrons = edepInEV / fIonizationEnergy;
+  
+  // Apply AC-LGAD amplification
+  G4double totalCharge = numElectrons * fAmplificationFactor;
+  
+  // Get detector parameters
+  G4double pixelSize = fDetector->GetPixelSize();
+  G4double pixelSpacing = fDetector->GetPixelSpacing();
+  G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
+  G4double detSize = fDetector->GetDetSize();
+  G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
+  G4ThreeVector detectorPosition = fDetector->GetDetectorPosition();
+  
+  // Calculate the first pixel position (corner)
+  G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
+  
+  // First pass: collect valid pixels and calculate weights
+  std::vector<G4double> weights;
+  std::vector<G4double> distances;
+  std::vector<G4double> angles;
+  std::vector<G4int> validPixelI;
+  std::vector<G4int> validPixelJ;
+  
+  G4double d0_mm = fD0 * 1e-3; // Convert microns to mm
+  
+  // Define the 9x9 grid: 4 pixels in each direction from the center
+  for (G4int di = -4; di <= 4; di++) {
+    for (G4int dj = -4; dj <= 4; dj++) {
+      // Calculate the pixel indices for this grid position
+      G4int gridPixelI = hitPixelI + di;
+      G4int gridPixelJ = hitPixelJ + dj;
+      
+      // Check if this pixel is within the detector bounds
+      if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
+          gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
+        // Store invalid data for out-of-bounds pixels
+        fGrid9x9ChargeFractions.push_back(-999.0); // Invalid marker
+        fGrid9x9Distances.push_back(-999.0);
+        fGrid9x9ChargeValues.push_back(0.0);
+        fGrid9x9ChargeCoulombs.push_back(0.0);
+        continue;
+      }
+      
+      // Calculate the center position of this grid pixel
+      G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
+      G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
+      
+      // Calculate the distance from the hit to the pixel center (in mm)
+      G4double distance = std::sqrt(std::pow(hitPosition.x() - pixelCenterX, 2) + 
+                                   std::pow(hitPosition.y() - pixelCenterY, 2));
+      
+      // Calculate the alpha angle for this pixel using the same algorithm as elsewhere
+      G4double alpha = CalculatePixelAlphaSubtended(hitPosition.x(), hitPosition.y(), 
+                                                   pixelCenterX, pixelCenterY, 
+                                                   pixelSize, pixelSize);
+      
+      // Store data for valid pixels
+      distances.push_back(distance);
+      angles.push_back(alpha);
+      validPixelI.push_back(gridPixelI);
+      validPixelJ.push_back(gridPixelJ);
+      
+      // Calculate weight according to formula: α_i * ln(d_i/d_0)^(-1)
+      // Handle the case where distance might be very small or zero
+      G4double weight = 0.0;
+      if (distance > d0_mm) {
+        weight = alpha * (1.0 / std::log(distance / d0_mm));
+      } else if (distance > 0) {
+        // For very small distances, use a large weight
+        weight = alpha * 1000.0; // Large weight for very close pixels
+      } else {
+        // Distance is zero (hit exactly on pixel center), give maximum weight
+        weight = alpha * 10000.0;
+      }
+      
+      weights.push_back(weight);
+    }
+  }
+  
+  // Calculate total weight
+  G4double totalWeight = 0.0;
+  for (G4double weight : weights) {
+    totalWeight += weight;
+  }
+  
+  // Second pass: calculate charge fractions and values
+  size_t validIndex = 0;
+  for (G4int di = -4; di <= 4; di++) {
+    for (G4int dj = -4; dj <= 4; dj++) {
+      // Calculate the pixel indices for this grid position
+      G4int gridPixelI = hitPixelI + di;
+      G4int gridPixelJ = hitPixelJ + dj;
+      
+      // Check if this pixel is within bounds
+      if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
+          gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
+        // Already stored invalid data in first pass
+        continue;
+      }
+      
+      // Calculate charge fraction and value
+      G4double chargeFraction = 0.0;
+      G4double chargeValue = 0.0;
+      
+      if (totalWeight > 0) {
+        chargeFraction = weights[validIndex] / totalWeight;
+        chargeValue = chargeFraction * totalCharge;
+      }
+      
+      fGrid9x9ChargeFractions.push_back(chargeFraction);
+      fGrid9x9Distances.push_back(distances[validIndex]);
+      fGrid9x9ChargeValues.push_back(chargeValue);
+      fGrid9x9ChargeCoulombs.push_back(chargeValue * fElementaryCharge);
+      
+      validIndex++;
+    }
+  }
 }

@@ -38,6 +38,9 @@ public:
                                          G4double pixelCenterX, G4double pixelCenterY,
                                          G4double pixelWidth, G4double pixelHeight);
     
+    // Method to calculate charge sharing in the 9x9 grid
+    void CalculateChargeSharing(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ, G4double edep);
+    
 private:
     RunAction* fRunAction;
     DetectorConstruction* fDetector;
@@ -56,6 +59,18 @@ private:
     std::vector<G4double> fGrid9x9Angles; // Angles from hit to each pixel in 9x9 grid
     std::vector<G4int> fGrid9x9PixelI;     // I indices of pixels in 9x9 grid
     std::vector<G4int> fGrid9x9PixelJ;     // J indices of pixels in 9x9 grid
+    
+    // 9x9 grid charge sharing information
+    std::vector<G4double> fGrid9x9ChargeFractions; // Charge fraction for each pixel in 9x9 grid
+    std::vector<G4double> fGrid9x9Distances;       // Distance from hit to each pixel center in 9x9 grid
+    std::vector<G4double> fGrid9x9ChargeValues;    // Actual charge value for each pixel in 9x9 grid (electrons)
+    std::vector<G4double> fGrid9x9ChargeCoulombs;  // Actual charge value for each pixel in 9x9 grid (Coulombs)
+    
+    // Constants for charge sharing calculation
+    static constexpr G4double fIonizationEnergy = 3.6; // eV - typical for silicon
+    static constexpr G4double fAmplificationFactor = 20.0; // AC-LGAD amplification factor
+    static constexpr G4double fD0 = 10.0; // microns - reference distance for charge sharing
+    static constexpr G4double fElementaryCharge = 1.602176634e-19; // Coulombs - elementary charge
 };
 
 #endif
