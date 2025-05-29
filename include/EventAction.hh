@@ -41,6 +41,13 @@ public:
     // Method to calculate charge sharing in the neighborhood (9x9) grid
     void CalculateNeighborhoodChargeSharing();
     
+    // Public setters for additional information from SteppingAction
+    void SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime);
+    void SetPhysicsProcessInfo(const G4String& processName, G4int trackID, G4int parentID, 
+                              G4int stepNumber, G4double stepLength);
+    void AddTrajectoryPoint(G4double x, G4double y, G4double z, G4double time);
+    void SetFinalParticleEnergy(G4double finalEnergy);
+    
 private:
     RunAction* fRunAction;
     DetectorConstruction* fDetector;
@@ -71,6 +78,31 @@ private:
     static constexpr G4double fAmplificationFactor = 20.0; // AC-LGAD amplification factor
     static constexpr G4double fD0 = 10.0; // microns - reference distance for charge sharing
     static constexpr G4double fElementaryCharge = 1.602176634e-19; // Coulombs - elementary charge
+    
+    // Additional tracking variables for enhanced ROOT output
+    G4double fInitialParticleEnergy;   // Initial particle energy
+    G4double fFinalParticleEnergy;     // Final particle energy  
+    G4double fParticleMomentum;        // Particle momentum
+    G4String fParticleName;            // Particle type name
+    G4String fCreatorProcess;          // Creator process
+    
+    // Timing information
+    G4double fGlobalTime;              // Global time of first hit
+    G4double fLocalTime;               // Local time of first hit
+    G4double fProperTime;              // Proper time of first hit
+    
+    // Physics process information
+    G4String fPhysicsProcess;          // Dominant physics process
+    G4int fTrackID;                    // Primary track ID
+    G4int fParentID;                   // Parent track ID
+    G4int fStepNumber;                 // Total number of steps
+    G4double fTotalStepLength;         // Total step length
+    
+    // Track trajectory information
+    std::vector<G4double> fTrajectoryX;    // X positions along track
+    std::vector<G4double> fTrajectoryY;    // Y positions along track
+    std::vector<G4double> fTrajectoryZ;    // Z positions along track
+    std::vector<G4double> fTrajectoryTime; // Time at each point
 };
 
 #endif

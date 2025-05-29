@@ -59,6 +59,24 @@ public:
                                    G4double pixelCornerOffset, G4double detSize, 
                                    G4int numBlocksPerSide);
     
+    // Method to set particle information
+    void SetParticleInfo(G4int eventID, G4double initialEnergy, G4double finalEnergy, 
+                        G4double momentum, const G4String& particleName, 
+                        const G4String& creatorProcess);
+    
+    // Method to set timing information
+    void SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime);
+    
+    // Method to set physics process information
+    void SetPhysicsInfo(const G4String& physicsProcess, G4int trackID, G4int parentID, 
+                       G4int stepNumber, G4double stepLength);
+    
+    // Method to set track trajectory information
+    void SetTrajectoryInfo(const std::vector<G4double>& trackX, 
+                          const std::vector<G4double>& trackY, 
+                          const std::vector<G4double>& trackZ,
+                          const std::vector<G4double>& trackTime);
+    
     // Fill the ROOT tree with current event data
     void FillTree();
 
@@ -109,6 +127,32 @@ private:
     G4double fGridPixelCornerOffset; // Pixel corner offset [mm]
     G4double fGridDetSize;          // Detector size [mm]
     G4int fGridNumBlocksPerSide;    // Number of blocks per side
+    
+    // Variables for particle information
+    G4int fEventID;                 // Event ID
+    G4double fInitialEnergy;        // Initial particle energy [MeV]
+    G4double fFinalEnergy;          // Final particle energy [MeV]
+    G4double fMomentum;             // Particle momentum [MeV/c]
+    std::string fParticleName;      // Particle type name
+    std::string fCreatorProcess;    // Creator process name
+    
+    // Variables for timing information
+    G4double fGlobalTime;           // Global time [ns]
+    G4double fLocalTime;            // Local time [ns]
+    G4double fProperTime;           // Proper time [ns]
+    
+    // Variables for physics process information
+    std::string fPhysicsProcess;    // Physics process name
+    G4int fTrackID;                 // Track ID
+    G4int fParentID;                // Parent track ID
+    G4int fStepNumber;              // Step number in track
+    G4double fStepLength;           // Step length [mm]
+    
+    // Variables for track trajectory information
+    std::vector<G4double> fTrajectoryX;    // X positions along track [mm]
+    std::vector<G4double> fTrajectoryY;    // Y positions along track [mm]
+    std::vector<G4double> fTrajectoryZ;    // Z positions along track [mm]
+    std::vector<G4double> fTrajectoryTime; // Time at each trajectory point [ns]
 };
 
 #endif
