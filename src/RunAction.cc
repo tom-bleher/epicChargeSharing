@@ -44,9 +44,24 @@ RunAction::RunAction()
   fGridPixelSpacing(0),
   fGridPixelCornerOffset(0),
   fGridDetSize(0),
-  fGridNumBlocksPerSide(0)
+  fGridNumBlocksPerSide(0),
+  fEventID(-1),
+  fInitialEnergy(0),
+  fFinalEnergy(0),
+  fMomentum(0),
+  fParticleName(""),
+  fCreatorProcess(""),
+  fGlobalTime(0),
+  fLocalTime(0),
+  fProperTime(0),
+  fPhysicsProcess(""),
+  fTrackID(-1),
+  fParentID(-1),
+  fStepNumber(-1),
+  fStepLength(0)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
+  // Initialize trajectory vectors (they are automatically initialized empty)
 }
 
 RunAction::~RunAction()
@@ -136,6 +151,32 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("GridNeighborhoodDistances", &fGridNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm]");
     fTree->Branch("GridNeighborhoodChargeValues", &fGridNeighborhoodChargeValues)->SetTitle("Charge Values for Neighborhood Grid Pixels");
     fTree->Branch("GridNeighborhoodChargeCoulombs", &fGridNeighborhoodChargeCoulombs)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels");
+    
+    // Add branches for particle information
+    fTree->Branch("EventID", &fEventID, "EventID/I")->SetTitle("Event ID");
+    fTree->Branch("InitialEnergy", &fInitialEnergy, "InitialEnergy/D")->SetTitle("Initial Particle Energy [MeV]");
+    fTree->Branch("FinalEnergy", &fFinalEnergy, "FinalEnergy/D")->SetTitle("Final Particle Energy [MeV]");
+    fTree->Branch("Momentum", &fMomentum, "Momentum/D")->SetTitle("Particle Momentum [MeV/c]");
+    fTree->Branch("ParticleName", &fParticleName)->SetTitle("Particle Type Name");
+    fTree->Branch("CreatorProcess", &fCreatorProcess)->SetTitle("Creator Process Name");
+    
+    // Add branches for timing information
+    fTree->Branch("GlobalTime", &fGlobalTime, "GlobalTime/D")->SetTitle("Global Time [ns]");
+    fTree->Branch("LocalTime", &fLocalTime, "LocalTime/D")->SetTitle("Local Time [ns]");
+    fTree->Branch("ProperTime", &fProperTime, "ProperTime/D")->SetTitle("Proper Time [ns]");
+    
+    // Add branches for physics process information
+    fTree->Branch("PhysicsProcess", &fPhysicsProcess)->SetTitle("Physics Process Name");
+    fTree->Branch("TrackID", &fTrackID, "TrackID/I")->SetTitle("Track ID");
+    fTree->Branch("ParentID", &fParentID, "ParentID/I")->SetTitle("Parent Track ID");
+    fTree->Branch("StepNumber", &fStepNumber, "StepNumber/I")->SetTitle("Step Number in Track");
+    fTree->Branch("StepLength", &fStepLength, "StepLength/D")->SetTitle("Step Length [mm]");
+    
+    // Add branches for track trajectory information
+    fTree->Branch("TrajectoryX", &fTrajectoryX)->SetTitle("X Positions Along Track [mm]");
+    fTree->Branch("TrajectoryY", &fTrajectoryY)->SetTitle("Y Positions Along Track [mm]");
+    fTree->Branch("TrajectoryZ", &fTrajectoryZ)->SetTitle("Z Positions Along Track [mm]");
+    fTree->Branch("TrajectoryTime", &fTrajectoryTime)->SetTitle("Time at Each Trajectory Point [ns]");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -508,4 +549,48 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
     G4cout << "  Pixel Corner Offset: " << fGridPixelCornerOffset << " mm" << G4endl;
     G4cout << "  Detector Size: " << fGridDetSize << " mm" << G4endl;
     G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
+}
+
+void RunAction::SetParticleInfo(G4int eventID, G4double initialEnergy, G4double finalEnergy, 
+                               G4double momentum, const G4String& particleName, 
+                               const G4String& creatorProcess)
+{
+    // Store particle information
+    fEventID = eventID;
+    fInitialEnergy = initialEnergy;
+    fFinalEnergy = finalEnergy;
+    fMomentum = momentum;
+    fParticleName = particleName;
+    fCreatorProcess = creatorProcess;
+}
+
+void RunAction::SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime)
+{
+    // Store timing information (convert to ns if needed)
+    fGlobalTime = globalTime / CLHEP::ns;  // Convert to ns
+    fLocalTime = localTime / CLHEP::ns;    // Convert to ns
+    fProperTime = properTime / CLHEP::ns;  // Convert to ns
+}
+
+void RunAction::SetPhysicsInfo(const G4String& physicsProcess, G4int trackID, G4int parentID, 
+                              G4int stepNumber, G4double stepLength)
+{
+    // Store physics process information
+    fPhysicsProcess = physicsProcess;
+    fTrackID = trackID;
+    fParentID = parentID;
+    fStepNumber = stepNumber;
+    fStepLength = stepLength;
+}
+
+void RunAction::SetTrajectoryInfo(const std::vector<G4double>& trackX, 
+                                 const std::vector<G4double>& trackY, 
+                                 const std::vector<G4double>& trackZ,
+                                 const std::vector<G4double>& trackTime)
+{
+    // Store trajectory information
+    fTrajectoryX = trackX;
+    fTrajectoryY = trackY;
+    fTrajectoryZ = trackZ;
+    fTrajectoryTime = trackTime;
 }

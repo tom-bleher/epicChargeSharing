@@ -4,6 +4,9 @@
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
+#include "G4ParticleTable.hh"
+#include "G4PrimaryParticle.hh"
+#include "G4PrimaryVertex.hh"
 #include <cmath>
 #include <vector>
 #include <algorithm>
@@ -20,7 +23,20 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fPixelIndexI(-1),
   fPixelIndexJ(-1),
   fPixelDistance(-1.),
-  fPixelHit(false)
+  fPixelHit(false),
+  fInitialParticleEnergy(0.),
+  fFinalParticleEnergy(0.),
+  fParticleMomentum(0.),
+  fParticleName(""),
+  fCreatorProcess(""),
+  fGlobalTime(0.),
+  fLocalTime(0.),
+  fProperTime(0.),
+  fPhysicsProcess(""),
+  fTrackID(-1),
+  fParentID(-1),
+  fStepNumber(0),
+  fTotalStepLength(0.)
 { 
 }
 
@@ -54,6 +70,27 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fGridNeighborhoodDistances.clear();
   fGridNeighborhoodChargeValues.clear();
   fGridNeighborhoodChargeCoulombs.clear();
+  
+  // Reset additional tracking variables
+  fInitialParticleEnergy = 0.;
+  fFinalParticleEnergy = 0.;
+  fParticleMomentum = 0.;
+  fParticleName = "";
+  fCreatorProcess = "";
+  fGlobalTime = 0.;
+  fLocalTime = 0.;
+  fProperTime = 0.;
+  fPhysicsProcess = "";
+  fTrackID = -1;
+  fParentID = -1;
+  fStepNumber = 0;
+  fTotalStepLength = 0.;
+  
+  // Reset trajectory data
+  fTrajectoryX.clear();
+  fTrajectoryY.clear();
+  fTrajectoryZ.clear();
+  fTrajectoryTime.clear();
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -63,7 +100,23 @@ void EventAction::EndOfEventAction(const G4Event* event)
     G4ThreeVector primaryPos = event->GetPrimaryVertex()->GetPosition();
     // Update the initial position
     fInitialPosition = primaryPos;
+    
+    // Get particle information from the primary vertex
+    if (event->GetPrimaryVertex()->GetPrimary()) {
+      G4PrimaryParticle* primary = event->GetPrimaryVertex()->GetPrimary();
+      fInitialParticleEnergy = primary->GetKineticEnergy();
+      fParticleMomentum = primary->GetMomentum().mag();
+      
+      // Get particle definition from PDG code
+      G4ParticleTable* particleTable = G4ParticleTable::GetParticleTable();
+      if (G4ParticleDefinition* particleDef = particleTable->FindParticle(primary->GetPDGcode())) {
+        fParticleName = particleDef->GetParticleName();
+      }
+    }
   }
+  
+  // Set event ID
+  G4int eventID = event->GetEventID();
   
   // Always record event data, even if no energy was deposited
   // Values are passed in Geant4's internal units (MeV for energy, mm for length)
@@ -91,6 +144,19 @@ void EventAction::EndOfEventAction(const G4Event* event)
   
   // Pass pixel hit status to RunAction
   fRunAction->SetPixelHit(fPixelHit);
+  
+  // Pass particle information to RunAction
+  fRunAction->SetParticleInfo(eventID, fInitialParticleEnergy, fFinalParticleEnergy, 
+                             fParticleMomentum, fParticleName, fCreatorProcess);
+  
+  // Pass timing information to RunAction
+  fRunAction->SetTimingInfo(fGlobalTime, fLocalTime, fProperTime);
+  
+  // Pass physics information to RunAction
+  fRunAction->SetPhysicsInfo(fPhysicsProcess, fTrackID, fParentID, fStepNumber, fTotalStepLength);
+  
+  // Pass trajectory information to RunAction
+  fRunAction->SetTrajectoryInfo(fTrajectoryX, fTrajectoryY, fTrajectoryZ, fTrajectoryTime);
   
   fRunAction->FillTree();
 }
@@ -636,4 +702,42 @@ void EventAction::CalculateNeighborhoodChargeSharing()
       validIndex++;
     }
   }
+}
+
+// Implementation of new setter methods for additional information
+void EventAction::SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime)
+{
+  // Only set timing on first call (first energy depositing step)
+  if (fGlobalTime == 0.) {
+    fGlobalTime = globalTime;
+    fLocalTime = localTime;
+    fProperTime = properTime;
+  }
+}
+
+void EventAction::SetPhysicsProcessInfo(const G4String& processName, G4int trackID, G4int parentID, 
+                                       G4int stepNumber, G4double stepLength)
+{
+  // Store the dominant physics process (first one or most significant)
+  if (fPhysicsProcess.empty()) {
+    fPhysicsProcess = processName;
+  }
+  
+  fTrackID = trackID;
+  fParentID = parentID;
+  fStepNumber = stepNumber;
+  fTotalStepLength += stepLength;
+}
+
+void EventAction::AddTrajectoryPoint(G4double x, G4double y, G4double z, G4double time)
+{
+  fTrajectoryX.push_back(x);
+  fTrajectoryY.push_back(y);
+  fTrajectoryZ.push_back(z);
+  fTrajectoryTime.push_back(time);
+}
+
+void EventAction::SetFinalParticleEnergy(G4double finalEnergy)
+{
+  fFinalParticleEnergy = finalEnergy;
 }
