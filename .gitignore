@@ -21,6 +21,13 @@ geant4_env/
 *.exe
 *.out
 
+# Images
+*.png
+*.pdf
+*.svg
+*.jpg
+*.jpeg
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
