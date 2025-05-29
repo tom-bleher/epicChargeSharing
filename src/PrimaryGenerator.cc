@@ -18,6 +18,23 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     G4ParticleTable *particleTable = G4ParticleTable::GetParticleTable();
     G4ParticleDefinition *particle = particleTable->FindParticle("e-");
 
+    // Print information about position constraints for 9x9 neighborhood analysis
+    G4double detSize = fDetector->GetDetSize();
+    G4double pixelSpacing = fDetector->GetPixelSpacing();
+    G4double margin = 4.0 * pixelSpacing;
+    G4double constrainedArea = detSize - 2.0 * margin;
+    
+    G4cout << "\n=== PRIMARY GENERATOR CONSTRAINTS ===" << G4endl;
+    G4cout << "Detector size: " << detSize/mm << " mm × " << detSize/mm << " mm" << G4endl;
+    G4cout << "Pixel spacing: " << pixelSpacing/mm << " mm" << G4endl;
+    G4cout << "9×9 neighborhood margin: " << margin/mm << " mm on each side" << G4endl;
+    G4cout << "Constrained generation area: " << constrainedArea/mm << " mm × " << constrainedArea/mm << " mm" << G4endl;
+    if (constrainedArea > 0) {
+        G4double areaRatio = (constrainedArea * constrainedArea) / (detSize * detSize);
+        G4cout << "Area utilization: " << areaRatio * 100.0 << "%" << G4endl;
+    }
+    G4cout << "====================================" << G4endl;
+
     // Initial position will be set randomly in GenerateRandomPosition()
     GenerateRandomPosition();
     
@@ -57,19 +74,40 @@ G4ThreeVector PrimaryGenerator::GetParticlePosition() const
 }
 
 // Generate random position within the detector area
+// Constrained to ensure 9x9 pixel neighborhoods stay within detector bounds
 void PrimaryGenerator::GenerateRandomPosition()
 {
     // Get detector size from the detector construction
     G4double detSize = fDetector->GetDetSize();
+    G4double pixelSpacing = fDetector->GetPixelSpacing();
+    
+    // Calculate margin needed to ensure 9x9 neighborhood stays within bounds
+    // A 9x9 grid extends 4 pixels in each direction from the center
+    G4double margin = 4.0 * pixelSpacing;
     
     // Calculate limits for x and y (detector is centered at origin)
     G4double halfSize = detSize / 2.0;
-    G4double xmin = -halfSize;
-    G4double xmax = halfSize;
-    G4double ymin = -halfSize;
-    G4double ymax = halfSize;
+    G4double xmin = -halfSize + margin;
+    G4double xmax = halfSize - margin;
+    G4double ymin = -halfSize + margin;
+    G4double ymax = halfSize - margin;
     
-    // Generate random position within the detector area
+    // Check if we have valid range after applying margin
+    if (xmax <= xmin || ymax <= ymin) {
+        G4cerr << "ERROR: Detector too small for 9x9 neighborhood analysis!" << G4endl;
+        G4cerr << "Detector size: " << detSize/mm << " mm" << G4endl;
+        G4cerr << "Required margin: " << margin/mm << " mm on each side" << G4endl;
+        G4cerr << "Minimum detector size needed: " << (2*margin)/mm << " mm" << G4endl;
+        
+        // Fall back to original behavior with warning
+        G4cout << "WARNING: Using full detector area - some 9x9 neighborhoods may extend outside bounds" << G4endl;
+        xmin = -halfSize;
+        xmax = halfSize;
+        ymin = -halfSize;
+        ymax = halfSize;
+    }
+    
+    // Generate random position within the constrained area
     G4double x = G4UniformRand() * (xmax - xmin) + xmin;
     G4double y = G4UniformRand() * (ymax - ymin) + ymin;
     
