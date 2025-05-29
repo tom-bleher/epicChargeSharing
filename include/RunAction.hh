@@ -77,6 +77,20 @@ public:
                           const std::vector<G4double>& trackZ,
                           const std::vector<G4double>& trackTime);
     
+    // Method to set step-by-step energy deposition information
+    void SetStepEnergyDeposition(const std::vector<G4double>& stepEdep,
+                                const std::vector<G4double>& stepZ,
+                                const std::vector<G4double>& stepTime,
+                                const std::vector<G4double>& stepLength,
+                                const std::vector<G4int>& stepNumber);
+    
+    // Method to set ALL step information (including non-energy depositing steps)
+    void SetAllStepInfo(const std::vector<G4double>& stepEdep,
+                       const std::vector<G4double>& stepZ,
+                       const std::vector<G4double>& stepTime,
+                       const std::vector<G4double>& stepLength,
+                       const std::vector<G4int>& stepNumber);
+    
     // Fill the ROOT tree with current event data
     void FillTree();
 
@@ -145,14 +159,28 @@ private:
     std::string fPhysicsProcess;    // Physics process name
     G4int fTrackID;                 // Track ID
     G4int fParentID;                // Parent track ID
-    G4int fStepNumber;              // Step number in track
-    G4double fStepLength;           // Step length [mm]
+    G4int fStepNum;                 // Step number in track (renamed to avoid conflict)
+    G4double fStepLen;              // Step length [mm] (renamed to avoid conflict)
     
     // Variables for track trajectory information
     std::vector<G4double> fTrajectoryX;    // X positions along track [mm]
     std::vector<G4double> fTrajectoryY;    // Y positions along track [mm]
     std::vector<G4double> fTrajectoryZ;    // Z positions along track [mm]
     std::vector<G4double> fTrajectoryTime; // Time at each trajectory point [ns]
+    
+    // Variables for step-by-step energy deposition information
+    std::vector<G4double> fStepEdepVec;    // Energy deposited per step [MeV]
+    std::vector<G4double> fStepZVec;       // Z position of each energy deposit [mm]
+    std::vector<G4double> fStepTimeVec;    // Time of each energy deposit [ns]
+    std::vector<G4double> fStepLenVec;     // Length of each step [mm]
+    std::vector<G4int> fStepNumVec;        // Step number for each energy deposit
+    
+    // Variables for ALL step information (including non-energy depositing steps)
+    std::vector<G4double> fAllStepEdepVec;    // Energy deposited per step (including 0) [MeV]
+    std::vector<G4double> fAllStepZVec;       // Z position of each step [mm]
+    std::vector<G4double> fAllStepTimeVec;    // Time of each step [ns]
+    std::vector<G4double> fAllStepLenVec;     // Length of each step [mm]
+    std::vector<G4int> fAllStepNumVec;        // Step number for each step
 };
 
 #endif

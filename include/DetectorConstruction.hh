@@ -60,8 +60,11 @@ private:
     
     G4int fNumBlocksPerSide;     // Number of pixels per row/column
     
+    // Control flags
+    G4bool fCheckOverlaps;       // Flag to check geometry overlaps
+    
     // Messenger for UI commands
-    DetectorMessenger* fMessenger;
+    DetectorMessenger* fDetectorMessenger;
 };
 
 #endif

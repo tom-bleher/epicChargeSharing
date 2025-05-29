@@ -57,11 +57,12 @@ RunAction::RunAction()
   fPhysicsProcess(""),
   fTrackID(-1),
   fParentID(-1),
-  fStepNumber(-1),
-  fStepLength(0)
+  fStepNum(-1),
+  fStepLen(0)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize trajectory vectors (they are automatically initialized empty)
+  // Initialize step energy deposition vectors (they are automatically initialized empty)
 }
 
 RunAction::~RunAction()
@@ -169,14 +170,28 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("PhysicsProcess", &fPhysicsProcess)->SetTitle("Physics Process Name");
     fTree->Branch("TrackID", &fTrackID, "TrackID/I")->SetTitle("Track ID");
     fTree->Branch("ParentID", &fParentID, "ParentID/I")->SetTitle("Parent Track ID");
-    fTree->Branch("StepNumber", &fStepNumber, "StepNumber/I")->SetTitle("Step Number in Track");
-    fTree->Branch("StepLength", &fStepLength, "StepLength/D")->SetTitle("Step Length [mm]");
+    fTree->Branch("StepNumber", &fStepNum, "StepNumber/I")->SetTitle("Step Number in Track");
+    fTree->Branch("StepLength", &fStepLen, "StepLength/D")->SetTitle("Total Step Length [mm]");
     
     // Add branches for track trajectory information
     fTree->Branch("TrajectoryX", &fTrajectoryX)->SetTitle("X Positions Along Track [mm]");
     fTree->Branch("TrajectoryY", &fTrajectoryY)->SetTitle("Y Positions Along Track [mm]");
     fTree->Branch("TrajectoryZ", &fTrajectoryZ)->SetTitle("Z Positions Along Track [mm]");
     fTree->Branch("TrajectoryTime", &fTrajectoryTime)->SetTitle("Time at Each Trajectory Point [ns]");
+    
+    // Add branches for step-by-step energy deposition information
+    fTree->Branch("StepEnergyDeposition", &fStepEdepVec)->SetTitle("Energy Deposited Per Step [MeV]");
+    fTree->Branch("StepZPosition", &fStepZVec)->SetTitle("Z Position of Each Energy Deposit [mm]");
+    fTree->Branch("StepTime", &fStepTimeVec)->SetTitle("Time of Each Energy Deposit [ns]");
+    fTree->Branch("StepLengthVector", &fStepLenVec)->SetTitle("Length of Each Energy Depositing Step [mm]");
+    fTree->Branch("StepNumberVector", &fStepNumVec)->SetTitle("Step Number for Each Energy Deposit");
+    
+    // Add branches for ALL step information (including non-energy depositing steps)
+    fTree->Branch("AllStepEnergyDeposition", &fAllStepEdepVec)->SetTitle("Energy Deposited Per Step (All Steps) [MeV]");
+    fTree->Branch("AllStepZPosition", &fAllStepZVec)->SetTitle("Z Position of Each Step [mm]");
+    fTree->Branch("AllStepTime", &fAllStepTimeVec)->SetTitle("Time of Each Step [ns]");
+    fTree->Branch("AllStepLengthVector", &fAllStepLenVec)->SetTitle("Length of Each Step [mm]");
+    fTree->Branch("AllStepNumberVector", &fAllStepNumVec)->SetTitle("Step Number for Each Step");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -579,8 +594,8 @@ void RunAction::SetPhysicsInfo(const G4String& physicsProcess, G4int trackID, G4
     fPhysicsProcess = physicsProcess;
     fTrackID = trackID;
     fParentID = parentID;
-    fStepNumber = stepNumber;
-    fStepLength = stepLength;
+    fStepNum = stepNumber;
+    fStepLen = stepLength;
 }
 
 void RunAction::SetTrajectoryInfo(const std::vector<G4double>& trackX, 
@@ -593,4 +608,34 @@ void RunAction::SetTrajectoryInfo(const std::vector<G4double>& trackX,
     fTrajectoryY = trackY;
     fTrajectoryZ = trackZ;
     fTrajectoryTime = trackTime;
+}
+
+void RunAction::SetStepEnergyDeposition(const std::vector<G4double>& stepEdep,
+                                       const std::vector<G4double>& stepZ,
+                                       const std::vector<G4double>& stepTime,
+                                       const std::vector<G4double>& stepLength,
+                                       const std::vector<G4int>& stepNumber)
+{
+    // Store step-by-step energy deposition information
+    fStepEdepVec = stepEdep;
+    fStepZVec = stepZ;
+    fStepTimeVec = stepTime;
+    fStepLenVec = stepLength;
+    fStepNumVec = stepNumber;
+    
+    // Store step-by-step energy deposition information
+}
+
+void RunAction::SetAllStepInfo(const std::vector<G4double>& stepEdep,
+                              const std::vector<G4double>& stepZ,
+                              const std::vector<G4double>& stepTime,
+                              const std::vector<G4double>& stepLength,
+                              const std::vector<G4int>& stepNumber)
+{
+    // Store ALL step information (including non-energy depositing steps)
+    fAllStepEdepVec = stepEdep;
+    fAllStepZVec = stepZ;
+    fAllStepTimeVec = stepTime;
+    fAllStepLenVec = stepLength;
+    fAllStepNumVec = stepNumber;
 }
