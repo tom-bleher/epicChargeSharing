@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Grid angle analyzer for individual hits from ROOT simulation data.
-Shows 9x9 pixel grid visualizations around specific hit positions.
+Shows neighborhood (9x9) pixel grid visualizations around specific hit positions.
 Also generates ensemble averages and handles edge cases.
 """
 
@@ -15,7 +15,7 @@ import random
 
 class RandomHitGridGenerator:
     """
-    Generator for 9x9 grid angle visualizations for random individual hits
+    Generator for neighborhood (9x9) grid angle visualizations for random individual hits
     """
     
     def __init__(self, filename):
@@ -42,27 +42,27 @@ class RandomHitGridGenerator:
                 self.data = tree.arrays(library="np")
                 
                 print(f"Loaded detector parameters: {self.detector_params}")
-                print(f"Loaded {len(self.data['PosX'])} events")
+                print(f"Loaded {len(self.data['TrueX'])} events")
                 
         except Exception as e:
             print(f"Error loading data: {e}")
             raise
     
-    def plot_single_9x9_grid(self, event_idx, save_individual=True, output_dir="", event_type="random"):
-        """Plot focused 9x9 grid for a single hit"""
-        if 'Grid9x9Angles' not in self.data:
-            print(f"No 9x9 grid data found for event {event_idx}")
+    def plot_single_neighborhood_grid(self, event_idx, save_individual=True, output_dir="", event_type="random"):
+        """Plot focused neighborhood (9x9) grid for a single hit"""
+        if 'GridNeighborhoodAngles' not in self.data:
+            print(f"No neighborhood grid data found for event {event_idx}")
             return None
             
         # Get event data
-        hit_x = self.data['PosX'][event_idx]
-        hit_y = self.data['PosY'][event_idx]
+        hit_x = self.data['TrueX'][event_idx]
+        hit_y = self.data['TrueY'][event_idx]
         hit_z = self.data['PosZ'][event_idx]
         pixel_x = self.data['PixelX'][event_idx]
         pixel_y = self.data['PixelY'][event_idx]
         pixel_dist = self.data['PixelDist'][event_idx]
         pixel_hit = self.data['PixelHit'][event_idx]
-        grid_angles = self.data['Grid9x9Angles'][event_idx]
+        grid_angles = self.data['GridNeighborhoodAngles'][event_idx]
         
         # Reshape 81-element array into 9x9 grid
         angle_grid = np.array(grid_angles).reshape(9, 9)
@@ -244,10 +244,10 @@ class RandomHitGridGenerator:
         
         return fig, ax, angle_grid
     
-    def plot_mean_9x9_grid(self, save_plot=True, output_dir=""):
-        """Plot mean 9x9 grid averaged across all non-inside-pixel events"""
-        if 'Grid9x9Angles' not in self.data:
-            print("No 9x9 grid data found for mean calculation")
+    def plot_mean_neighborhood_grid(self, save_plot=True, output_dir=""):
+        """Plot mean neighborhood (9x9) grid averaged across all non-inside-pixel events"""
+        if 'GridNeighborhoodAngles' not in self.data:
+            print("No neighborhood grid data found for mean calculation")
             return None
             
         # Find all non-inside-pixel events
@@ -266,7 +266,7 @@ class RandomHitGridGenerator:
         valid_event_count = 0
         
         for event_idx in non_inside_pixel_indices:
-            grid_angles = self.data['Grid9x9Angles'][event_idx]
+            grid_angles = self.data['GridNeighborhoodAngles'][event_idx]
             angle_grid = np.array(grid_angles).reshape(9, 9)
             
             # Replace invalid angles (-999.0) with NaN
@@ -297,7 +297,7 @@ class RandomHitGridGenerator:
         pixel_size = self.detector_params['pixel_size']
         pixel_spacing = self.detector_params['pixel_spacing']
         
-        # Create figure focused on 9x9 grid area
+        # Create figure focused on neighborhood (9x9) grid area
         fig, ax = plt.subplots(figsize=(12, 12))
         
         # Calculate the bounds of the 9x9 grid centered on reference position
@@ -413,7 +413,7 @@ class RandomHitGridGenerator:
         cbar.ax.tick_params(labelsize=10)
         
         # Add title to distinguish from individual plots
-        title = f'Mean Angular Distribution: 9×9 Grid Analysis\n' \
+        title = f'Mean Angular Distribution: Neighborhood (9x9) Grid Analysis\n' \
                 f'Ensemble Average (N = {valid_event_count} events, excluding inside-pixel hits)'
         ax.set_title(title, fontsize=12, fontweight='bold', pad=15)
         
@@ -422,7 +422,7 @@ class RandomHitGridGenerator:
         # Save plot if requested
         if save_plot:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            filename = f'mean_9x9_grid_{valid_event_count}_events_{timestamp}.png'
+            filename = f'mean_neighborhood_grid_{valid_event_count}_events_{timestamp}.png'
             if output_dir:
                 filename = os.path.join(output_dir, filename)
             
@@ -440,9 +440,9 @@ class RandomHitGridGenerator:
         return fig, ax, mean_angle_grid, valid_event_count
     
     def generate_random_hits_individual(self, num_events=3, save_plots=True, output_dir="", seed=None, include_mean=True, include_edge_case=True):
-        """Create individual 9x9 grid visualizations for N random hits and optionally a mean plot"""
-        if 'Grid9x9Angles' not in self.data:
-            print("No 9x9 grid data found")
+        """Create individual neighborhood (9x9) grid visualizations for N random hits and optionally a mean plot"""
+        if 'GridNeighborhoodAngles' not in self.data:
+            print("No neighborhood grid data found")
             return None
             
         # Set random seed for reproducibility if provided
@@ -451,7 +451,7 @@ class RandomHitGridGenerator:
             np.random.seed(seed)
             
         # Select N random events
-        total_events = len(self.data['PosX'])
+        total_events = len(self.data['TrueX'])
         if num_events > total_events:
             print(f"Requested {num_events} events, but only {total_events} available. Using all events.")
             num_events = total_events
@@ -464,7 +464,7 @@ class RandomHitGridGenerator:
         # Find an event where hit was inside pixel or closest to it
         inside_pixel_event = self.find_inside_pixel_event()
         
-        # Find an edge case event where 9x9 grid is incomplete
+        # Find an edge case event where neighborhood (9x9) grid is incomplete
         edge_case_event = None
         if include_edge_case:
             edge_case_event = self.find_edge_case_event()
@@ -495,7 +495,7 @@ class RandomHitGridGenerator:
                 event_type = "edge-case"
                 
             print(f"\nProcessing {event_type} event {event_idx} ({i+1}/{len(all_events)})...")
-            fig, ax, angle_grid = self.plot_single_9x9_grid(event_idx, 
+            fig, ax, angle_grid = self.plot_single_neighborhood_grid(event_idx, 
                                                            save_individual=save_plots, 
                                                            output_dir=output_dir,
                                                            event_type=event_type)
@@ -504,14 +504,14 @@ class RandomHitGridGenerator:
         # Generate mean plot if requested
         if include_mean:
             print(f"\nGenerating mean plot...")
-            fig, ax, mean_angle_grid, valid_event_count = self.plot_mean_9x9_grid(save_plot=save_plots, 
+            fig, ax, mean_angle_grid, valid_event_count = self.plot_mean_neighborhood_grid(save_plot=save_plots, 
                                                                                 output_dir=output_dir)
             results.append((-1, fig, ax, mean_angle_grid))
         
         print(f"\n" + "="*60)
         print(f"PROCESSING COMPLETE")
         print(f"="*60)
-        print(f"Generated {len(all_events)} individual 9×9 grid visualizations")
+        print(f"Generated {len(all_events)} individual neighborhood (9x9) grid visualizations")
         print(f"Random events: {random_events}")
         if inside_pixel_event is not None:
             print(f"Inside-pixel/closest event: {inside_pixel_event}")
@@ -528,17 +528,17 @@ class RandomHitGridGenerator:
         return results, all_events
     
     def find_edge_case_event(self):
-        """Find an event where the hit is near the detector edge so 9x9 grid is incomplete"""
-        if 'Grid9x9Angles' not in self.data:
-            print("Grid9x9Angles data not available for edge case search")
+        """Find an event where the hit is near the detector edge so neighborhood (9x9) grid is incomplete"""
+        if 'GridNeighborhoodAngles' not in self.data:
+            print("GridNeighborhoodAngles data not available for edge case search")
             return None
             
         # Get detector parameters
         detector_size = self.detector_params['detector_size']
         pixel_spacing = self.detector_params['pixel_spacing']
         
-        # Calculate how close to edge a hit needs to be for incomplete 9x9 grid
-        grid_half_extent = 4 * pixel_spacing  # 4 pixels from center to edge of 9x9 grid
+        # Calculate how close to edge a hit needs to be for incomplete neighborhood (9x9) grid
+        grid_half_extent = 4 * pixel_spacing  # 4 pixels from center to edge of neighborhood grid
         edge_threshold = detector_size/2 - grid_half_extent
         
         print(f"Detector size: {detector_size} mm")
@@ -546,8 +546,8 @@ class RandomHitGridGenerator:
         print(f"Edge threshold: {edge_threshold} mm from detector center")
         
         # Find events where hit is close to any edge
-        hit_x = self.data['PosX']
-        hit_y = self.data['PosY']
+        hit_x = self.data['TrueX']
+        hit_y = self.data['TrueY']
         
         # Calculate distance from detector center and edges
         dist_from_center = np.sqrt(hit_x**2 + hit_y**2)
@@ -569,7 +569,7 @@ class RandomHitGridGenerator:
         max_incomplete_count = 0
         
         for event_idx in near_edge_indices:
-            grid_angles = self.data['Grid9x9Angles'][event_idx]
+            grid_angles = self.data['GridNeighborhoodAngles'][event_idx]
             angle_grid = np.array(grid_angles).reshape(9, 9)
             
             # Count incomplete/invalid positions (should be -999.0 for out-of-bounds)
@@ -629,7 +629,7 @@ def create_random_hits_plots(root_filename, num_events=1, output_dir="", seed=42
     Parameters:
     -----------
     root_filename : str
-        Path to ROOT file containing 9x9 grid data
+        Path to ROOT file containing neighborhood (9x9) grid data
     num_events : int, optional
         Number of random events to visualize (default: 1)
     output_dir : str, optional
@@ -639,7 +639,7 @@ def create_random_hits_plots(root_filename, num_events=1, output_dir="", seed=42
     include_mean : bool, optional
         Whether to include a mean plot of all non-inside-pixel events (default: True)
     include_edge_case : bool, optional
-        Whether to include an edge case where 9x9 grid is incomplete (default: True)
+        Whether to include an edge case where neighborhood (9x9) grid is incomplete (default: True)
     
     Returns:
     --------
@@ -656,10 +656,10 @@ def create_random_hits_plots(root_filename, num_events=1, output_dir="", seed=42
 if __name__ == "__main__":
     # Configuration parameters
     NUM_EVENTS = 3  # Change this to control number of random events to visualize
-    OUTPUT_DIR = "9x9_grid_plots"  # Directory to save plots (empty string for current directory)
+    OUTPUT_DIR = "neighborhood_grid_plots"  # Directory to save plots (empty string for current directory)
     RANDOM_SEED = 42  # For reproducible results
     INCLUDE_MEAN = True  # Whether to include mean plot of all non-inside-pixel events
-    INCLUDE_EDGE_CASE = True  # Whether to include edge case where 9x9 grid is incomplete
+    INCLUDE_EDGE_CASE = True  # Whether to include edge case where neighborhood (9x9) grid is incomplete
     
     # Default ROOT file (can be changed)
     root_file = "epicToyOutput.root"
@@ -671,11 +671,11 @@ if __name__ == "__main__":
         exit(1)
     
     print("="*60)
-    print(f"GENERATING {NUM_EVENTS} RANDOM HITS 9x9 GRIDS")
+    print(f"GENERATING {NUM_EVENTS} RANDOM HITS NEIGHBORHOOD (9x9) GRIDS")
     if INCLUDE_MEAN:
         print("+ MEAN GRID OF ALL NON-INSIDE-PIXEL EVENTS")
     if INCLUDE_EDGE_CASE:
-        print("+ EDGE CASE WHERE 9x9 GRID IS INCOMPLETE")
+        print("+ EDGE CASE WHERE NEIGHBORHOOD (9x9) GRID IS INCOMPLETE")
     print("="*60)
     
     try:
@@ -690,12 +690,12 @@ if __name__ == "__main__":
         print("\n" + "="*60)
         print("VISUALIZATION COMPLETE")
         print("="*60)
-        print(f"Generated {NUM_EVENTS} individual 9×9 grid plots for events: {selected_events}")
+        print(f"Generated {NUM_EVENTS} individual neighborhood (9x9) grid plots for events: {selected_events}")
         if INCLUDE_MEAN:
-            print("Generated 1 mean 9×9 grid plot averaged across all non-inside-pixel events")
+            print("Generated 1 mean neighborhood (9x9) grid plot averaged across all non-inside-pixel events")
         if INCLUDE_EDGE_CASE:
-            print("Generated 1 edge case 9×9 grid plot where grid extends beyond detector")
-        print("Each event is displayed as a separate plot focused on its 9×9 grid area.")
+            print("Generated 1 edge case neighborhood (9x9) grid plot where grid extends beyond detector")
+        print("Each event is displayed as a separate plot focused on its neighborhood (9x9) grid area.")
         
     except Exception as e:
         print(f"Error generating visualization: {e}")

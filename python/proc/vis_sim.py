@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Visualize hit positions (PosX, PosY) and their pixel approximations (PixelX, PixelY)
+Visualize hit positions (TrueX, TrueY) and their pixel approximations (PixelX, PixelY)
 from a ROOT file using uproot and matplotlib.
 
 Optimized for performance with multiprocessing and efficient plotting techniques.
@@ -35,9 +35,9 @@ def create_hit_positions_plot(data_dict, output_prefix=""):
     fig = plt.figure(figsize=(10, 8), dpi=150)
     ax = fig.add_subplot(111)
     hb = ax.hexbin(pos_x, pos_y, gridsize=50, cmap='viridis')
-    ax.set_title("Hit Positions (PosX, PosY)", fontsize=14)
-    ax.set_xlabel("PosX [mm]", fontsize=12)
-    ax.set_ylabel("PosY [mm]", fontsize=12)
+    ax.set_title("Hit Positions (TrueX, TrueY)", fontsize=14)
+    ax.set_xlabel("TrueX [mm]", fontsize=12)
+    ax.set_ylabel("TrueY [mm]", fontsize=12)
     ax.grid(alpha=0.3)
     fig.colorbar(hb, ax=ax, label="Count")
     plt.tight_layout()
@@ -215,9 +215,9 @@ def create_combined_plots(data_dict, output_prefix=""):
     # 1. Scatter plot showing original hit positions
     ax1 = fig.add_subplot(221)
     hb1 = ax1.hexbin(pos_x, pos_y, gridsize=50, cmap='viridis')
-    ax1.set_title("Hit Positions (PosX, PosY)", fontsize=14)
-    ax1.set_xlabel("PosX [mm]", fontsize=12)
-    ax1.set_ylabel("PosY [mm]", fontsize=12)
+    ax1.set_title("Hit Positions (TrueX, TrueY)", fontsize=14)
+    ax1.set_xlabel("TrueX [mm]", fontsize=12)
+    ax1.set_ylabel("TrueY [mm]", fontsize=12)
     ax1.grid(alpha=0.3)
     fig.colorbar(hb1, ax=ax1, label="Count")
     
@@ -832,7 +832,7 @@ def get_detector_parameters():
 
 def main():
     parser = argparse.ArgumentParser(description='Visualize hit positions and pixel approximations')
-    parser.add_argument('-f', '--file', type=str, default="build/epicToyOutput.root",
+    parser.add_argument('-f', '--file', type=str, default="/home/tom/Desktop/Cultural_Keys/epicToy/build/epicToyOutput.root",
                         help='Path to ROOT file')
     parser.add_argument('-o', '--output-dir', type=str, default="",
                         help='Output directory for plots')
@@ -883,13 +883,13 @@ def main():
             print("Available branches:", tree.keys())
             
             # Read the position and pixel data
-            data = tree.arrays(["PosX", "PosY", "PixelX", "PixelY", "PixelDist", "PixelI", "PixelJ", "PixelHit", "PixelAlpha"])
+            data = tree.arrays(["TrueX", "TrueY", "PixelX", "PixelY", "PixelDist", "PixelI", "PixelJ", "PixelHit", "PixelAlpha"])
             
             # Convert awkward arrays to numpy arrays for plotting
             # Use ak.to_numpy() instead of np.array() to avoid deprecation warnings
             import awkward as ak
-            pos_x = ak.to_numpy(data["PosX"])
-            pos_y = ak.to_numpy(data["PosY"])
+            pos_x = ak.to_numpy(data["TrueX"])
+            pos_y = ak.to_numpy(data["TrueY"])
             pixel_x = ak.to_numpy(data["PixelX"])
             pixel_y = ak.to_numpy(data["PixelY"])
             pixel_dist = ak.to_numpy(data["PixelDist"])
