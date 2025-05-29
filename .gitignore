@@ -28,6 +28,9 @@ cmake_install.cmake
 *.cmake
 !CMakeLists.txt
 
+# Python
+*.pyc
+
 # Root files
 *.root
 
@@ -36,3 +39,4 @@ cmake_install.cmake
 .idea/
 *.swp
 *~
+*.mdc
