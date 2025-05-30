@@ -98,7 +98,22 @@ public:
                               G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
                               G4double chi2, G4double ndf, G4double prob, G4double r_squared,
                               G4int n_points, G4bool fit_successful,
-                              G4double residual_mean, G4double residual_std);
+                              G4double residual_mean, G4double residual_std,
+                              G4int n_outliers_removed, G4bool constraints_satisfied,
+                              G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
+                              G4int fit_attempt_number);
+    
+    // Method to set 3D Gaussian fit results for ALL DATA (no outlier removal)
+    void SetGaussianFitResultsAllData(G4double amplitude, G4double x0, G4double y0,
+                                      G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
+                                      G4double amplitude_err, G4double x0_err, G4double y0_err,
+                                      G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
+                                      G4double chi2, G4double ndf, G4double prob, G4double r_squared,
+                                      G4int n_points, G4bool fit_successful,
+                                      G4double residual_mean, G4double residual_std,
+                                      G4int n_outliers_removed, G4bool constraints_satisfied,
+                                      G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
+                                      G4int fit_attempt_number);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -216,6 +231,51 @@ private:
     G4bool fFitSuccessful;        // Whether fit was successful
     G4double fFitResidualMean;    // Mean of residuals
     G4double fFitResidualStd;     // Standard deviation of residuals
+    
+    // Enhanced robustness metrics
+    G4int fFitNOutliersRemoved;   // Number of outliers removed
+    G4bool fFitConstraintsSatisfied; // Whether geometric constraints were satisfied
+    G4double fFitCenterDistFromEdge; // Distance from fit center to detector edge [mm]
+    G4double fFitMinDistToPixel;  // Minimum distance from fit center to any pixel [mm]
+    G4int fFitAttemptNumber;      // Which fitting attempt succeeded (1-based)
+    
+    // Variables for 3D Gaussian fit results for ALL DATA (no outlier removal)
+    G4double fFitAmplitude_alldata;         // Fitted amplitude (all data)
+    G4double fFitX0_alldata;               // Fitted X center [mm] (all data)
+    G4double fFitY0_alldata;               // Fitted Y center [mm] (all data)
+    G4double fFitSigmaX_alldata;           // Fitted sigma X [mm] (all data)
+    G4double fFitSigmaY_alldata;           // Fitted sigma Y [mm] (all data)
+    G4double fFitTheta_alldata;            // Fitted rotation angle [rad] (all data)
+    G4double fFitOffset_alldata;           // Fitted offset (all data)
+    
+    G4double fFitAmplitudeErr_alldata;     // Error in amplitude (all data)
+    G4double fFitX0Err_alldata;           // Error in X center [mm] (all data)
+    G4double fFitY0Err_alldata;           // Error in Y center [mm] (all data)
+    G4double fFitSigmaXErr_alldata;       // Error in sigma X [mm] (all data)
+    G4double fFitSigmaYErr_alldata;       // Error in sigma Y [mm] (all data)
+    G4double fFitThetaErr_alldata;        // Error in rotation angle [rad] (all data)
+    G4double fFitOffsetErr_alldata;       // Error in offset (all data)
+    
+    G4double fFitChi2_alldata;            // Chi-squared value (all data)
+    G4double fFitNDF_alldata;             // Number of degrees of freedom (all data)
+    G4double fFitProb_alldata;            // Fit probability (all data)
+    G4double fFitRSquared_alldata;        // R-squared value (all data)
+    G4int fFitNPoints_alldata;            // Number of points used in fit (all data)
+    G4bool fFitSuccessful_alldata;        // Whether fit was successful (all data)
+    G4double fFitResidualMean_alldata;    // Mean of residuals (all data)
+    G4double fFitResidualStd_alldata;     // Standard deviation of residuals (all data)
+    
+    // Enhanced robustness metrics for all data fit
+    G4int fFitNOutliersRemoved_alldata;   // Number of outliers removed (all data, should be 0)
+    G4bool fFitConstraintsSatisfied_alldata; // Whether geometric constraints were satisfied (all data)
+    G4double fFitCenterDistFromEdge_alldata; // Distance from fit center to detector edge [mm] (all data)
+    G4double fFitMinDistToPixel_alldata;  // Minimum distance from fit center to any pixel [mm] (all data)
+    G4int fFitAttemptNumber_alldata;      // Which fitting attempt succeeded (1-based) (all data)
+    
+    // Additional variables for convenient access to Gaussian center and distance calculation
+    G4double fGaussX;             // Gaussian X center [mm] (alias for fFitX0)
+    G4double fGaussY;             // Gaussian Y center [mm] (alias for fFitY0)  
+    G4double fGaussTrueDistance;  // Distance from Gaussian center to true position [mm]
 };
 
 #endif
