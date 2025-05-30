@@ -15,6 +15,7 @@
 #include "G4VisAttributes.hh"
 
 class DetectorMessenger;
+class EventAction;
 
 class DetectorConstruction : public G4VUserDetectorConstruction
 {
@@ -24,11 +25,20 @@ public:
     
     virtual G4VPhysicalVolume* Construct();
     
+    // Method to set EventAction pointer for neighborhood configuration
+    void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
+    
     // Method to set the grid parameters
     void SetGridParameters(G4double pixelSize, G4double pixelSpacing, G4double pixelCornerOffset, G4int numPixels);
     
     // Method to set the corner offset directly (requires geometry rebuild)
     void SetPixelCornerOffset(G4double cornerOffset);
+    
+    // Method to set neighborhood radius
+    void SetNeighborhoodRadius(G4int radius);
+    
+    // Getter method for DetectorMessenger
+    DetectorMessenger* GetDetectorMessenger() const { return fDetectorMessenger; }
     
     // Getter methods for parameters needed to calculate nearest pixel
     G4double GetPixelSize() const { return fPixelSize; }
@@ -62,6 +72,9 @@ private:
     
     // Control flags
     G4bool fCheckOverlaps;       // Flag to check geometry overlaps
+    
+    // EventAction pointer for neighborhood configuration
+    EventAction* fEventAction;
     
     // Messenger for UI commands
     DetectorMessenger* fDetectorMessenger;
