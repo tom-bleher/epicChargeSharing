@@ -866,9 +866,9 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
     results.offset = best_params[6];
     
     // Calculate statistics
-    results.chi2 = best_chi2;
+    results.chi2 = results.ndf > 0 ? best_chi2 / results.ndf : best_chi2;
     results.ndf = results.n_points - fNParams;
-    results.prob = (results.ndf > 0) ? TMath::Prob(results.chi2, results.ndf) : 0.0;
+    results.prob = (results.ndf > 0) ? TMath::Prob(best_chi2, results.ndf) : 0.0;
     results.r_squared = CalculateRSquared(x_clean, y_clean, z_clean, best_params);
     
     // Calculate residual statistics
@@ -884,7 +884,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
     results.min_distance_to_pixel = CalculateMinDistanceToPixel(results.x0, results.y0);
     
     // Enhanced error estimates based on parameter sensitivity
-    const G4double reduced_chi2 = results.ndf > 0 ? results.chi2 / results.ndf : 1.0;
+    const G4double reduced_chi2 = results.chi2; // results.chi2 already contains reduced chi-squared
     const G4double error_scale = TMath::Sqrt(TMath::Max(1.0, reduced_chi2));
     
     // More sophisticated error estimates
@@ -913,8 +913,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
                << results.theta_err * 180.0 / TMath::Pi() << "°)" << G4endl;
         G4cout << "  Offset: " << results.offset << " ± " << results.offset_err << G4endl;
         G4cout << "Statistics:" << G4endl;
-        G4cout << "  Chi2/NDF: " << results.chi2 << " / " << results.ndf 
-               << " = " << (results.ndf > 0 ? results.chi2/results.ndf : 0) << G4endl;
+        G4cout << "  Reduced Chi2: " << results.chi2 << " (NDF: " << results.ndf << ")" << G4endl;
         G4cout << "  Probability: " << results.prob << G4endl;
         G4cout << "  R-squared: " << results.r_squared << G4endl;
         G4cout << "  Data points: " << results.n_points << " (outliers removed: " << results.n_outliers_removed << ")" << G4endl;
@@ -1049,9 +1048,9 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
     results.offset = best_params[6];
     
     // Calculate statistics
-    results.chi2 = best_chi2;
+    results.chi2 = results.ndf > 0 ? best_chi2 / results.ndf : best_chi2;
     results.ndf = results.n_points - fNParams;
-    results.prob = (results.ndf > 0) ? TMath::Prob(results.chi2, results.ndf) : 0.0;
+    results.prob = (results.ndf > 0) ? TMath::Prob(best_chi2, results.ndf) : 0.0;
     results.r_squared = CalculateRSquared(x_coords, y_coords, z_values, best_params);
     
     // Calculate residual statistics
@@ -1067,7 +1066,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
     results.min_distance_to_pixel = CalculateMinDistanceToPixel(results.x0, results.y0);
     
     // Enhanced error estimates based on parameter sensitivity
-    const G4double reduced_chi2 = results.ndf > 0 ? results.chi2 / results.ndf : 1.0;
+    const G4double reduced_chi2 = results.chi2; // results.chi2 already contains reduced chi-squared
     const G4double error_scale = TMath::Sqrt(TMath::Max(1.0, reduced_chi2));
     
     // More sophisticated error estimates
@@ -1096,8 +1095,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
                << results.theta_err * 180.0 / TMath::Pi() << "°)" << G4endl;
         G4cout << "  Offset: " << results.offset << " ± " << results.offset_err << G4endl;
         G4cout << "Statistics:" << G4endl;
-        G4cout << "  Chi2/NDF: " << results.chi2 << " / " << results.ndf 
-               << " = " << (results.ndf > 0 ? results.chi2/results.ndf : 0) << G4endl;
+        G4cout << "  Reduced Chi2: " << results.chi2 << " (NDF: " << results.ndf << ")" << G4endl;
         G4cout << "  Probability: " << results.prob << G4endl;
         G4cout << "  R-squared: " << results.r_squared << G4endl;
         G4cout << "  Data points: " << results.n_points << " (outliers removed: " << results.n_outliers_removed << ")" << G4endl;

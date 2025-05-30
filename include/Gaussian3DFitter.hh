@@ -67,7 +67,7 @@ public:
         G4double offset_err;
         
         // Fit statistics
-        G4double chi2;             // Chi-squared value
+        G4double chi2;             // Reduced chi-squared value (chi2/ndf)
         G4double ndf;              // Number of degrees of freedom
         G4double prob;             // Fit probability
         G4double r_squared;        // R-squared value

@@ -268,7 +268,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("FitThetaErr", &fFitThetaErr, "FitThetaErr/D")->SetTitle("Error in Fitted Rotation Angle [rad]");
     fTree->Branch("FitOffsetErr", &fFitOffsetErr, "FitOffsetErr/D")->SetTitle("Error in Fitted Offset");
     
-    fTree->Branch("FitChi2", &fFitChi2, "FitChi2/D")->SetTitle("Fit Chi-squared Value");
+    fTree->Branch("FitChi2", &fFitChi2, "FitChi2/D")->SetTitle("Fit Reduced Chi-squared Value (chi2/ndf)");
     fTree->Branch("FitNDF", &fFitNDF, "FitNDF/D")->SetTitle("Fit Number of Degrees of Freedom");
     fTree->Branch("FitProb", &fFitProb, "FitProb/D")->SetTitle("Fit Probability");
     fTree->Branch("FitRSquared", &fFitRSquared, "FitRSquared/D")->SetTitle("Fit R-squared Value");
@@ -303,7 +303,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("FitOffsetErr_alldata", &fFitOffsetErr_alldata, "FitOffsetErr_alldata/D")->SetTitle("Error in Fitted Offset (All Data)");
     
     // Add branches for fit statistics (all data)
-    fTree->Branch("FitChi2_alldata", &fFitChi2_alldata, "FitChi2_alldata/D")->SetTitle("Fit Chi-squared Value (All Data)");
+    fTree->Branch("FitChi2_alldata", &fFitChi2_alldata, "FitChi2_alldata/D")->SetTitle("Fit Reduced Chi-squared Value (chi2/ndf) (All Data)");
     fTree->Branch("FitNDF_alldata", &fFitNDF_alldata, "FitNDF_alldata/D")->SetTitle("Fit Number of Degrees of Freedom (All Data)");
     fTree->Branch("FitProb_alldata", &fFitProb_alldata, "FitProb_alldata/D")->SetTitle("Fit Probability (All Data)");
     fTree->Branch("FitRSquared_alldata", &fFitRSquared_alldata, "FitRSquared_alldata/D")->SetTitle("Fit R-squared Value (All Data)");
