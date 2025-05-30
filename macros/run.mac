@@ -1,0 +1,18 @@
+# Test macro for Gaussian fitting
+# Simple run with a few events to test the fitting
+
+# Set verbosity
+/control/verbose 0
+/run/verbose 0
+/event/verbose 0
+/tracking/verbose 0
+
+# Initialize
+/run/initialize
+
+# Set particle gun parameters
+/gun/particle e-
+/gun/energy 1 MeV
+
+# Run events to test fitting
+/run/beamOn 10000
