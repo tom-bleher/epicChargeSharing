@@ -4,6 +4,10 @@ Visualization of 3D Gaussian fitting results from ROOT file.
 Reads pre-computed Gaussian fit parameters from Geant4 simulation and creates plots.
 """
 
+# Set matplotlib to use non-interactive backend before importing pyplot
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for headless operation
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -397,7 +401,7 @@ class GaussianRootPlotter:
             plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
             print(f"Simple fit plot saved to {filename}")
         
-        plt.show()
+        # plt.show()  # Commented out for non-interactive backend
         return fig
 
     def plot_3d_visualization(self, event_idx, data, detector_params, charge_type='fraction', 
@@ -559,7 +563,7 @@ class GaussianRootPlotter:
             plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
             print(f"3D visualization saved to {filename}")
         
-        plt.show()
+        # plt.show()  # Commented out for non-interactive backend
         return fig
 
     def print_fit_summary(self, event_idx, data):
@@ -596,63 +600,30 @@ class GaussianRootPlotter:
             print(f"{param_name:<20} {val:<20.6f} {err:<20.6f}")
         
         print(f"\n{'='*70}")
-        print("FIT STATISTICS")
+        print("FIT STATISTICS (ALL DATA)")
         print(f"{'='*70}")
         
-        # Statistics comparison
+        # Statistics for all-data fit only
         stat_names = [
-            ('R-squared', 'FitRSquared', 'FitRSquared_alldata'),
-            ('Chi-squared', 'FitChi2', 'FitChi2_alldata'),
-            ('Degrees of Freedom', 'FitNDF', 'FitNDF_alldata'),
-            ('Fit Probability', 'FitProb', 'FitProb_alldata'),
-            ('Data Points', 'FitNPoints', 'FitNPoints_alldata'),
-            ('Residual Mean', 'FitResidualMean', 'FitResidualMean_alldata'),
-            ('Residual Std', 'FitResidualStd', 'FitResidualStd_alldata')
+            ('R-squared', 'FitRSquared_alldata'),
+            ('Chi-squared', 'FitChi2_alldata'),
+            ('Degrees of Freedom', 'FitNDF_alldata'),
+            ('Fit Probability', 'FitProb_alldata'),
+            ('Data Points', 'FitNPoints_alldata'),
+            ('Residual Mean', 'FitResidualMean_alldata'),
+            ('Residual Std', 'FitResidualStd_alldata')
         ]
         
-        for stat_name, outliers_key, all_data_key in stat_names:
-            if outliers_removed_success and all_data_success:
-                outliers_val = data[outliers_key][event_idx]
-                all_data_val = data[all_data_key][event_idx]
-                
-                if stat_name == 'Degrees of Freedom' or stat_name == 'Data Points':
-                    # Integer values
-                    diff = int(outliers_val) - int(all_data_val)
-                    print(f"{stat_name:<20} {int(outliers_val):<20} {int(all_data_val):<20} {diff:<15}")
-                else:
-                    # Float values
-                    diff = outliers_val - all_data_val
-                    print(f"{stat_name:<20} {outliers_val:<20.6f} {all_data_val:<20.6f} {diff:<15.6f}")
-            elif outliers_removed_success:
-                outliers_val = data[outliers_key][event_idx]
-                if stat_name == 'Degrees of Freedom' or stat_name == 'Data Points':
-                    print(f"{stat_name:<20} {int(outliers_val):<20} {'FAILED':<20} {'N/A':<15}")
-                else:
-                    print(f"{stat_name:<20} {outliers_val:<20.6f} {'FAILED':<20} {'N/A':<15}")
-            elif all_data_success:
-                all_data_val = data[all_data_key][event_idx]
-                if stat_name == 'Degrees of Freedom' or stat_name == 'Data Points':
-                    print(f"{stat_name:<20} {'FAILED':<20} {int(all_data_val):<20} {'N/A':<15}")
-                else:
-                    print(f"{stat_name:<20} {'FAILED':<20} {all_data_val:<20.6f} {'N/A':<15}")
+        for stat_name, all_data_key in stat_names:
+            all_data_val = data[all_data_key][event_idx]
+            if stat_name == 'Degrees of Freedom' or stat_name == 'Data Points':
+                print(f"{stat_name:<20} {int(all_data_val)}")
+            else:
+                print(f"{stat_name:<20} {all_data_val:.6f}")
         
         # Reduced Chi-squared calculation
-        if outliers_removed_success and all_data_success:
-            chi2_red_outliers = data['FitChi2'][event_idx]/data['FitNDF'][event_idx] if data['FitNDF'][event_idx] > 0 else 0
-            chi2_red_all = data['FitChi2_alldata'][event_idx]/data['FitNDF_alldata'][event_idx] if data['FitNDF_alldata'][event_idx] > 0 else 0
-            diff_chi2_red = chi2_red_outliers - chi2_red_all
-            print(f"{'Reduced Chi-squared':<20} {chi2_red_outliers:<20.6f} {chi2_red_all:<20.6f} {diff_chi2_red:<15.6f}")
-        elif outliers_removed_success:
-            chi2_red_outliers = data['FitChi2'][event_idx]/data['FitNDF'][event_idx] if data['FitNDF'][event_idx] > 0 else 0
-            print(f"{'Reduced Chi-squared':<20} {chi2_red_outliers:<20.6f} {'FAILED':<20} {'N/A':<15}")
-        elif all_data_success:
-            chi2_red_all = data['FitChi2_alldata'][event_idx]/data['FitNDF_alldata'][event_idx] if data['FitNDF_alldata'][event_idx] > 0 else 0
-            print(f"{'Reduced Chi-squared':<20} {'FAILED':<20} {chi2_red_all:<20.6f} {'N/A':<15}")
-        
-        # Special statistics for outliers removed fit
-        if outliers_removed_success:
-            n_outliers = data['FitNOutliersRemoved'][event_idx]
-            print(f"{'Outliers Removed':<20} {int(n_outliers):<20} {'0':<20} {int(n_outliers):<15}")
+        chi2_red_all = data['FitChi2_alldata'][event_idx]/data['FitNDF_alldata'][event_idx] if data['FitNDF_alldata'][event_idx] > 0 else 0
+        print(f"{'Reduced Chi-squared':<20} {chi2_red_all:.6f}")
         
         print(f"\n{'='*70}")
         print("POSITION COMPARISON")
@@ -663,29 +634,10 @@ class GaussianRootPlotter:
         
         print(f"True Position:       ({true_x:.6f}, {true_y:.6f}) mm")
         
-        if outliers_removed_success:
-            fit_x_outliers = data['FitX0'][event_idx]
-            fit_y_outliers = data['FitY0'][event_idx]
-            distance_outliers = np.sqrt((fit_x_outliers - true_x)**2 + (fit_y_outliers - true_y)**2)
-            print(f"Outliers Removed:    ({fit_x_outliers:.6f}, {fit_y_outliers:.6f}) mm, Distance: {distance_outliers:.6f} mm")
-        
-        if all_data_success:
-            fit_x_all = data['FitX0_alldata'][event_idx]
-            fit_y_all = data['FitY0_alldata'][event_idx]
-            distance_all = np.sqrt((fit_x_all - true_x)**2 + (fit_y_all - true_y)**2)
-            print(f"All Data:            ({fit_x_all:.6f}, {fit_y_all:.6f}) mm, Distance: {distance_all:.6f} mm")
-        
-        if outliers_removed_success and all_data_success:
-            distance_improvement = distance_all - distance_outliers
-            improvement_percent = (distance_improvement / distance_all * 100) if distance_all > 0 else 0
-            print(f"\nDistance Improvement: {distance_improvement:.6f} mm ({improvement_percent:+.2f}%)")
-            
-            if distance_improvement > 0:
-                print("Outlier removal IMPROVED the fit!")
-            elif distance_improvement < 0:
-                print("Outlier removal DEGRADED the fit!")
-            else:
-                print("Outlier removal had NO EFFECT on distance.")
+        fit_x_all = data['FitX0_alldata'][event_idx]
+        fit_y_all = data['FitY0_alldata'][event_idx]
+        distance_all = np.sqrt((fit_x_all - true_x)**2 + (fit_y_all - true_y)**2)
+        print(f"All Data Fit:        ({fit_x_all:.6f}, {fit_y_all:.6f}) mm, Distance: {distance_all:.6f} mm")
         
         print(f"{'='*70}")
 
@@ -1041,7 +993,7 @@ class GaussianRootPlotter:
             plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
             print(f"Dual fit comparison plot saved to {filename}")
         
-        plt.show()
+        # plt.show()  # Commented out for non-interactive backend
         return fig
 
     def analyze_outlier_patterns(self, event_idx, data, detector_params, charge_type='fraction', verbose=True):
@@ -1337,7 +1289,7 @@ class GaussianRootPlotter:
             plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
             print(f"Outlier grid analysis plot saved to {filename}")
         
-        plt.show()
+        # plt.show()  # Commented out for non-interactive backend
         return fig, analysis
 
 def analyze_multiple_events_from_root(root_filename, event_indices=None, charge_type='fraction', 
@@ -1370,7 +1322,7 @@ def analyze_multiple_events_from_root(root_filename, event_indices=None, charge_
     
     # Find successful fits if no specific events requested
     if event_indices is None:
-        successful_events = np.where(data['FitSuccessful'])[0]
+        successful_events = np.where(data['FitSuccessful_alldata'])[0]
         if len(successful_events) == 0:
             print("No successful fits found in ROOT file!")
             return
@@ -1390,7 +1342,7 @@ def analyze_multiple_events_from_root(root_filename, event_indices=None, charge_
         print(f"Processing event {event_idx} ({i+1}/{len(event_indices)})")
         print(f"{'='*50}")
         
-        if not data['FitSuccessful'][event_idx]:
+        if not data['FitSuccessful_alldata'][event_idx]:
             print(f"Skipping event {event_idx} - fit was not successful")
             continue
         
@@ -1407,21 +1359,21 @@ def analyze_multiple_events_from_root(root_filename, event_indices=None, charge_
                 plotter.plot_3d_visualization(event_idx, data, detector_params, charge_type, 
                                             save_plots, output_dir)
             
-            # Collect results for summary
+            # Collect results for summary (using all-data fit results)
             true_x = data['TrueX'][event_idx]
             true_y = data['TrueY'][event_idx]
-            fit_x = data['FitX0'][event_idx]
-            fit_y = data['FitY0'][event_idx]
+            fit_x = data['FitX0_alldata'][event_idx]
+            fit_y = data['FitY0_alldata'][event_idx]
             distance = np.sqrt((fit_x - true_x)**2 + (fit_y - true_y)**2)
             
             results_summary.append({
                 'event_idx': event_idx,
-                'r_squared': data['FitRSquared'][event_idx],
-                'chi2_reduced': data['FitChi2'][event_idx]/data['FitNDF'][event_idx],
+                'r_squared': data['FitRSquared_alldata'][event_idx],
+                'chi2_reduced': data['FitChi2_alldata'][event_idx]/data['FitNDF_alldata'][event_idx],
                 'distance_error': distance,
-                'sigma_x': data['FitSigmaX'][event_idx],
-                'sigma_y': data['FitSigmaY'][event_idx],
-                'n_points': data['FitNPoints'][event_idx]
+                'sigma_x': data['FitSigmaX_alldata'][event_idx],
+                'sigma_y': data['FitSigmaY_alldata'][event_idx],
+                'n_points': data['FitNPoints_alldata'][event_idx]
             })
             
         except Exception as e:
@@ -1465,7 +1417,7 @@ def plot_single_event_from_root(root_filename, event_idx, charge_type='fraction'
         print(f"Error: Event {event_idx} not found. Only {len(data['EventID'])} events in file.")
         return None
     
-    if not data['FitSuccessful'][event_idx]:
+    if not data['FitSuccessful_alldata'][event_idx]:
         print(f"Error: Fit was not successful for event {event_idx}")
         return None
     
@@ -1500,7 +1452,7 @@ def compare_python_vs_cpp_fits(root_filename, event_idx, charge_type='fraction')
     plotter = GaussianRootPlotter()
     data, detector_params = plotter.load_root_data(root_filename)
     
-    if not data['FitSuccessful'][event_idx]:
+    if not data['FitSuccessful_alldata'][event_idx]:
         print(f"C++ fit was not successful for event {event_idx}")
         return
     
@@ -1520,14 +1472,14 @@ def compare_python_vs_cpp_fits(root_filename, event_idx, charge_type='fraction')
         print(f"{'='*60}")
         
         cpp_params = {
-            'amplitude': data['FitAmplitude'][event_idx],
-            'x0': data['FitX0'][event_idx],
-            'y0': data['FitY0'][event_idx],
-            'sigma_x': data['FitSigmaX'][event_idx],
-            'sigma_y': data['FitSigmaY'][event_idx],
-            'theta': data['FitTheta'][event_idx],
-            'offset': data['FitOffset'][event_idx],
-            'r_squared': data['FitRSquared'][event_idx]
+            'amplitude': data['FitAmplitude_alldata'][event_idx],
+            'x0': data['FitX0_alldata'][event_idx],
+            'y0': data['FitY0_alldata'][event_idx],
+            'sigma_x': data['FitSigmaX_alldata'][event_idx],
+            'sigma_y': data['FitSigmaY_alldata'][event_idx],
+            'theta': data['FitTheta_alldata'][event_idx],
+            'offset': data['FitOffset_alldata'][event_idx],
+            'r_squared': data['FitRSquared_alldata'][event_idx]
         }
         
         py_params = python_results['parameters']
@@ -1553,38 +1505,14 @@ def compare_python_vs_cpp_fits(root_filename, event_idx, charge_type='fraction')
     except Exception as e:
         print(f"Error running Python fit: {e}")
 
-def plot_dual_fit_from_root(root_filename, event_idx, charge_type='fraction', 
-                           save_plots=True, output_dir=""):
-    """
-    Convenience function to plot dual fit comparison for a single event from ROOT file
-    """
-    # Create plotter and load data
-    plotter = GaussianRootPlotter()
-    data, detector_params = plotter.load_root_data(root_filename)
-    
-    if event_idx >= len(data['EventID']):
-        print(f"Error: Event {event_idx} not found. Only {len(data['EventID'])} events in file.")
-        return None
-    
-    outliers_removed_success = data['FitSuccessful'][event_idx]
-    all_data_success = data['FitSuccessful_alldata'][event_idx]
-    
-    if not (outliers_removed_success or all_data_success):
-        print(f"Error: Both fits failed for event {event_idx}")
-        return None
-    
-    # Create output directory
-    if save_plots and output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # Print summary
-    plotter.print_fit_summary(event_idx, data)
-    
-    # Create dual comparison plot
-    result = plotter.plot_dual_fit_comparison(event_idx, data, detector_params, 
-                                            charge_type, save_plots, output_dir, root_filename)
-    
-    return result
+# COMMENTED OUT - outlier functionality removed from C++ code
+# def plot_dual_fit_from_root(root_filename, event_idx, charge_type='fraction', 
+#                            save_plots=True, output_dir=""):
+#     """
+#     Convenience function to plot dual fit comparison for a single event from ROOT file
+#     COMMENTED OUT - outlier functionality removed
+#     """
+#     pass
 
 def analyze_multiple_events_dual_fits(root_filename, event_indices=None, charge_type='fraction', 
                                      save_plots=True, output_dir=""):
@@ -1731,162 +1659,23 @@ def analyze_multiple_events_dual_fits(root_filename, event_indices=None, charge_
     
     return results_summary
 
-def analyze_outlier_patterns_from_root(root_filename, event_idx, charge_type='fraction',
-                                      save_plots=True, output_dir=""):
-    """
-    Convenience function to analyze outlier patterns for a single event
-    """
-    # Create plotter and load data
-    plotter = GaussianRootPlotter()
-    data, detector_params = plotter.load_root_data(root_filename)
-    
-    if event_idx >= len(data['EventID']):
-        print(f"Error: Event {event_idx} not found. Only {len(data['EventID'])} events in file.")
-        return None
-    
-    # Create output directory
-    if save_plots and output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # Analyze outlier patterns
-    analysis = plotter.analyze_outlier_patterns(event_idx, data, detector_params, charge_type, verbose=True)
-    
-    # Create visualization if outliers found
-    if analysis['n_outliers'] > 0:
-        result = plotter.plot_outlier_grid_visualization(event_idx, data, detector_params, charge_type, 
-                                                        save_plots, output_dir)
-        return result
-    else:
-        print(f"No outliers found for event {event_idx} - no visualization needed")
-        return None
+# COMMENTED OUT - outlier functionality removed from C++ code  
+# def analyze_outlier_patterns_from_root(root_filename, event_idx, charge_type='fraction',
+#                                       save_plots=True, output_dir=""):
+#     """
+#     Convenience function to analyze outlier patterns for a single event
+#     COMMENTED OUT - outlier functionality removed
+#     """
+#     pass
 
-def analyze_outlier_patterns_multiple_events(root_filename, event_indices=None, charge_type='fraction',
-                                            save_plots=True, output_dir=""):
-    """
-    Analyze outlier patterns across multiple events to find overall trends
-    """
-    print(f"Loading data from ROOT file: {root_filename}")
-    
-    # Create plotter and load data
-    plotter = GaussianRootPlotter()
-    data, detector_params = plotter.load_root_data(root_filename)
-    
-    print(f"Loaded {len(data['EventID'])} events from ROOT file")
-    
-    # Find events with outliers
-    if event_indices is None:
-        # Use events where outliers were actually removed
-        events_with_outliers = []
-        for i in range(len(data['EventID'])):
-            if data['FitNOutliersRemoved'][i] > 0:
-                events_with_outliers.append(i)
-        
-        if len(events_with_outliers) == 0:
-            print("No events with outliers found!")
-            return
-        
-        event_indices = events_with_outliers[:min(10, len(events_with_outliers))]
-        print(f"Found {len(events_with_outliers)} events with outliers, analyzing first {len(event_indices)}")
-    
-    # Create output directory
-    if save_plots and output_dir and not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # Analyze each event
-    all_analyses = []
-    ring_statistics = {0: [], 1: [], 2: [], 3: [], 4: []}  # Outlier fractions by ring
-    
-    for i, event_idx in enumerate(event_indices):
-        print(f"\n{'='*50}")
-        print(f"Processing event {event_idx} ({i+1}/{len(event_indices)})")
-        print(f"{'='*50}")
-        
-        try:
-            analysis = plotter.analyze_outlier_patterns(event_idx, data, detector_params, charge_type, verbose=True)
-            all_analyses.append(analysis)
-            
-            # Collect ring statistics
-            if analysis['n_outliers'] > 0:
-                for ring in range(5):
-                    ring_statistics[ring].append(analysis['outlier_fraction_by_ring'][ring])
-            
-            # Create visualization for events with outliers
-            if analysis['n_outliers'] > 0 and save_plots:
-                plotter.plot_outlier_grid_visualization(event_idx, data, detector_params, charge_type, 
-                                                       save_plots, output_dir)
-            
-        except Exception as e:
-            print(f"Error processing event {event_idx}: {e}")
-            continue
-    
-    # Print overall statistics
-    if all_analyses:
-        print(f"\n{'='*80}")
-        print("OVERALL OUTLIER PATTERN ANALYSIS")
-        print(f"{'='*80}")
-        
-        events_with_outliers = [a for a in all_analyses if a['n_outliers'] > 0]
-        
-        if len(events_with_outliers) > 0:
-            total_outliers = [a['n_outliers'] for a in events_with_outliers]
-            outlier_percentages = [a['outlier_percentage'] for a in events_with_outliers]
-            center_dist_ratios = []
-            
-            for a in events_with_outliers:
-                if len(a['outlier_center_distances']) > 0:
-                    ratio = a['avg_center_dist_outliers'] / a['avg_center_dist_all']
-                    center_dist_ratios.append(ratio)
-            
-            print(f"Events analyzed: {len(all_analyses)}")
-            print(f"Events with outliers: {len(events_with_outliers)}")
-            print(f"Average outliers per event: {np.mean(total_outliers):.1f} ± {np.std(total_outliers):.1f}")
-            print(f"Average outlier percentage: {np.mean(outlier_percentages):.1f}% ± {np.std(outlier_percentages):.1f}%")
-            
-            if len(center_dist_ratios) > 0:
-                avg_ratio = np.mean(center_dist_ratios)
-                print(f"Average center distance ratio (outliers/all): {avg_ratio:.2f} ± {np.std(center_dist_ratios):.2f}")
-                if avg_ratio > 1.1:
-                    print("→ Outliers are typically FARTHER from center")
-                elif avg_ratio < 0.9:
-                    print("→ Outliers are typically CLOSER to center")
-                else:
-                    print("→ Outliers show no clear distance pattern from center")
-            
-            print(f"\nOUTLIER DISTRIBUTION BY RING (across all events):")
-            print(f"{'Ring':<8} {'Avg Fraction':<15} {'Std Dev':<10} {'Events':<8} {'Description'}")
-            print("-" * 65)
-            
-            ring_descriptions = {
-                0: "Center pixel",
-                1: "Adjacent to center", 
-                2: "Second ring",
-                3: "Third ring",
-                4: "Corner pixels"
-            }
-            
-            max_avg_fraction = 0
-            max_ring = 0
-            
-            for ring in range(5):
-                if len(ring_statistics[ring]) > 0:
-                    avg_frac = np.mean(ring_statistics[ring])
-                    std_frac = np.std(ring_statistics[ring])
-                    n_events = len(ring_statistics[ring])
-                    desc = ring_descriptions[ring]
-                    
-                    print(f"{ring:<8} {avg_frac:<15.3f} {std_frac:<10.3f} {n_events:<8} {desc}")
-                    
-                    if avg_frac > max_avg_fraction:
-                        max_avg_fraction = avg_frac
-                        max_ring = ring
-            
-            if max_avg_fraction > 0:
-                print(f"\nHighest average outlier concentration: Ring {max_ring} ({ring_descriptions[max_ring]}) with {max_avg_fraction:.1%}")
-        
-        else:
-            print("No events with outliers found in the analyzed set.")
-    
-    return all_analyses
+# COMMENTED OUT - outlier functionality removed from C++ code
+# def analyze_outlier_patterns_multiple_events(root_filename, event_indices=None, charge_type='fraction',
+#                                             save_plots=True, output_dir=""):
+#     """
+#     Analyze outlier patterns across multiple events to find overall trends
+#     COMMENTED OUT - outlier functionality removed
+#     """
+#     pass
 
 if __name__ == "__main__":
     # Example usage - try multiple possible paths for the ROOT file
