@@ -160,10 +160,10 @@ if(ROOT_FOUND AND NOT "${ROOT_LIBS}" STREQUAL "")
   # Use the libraries returned by root-config if available
   set(ROOT_LIBRARIES ${ROOT_LIBS})
 else()
-  # Fall back to common ROOT libraries
+  # Fall back to common ROOT libraries including math libraries for fitting
   if(ROOT_FOUND)
     message(STATUS "Using default ROOT libraries")
-    set(ROOT_LIBRARIES "-lCore -lRIO -lHist -lTree -lGraf")
+    set(ROOT_LIBRARIES "-lCore -lRIO -lHist -lTree -lGraf -lMinuit -lMathCore -lMatrix")
   else()
     set(ROOT_LIBRARIES "")
   endif()
