@@ -37,6 +37,9 @@ public:
     // Method to set neighborhood radius
     void SetNeighborhoodRadius(G4int radius);
     
+    // Method to get neighborhood radius  
+    G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
+    
     // Getter method for DetectorMessenger
     DetectorMessenger* GetDetectorMessenger() const { return fDetectorMessenger; }
     
@@ -78,6 +81,9 @@ private:
     
     // Messenger for UI commands
     DetectorMessenger* fDetectorMessenger;
+    
+    // Neighborhood radius
+    G4int fNeighborhoodRadius;
 };
 
 #endif
