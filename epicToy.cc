@@ -6,16 +6,34 @@
 #include "G4VisManager.hh"
 #include "G4VisExecutive.hh"
 #include "G4UIExecutive.hh"
+#include "G4Threading.hh"
 
 #include "PhysicsList.hh"
 #include "DetectorConstruction.hh"
 #include "ActionInitialization.hh"
 
+void PrintUsage() {
+    G4cout << "\nUsage: ./epicToy [options] [macro_file]\n" << G4endl;
+    G4cout << "Options:" << G4endl;
+    G4cout << "  -m, --macro [file]     : Run in batch mode with specified macro file" << G4endl;
+    G4cout << "  -t, --threads [N]      : Set number of threads (default: all available cores)" << G4endl;
+    G4cout << "  --single-threaded      : Force single-threaded mode" << G4endl;
+    G4cout << "  -h, --help             : Print this help message" << G4endl;
+    G4cout << "\nExamples:" << G4endl;
+    G4cout << "  ./epicToy                          : Interactive mode with multithreading" << G4endl;
+    G4cout << "  ./epicToy -m macro.mac             : Batch mode with multithreading" << G4endl;
+    G4cout << "  ./epicToy -m macro.mac -t 4        : Batch mode with 4 threads" << G4endl;
+    G4cout << "  ./epicToy --single-threaded        : Interactive mode, single-threaded" << G4endl;
+    G4cout << G4endl;
+}
+
 int main(int argc, char** argv)
 {
-    // Check if we're running in batch mode
+    // Default settings
     G4bool isBatch = false;
+    G4bool forceSingleThreaded = false;
     G4String macroFile = "";
+    G4int requestedThreads = -1; // -1 means use all available cores
     
     // Set QT_QPA_PLATFORM environment variable to avoid Qt issues in batch mode
     char* oldQtPlatform = getenv("QT_QPA_PLATFORM");
@@ -24,14 +42,54 @@ int main(int argc, char** argv)
     // Parse command line arguments
     for (G4int i = 1; i < argc; i++) {
         G4String arg = argv[i];
-        if (arg == "-m" || arg == "--macro" || arg == "batch") {
+        
+        if (arg == "-h" || arg == "--help") {
+            PrintUsage();
+            return 0;
+        }
+        else if (arg == "-m" || arg == "--macro") {
             isBatch = true;
-            if (i + 1 < argc && arg != "batch") {
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
                 macroFile = argv[++i];
-            } else if (arg == "batch" && i + 1 < argc) {
-                // Handle the case when "batch" is directly used as an argument
+            } else {
+                G4cerr << "Error: -m/--macro requires a filename argument" << G4endl;
+                PrintUsage();
+                return 1;
+            }
+        }
+        else if (arg == "-t" || arg == "--threads") {
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                requestedThreads = std::atoi(argv[++i]);
+                if (requestedThreads <= 0) {
+                    G4cerr << "Error: Invalid number of threads: " << requestedThreads << G4endl;
+                    PrintUsage();
+                    return 1;
+                }
+            } else {
+                G4cerr << "Error: -t/--threads requires a number argument" << G4endl;
+                PrintUsage();
+                return 1;
+            }
+        }
+        else if (arg == "--single-threaded") {
+            forceSingleThreaded = true;
+        }
+        else if (arg == "batch") {
+            // Legacy support for old command format
+            isBatch = true;
+            if (i + 1 < argc) {
                 macroFile = argv[++i];
             }
+        }
+        else if (arg[0] != '-') {
+            // Assume it's a macro file if no flag specified
+            isBatch = true;
+            macroFile = arg;
+        }
+        else {
+            G4cerr << "Error: Unknown option: " << arg << G4endl;
+            PrintUsage();
+            return 1;
         }
     }
     
@@ -48,26 +106,52 @@ int main(int argc, char** argv)
         ui = new G4UIExecutive(argc, argv, "Qt");
     }
 
-    // Create the appropriate run manager
+    // Create the appropriate run manager with enhanced multithreading support
     G4RunManager* runManager = nullptr;
     
     #ifdef G4MULTITHREADED
-    if (!isBatch) {
-        // Use multithreaded mode only for interactive sessions
+    if (!forceSingleThreaded) {
+        // Use multithreaded mode by default for both interactive and batch
         G4MTRunManager* mtRunManager = new G4MTRunManager;
-        // Use all available cores on the machine by default
-        G4int nThreads = G4Threading::G4GetNumberOfCores();
+        
+        // Determine number of threads to use
+        G4int nThreads;
+        if (requestedThreads > 0) {
+            nThreads = requestedThreads;
+        } else {
+            // Use all available cores by default
+            nThreads = G4Threading::G4GetNumberOfCores();
+        }
+        
+        // Ensure we don't exceed system capabilities
+        G4int maxThreads = G4Threading::G4GetNumberOfCores();
+        if (nThreads > maxThreads) {
+            G4cout << "Warning: Requested " << nThreads << " threads, but only " 
+                   << maxThreads << " cores available. Using " << maxThreads << " threads." << G4endl;
+            nThreads = maxThreads;
+        }
+        
         mtRunManager->SetNumberOfThreads(nThreads);
-        G4cout << "Running in multithreaded mode with " << nThreads << " threads" << G4endl;
+        
+        G4cout << "=== MULTITHREADING ENABLED ===" << G4endl;
+        G4cout << "Mode: " << (isBatch ? "Batch" : "Interactive") << G4endl;
+        G4cout << "Threads: " << nThreads << " (of " << maxThreads << " available cores)" << G4endl;
+        G4cout << "===============================" << G4endl;
+        
         runManager = mtRunManager;
     } else {
-        // Use single-threaded mode for batch processing
+        // Use single-threaded mode when explicitly requested
         runManager = new G4RunManager;
-        G4cout << "Running in batch mode (single-threaded)" << G4endl;
+        G4cout << "=== SINGLE-THREADED MODE ===" << G4endl;
+        G4cout << "Mode: " << (isBatch ? "Batch" : "Interactive") << G4endl;
+        G4cout << "=============================" << G4endl;
     }
     #else
         runManager = new G4RunManager;
-        G4cout << "Running in single-threaded mode" << G4endl;
+        G4cout << "=== SINGLE-THREADED MODE ===" << G4endl;
+        G4cout << "Reason: GEANT4 compiled without multithreading support" << G4endl;
+        G4cout << "Mode: " << (isBatch ? "Batch" : "Interactive") << G4endl;
+        G4cout << "=============================" << G4endl;
     #endif
     
     // Physics List
@@ -103,10 +187,23 @@ int main(int argc, char** argv)
         delete ui;
     } else {
         // Batch mode - execute the specified macro without visualization
-        G4cout << "Running in batch mode with macro: " << macroFile << G4endl;
+        if (macroFile.empty()) {
+            G4cerr << "Error: No macro file specified for batch mode" << G4endl;
+            PrintUsage();
+            delete runManager;
+            return 1;
+        }
+        
+        G4cout << "Executing macro file: " << macroFile << G4endl;
         G4String command = "/control/execute ";
         command += macroFile;
-        uiManager->ApplyCommand(command);
+        G4int status = uiManager->ApplyCommand(command);
+        
+        if (status != 0) {
+            G4cerr << "Error executing macro file: " << macroFile << G4endl;
+            delete runManager;
+            return 1;
+        }
     }
     
     // Clean up

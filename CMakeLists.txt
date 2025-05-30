@@ -1,14 +1,66 @@
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
 project(ePIC_Toy_Detector)
+
+# Set CMake policies for modern behavior
+if(POLICY CMP0069)
+    cmake_policy(SET CMP0069 NEW)  # Link time optimization support
+endif()
+
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)  # find_package uses PackageName_ROOT variables
+endif()
 
 # Set C++20 standard to match ROOT configuration
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Find Geant4 package
+# Add compiler optimization and multithreading support
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
+
+# Enable multithreading support
+find_package(Threads REQUIRED)
+
+# Set build type to Release by default for optimal performance
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+# Add performance optimization options for multithreading
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    # Enable link-time optimization if supported
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT error)
+    if(LTO_SUPPORTED)
+        message(STATUS "Link-time optimization supported - enabling for better performance")
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+        message(STATUS "Link-time optimization not supported: ${error}")
+    endif()
+    
+    # Add additional optimization flags for multithreaded performance
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffast-math -funroll-loops")
+        message(STATUS "Added performance optimization flags for ${CMAKE_CXX_COMPILER_ID}")
+    endif()
+endif()
+
+# Find Geant4 package with multithreading support
 find_package(Geant4 REQUIRED ui_all vis_all)
+
+# Check if Geant4 was built with multithreading support
+if(Geant4_multithreaded_FOUND)
+    message(STATUS "Geant4 multithreading support: ENABLED")
+    add_definitions(-DG4MULTITHREADED)
+else()
+    message(STATUS "Geant4 multithreading support: DISABLED")
+    message(WARNING "Geant4 was not built with multithreading support. Consider rebuilding Geant4 with -DGEANT4_BUILD_MULTITHREADED=ON for optimal performance.")
+endif()
 
 # Try to find ROOT using different methods
 # Method 1: Use ROOT's provided scripts
@@ -171,9 +223,27 @@ endif()
 
 message(STATUS "ROOT Libraries: ${ROOT_LIBRARIES}")
 
-# Create the executable
+# Create the executable with enhanced performance settings
 add_executable(epicToy epicToy.cc ${sources} ${headers})
-target_link_libraries(epicToy ${Geant4_LIBRARIES} ${ROOT_LIBRARIES})
+
+# Link libraries including threading support
+target_link_libraries(epicToy 
+    ${Geant4_LIBRARIES} 
+    ${ROOT_LIBRARIES} 
+    Threads::Threads
+)
+
+# Set target-specific properties for optimization
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    set_target_properties(epicToy PROPERTIES
+        COMPILE_FLAGS "-O3 -march=native -mtune=native"
+    )
+    
+    # Enable interprocedural optimization for this target if supported
+    if(LTO_SUPPORTED)
+        set_property(TARGET epicToy PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif()
+endif()
 
 # Copy macro files
 file(GLOB MACRO_FILES
@@ -188,3 +258,27 @@ file(GLOB DATA_FILES
 file(COPY ${DATA_FILES} DESTINATION ${PROJECT_BINARY_DIR})
 
 add_custom_target(ePIC DEPENDS epicToy)
+
+# Add custom target for performance build
+add_custom_target(performance
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ${CMAKE_SOURCE_DIR}
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config Release
+    COMMENT "Building with maximum performance optimizations"
+)
+
+# Print summary of multithreading capabilities
+message(STATUS "=== MULTITHREADING SUMMARY ===")
+message(STATUS "Geant4 MT support: ${Geant4_multithreaded_FOUND}")
+message(STATUS "Threading library: ${CMAKE_THREAD_LIBS_INIT}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    message(STATUS "Performance optimizations: ENABLED")
+    if(LTO_SUPPORTED)
+        message(STATUS "Link-time optimization: ENABLED")
+    else()
+        message(STATUS "Link-time optimization: DISABLED")
+    endif()
+else()
+    message(STATUS "Performance optimizations: DISABLED (Debug build)")
+endif()
+message(STATUS "==============================")
