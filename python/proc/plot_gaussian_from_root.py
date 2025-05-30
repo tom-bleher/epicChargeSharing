@@ -72,36 +72,7 @@ class GaussianRootPlotter:
                     'GridNeighborhoodDistances': tree['GridNeighborhoodDistances'].array(library="np"),
                     'GridNeighborhoodChargeValues': tree['GridNeighborhoodChargeValues'].array(library="np"),
                     
-                    # Fit results (outliers removed)
-                    'FitAmplitude': tree['FitAmplitude'].array(library="np"),
-                    'FitX0': tree['FitX0'].array(library="np"),
-                    'FitY0': tree['FitY0'].array(library="np"),
-                    'FitSigmaX': tree['FitSigmaX'].array(library="np"),
-                    'FitSigmaY': tree['FitSigmaY'].array(library="np"),
-                    'FitTheta': tree['FitTheta'].array(library="np"),
-                    'FitOffset': tree['FitOffset'].array(library="np"),
-                    
-                    # Fit errors (outliers removed)
-                    'FitAmplitudeErr': tree['FitAmplitudeErr'].array(library="np"),
-                    'FitX0Err': tree['FitX0Err'].array(library="np"),
-                    'FitY0Err': tree['FitY0Err'].array(library="np"),
-                    'FitSigmaXErr': tree['FitSigmaXErr'].array(library="np"),
-                    'FitSigmaYErr': tree['FitSigmaYErr'].array(library="np"),
-                    'FitThetaErr': tree['FitThetaErr'].array(library="np"),
-                    'FitOffsetErr': tree['FitOffsetErr'].array(library="np"),
-                    
-                    # Fit statistics (outliers removed)
-                    'FitChi2': tree['FitChi2'].array(library="np"),
-                    'FitNDF': tree['FitNDF'].array(library="np"),
-                    'FitProb': tree['FitProb'].array(library="np"),
-                    'FitRSquared': tree['FitRSquared'].array(library="np"),
-                    'FitNPoints': tree['FitNPoints'].array(library="np"),
-                    'FitSuccessful': tree['FitSuccessful'].array(library="np"),
-                    'FitResidualMean': tree['FitResidualMean'].array(library="np"),
-                    'FitResidualStd': tree['FitResidualStd'].array(library="np"),
-                    'FitNOutliersRemoved': tree['FitNOutliersRemoved'].array(library="np"),
-                    
-                    # Fit results (all data - no outliers removed)
+                    # Fit results (all data - ONLY type available, outlier functionality removed)
                     'FitAmplitude_alldata': tree['FitAmplitude_alldata'].array(library="np"),
                     'FitX0_alldata': tree['FitX0_alldata'].array(library="np"),
                     'FitY0_alldata': tree['FitY0_alldata'].array(library="np"),
@@ -128,7 +99,7 @@ class GaussianRootPlotter:
                     'FitSuccessful_alldata': tree['FitSuccessful_alldata'].array(library="np"),
                     'FitResidualMean_alldata': tree['FitResidualMean_alldata'].array(library="np"),
                     'FitResidualStd_alldata': tree['FitResidualStd_alldata'].array(library="np"),
-                    'FitNOutliersRemoved_alldata': tree['FitNOutliersRemoved_alldata'].array(library="np"),
+                    # 'FitNOutliersRemoved_alldata': tree['FitNOutliersRemoved_alldata'].array(library="np"), - COMMENTED OUT - outlier functionality removed
                     
                     # Event data
                     'EventID': tree['EventID'].array(library="np"),
@@ -215,48 +186,48 @@ class GaussianRootPlotter:
 
     def calculate_residuals(self, event_idx, data, detector_params, charge_type='fraction'):
         """
-        Calculate residuals from stored fit parameters
+        Calculate residuals from stored fit parameters (ALL DATA only)
         """
         # Get charge coordinates
         x, y, z = self.get_charge_coordinates(event_idx, data, detector_params, charge_type)
         
-        # Get fit parameters
+        # Get fit parameters (using all-data fit since outlier functionality removed)
         fit_params = [
-            data['FitAmplitude'][event_idx],
-            data['FitX0'][event_idx],
-            data['FitY0'][event_idx],
-            data['FitSigmaX'][event_idx],
-            data['FitSigmaY'][event_idx],
-            data['FitTheta'][event_idx],
-            data['FitOffset'][event_idx]
+            data['FitAmplitude_alldata'][event_idx],
+            data['FitX0_alldata'][event_idx],
+            data['FitY0_alldata'][event_idx],
+            data['FitSigmaX_alldata'][event_idx],
+            data['FitSigmaY_alldata'][event_idx],
+            data['FitTheta_alldata'][event_idx],
+            data['FitOffset_alldata'][event_idx]
         ]
         
         # Calculate fitted values
         fitted_z = self.gaussian_3d(fit_params, (x, y))
         residuals = z - fitted_z
         
-        return x, y, z, fitted_z, residuals 
+        return x, y, z, fitted_z, residuals
 
     def plot_simple_fit_results(self, event_idx, data, detector_params, charge_type='fraction', 
                                save_plot=True, output_dir="", root_filename=None):
         """
         Create simple 2-panel plot: Data+Fit and Residuals
-        Replicating the exact visual presentation from fit_gaussian.py
+        Now only works with ALL DATA fits (outlier functionality removed)
         """
-        # Check if fit was successful
-        if not data['FitSuccessful'][event_idx]:
+        # Check if fit was successful (using all-data fit only)
+        if not data['FitSuccessful_alldata'][event_idx]:
             print(f"Warning: Fit was not successful for event {event_idx}")
             return None
         
-        # Get fit parameters from ROOT
+        # Get fit parameters from ROOT (all-data fit only)
         root_fit_params = [
-            data['FitAmplitude'][event_idx],
-            data['FitX0'][event_idx],
-            data['FitY0'][event_idx],
-            data['FitSigmaX'][event_idx],
-            data['FitSigmaY'][event_idx],
-            data['FitTheta'][event_idx],
-            data['FitOffset'][event_idx]
+            data['FitAmplitude_alldata'][event_idx],
+            data['FitX0_alldata'][event_idx],
+            data['FitY0_alldata'][event_idx],
+            data['FitSigmaX_alldata'][event_idx],
+            data['FitSigmaY_alldata'][event_idx],
+            data['FitTheta_alldata'][event_idx],
+            data['FitOffset_alldata'][event_idx]
         ]
         
         # Validate fit parameters
@@ -432,25 +403,25 @@ class GaussianRootPlotter:
     def plot_3d_visualization(self, event_idx, data, detector_params, charge_type='fraction', 
                              save_plot=True, output_dir=""):
         """
-        Create 3D visualization of the Gaussian fit results
+        Create 3D visualization of the Gaussian fit results (ALL DATA only)
         """
-        # Check if fit was successful
-        if not data['FitSuccessful'][event_idx]:
+        # Check if fit was successful (using all-data fit only)
+        if not data['FitSuccessful_alldata'][event_idx]:
             print(f"Warning: Fit was not successful for event {event_idx}")
             return None
         
         # Get coordinates and residuals
         x, y, z, fitted_z, residuals = self.calculate_residuals(event_idx, data, detector_params, charge_type)
         
-        # Get fit parameters
+        # Get fit parameters (all-data fit only)
         fit_params = [
-            data['FitAmplitude'][event_idx],
-            data['FitX0'][event_idx],
-            data['FitY0'][event_idx],
-            data['FitSigmaX'][event_idx],
-            data['FitSigmaY'][event_idx],
-            data['FitTheta'][event_idx],
-            data['FitOffset'][event_idx]
+            data['FitAmplitude_alldata'][event_idx],
+            data['FitX0_alldata'][event_idx],
+            data['FitY0_alldata'][event_idx],
+            data['FitSigmaX_alldata'][event_idx],
+            data['FitSigmaY_alldata'][event_idx],
+            data['FitTheta_alldata'][event_idx],
+            data['FitOffset_alldata'][event_idx]
         ]
         
         # Get true positions
@@ -570,7 +541,7 @@ class GaussianRootPlotter:
         
         # Add overall title
         fig.suptitle(f'3D Gaussian Fit Visualization - Event {event_idx} (from ROOT)\n'
-                    f'R² = {data["FitRSquared"][event_idx]:.6f}, χ²/NDF = {data["FitChi2"][event_idx]/data["FitNDF"][event_idx]:.6f}', 
+                    f'R² = {data["FitRSquared_alldata"][event_idx]:.6f}, χ²/NDF = {data["FitChi2_alldata"][event_idx]/data["FitNDF_alldata"][event_idx]:.6f}', 
                     fontsize=16, y=0.95)
         
         plt.tight_layout()
@@ -593,49 +564,39 @@ class GaussianRootPlotter:
 
     def print_fit_summary(self, event_idx, data):
         """
-        Print detailed fit summary for an event showing both fits
+        Print fit summary for an event (ALL DATA only - outlier functionality removed)
         """
         print(f"\n{'='*70}")
-        print(f"DUAL GAUSSIAN FIT SUMMARY - EVENT {event_idx}")
+        print(f"GAUSSIAN FIT SUMMARY - EVENT {event_idx} (ALL DATA)")
         print(f"{'='*70}")
         
-        outliers_removed_success = data['FitSuccessful'][event_idx]
         all_data_success = data['FitSuccessful_alldata'][event_idx]
         
-        if not (outliers_removed_success or all_data_success):
-            print("Both fits were NOT successful!")
+        if not all_data_success:
+            print("Fit was NOT successful!")
             return
         
-        # Print header for comparison table
-        print(f"{'Parameter':<20} {'Outliers Removed':<20} {'All Data':<20} {'Difference':<15}")
-        print(f"{'-'*75}")
+        # Print fit parameters for all-data fit only
+        print(f"{'Parameter':<20} {'Value':<20} {'Error':<20}")
+        print(f"{'-'*60}")
         
-        # Fit parameters comparison
         param_names = [
-            ('Amplitude', 'FitAmplitude', 'FitAmplitude_alldata'),
-            ('X Center [mm]', 'FitX0', 'FitX0_alldata'),
-            ('Y Center [mm]', 'FitY0', 'FitY0_alldata'),
-            ('Sigma X [mm]', 'FitSigmaX', 'FitSigmaX_alldata'),
-            ('Sigma Y [mm]', 'FitSigmaY', 'FitSigmaY_alldata'),
-            ('Rotation [rad]', 'FitTheta', 'FitTheta_alldata'),
-            ('Offset', 'FitOffset', 'FitOffset_alldata')
+            ('Amplitude', 'FitAmplitude_alldata', 'FitAmplitudeErr_alldata'),
+            ('X Center [mm]', 'FitX0_alldata', 'FitX0Err_alldata'),
+            ('Y Center [mm]', 'FitY0_alldata', 'FitY0Err_alldata'),
+            ('Sigma X [mm]', 'FitSigmaX_alldata', 'FitSigmaXErr_alldata'),
+            ('Sigma Y [mm]', 'FitSigmaY_alldata', 'FitSigmaYErr_alldata'),
+            ('Rotation [rad]', 'FitTheta_alldata', 'FitThetaErr_alldata'),
+            ('Offset', 'FitOffset_alldata', 'FitOffsetErr_alldata')
         ]
         
-        for param_name, outliers_key, all_data_key in param_names:
-            if outliers_removed_success and all_data_success:
-                outliers_val = data[outliers_key][event_idx]
-                all_data_val = data[all_data_key][event_idx]
-                diff = outliers_val - all_data_val
-                print(f"{param_name:<20} {outliers_val:<20.6f} {all_data_val:<20.6f} {diff:<15.6f}")
-            elif outliers_removed_success:
-                outliers_val = data[outliers_key][event_idx]
-                print(f"{param_name:<20} {outliers_val:<20.6f} {'FAILED':<20} {'N/A':<15}")
-            elif all_data_success:
-                all_data_val = data[all_data_key][event_idx]
-                print(f"{param_name:<20} {'FAILED':<20} {all_data_val:<20.6f} {'N/A':<15}")
+        for param_name, val_key, err_key in param_names:
+            val = data[val_key][event_idx]
+            err = data[err_key][event_idx]
+            print(f"{param_name:<20} {val:<20.6f} {err:<20.6f}")
         
         print(f"\n{'='*70}")
-        print("FIT STATISTICS COMPARISON")
+        print("FIT STATISTICS")
         print(f"{'='*70}")
         
         # Statistics comparison
@@ -1082,58 +1043,6 @@ class GaussianRootPlotter:
         
         plt.show()
         return fig
-
-    def identify_outliers_like_cpp(self, x, y, z, outlier_threshold=3.0, verbose=False):
-        """
-        Identify outliers using the same method as the C++ code:
-        Modified Z-score with Median Absolute Deviation (MAD)
-        
-        Returns:
-        --------
-        outlier_mask : array of bool
-            True for outliers, False for good points
-        outlier_info : dict
-            Information about the outlier detection process
-        """
-        import numpy as np
-        
-        if len(z) < 10:
-            return np.zeros(len(z), dtype=bool), {'n_outliers': 0, 'threshold_used': 0}
-        
-        # Calculate median
-        z_sorted = np.sort(z)
-        median = z_sorted[len(z_sorted) // 2]
-        
-        # Calculate MAD (Median Absolute Deviation)
-        abs_deviations = np.abs(z - median)
-        mad = np.median(abs_deviations)
-        
-        # Use modified Z-score with MAD (same as C++ code)
-        mad_threshold = outlier_threshold * 1.4826 * mad  # 1.4826 converts MAD to std dev equivalent
-        
-        # Identify outliers
-        modified_z_scores = np.abs(z - median)
-        outlier_mask = modified_z_scores > mad_threshold
-        
-        outlier_info = {
-            'n_outliers': np.sum(outlier_mask),
-            'median': median,
-            'mad': mad,
-            'threshold_used': mad_threshold,
-            'modified_z_scores': modified_z_scores,
-            'outlier_threshold': outlier_threshold
-        }
-        
-        if verbose:
-            print(f"  Outlier detection: median={median:.6f}, MAD={mad:.6f}, threshold={mad_threshold:.6f}")
-            if np.sum(outlier_mask) > 0:
-                print(f"  Found {np.sum(outlier_mask)} outliers:")
-                for i, (xi, yi, zi, is_outlier) in enumerate(zip(x, y, z, outlier_mask)):
-                    if is_outlier:
-                        z_score_ratio = modified_z_scores[i] / mad_threshold if mad_threshold > 0 else 0
-                        print(f"    Removed outlier at ({xi:.6f}, {yi:.6f}) with value {zi:.6f} (modified Z={z_score_ratio:.2f})")
-        
-        return outlier_mask, outlier_info
 
     def analyze_outlier_patterns(self, event_idx, data, detector_params, charge_type='fraction', verbose=True):
         """
@@ -2006,14 +1915,14 @@ if __name__ == "__main__":
     
     # Configuration
     CHARGE_TYPE = 'fraction'       # 'fraction', 'value', or 'coulomb'
-    OUTPUT_DIR = "gaussian_dual_fits"
+    OUTPUT_DIR = "gaussian_fits"
     
     print("="*70)
-    print("DUAL GAUSSIAN FIT VISUALIZATION FROM ROOT FILE")
+    print("GAUSSIAN FIT VISUALIZATION FROM ROOT FILE")
     print("="*70)
     print("This script reads pre-computed Gaussian fit results from the")
-    print("C++ Geant4 simulation and creates visualization plots comparing")
-    print("fits with outliers removed vs fits with all data.")
+    print("C++ Geant4 simulation and creates visualization plots.")
+    print("NOTE: Outlier functionality has been removed - only ALL DATA fits available.")
     print("="*70)
     
     # Load data to check what's available
@@ -2023,180 +1932,57 @@ if __name__ == "__main__":
         
         print(f"\nLoaded {len(data['EventID'])} events from ROOT file")
         
-        # Find successful fits for both types
-        outliers_success = data['FitSuccessful']
+        # Find successful fits (all-data only)
         all_data_success = data['FitSuccessful_alldata']
-        both_success = np.logical_and(outliers_success, all_data_success)
-        any_success = np.logical_or(outliers_success, all_data_success)
         
-        outliers_only_success = np.logical_and(outliers_success, ~all_data_success)
-        all_data_only_success = np.logical_and(~outliers_success, all_data_success)
-        
-        total_events = len(data['FitSuccessful'])
-        both_count = np.sum(both_success)
-        outliers_only_count = np.sum(outliers_only_success)
-        all_data_only_count = np.sum(all_data_only_success)
-        any_count = np.sum(any_success)
+        total_events = len(data['FitSuccessful_alldata'])
+        all_data_count = np.sum(all_data_success)
         
         print(f"Fit success rates:")
-        print(f"  Both fits successful:           {both_count}/{total_events} ({both_count/total_events*100:.1f}%)")
-        print(f"  Only outliers-removed successful: {outliers_only_count}/{total_events} ({outliers_only_count/total_events*100:.1f}%)")
-        print(f"  Only all-data successful:       {all_data_only_count}/{total_events} ({all_data_only_count/total_events*100:.1f}%)")
-        print(f"  At least one successful:        {any_count}/{total_events} ({any_count/total_events*100:.1f}%)")
+        print(f"  All-data fits successful:       {all_data_count}/{total_events} ({all_data_count/total_events*100:.1f}%)")
         
-        if any_count == 0:
+        if all_data_count == 0:
             print("No successful fits found in ROOT file!")
             print("Make sure the Gaussian fitting was enabled in the C++ simulation.")
             exit(1)
         
         # Find events for demonstration
-        both_success_events = np.where(both_success)[0]
-        any_success_events = np.where(any_success)[0]
+        success_events = np.where(all_data_success)[0]
         
-        print(f"First 10 events with any successful fit: {any_success_events[:10].tolist()}")
-        if len(both_success_events) > 0:
-            print(f"First 10 events with both fits successful: {both_success_events[:10].tolist()}")
+        print(f"First 10 events with successful fits: {success_events[:10].tolist()}")
         
-        # Demonstrate single event dual analysis
-        demo_event = any_success_events[0]
-        print(f"\nDemonstrating dual fit analysis for event {demo_event}:")
+        # Demonstrate single event analysis
+        demo_event = success_events[0]
+        print(f"\nDemonstrating fit analysis for event {demo_event}:")
         
-        # Dual fit comparison plot
-        print(f"\n1. Creating dual fit comparison plot...")
-        plot_dual_fit_from_root(root_file, demo_event, CHARGE_TYPE, 
-                               save_plots=True, output_dir=OUTPUT_DIR)
+        # Single fit plot
+        print(f"\n1. Creating fit visualization plot...")
+        plot_single_event_from_root(root_file, demo_event, CHARGE_TYPE, 
+                                   save_plots=True, output_dir=OUTPUT_DIR, 
+                                   plot_style='simple')
         
-        # If we have events where both fits succeeded, demonstrate effectiveness analysis
-        if len(both_success_events) > 0:
-            print(f"\n2. Analyzing outlier removal effectiveness...")
-            events_to_analyze = both_success_events[:min(5, len(both_success_events))]
-            summary = analyze_multiple_events_dual_fits(root_file, events_to_analyze, CHARGE_TYPE, 
-                                                      save_plots=True, output_dir=OUTPUT_DIR)
-        else:
-            print(f"\n2. No events with both fits successful - analyzing available events...")
-            events_to_analyze = any_success_events[:min(5, len(any_success_events))]
-            summary = analyze_multiple_events_dual_fits(root_file, events_to_analyze, CHARGE_TYPE, 
-                                                      save_plots=True, output_dir=OUTPUT_DIR)
-        
-        # Show comparison with original single-fit analysis
-        print(f"\n3. For comparison, showing original single-fit analysis...")
-        try:
-            if len(both_success_events) > 0:
-                comparison_event = both_success_events[0]
-            else:
-                comparison_event = any_success_events[0]
-            
-            plot_single_event_from_root(root_file, comparison_event, CHARGE_TYPE, 
-                                       save_plots=True, output_dir=OUTPUT_DIR, 
-                                       plot_style='simple')
-        except Exception as e:
-            print(f"Could not create comparison plot: {e}")
+        # Multiple events analysis
+        print(f"\n2. Analyzing multiple events...")
+        events_to_analyze = success_events[:min(5, len(success_events))]
+        summary = analyze_multiple_events_from_root(root_file, events_to_analyze, CHARGE_TYPE, 
+                                                  save_plots=True, output_dir=OUTPUT_DIR)
         
         print(f"\n{'='*70}")
-        print("DUAL FIT ANALYSIS COMPLETE")
+        print("FIT ANALYSIS COMPLETE")
         print(f"{'='*70}")
-        print(f"Generated dual fit comparison plots from C++ Gaussian fits")
+        print(f"Generated fit visualization plots from C++ Gaussian fits")
         print(f"Results saved to: {OUTPUT_DIR}")
-        print(f"\nNew features in this improved script:")
-        print(f"  - Displays both fits side by side: outliers removed vs all data")
-        print(f"  - Shows which fit performs better for each event")
-        print(f"  - Calculates improvement statistics from outlier removal")
-        print(f"  - Provides comprehensive comparison tables in text output")
-        print(f"  - Uses different color schemes to distinguish the two fits")
-        print(f"  - Shows number of outliers removed and effectiveness metrics")
-        print(f"\nUsage examples for dual fit analysis:")
-        print(f"  # Single event dual comparison:")
-        print(f"  plot_dual_fit_from_root('{root_file}', {demo_event}, 'fraction')")
-        print(f"  # Multiple events dual analysis:")
-        print(f"  analyze_multiple_events_dual_fits('{root_file}', [{', '.join(map(str, events_to_analyze[:3]))}], 'fraction')")
-        print(f"  # Original single fit plots still available:")
+        print(f"\nFeatures available:")
+        print(f"  - Shows fitted Gaussian surface with data points")
+        print(f"  - Displays fit quality metrics (R², χ²/NDF)")
+        print(f"  - Shows distance from true position")
+        print(f"  - Creates residual analysis plots")
+        print(f"  - Supports 3D visualization")
+        print(f"\nUsage examples:")
+        print(f"  # Single event simple plot:")
         print(f"  plot_single_event_from_root('{root_file}', {demo_event}, 'fraction', plot_style='simple')")
-        
-        # Print summary statistics if we have dual fit data
-        if len(both_success_events) > 5:
-            print(f"\nBrief effectiveness analysis of outlier removal (based on first 10 dual-success events):")
-            sample_events = both_success_events[:10]
-            
-            improvements = []
-            for event_idx in sample_events:
-                true_x = data['TrueX'][event_idx]
-                true_y = data['TrueY'][event_idx]
-                
-                fit_x_outliers = data['FitX0'][event_idx]
-                fit_y_outliers = data['FitY0'][event_idx]
-                distance_outliers = np.sqrt((fit_x_outliers - true_x)**2 + (fit_y_outliers - true_y)**2)
-                
-                fit_x_all = data['FitX0_alldata'][event_idx]
-                fit_y_all = data['FitY0_alldata'][event_idx]
-                distance_all = np.sqrt((fit_x_all - true_x)**2 + (fit_y_all - true_y)**2)
-                
-                improvement = distance_all - distance_outliers
-                improvements.append(improvement)
-            
-            avg_improvement = np.mean(improvements)
-            positive_improvements = sum(1 for imp in improvements if imp > 0)
-            
-            print(f"  Average distance improvement: {avg_improvement:.6f} mm")
-            print(f"  Outlier removal improved fits in {positive_improvements}/{len(improvements)} cases ({positive_improvements/len(improvements)*100:.1f}%)")
-        
-        # Demonstrate single event outlier analysis
-        print(f"\n4. Analyzing outlier patterns for event {demo_event}...")
-        try:
-            analyze_outlier_patterns_from_root(root_file, demo_event, CHARGE_TYPE,
-                                             save_plots=True, output_dir=OUTPUT_DIR)
-        except Exception as e:
-            print(f"Could not perform outlier analysis: {e}")
-        
-        # Multi-event outlier pattern analysis
-        if any_count > 10:
-            print(f"\n5. Analyzing outlier patterns across multiple events...")
-            try:
-                outlier_analyses = analyze_outlier_patterns_multiple_events(root_file, None, CHARGE_TYPE,
-                                                                           save_plots=True, output_dir=OUTPUT_DIR)
-            except Exception as e:
-                print(f"Could not perform multi-event outlier analysis: {e}")
-        
-        # Show comparison with original single-fit analysis
-        print(f"\n6. For comparison, showing original single-fit analysis...")
-        try:
-            if len(both_success_events) > 0:
-                comparison_event = both_success_events[0]
-            else:
-                comparison_event = any_success_events[0]
-            
-            plot_single_event_from_root(root_file, comparison_event, CHARGE_TYPE, 
-                                       save_plots=True, output_dir=OUTPUT_DIR, 
-                                       plot_style='simple')
-        except Exception as e:
-            print(f"Could not create comparison plot: {e}")
-        
-        print(f"\n{'='*70}")
-        print("DUAL FIT AND OUTLIER ANALYSIS COMPLETE")
-        print(f"{'='*70}")
-        print(f"Generated comprehensive analysis plots from C++ Gaussian fits")
-        print(f"Results saved to: {OUTPUT_DIR}")
-        print(f"\nNew features in this enhanced script:")
-        print(f"  - Displays both fits side by side: outliers removed vs all data")
-        print(f"  - Shows which fit performs better for each event")
-        print(f"  - Calculates improvement statistics from outlier removal")
-        print(f"  - Provides comprehensive comparison tables in text output")
-        print(f"  - Uses different color schemes to distinguish the two fits")
-        print(f"  - Shows number of outliers removed and effectiveness metrics")
-        print(f"  - ANALYZES OUTLIER SPATIAL PATTERNS in the 9x9 grid")
-        print(f"  - Identifies whether outliers cluster at edges or center")
-        print(f"  - Shows outlier detection statistics (MAD-based thresholding)")
-        print(f"  - Provides ring-by-ring outlier analysis")
-        print(f"\nUsage examples for analysis:")
-        print(f"  # Single event dual comparison:")
-        print(f"  plot_dual_fit_from_root('{root_file}', {demo_event}, 'fraction')")
-        print(f"  # Multiple events dual analysis:")
-        print(f"  analyze_multiple_events_dual_fits('{root_file}', [{', '.join(map(str, events_to_analyze[:3]))}], 'fraction')")
-        print(f"  # Single event outlier pattern analysis:")
-        print(f"  analyze_outlier_patterns_from_root('{root_file}', {demo_event}, 'fraction')")
-        print(f"  # Multi-event outlier pattern analysis:")
-        print(f"  analyze_outlier_patterns_multiple_events('{root_file}', None, 'fraction')")
-        print(f"  # Original plots still work:")
-        print(f"  plot_single_event_from_root('{root_file}', {demo_event}, 'fraction', plot_style='simple')")
+        print(f"  # Multiple events analysis:")
+        print(f"  analyze_multiple_events_from_root('{root_file}', [{', '.join(map(str, events_to_analyze[:3]))}], 'fraction')")
     
     except Exception as e:
         print(f"Error loading ROOT file: {e}")

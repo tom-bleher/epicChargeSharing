@@ -21,8 +21,8 @@ public:
      * @brief Enumeration for fit types
      */
     enum FitType {
-        ALL_DATA = 0,        // Fit with all data (no outlier removal)
-        OUTLIER_CLEANED = 1  // Fit with outlier detection and removal
+        ALL_DATA = 0        // Fit with all data (no outlier removal)
+        // OUTLIER_CLEANED = 1  // Fit with outlier detection and removal - COMMENTED OUT
     };
 
     /**
@@ -72,7 +72,7 @@ public:
         G4double prob;             // Fit probability
         G4double r_squared;        // R-squared value
         G4int n_points;            // Number of data points used in fit
-        G4int n_outliers_removed;  // Number of outliers removed
+        // G4int n_outliers_removed;  // Number of outliers removed - COMMENTED OUT
         G4bool fit_successful;     // Whether fit converged successfully
         G4bool constraints_satisfied; // Whether all constraints are satisfied
         
@@ -90,7 +90,7 @@ public:
             fit_type(ALL_DATA),
             amplitude(0), x0(0), y0(0), sigma_x(0), sigma_y(0), theta(0), offset(0),
             amplitude_err(0), x0_err(0), y0_err(0), sigma_x_err(0), sigma_y_err(0), theta_err(0), offset_err(0),
-            chi2(0), ndf(0), prob(0), r_squared(0), n_points(0), n_outliers_removed(0), 
+            chi2(0), ndf(0), prob(0), r_squared(0), n_points(0), /* n_outliers_removed(0), */ 
             fit_successful(false), constraints_satisfied(false),
             residual_mean(0), residual_std(0),
             center_distance_from_detector_edge(0), min_distance_to_pixel(0), fit_attempt_number(0) {}
@@ -127,11 +127,13 @@ public:
      * @param verbose Whether to print fit progress and results
      * @return FitResults structure containing all fit information
      */
+    /*
     FitResults FitGaussian3D(const std::vector<G4double>& x_coords,
                             const std::vector<G4double>& y_coords,
                             const std::vector<G4double>& z_values,
                             const std::vector<G4double>& z_errors = std::vector<G4double>(),
                             G4bool verbose = false);
+    */
     
     /**
      * @brief Fit 3D Gaussian to charge distribution data WITHOUT outlier removal
@@ -177,12 +179,14 @@ private:
     /**
      * @brief Remove outliers from data using robust statistical methods
      */
+    /*
     void RemoveOutliers(std::vector<G4double>& x_coords,
                        std::vector<G4double>& y_coords,
                        std::vector<G4double>& z_values,
                        std::vector<G4double>& z_errors,
                        G4int& n_outliers_removed,
                        G4bool verbose = false);
+    */
     
     /**
      * @brief Check if point is inside any pixel with buffer zone
@@ -261,7 +265,7 @@ private:
     
     // Robustness parameters
     static const G4int fMaxFitAttempts = 3;     // Maximum number of fitting attempts
-    static const G4double fOutlierThreshold;   // Z-score threshold for outlier removal
+    // static const G4double fOutlierThreshold;   // Z-score threshold for outlier removal - COMMENTED OUT
     static const G4double fConstraintPenalty;  // Penalty factor for constraint violations
 };
 
