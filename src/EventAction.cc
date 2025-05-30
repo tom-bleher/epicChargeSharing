@@ -40,8 +40,16 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fTotalStepLength(0.),
   fGaussianFitter(nullptr)
 { 
-  // Create the 3D Gaussian fitter instance
-  fGaussianFitter = new Gaussian3DFitter();
+  // Create the 3D Gaussian fitter instance with detector geometry constraints
+  Gaussian3DFitter::DetectorGeometry geometry;
+  geometry.detector_size = fDetector->GetDetSize();
+  geometry.pixel_size = fDetector->GetPixelSize();
+  geometry.pixel_spacing = fDetector->GetPixelSpacing();
+  geometry.pixel_corner_offset = fDetector->GetPixelCornerOffset();
+  geometry.num_blocks_per_side = fDetector->GetNumBlocksPerSide();
+  geometry.pixel_exclusion_buffer = 0.01; // 10 microns as requested
+  
+  fGaussianFitter = new Gaussian3DFitter(geometry);
 }
 
 EventAction::~EventAction()
@@ -221,10 +229,17 @@ void EventAction::EndOfEventAction(const G4Event* event)
     
     // Perform fitting if we have enough data points
     if (x_coords.size() >= 4) { // Need at least 4 points for meaningful fit
-      Gaussian3DFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
+      // Perform BOTH fits: with all data and with outlier removal
+      
+      // Fit 1: All data (no outlier removal)
+      Gaussian3DFitter::FitResults fitResults_alldata = fGaussianFitter->FitGaussian3DAllData(
         x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
       
-      // Pass fit results to RunAction
+      // Fit 2: With outlier detection and removal  
+      Gaussian3DFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
+        x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
+
+      // Pass fit results with outlier removal to RunAction
       fRunAction->SetGaussianFitResults(
         fitResults.amplitude, fitResults.x0, fitResults.y0,
         fitResults.sigma_x, fitResults.sigma_y, fitResults.theta, fitResults.offset,
@@ -232,30 +247,66 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.sigma_x_err, fitResults.sigma_y_err, fitResults.theta_err, fitResults.offset_err,
         fitResults.chi2, fitResults.ndf, fitResults.prob, fitResults.r_squared,
         fitResults.n_points, fitResults.fit_successful,
-        fitResults.residual_mean, fitResults.residual_std);
+        fitResults.residual_mean, fitResults.residual_std,
+        fitResults.n_outliers_removed, fitResults.constraints_satisfied,
+        fitResults.center_distance_from_detector_edge, fitResults.min_distance_to_pixel,
+        fitResults.fit_attempt_number);
+        
+      // Pass fit results for all data (no outlier removal) to RunAction
+      fRunAction->SetGaussianFitResultsAllData(
+        fitResults_alldata.amplitude, fitResults_alldata.x0, fitResults_alldata.y0,
+        fitResults_alldata.sigma_x, fitResults_alldata.sigma_y, fitResults_alldata.theta, fitResults_alldata.offset,
+        fitResults_alldata.amplitude_err, fitResults_alldata.x0_err, fitResults_alldata.y0_err,
+        fitResults_alldata.sigma_x_err, fitResults_alldata.sigma_y_err, fitResults_alldata.theta_err, fitResults_alldata.offset_err,
+        fitResults_alldata.chi2, fitResults_alldata.ndf, fitResults_alldata.prob, fitResults_alldata.r_squared,
+        fitResults_alldata.n_points, fitResults_alldata.fit_successful,
+        fitResults_alldata.residual_mean, fitResults_alldata.residual_std,
+        fitResults_alldata.n_outliers_removed, fitResults_alldata.constraints_satisfied,
+        fitResults_alldata.center_distance_from_detector_edge, fitResults_alldata.min_distance_to_pixel,
+        fitResults_alldata.fit_attempt_number);
         
       // Optional: Print fit results for debugging (only for first few events)
-      if (eventID < 5 && fitResults.fit_successful) {
-        G4cout << "Event " << eventID << " - 3D Gaussian Fit Results:" << G4endl;
-        G4cout << "  Center: (" << fitResults.x0 << ", " << fitResults.y0 << ") mm" << G4endl;
-        G4cout << "  Sigma: (" << fitResults.sigma_x << ", " << fitResults.sigma_y << ") mm" << G4endl;
-        G4cout << "  R²: " << fitResults.r_squared << G4endl;
+      if (eventID < 5) {
+        if (fitResults_alldata.fit_successful) {
+          G4cout << "Event " << eventID << " - All Data Fit Results:" << G4endl;
+          G4cout << "  Center: (" << fitResults_alldata.x0 << ", " << fitResults_alldata.y0 << ") mm" << G4endl;
+          G4cout << "  Sigma: (" << fitResults_alldata.sigma_x << ", " << fitResults_alldata.sigma_y << ") mm" << G4endl;
+          G4cout << "  R²: " << fitResults_alldata.r_squared << G4endl;
+        }
+        if (fitResults.fit_successful) {
+          G4cout << "Event " << eventID << " - Outlier-Cleaned Fit Results:" << G4endl;
+          G4cout << "  Center: (" << fitResults.x0 << ", " << fitResults.y0 << ") mm" << G4endl;
+          G4cout << "  Sigma: (" << fitResults.sigma_x << ", " << fitResults.sigma_y << ") mm" << G4endl;
+          G4cout << "  R²: " << fitResults.r_squared << ", Outliers removed: " << fitResults.n_outliers_removed << G4endl;
+        }
       }
     } else {
-      // Not enough data points for fitting - set default values
+      // Not enough data points for fitting - set default values for both fits
       fRunAction->SetGaussianFitResults(
         0, 0, 0, 0, 0, 0, 0,  // parameters
         0, 0, 0, 0, 0, 0, 0,  // errors
         0, 0, 0, 0,           // chi2, ndf, prob, r_squared
-        x_coords.size(), false, 0, 0); // n_points, fit_successful, residual stats
+        x_coords.size(), false, 0, 0, 0, 0, 0, 0, 0); // n_points, fit_successful, residual stats
+      
+      fRunAction->SetGaussianFitResultsAllData(
+        0, 0, 0, 0, 0, 0, 0,  // parameters
+        0, 0, 0, 0, 0, 0, 0,  // errors
+        0, 0, 0, 0,           // chi2, ndf, prob, r_squared
+        x_coords.size(), false, 0, 0, 0, 0, 0, 0, 0); // n_points, fit_successful, residual stats
     }
   } else {
-    // No fitter or no charge data - set default values
+    // No fitter or no charge data - set default values for both fits
     fRunAction->SetGaussianFitResults(
       0, 0, 0, 0, 0, 0, 0,  // parameters
       0, 0, 0, 0, 0, 0, 0,  // errors
       0, 0, 0, 0,           // chi2, ndf, prob, r_squared
-      0, false, 0, 0);      // n_points, fit_successful, residual stats
+      0, false, 0, 0, 0, 0, 0, 0, 0);      // n_points, fit_successful, residual stats
+    
+    fRunAction->SetGaussianFitResultsAllData(
+      0, 0, 0, 0, 0, 0, 0,  // parameters
+      0, 0, 0, 0, 0, 0, 0,  // errors
+      0, 0, 0, 0,           // chi2, ndf, prob, r_squared
+      0, false, 0, 0, 0, 0, 0, 0, 0);      // n_points, fit_successful, residual stats
   }
   
   fRunAction->FillTree();

@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <cmath>
 #include "TFile.h"
 #include "TTree.h"
 #include "TChain.h"
@@ -80,7 +81,42 @@ RunAction::RunAction()
   fFitNPoints(0),
   fFitSuccessful(false),
   fFitResidualMean(0),
-  fFitResidualStd(0)
+  fFitResidualStd(0),
+  fGaussX(0),
+  fGaussY(0), 
+  fGaussTrueDistance(0),
+  fFitNOutliersRemoved(0),
+  fFitConstraintsSatisfied(false),
+  fFitCenterDistFromEdge(0),
+  fFitMinDistToPixel(0),
+  fFitAttemptNumber(0),
+  fFitAmplitude_alldata(0),
+  fFitX0_alldata(0),
+  fFitY0_alldata(0),
+  fFitSigmaX_alldata(0),
+  fFitSigmaY_alldata(0),
+  fFitTheta_alldata(0),
+  fFitOffset_alldata(0),
+  fFitAmplitudeErr_alldata(0),
+  fFitX0Err_alldata(0),
+  fFitY0Err_alldata(0),
+  fFitSigmaXErr_alldata(0),
+  fFitSigmaYErr_alldata(0),
+  fFitThetaErr_alldata(0),
+  fFitOffsetErr_alldata(0),
+  fFitChi2_alldata(0),
+  fFitNDF_alldata(0),
+  fFitProb_alldata(0),
+  fFitRSquared_alldata(0),
+  fFitNPoints_alldata(0),
+  fFitSuccessful_alldata(false),
+  fFitResidualMean_alldata(0),
+  fFitResidualStd_alldata(0),
+  fFitNOutliersRemoved_alldata(0),
+  fFitConstraintsSatisfied_alldata(false),
+  fFitCenterDistFromEdge_alldata(0),
+  fFitMinDistToPixel_alldata(0),
+  fFitAttemptNumber_alldata(0)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize trajectory vectors (they are automatically initialized empty)
@@ -240,6 +276,53 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("FitSuccessful", &fFitSuccessful, "FitSuccessful/O")->SetTitle("Whether Fit was Successful");
     fTree->Branch("FitResidualMean", &fFitResidualMean, "FitResidualMean/D")->SetTitle("Mean of Fit Residuals");
     fTree->Branch("FitResidualStd", &fFitResidualStd, "FitResidualStd/D")->SetTitle("Standard Deviation of Fit Residuals");
+    
+    // Add branches for enhanced robustness metrics
+    fTree->Branch("FitNOutliersRemoved", &fFitNOutliersRemoved, "FitNOutliersRemoved/I")->SetTitle("Number of Outliers Removed");
+    fTree->Branch("FitConstraintsSatisfied", &fFitConstraintsSatisfied, "FitConstraintsSatisfied/O")->SetTitle("Whether Geometric Constraints were Satisfied");
+    fTree->Branch("FitCenterDistFromEdge", &fFitCenterDistFromEdge, "FitCenterDistFromEdge/D")->SetTitle("Distance from Fit Center to Detector Edge [mm]");
+    fTree->Branch("FitMinDistToPixel", &fFitMinDistToPixel, "FitMinDistToPixel/D")->SetTitle("Minimum Distance from Fit Center to Any Pixel [mm]");
+    fTree->Branch("FitAttemptNumber", &fFitAttemptNumber, "FitAttemptNumber/I")->SetTitle("Which Fitting Attempt Succeeded (1-based)");
+    
+    // Add branches for 3D Gaussian fit results (ALL DATA - no outlier removal)
+    fTree->Branch("FitAmplitude_alldata", &fFitAmplitude_alldata, "FitAmplitude_alldata/D")->SetTitle("Fitted Gaussian Amplitude (All Data)");
+    fTree->Branch("FitX0_alldata", &fFitX0_alldata, "FitX0_alldata/D")->SetTitle("Fitted Gaussian Center X [mm] (All Data)");
+    fTree->Branch("FitY0_alldata", &fFitY0_alldata, "FitY0_alldata/D")->SetTitle("Fitted Gaussian Center Y [mm] (All Data)");
+    fTree->Branch("FitSigmaX_alldata", &fFitSigmaX_alldata, "FitSigmaX_alldata/D")->SetTitle("Fitted Gaussian Sigma X [mm] (All Data)");
+    fTree->Branch("FitSigmaY_alldata", &fFitSigmaY_alldata, "FitSigmaY_alldata/D")->SetTitle("Fitted Gaussian Sigma Y [mm] (All Data)");
+    fTree->Branch("FitTheta_alldata", &fFitTheta_alldata, "FitTheta_alldata/D")->SetTitle("Fitted Gaussian Rotation Angle [rad] (All Data)");
+    fTree->Branch("FitOffset_alldata", &fFitOffset_alldata, "FitOffset_alldata/D")->SetTitle("Fitted Gaussian Offset (All Data)");
+    
+    // Add branches for fit parameter errors (all data)
+    fTree->Branch("FitAmplitudeErr_alldata", &fFitAmplitudeErr_alldata, "FitAmplitudeErr_alldata/D")->SetTitle("Error in Fitted Amplitude (All Data)");
+    fTree->Branch("FitX0Err_alldata", &fFitX0Err_alldata, "FitX0Err_alldata/D")->SetTitle("Error in Fitted Center X [mm] (All Data)");
+    fTree->Branch("FitY0Err_alldata", &fFitY0Err_alldata, "FitY0Err_alldata/D")->SetTitle("Error in Fitted Center Y [mm] (All Data)");
+    fTree->Branch("FitSigmaXErr_alldata", &fFitSigmaXErr_alldata, "FitSigmaXErr_alldata/D")->SetTitle("Error in Fitted Sigma X [mm] (All Data)");
+    fTree->Branch("FitSigmaYErr_alldata", &fFitSigmaYErr_alldata, "FitSigmaYErr_alldata/D")->SetTitle("Error in Fitted Sigma Y [mm] (All Data)");
+    fTree->Branch("FitThetaErr_alldata", &fFitThetaErr_alldata, "FitThetaErr_alldata/D")->SetTitle("Error in Fitted Rotation Angle [rad] (All Data)");
+    fTree->Branch("FitOffsetErr_alldata", &fFitOffsetErr_alldata, "FitOffsetErr_alldata/D")->SetTitle("Error in Fitted Offset (All Data)");
+    
+    // Add branches for fit statistics (all data)
+    fTree->Branch("FitChi2_alldata", &fFitChi2_alldata, "FitChi2_alldata/D")->SetTitle("Fit Chi-squared Value (All Data)");
+    fTree->Branch("FitNDF_alldata", &fFitNDF_alldata, "FitNDF_alldata/D")->SetTitle("Fit Number of Degrees of Freedom (All Data)");
+    fTree->Branch("FitProb_alldata", &fFitProb_alldata, "FitProb_alldata/D")->SetTitle("Fit Probability (All Data)");
+    fTree->Branch("FitRSquared_alldata", &fFitRSquared_alldata, "FitRSquared_alldata/D")->SetTitle("Fit R-squared Value (All Data)");
+    fTree->Branch("FitNPoints_alldata", &fFitNPoints_alldata, "FitNPoints_alldata/I")->SetTitle("Number of Points Used in Fit (All Data)");
+    fTree->Branch("FitSuccessful_alldata", &fFitSuccessful_alldata, "FitSuccessful_alldata/O")->SetTitle("Whether Fit was Successful (All Data)");
+    fTree->Branch("FitResidualMean_alldata", &fFitResidualMean_alldata, "FitResidualMean_alldata/D")->SetTitle("Mean of Fit Residuals (All Data)");
+    fTree->Branch("FitResidualStd_alldata", &fFitResidualStd_alldata, "FitResidualStd_alldata/D")->SetTitle("Standard Deviation of Fit Residuals (All Data)");
+    
+    // Add branches for enhanced robustness metrics (all data)
+    fTree->Branch("FitNOutliersRemoved_alldata", &fFitNOutliersRemoved_alldata, "FitNOutliersRemoved_alldata/I")->SetTitle("Number of Outliers Removed (All Data)");
+    fTree->Branch("FitConstraintsSatisfied_alldata", &fFitConstraintsSatisfied_alldata, "FitConstraintsSatisfied_alldata/O")->SetTitle("Whether Geometric Constraints were Satisfied (All Data)");
+    fTree->Branch("FitCenterDistFromEdge_alldata", &fFitCenterDistFromEdge_alldata, "FitCenterDistFromEdge_alldata/D")->SetTitle("Distance from Fit Center to Detector Edge [mm] (All Data)");
+    fTree->Branch("FitMinDistToPixel_alldata", &fFitMinDistToPixel_alldata, "FitMinDistToPixel_alldata/D")->SetTitle("Minimum Distance from Fit Center to Any Pixel [mm] (All Data)");
+    fTree->Branch("FitAttemptNumber_alldata", &fFitAttemptNumber_alldata, "FitAttemptNumber_alldata/I")->SetTitle("Which Fitting Attempt Succeeded (1-based) (All Data)");
+    
+    // Add convenient alias branches for Gaussian center coordinates and distance calculation
+    fTree->Branch("GaussX", &fGaussX, "GaussX/D")->SetTitle("Gaussian Center X [mm]");
+    fTree->Branch("GaussY", &fGaussY, "GaussY/D")->SetTitle("Gaussian Center Y [mm]");
+    fTree->Branch("GaussTrueDistance", &fGaussTrueDistance, "GaussTrueDistance/D")->SetTitle("Distance from Gaussian Center to True Position [mm]");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -694,9 +777,12 @@ void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double 
                                      G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
                                      G4double chi2, G4double ndf, G4double prob, G4double r_squared,
                                      G4int n_points, G4bool fit_successful,
-                                     G4double residual_mean, G4double residual_std)
+                                     G4double residual_mean, G4double residual_std,
+                                     G4int n_outliers_removed, G4bool constraints_satisfied,
+                                     G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
+                                     G4int fit_attempt_number)
 {
-    // Store 3D Gaussian fit results
+    // Store 3D Gaussian fit results (WITH outlier removal)
     fFitAmplitude = amplitude;
     fFitX0 = x0;
     fFitY0 = y0;
@@ -721,4 +807,67 @@ void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double 
     fFitSuccessful = fit_successful;
     fFitResidualMean = residual_mean;
     fFitResidualStd = residual_std;
+    
+    // Store enhanced robustness metrics
+    fFitNOutliersRemoved = n_outliers_removed;
+    fFitConstraintsSatisfied = constraints_satisfied;
+    fFitCenterDistFromEdge = center_distance_from_detector_edge;
+    fFitMinDistToPixel = min_distance_to_pixel;
+    fFitAttemptNumber = fit_attempt_number;
+    
+    // Set alias variables for convenient access to Gaussian center coordinates
+    fGaussX = x0;  // Alias for fFitX0
+    fGaussY = y0;  // Alias for fFitY0
+    
+    // Calculate distance from Gaussian center to true position
+    if (fit_successful) {
+        fGaussTrueDistance = std::sqrt(std::pow(fGaussX - fTrueX, 2) + std::pow(fGaussY - fTrueY, 2));
+    } else {
+        fGaussTrueDistance = -1.0;  // Set to -1 if fit was unsuccessful
+    }
+}
+
+void RunAction::SetGaussianFitResultsAllData(G4double amplitude, G4double x0, G4double y0,
+                                             G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
+                                             G4double amplitude_err, G4double x0_err, G4double y0_err,
+                                             G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
+                                             G4double chi2, G4double ndf, G4double prob, G4double r_squared,
+                                             G4int n_points, G4bool fit_successful,
+                                             G4double residual_mean, G4double residual_std,
+                                             G4int n_outliers_removed, G4bool constraints_satisfied,
+                                             G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
+                                             G4int fit_attempt_number)
+{
+    // Store 3D Gaussian fit results for ALL DATA (WITHOUT outlier removal)
+    fFitAmplitude_alldata = amplitude;
+    fFitX0_alldata = x0;
+    fFitY0_alldata = y0;
+    fFitSigmaX_alldata = sigma_x;
+    fFitSigmaY_alldata = sigma_y;
+    fFitTheta_alldata = theta;
+    fFitOffset_alldata = offset;
+    
+    fFitAmplitudeErr_alldata = amplitude_err;
+    fFitX0Err_alldata = x0_err;
+    fFitY0Err_alldata = y0_err;
+    fFitSigmaXErr_alldata = sigma_x_err;
+    fFitSigmaYErr_alldata = sigma_y_err;
+    fFitThetaErr_alldata = theta_err;
+    fFitOffsetErr_alldata = offset_err;
+    
+    fFitChi2_alldata = chi2;
+    fFitNDF_alldata = ndf;
+    fFitProb_alldata = prob;
+    fFitRSquared_alldata = r_squared;
+    fFitNPoints_alldata = n_points;
+    fFitSuccessful_alldata = fit_successful;
+    fFitResidualMean_alldata = residual_mean;
+    fFitResidualStd_alldata = residual_std;
+    
+    // Store enhanced robustness metrics for all data fit
+    fFitNOutliersRemoved_alldata = n_outliers_removed;
+    fFitConstraintsSatisfied_alldata = constraints_satisfied;
+    fFitCenterDistFromEdge_alldata = center_distance_from_detector_edge;
+    fFitMinDistToPixel_alldata = min_distance_to_pixel;
+    fFitAttemptNumber_alldata = fit_attempt_number;
 }
