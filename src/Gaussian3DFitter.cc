@@ -10,7 +10,7 @@
 #include "TMath.h"
 
 // Define static constants
-const G4double Gaussian3DFitter::fOutlierThreshold = 3.0;  // 3-sigma outlier threshold
+// const G4double Gaussian3DFitter::fOutlierThreshold = 3.0;  // 3-sigma outlier threshold - COMMENTED OUT
 const G4double Gaussian3DFitter::fConstraintPenalty = 1000.0;  // Large penalty for constraint violations
 
 Gaussian3DFitter::Gaussian3DFitter(const DetectorGeometry& detector_geometry) 
@@ -218,6 +218,7 @@ void Gaussian3DFitter::ApplyParameterBounds(G4double* params) const
     while (params[5] < -TMath::Pi()) params[5] += 2.0 * TMath::Pi();
 }
 
+/*
 void Gaussian3DFitter::RemoveOutliers(std::vector<G4double>& x_coords,
                                      std::vector<G4double>& y_coords,
                                      std::vector<G4double>& z_values,
@@ -285,6 +286,7 @@ void Gaussian3DFitter::RemoveOutliers(std::vector<G4double>& x_coords,
         G4cout << "  Removed " << n_outliers_removed << " outliers, " << z_values.size() << " points remaining" << G4endl;
     }
 }
+*/
 
 void Gaussian3DFitter::CalculateInitialGuess(const std::vector<G4double>& x_coords,
                                              const std::vector<G4double>& y_coords,
@@ -729,6 +731,7 @@ void Gaussian3DFitter::RobustSimplexFit(const std::vector<G4double>& x_coords,
     }
 }
 
+/*
 Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G4double>& x_coords,
                                                             const std::vector<G4double>& y_coords,
                                                             const std::vector<G4double>& z_values,
@@ -736,7 +739,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
                                                             G4bool verbose)
 {
     FitResults results;
-    results.fit_type = OUTLIER_CLEANED; // This method performs outlier removal
+    // results.fit_type = OUTLIER_CLEANED; // This method performs outlier removal - COMMENTED OUT
     
     // Check input data validity
     if (x_coords.size() != y_coords.size() || x_coords.size() != z_values.size()) {
@@ -927,6 +930,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
     
     return results;
 }
+*/
 
 Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::vector<G4double>& x_coords,
                                                                    const std::vector<G4double>& y_coords,
@@ -954,17 +958,16 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
     }
     
     if (verbose) {
-        G4cout << "\n=== Gaussian3D Fitting (ALL data, NO outlier removal) ===" << G4endl;
+        G4cout << "\n=== Gaussian3D Fitting (ALL data) ===" << G4endl;
         G4cout << "Data points: " << x_coords.size() << G4endl;
         G4cout << "Detector geometry: " << fDetectorGeometry.detector_size << "×" << fDetectorGeometry.detector_size 
                << " mm, " << fDetectorGeometry.num_blocks_per_side << "×" << fDetectorGeometry.num_blocks_per_side << " pixels" << G4endl;
         G4cout << "Pixel exclusion buffer: " << fDetectorGeometry.pixel_exclusion_buffer << " mm" << G4endl;
     }
     
-    // Use original data without outlier removal
+    // Use all data points
     results.n_points = x_coords.size();
-    results.n_outliers_removed = 0; // No outliers removed in this method
-    
+
     // Try multiple fitting strategies
     G4bool fit_found = false;
     G4double best_chi2 = 1e10;
@@ -989,7 +992,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
                 G4cout << "  Offset: " << fitParams[6] << G4endl;
             }
             
-            // Perform robust simplex optimization (without outlier removal, but still with constraints)
+            // Perform robust simplex optimization with constraints
             RobustSimplexFit(x_coords, y_coords, z_values, z_errors, fitParams, verbose);
             
             // Check constraints
@@ -1084,7 +1087,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
     results.fit_successful = (results.r_squared > 0.3 && results.constraints_satisfied);
     
     if (verbose) {
-        G4cout << "\n=== Final Fit Results (ALL data, NO outlier removal) ===" << G4endl;
+        G4cout << "\n=== Final Fit Results (ALL data) ===" << G4endl;
         G4cout << "✓ Fit successful: " << (results.fit_successful ? "Yes" : "No") << G4endl;
         G4cout << "Parameters:" << G4endl;
         G4cout << "  Amplitude: " << results.amplitude << " ± " << results.amplitude_err << G4endl;
@@ -1100,7 +1103,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
         G4cout << "  Chi2/NDF: " << results.chi2 << G4endl;
         G4cout << "  Probability: " << results.prob << G4endl;
         G4cout << "  R-squared: " << results.r_squared << G4endl;
-        G4cout << "  Data points: " << results.n_points << " (outliers removed: " << results.n_outliers_removed << ")" << G4endl;
+        G4cout << "  Data points: " << results.n_points << G4endl;
         G4cout << "Robustness:" << G4endl;
         G4cout << "  Distance from detector edge: " << results.center_distance_from_detector_edge << " mm" << G4endl;
         G4cout << "  Min distance to pixel: " << results.min_distance_to_pixel << " mm" << G4endl;

@@ -91,7 +91,7 @@ public:
                        const std::vector<G4double>& stepLength,
                        const std::vector<G4int>& stepNumber);
     
-    // Method to set 3D Gaussian fit results
+    // Method to set 3D Gaussian fit results (ALL DATA)
     void SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
                               G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
                               G4double amplitude_err, G4double x0_err, G4double y0_err,
@@ -99,11 +99,11 @@ public:
                               G4double chi2, G4double ndf, G4double prob, G4double r_squared,
                               G4int n_points, G4bool fit_successful,
                               G4double residual_mean, G4double residual_std,
-                              G4int n_outliers_removed, G4bool constraints_satisfied,
+                              /* G4int n_outliers_removed, */ G4bool constraints_satisfied,
                               G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
                               G4int fit_attempt_number);
     
-    // Method to set 3D Gaussian fit results for ALL DATA (no outlier removal)
+    // Method to set 3D Gaussian fit results for ALL DATA
     void SetGaussianFitResultsAllData(G4double amplitude, G4double x0, G4double y0,
                                       G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
                                       G4double amplitude_err, G4double x0_err, G4double y0_err,
@@ -111,7 +111,7 @@ public:
                                       G4double chi2, G4double ndf, G4double prob, G4double r_squared,
                                       G4int n_points, G4bool fit_successful,
                                       G4double residual_mean, G4double residual_std,
-                                      G4int n_outliers_removed, G4bool constraints_satisfied,
+                                      /* G4int n_outliers_removed, */ G4bool constraints_satisfied,
                                       G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
                                       G4int fit_attempt_number);
     
@@ -233,7 +233,7 @@ private:
     G4double fFitResidualStd;     // Standard deviation of residuals
     
     // Enhanced robustness metrics
-    G4int fFitNOutliersRemoved;   // Number of outliers removed
+    // G4int fFitNOutliersRemoved;   // Number of outliers removed - COMMENTED OUT
     G4bool fFitConstraintsSatisfied; // Whether geometric constraints were satisfied
     G4double fFitCenterDistFromEdge; // Distance from fit center to detector edge [mm]
     G4double fFitMinDistToPixel;  // Minimum distance from fit center to any pixel [mm]
@@ -266,11 +266,8 @@ private:
     G4double fFitResidualStd_alldata;     // Standard deviation of residuals (all data)
     
     // Enhanced robustness metrics for all data fit
-    G4int fFitNOutliersRemoved_alldata;   // Number of outliers removed (all data, should be 0)
+    // G4int fFitNOutliersRemoved_alldata;   // Number of outliers removed (all data, should be 0) - COMMENTED OUT
     G4bool fFitConstraintsSatisfied_alldata; // Whether geometric constraints were satisfied (all data)
-    G4double fFitCenterDistFromEdge_alldata; // Distance from fit center to detector edge [mm] (all data)
-    G4double fFitMinDistToPixel_alldata;  // Minimum distance from fit center to any pixel [mm] (all data)
-    G4int fFitAttemptNumber_alldata;      // Which fitting attempt succeeded (1-based) (all data)
     
     // Additional variables for convenient access to Gaussian center and distance calculation
     G4double fGaussX;             // Gaussian X center [mm] (alias for fFitX0)
