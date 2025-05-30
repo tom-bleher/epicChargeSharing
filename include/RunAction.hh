@@ -223,7 +223,7 @@ private:
     G4double fFitThetaErr;        // Error in rotation angle [rad]
     G4double fFitOffsetErr;       // Error in offset
     
-    G4double fFitChi2;            // Reduced chi-squared value (chi2/ndf)
+    G4double fFitChi2;            // Chi-squared value
     G4double fFitNDF;             // Number of degrees of freedom
     G4double fFitProb;            // Fit probability
     G4double fFitRSquared;        // R-squared value
@@ -256,7 +256,7 @@ private:
     G4double fFitThetaErr_alldata;        // Error in rotation angle [rad] (all data)
     G4double fFitOffsetErr_alldata;       // Error in offset (all data)
     
-    G4double fFitChi2_alldata;            // Reduced chi-squared value (chi2/ndf) (all data)
+    G4double fFitChi2_alldata;            // Chi-squared value (all data)
     G4double fFitNDF_alldata;             // Number of degrees of freedom (all data)
     G4double fFitProb_alldata;            // Fit probability (all data)
     G4double fFitRSquared_alldata;        // R-squared value (all data)
