@@ -69,6 +69,7 @@ execute_process(
   OUTPUT_VARIABLE ROOT_CONFIG_EXECUTABLE
   OUTPUT_STRIP_TRAILING_WHITESPACE
   RESULT_VARIABLE ROOT_CONFIG_RESULT
+  TIMEOUT 10
 )
 
 if(ROOT_CONFIG_EXECUTABLE AND NOT "${ROOT_CONFIG_EXECUTABLE}" STREQUAL "NOTFOUND")
@@ -81,52 +82,64 @@ if(ROOT_CONFIG_EXECUTABLE AND NOT "${ROOT_CONFIG_EXECUTABLE}" STREQUAL "NOTFOUND
     OUTPUT_STRIP_TRAILING_WHITESPACE
     RESULT_VARIABLE ROOT_VERSION_RESULT
     ERROR_QUIET
+    TIMEOUT 10
   )
   
   if(ROOT_VERSION_RESULT EQUAL 0)
+    message(STATUS "ROOT version: ${ROOT_VERSION}")
     # If root-config works correctly, get configuration details
     execute_process(
       COMMAND ${ROOT_CONFIG_EXECUTABLE} --prefix
       OUTPUT_VARIABLE ROOT_PREFIX
       OUTPUT_STRIP_TRAILING_WHITESPACE
+      TIMEOUT 10
     )
     
     execute_process(
       COMMAND ${ROOT_CONFIG_EXECUTABLE} --cflags
       OUTPUT_VARIABLE ROOT_CFLAGS
       OUTPUT_STRIP_TRAILING_WHITESPACE
+      TIMEOUT 10
     )
     
     execute_process(
       COMMAND ${ROOT_CONFIG_EXECUTABLE} --libs
       OUTPUT_VARIABLE ROOT_LIBS
       OUTPUT_STRIP_TRAILING_WHITESPACE
+      TIMEOUT 10
     )
     
     execute_process(
       COMMAND ${ROOT_CONFIG_EXECUTABLE} --incdir
       OUTPUT_VARIABLE ROOT_INCLUDE_DIR
       OUTPUT_STRIP_TRAILING_WHITESPACE
+      TIMEOUT 10
     )
     
     execute_process(
       COMMAND ${ROOT_CONFIG_EXECUTABLE} --libdir
       OUTPUT_VARIABLE ROOT_LIBRARY_DIR
       OUTPUT_STRIP_TRAILING_WHITESPACE
+      TIMEOUT 10
     )
   else()
     message(STATUS "root-config found but not executable, will try alternative methods")
     set(ROOT_CONFIG_EXECUTABLE "")
   endif()
   
-  message(STATUS "ROOT prefix: ${ROOT_PREFIX}")
-  message(STATUS "ROOT include dir: ${ROOT_INCLUDE_DIR}")
-  message(STATUS "ROOT library dir: ${ROOT_LIBRARY_DIR}")
-  
-  include_directories(${ROOT_INCLUDE_DIR})
-  link_directories(${ROOT_LIBRARY_DIR})
-  
-  set(ROOT_FOUND TRUE)
+  if(ROOT_PREFIX AND ROOT_INCLUDE_DIR AND ROOT_LIBRARY_DIR)
+    message(STATUS "ROOT prefix: ${ROOT_PREFIX}")
+    message(STATUS "ROOT include dir: ${ROOT_INCLUDE_DIR}")
+    message(STATUS "ROOT library dir: ${ROOT_LIBRARY_DIR}")
+    
+    include_directories(${ROOT_INCLUDE_DIR})
+    link_directories(${ROOT_LIBRARY_DIR})
+    
+    set(ROOT_FOUND TRUE)
+  else()
+    message(WARNING "Failed to get ROOT configuration from root-config, trying fallback methods")
+    set(ROOT_CONFIG_EXECUTABLE "")
+  endif()
 else()
   # Method 2: Standard CMake find_package
   find_package(ROOT QUIET)
