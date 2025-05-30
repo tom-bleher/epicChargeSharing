@@ -137,7 +137,7 @@ The simulation generates `epicToyOutput.root` with the following branches:
 | Branch                           | Type            | Units   | Description                  |
 | -------------------------------- | --------------- | ------- | ---------------------------- |
 | `Edep`                           | Double          | MeV     | Energy deposited in detector |
-| `PosX`, `PosY`, `PosZ`           | Double          | mm      | Hit position coordinates     |
+| `TrueX`, `TrueY`, `TrueZ`           | Double          | mm      | Hit position coordinates     |
 | `InitX`, `InitY`, `InitZ`        | Double          | mm      | Initial particle position    |
 | `PixelX`, `PixelY`, `PixelZ`     | Double          | mm      | Nearest pixel center         |
 | `PixelI`, `PixelJ`               | Integer         | -       | Pixel grid indices           |
