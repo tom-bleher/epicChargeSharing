@@ -18,8 +18,9 @@ class PixelDetectorVisualizer:
     """
     Interactive visualization of a pixel detector with functionality to:
     - Place point particles in the detector (outside pixels)
-    - Calculate angles between particles and pixels
+    - Calculate angles between particles and pixels using two different methods
     - Visualize these angles with arcs and lines
+    - Compare the two alpha calculation methods
     """
     def __init__(self, histogram_bins=100):
         # Parameters from DetectorConstruction.cc (converting to mm)
@@ -51,56 +52,96 @@ class PixelDetectorVisualizer:
         self.save_detector_button = Button(self.save_detector_button_ax, 'Save Detector Image')
         self.save_detector_button.on_clicked(lambda event: self.save_detector_visualization())
         
-        # Create separate figure for alpha vs distance scatter plot
+        # Create separate figure for alpha vs distance scatter plot - GEOMETRIC METHOD
         self.scatter_fig, self.scatter_ax = plt.subplots(figsize=(10, 8))
-        self.scatter_ax.set_title('Alpha Angle vs Distance (Combined Cases)')
+        self.scatter_ax.set_title('Alpha Angle vs Distance (Geometric Method - Combined Cases)')
         self.scatter_ax.set_xlabel('Distance (mm)')
         self.scatter_ax.set_ylabel('Alpha Angle (degrees)')
         self.scatter_ax.grid(True, linestyle='--', alpha=0.7)
+        
+        # Create separate figure for alpha vs distance scatter plot - ANALYTICAL METHOD
+        self.scatter_analytical_fig, self.scatter_analytical_ax = plt.subplots(figsize=(10, 8))
+        self.scatter_analytical_ax.set_title('Alpha Angle vs Distance (Analytical Method - Combined Cases)')
+        self.scatter_analytical_ax.set_xlabel('Distance (mm)')
+        self.scatter_analytical_ax.set_ylabel('Alpha Angle (degrees)')
+        self.scatter_analytical_ax.grid(True, linestyle='--', alpha=0.7)
+        
+        # Create comparison figure
+        self.comparison_fig, self.comparison_ax = plt.subplots(figsize=(12, 8))
+        self.comparison_ax.set_title('Alpha Angle Comparison: Geometric vs Analytical Methods')
+        self.comparison_ax.set_xlabel('Distance (mm)')
+        self.comparison_ax.set_ylabel('Alpha Angle (degrees)')
+        self.comparison_ax.grid(True, linestyle='--', alpha=0.7)
         
         # Add a button to save CSV data
         self.save_csv_button_ax = self.scatter_fig.add_axes([0.7, 0.01, 0.25, 0.05])
         self.save_csv_button = Button(self.save_csv_button_ax, 'Save to CSV')
         self.save_csv_button.on_clicked(lambda event: self.save_to_csv())
         
-        # Store distance and alpha values for scatter plot
+        # Store distance and alpha values for scatter plot - GEOMETRIC METHOD
         self.distances = []
-        self.alphas = []
+        self.alphas_geometric = []  # Renamed for clarity
         self.point_types = []  # 1 for same side case, 2 for adjacent sides case
         self.scatter_plot = None
         
-        # Create separate figures for the two cases
+        # Store alpha values for ANALYTICAL METHOD
+        self.alphas_analytical = []
+        
+        # Create separate figures for the two cases - GEOMETRIC METHOD
         self.case1_fig, self.case1_ax = plt.subplots(figsize=(10, 8))
-        self.case1_ax.set_title('Alpha Angle vs Distance (Same Side Case - 0 points)')
+        self.case1_ax.set_title('Alpha Angle vs Distance (Geometric Method - Same Side Case - 0 points)')
         self.case1_ax.set_xlabel('Distance (mm)')
         self.case1_ax.set_ylabel('Alpha Angle (degrees)')
         self.case1_ax.grid(True, linestyle='--', alpha=0.7)
         self.case1_scatter = None
         
         self.case2_fig, self.case2_ax = plt.subplots(figsize=(10, 8))
-        self.case2_ax.set_title('Alpha Angle vs Distance (Adjacent Sides Case - 0 points)')
+        self.case2_ax.set_title('Alpha Angle vs Distance (Geometric Method - Adjacent Sides Case - 0 points)')
         self.case2_ax.set_xlabel('Distance (mm)')
         self.case2_ax.set_ylabel('Alpha Angle (degrees)')
         self.case2_ax.grid(True, linestyle='--', alpha=0.7)
         self.case2_scatter = None
         
-        # Create figure for alpha angle histogram (wider for presentation format)
+        # Create separate figures for the two cases - ANALYTICAL METHOD
+        self.case1_analytical_fig, self.case1_analytical_ax = plt.subplots(figsize=(10, 8))
+        self.case1_analytical_ax.set_title('Alpha Angle vs Distance (Analytical Method - Same Side Case - 0 points)')
+        self.case1_analytical_ax.set_xlabel('Distance (mm)')
+        self.case1_analytical_ax.set_ylabel('Alpha Angle (degrees)')
+        self.case1_analytical_ax.grid(True, linestyle='--', alpha=0.7)
+        self.case1_analytical_scatter = None
+        
+        self.case2_analytical_fig, self.case2_analytical_ax = plt.subplots(figsize=(10, 8))
+        self.case2_analytical_ax.set_title('Alpha Angle vs Distance (Analytical Method - Adjacent Sides Case - 0 points)')
+        self.case2_analytical_ax.set_xlabel('Distance (mm)')
+        self.case2_analytical_ax.set_ylabel('Alpha Angle (degrees)')
+        self.case2_analytical_ax.grid(True, linestyle='--', alpha=0.7)
+        self.case2_analytical_scatter = None
+        
+        # Create figure for alpha angle histogram - GEOMETRIC METHOD (wider for presentation format)
         self.hist_fig, self.hist_ax = plt.subplots(figsize=(16, 9))  # 16:9 aspect ratio for presentations
-        self.hist_ax.set_title('Histogram of Alpha Angles (0 points)', fontsize=14)
+        self.hist_ax.set_title('Histogram of Alpha Angles - Geometric Method (0 points)', fontsize=14)
         self.hist_ax.set_xlabel('Alpha Angle (degrees)', fontsize=13)
         self.hist_ax.set_ylabel('Count', fontsize=13)
         self.hist_ax.tick_params(axis='both', which='major', labelsize=12)
         self.hist_ax.grid(True, linestyle='--', alpha=0.7)
         self.hist_bars = None
         
-        # Set up buttons
-        #self.new_points_button_ax = self.fig.add_axes([0.65, 0.05, 0.15, 0.05])
-        #self.new_points_button = Button(self.new_points_button_ax, 'New Points')
-        #self.new_points_button.on_clicked(self.generate_random_points)
+        # Create figure for alpha angle histogram - ANALYTICAL METHOD
+        self.hist_analytical_fig, self.hist_analytical_ax = plt.subplots(figsize=(16, 9))
+        self.hist_analytical_ax.set_title('Histogram of Alpha Angles - Analytical Method (0 points)', fontsize=14)
+        self.hist_analytical_ax.set_xlabel('Alpha Angle (degrees)', fontsize=13)
+        self.hist_analytical_ax.set_ylabel('Count', fontsize=13)
+        self.hist_analytical_ax.tick_params(axis='both', which='major', labelsize=12)
+        self.hist_analytical_ax.grid(True, linestyle='--', alpha=0.7)
+        self.hist_analytical_bars = None
         
-        #self.clear_button_ax = self.fig.add_axes([0.8, 0.05, 0.15, 0.05])
-        #self.clear_button = Button(self.clear_button_ax, 'Clear Points')
-        #self.clear_button.on_clicked(self.clear_points)
+        # Create comparison histogram
+        self.hist_comparison_fig, self.hist_comparison_ax = plt.subplots(figsize=(16, 9))
+        self.hist_comparison_ax.set_title('Alpha Angle Histogram Comparison: Geometric vs Analytical Methods (0 points)', fontsize=14)
+        self.hist_comparison_ax.set_xlabel('Alpha Angle (degrees)', fontsize=13)
+        self.hist_comparison_ax.set_ylabel('Count', fontsize=13)
+        self.hist_comparison_ax.tick_params(axis='both', which='major', labelsize=12)
+        self.hist_comparison_ax.grid(True, linestyle='--', alpha=0.7)
         
         # Configuration for points
         self.num_random_points = 100  # Number of random points to generate
@@ -125,10 +166,6 @@ class PixelDetectorVisualizer:
         self.ax.grid(True, linestyle='--', alpha=0.7)
         self.ax.set_xlabel('X (mm)')
         self.ax.set_ylabel('Y (mm)')
-        #self.ax.set_title('Pixel Detector with Alpha Angle Calculation')
-        
-        # Show instructions
-        #self.update_info_text("Click anywhere in the detector (outside pixels) to place a point.")
 
     def get_detector_parameters(self):
         """Get detector parameters that match the actual Geant4 simulation"""
@@ -228,10 +265,10 @@ class PixelDetectorVisualizer:
         
         return pixel_idx, distance
 
-    def calculate_alpha(self, point_x, point_y, pixel_idx):
+    def calculate_alpha_geometric(self, point_x, point_y, pixel_idx):
         """
         Calculate the maximum angle (alpha) from the point to the pixel
-        without having lines intersect the pixel
+        without having lines intersect the pixel using geometric method
         
         Returns:
         - alpha: maximum viewing angle
@@ -304,6 +341,47 @@ class PixelDetectorVisualizer:
             point_type = 2  # Adjacent sides
             
         return alpha, start_angle, end_angle, bisector_angle, point_type
+    
+    def calculate_alpha_analytical(self, point_x, point_y, pixel_idx):
+        """
+        Calculate the alpha angle using the analytical formula from the image:
+        α = tan^(-1) [(l/2 * √2) / (l/2 * √2 + d)]
+        
+        where:
+        - l: side of the pixel pad (self.pixel_size)
+        - d: distance from event hit to center of pixel pad
+        
+        Returns:
+        - alpha: analytical alpha angle in radians
+        """
+        if pixel_idx < 0 or pixel_idx >= len(self.all_pixel_positions):
+            return 0
+            
+        # Get pixel center coordinates
+        center_x, center_y, pwidth, pheight = self.all_pixel_positions[pixel_idx]
+        
+        # Calculate distance from point to pixel center
+        d = math.sqrt((point_x - center_x)**2 + (point_y - center_y)**2)
+        
+        # Use the pixel size as l (side of the pixel pad)
+        l = self.pixel_size
+        
+        # Apply the analytical formula: α = tan^(-1) [(l/2 * √2) / (l/2 * √2 + d)]
+        numerator = (l/2) * math.sqrt(2)
+        denominator = numerator + d
+        
+        # Handle edge case where denominator could be very small
+        if denominator < 1e-10:
+            alpha = math.pi/2  # Maximum possible angle (90 degrees)
+        else:
+            alpha = math.atan(numerator / denominator)
+        
+        return alpha
+
+    # Keep the old method name for backward compatibility
+    def calculate_alpha(self, point_x, point_y, pixel_idx):
+        """Wrapper for backward compatibility - uses geometric method"""
+        return self.calculate_alpha_geometric(point_x, point_y, pixel_idx)
 
     def draw_alpha_visualization(self, point_x, point_y, pixel_idx):
         """Draw visualization of the alpha angle and projection lines"""
@@ -325,8 +403,8 @@ class PixelDetectorVisualizer:
         self.ax.add_patch(pixel_highlight)
         visuals.append(pixel_highlight)
         
-        # Calculate alpha and related angles
-        alpha, start_angle, end_angle, bisector_angle, point_type = self.calculate_alpha(point_x, point_y, pixel_idx)
+        # Calculate alpha and related angles using geometric method
+        alpha, start_angle, end_angle, bisector_angle, point_type = self.calculate_alpha_geometric(point_x, point_y, pixel_idx)
         
         # Calculate pixel center and distance to point (center coordinates are already available)
         pixel_center_x = center_x
@@ -376,40 +454,13 @@ class PixelDetectorVisualizer:
         visuals.append(line1)
         visuals.append(line2)
         
-        # Calculate the complementary bisector angle (middle of the larger angle region)
-        comp_bisector_angle = bisector_angle + math.pi
-        if comp_bisector_angle > 2 * math.pi:
-            comp_bisector_angle -= 2 * math.pi
-            
-        # Only show angle indicator text if we have <= 100 points
-        if len(self.points) <= 100:
-            radius_factor = 0.7  # Adjust as needed for text positioning
-            #angle_text = self.ax.text(point_x + radius*radius_factor*math.cos(comp_bisector_angle),
-                                    #point_y + radius*radius_factor*math.sin(comp_bisector_angle),
-                                    #f'α = {math.degrees(alpha):.1f}°',
-                                    #color='red', fontsize=10,
-                                    #horizontalalignment='center',
-                                    #verticalalignment='center')
-            #svisuals.append(angle_text)
-        
         # Draw dotted line to the pixel center
         dist_line = self.ax.plot([point_x, pixel_center_x], 
                                 [point_y, pixel_center_y], 
                                 'k--', linewidth=1, alpha=0.6)[0]
         visuals.append(dist_line)
         
-        # Distance is already calculated above
-        
-        # Add text box with both distance and angle only if we have <= 100 points
-        #if len(self.points) <= 100:
-            #info_text = self.ax.text(point_x + 0.1, point_y + 0.1, 
-                                #f'd = {distance:.2f} mm\nα = {math.degrees(alpha):.1f}°',
-                                #fontsize=7, color='black',
-                                #bbox=dict(facecolor='white', alpha=0.8, boxstyle='round', pad=0.2),
-                                #verticalalignment='bottom')
-            #visuals.append(info_text)
-        
-        #return visuals
+        return visuals
 
     def generate_random_points(self, event=None):
         """Generate random points in the detector (outside pixels) using multiprocessing"""
@@ -549,7 +600,7 @@ class PixelDetectorVisualizer:
         return valid_points
 
     def add_point(self, x, y):
-        """Add a point and calculate/visualize its alpha angle"""
+        """Add a point and calculate/visualize its alpha angle using both methods"""
         # Add point to the list
         self.points.append((x, y))
         
@@ -562,18 +613,21 @@ class PixelDetectorVisualizer:
         
         # Draw alpha visualization
         visuals = self.draw_alpha_visualization(x, y, closest_pixel_idx)
-        #visuals.append(point_patch)
         
         # Store all visuals associated with this point
         self.point_visualizations.append(visuals)
         
-        # Calculate alpha and point type for info text
-        alpha, _, _, _, point_type = self.calculate_alpha(x, y, closest_pixel_idx)
+        # Calculate alpha using both methods and point type for info text
+        alpha_geometric, _, _, _, point_type = self.calculate_alpha_geometric(x, y, closest_pixel_idx)
+        alpha_analytical = self.calculate_alpha_analytical(x, y, closest_pixel_idx)
         
-        # Add data points to scatter plot
-        alpha_deg = math.degrees(alpha)
+        # Add data points to scatter plots
+        alpha_geometric_deg = math.degrees(alpha_geometric)
+        alpha_analytical_deg = math.degrees(alpha_analytical)
+        
         self.distances.append(distance)
-        self.alphas.append(alpha_deg)
+        self.alphas_geometric.append(alpha_geometric_deg)
+        self.alphas_analytical.append(alpha_analytical_deg)
         self.point_types.append(point_type)
         
         # Only update the plots periodically for better performance
@@ -581,9 +635,13 @@ class PixelDetectorVisualizer:
         update_threshold = 100 if len(self.points) <= 100 else 1000
         if len(self.points) == 1 or len(self.points) == self.num_random_points or len(self.points) % update_threshold == 0:
             self._update_scatter_plot()
+            self._update_analytical_scatter_plot()
+            self._update_comparison_plot()
             self._update_case_plots()
+            self._update_analytical_case_plots()
             self._update_histogram()
-            self._update_histogram()
+            self._update_analytical_histogram()
+            self._update_comparison_histogram()
     
     def _update_scatter_plot(self):
         """Update the scatter plot with the current data (as a separate method for optimization)"""
@@ -603,10 +661,10 @@ class PixelDetectorVisualizer:
         case2_indices = [i for i, t in enumerate(self.point_types) if t == 2]
         
         case1_distances = [self.distances[i] for i in case1_indices]
-        case1_alphas = [self.alphas[i] for i in case1_indices]
+        case1_alphas = [self.alphas_geometric[i] for i in case1_indices]
         
         case2_distances = [self.distances[i] for i in case2_indices]
-        case2_alphas = [self.alphas[i] for i in case2_indices]
+        case2_alphas = [self.alphas_geometric[i] for i in case2_indices]
         
         # Plot each case with a specific discrete color
         # Blue for Case 1 (Same Side) and Red for Case 2 (Adjacent Sides)
@@ -637,13 +695,13 @@ class PixelDetectorVisualizer:
         total_points = len(self.distances)
         case1_count = len(case1_distances)
         case2_count = len(case2_distances)
-        self.scatter_ax.set_title(f'Alpha Angle vs Distance (Combined: {total_points} points, ' +
+        self.scatter_ax.set_title(f'Alpha Angle vs Distance (Geometric Method - Combined: {total_points} points, ' +
                                  f'Same Side: {case1_count}, Adjacent Sides: {case2_count})')
         
         # Update axes limits
         if self.distances:
             self.scatter_ax.set_xlim(0, max(self.distances) * 1.1)
-            self.scatter_ax.set_ylim(0, max(self.alphas) * 1.1)
+            self.scatter_ax.set_ylim(0, max(self.alphas_geometric) * 1.1)
         else:
             self.scatter_ax.set_xlim(0, 15)
             self.scatter_ax.set_ylim(0, 90)
@@ -655,10 +713,10 @@ class PixelDetectorVisualizer:
         """Update the separate case plots with the current data"""
         # Separate data by case
         case1_distances = [d for d, t in zip(self.distances, self.point_types) if t == 1]
-        case1_alphas = [a for a, t in zip(self.alphas, self.point_types) if t == 1]
+        case1_alphas = [a for a, t in zip(self.alphas_geometric, self.point_types) if t == 1]
         
         case2_distances = [d for d, t in zip(self.distances, self.point_types) if t == 2]
-        case2_alphas = [a for a, t in zip(self.alphas, self.point_types) if t == 2]
+        case2_alphas = [a for a, t in zip(self.alphas_geometric, self.point_types) if t == 2]
         
         # Update case 1 plot (Same Side Case - Blue)
         if hasattr(self, 'case1_scatter') and self.case1_scatter:
@@ -681,7 +739,7 @@ class PixelDetectorVisualizer:
             self.case1_ax.set_ylim(0, 90)
         
         # Add case count to the title
-        self.case1_ax.set_title(f'Alpha Angle vs Distance (Same Side Case - {len(case1_distances)} points)')
+        self.case1_ax.set_title(f'Alpha Angle vs Distance (Geometric Method - Same Side Case - {len(case1_distances)} points)')
             
         # Update case 2 plot (Adjacent Sides Case - Red)
         if hasattr(self, 'case2_scatter') and self.case2_scatter:
@@ -704,7 +762,7 @@ class PixelDetectorVisualizer:
             self.case2_ax.set_ylim(0, 90)
             
         # Add case count to the title
-        self.case2_ax.set_title(f'Alpha Angle vs Distance (Adjacent Sides Case - {len(case2_distances)} points)')
+        self.case2_ax.set_title(f'Alpha Angle vs Distance (Geometric Method - Adjacent Sides Case - {len(case2_distances)} points)')
         
         # Redraw the canvases
         self.case1_fig.canvas.draw_idle()
@@ -719,7 +777,7 @@ class PixelDetectorVisualizer:
         self.hist_ax.set_ylabel('Count')
         
         # If we have no data, just return
-        if not self.alphas:
+        if not self.alphas_geometric:
             self.hist_ax.set_title('Histogram of Alpha Angles (0 points)', fontsize=14)
             self.hist_ax.tick_params(axis='both', which='major', labelsize=12)
             return
@@ -734,11 +792,11 @@ class PixelDetectorVisualizer:
         self.hist_ax.tick_params(axis='both', which='major', labelsize=12)
         
         # Create separate histograms for each case
-        case1_alphas = [a for a, t in zip(self.alphas, self.point_types) if t == 1]
-        case2_alphas = [a for a, t in zip(self.alphas, self.point_types) if t == 2]
+        case1_alphas = [a for a, t in zip(self.alphas_geometric, self.point_types) if t == 1]
+        case2_alphas = [a for a, t in zip(self.alphas_geometric, self.point_types) if t == 2]
         
         # Set up the bins to cover the full range
-        all_alphas = self.alphas.copy()
+        all_alphas = self.alphas_geometric.copy()
         if all_alphas:
             min_alpha = min(all_alphas)
             max_alpha = max(all_alphas)
@@ -809,7 +867,7 @@ class PixelDetectorVisualizer:
         
         # Add legend without the reference lines and update title
         self.hist_ax.legend(loc='upper right')  # Position legend in upper right corner
-        self.hist_ax.set_title(f'Histogram of Alpha Angles ({len(all_alphas)} points)', fontsize=14)
+        self.hist_ax.set_title(f'Histogram of Alpha Angles - Geometric Method ({len(all_alphas)} points)', fontsize=14)
         
         # Set x-axis limits based on data
         self.hist_ax.set_xlim(x_min, x_max)
@@ -819,6 +877,361 @@ class PixelDetectorVisualizer:
         
         # Redraw the canvas
         self.hist_fig.canvas.draw_idle()
+
+    def _update_analytical_scatter_plot(self):
+        """Update the analytical scatter plot with the current data"""
+        # Remove previous scatter plots if they exist
+        if hasattr(self, 'analytical_scatter_plot_case1') and self.analytical_scatter_plot_case1:
+            self.analytical_scatter_plot_case1.remove()
+        if hasattr(self, 'analytical_scatter_plot_case2') and self.analytical_scatter_plot_case2:
+            self.analytical_scatter_plot_case2.remove()
+        
+        # Separate data by case type
+        case1_indices = [i for i, t in enumerate(self.point_types) if t == 1]
+        case2_indices = [i for i, t in enumerate(self.point_types) if t == 2]
+        
+        case1_distances = [self.distances[i] for i in case1_indices]
+        case1_alphas = [self.alphas_analytical[i] for i in case1_indices]
+        
+        case2_distances = [self.distances[i] for i in case2_indices]
+        case2_alphas = [self.alphas_analytical[i] for i in case2_indices]
+        
+        # Plot each case with a specific discrete color
+        self.analytical_scatter_plot_case1 = self.scatter_analytical_ax.scatter(
+            case1_distances, 
+            case1_alphas, 
+            color='blue',
+            label='Same Side Case', 
+            s=50,
+            alpha=0.7, 
+            edgecolors='black'
+        )
+        
+        self.analytical_scatter_plot_case2 = self.scatter_analytical_ax.scatter(
+            case2_distances, 
+            case2_alphas, 
+            color='red', 
+            label='Adjacent Sides Case', 
+            s=50,
+            alpha=0.7, 
+            edgecolors='black'
+        )
+        
+        # Always show the legend
+        self.scatter_analytical_ax.legend(loc='upper right')
+        
+        # Update the title to show case counts
+        total_points = len(self.distances)
+        case1_count = len(case1_distances)
+        case2_count = len(case2_distances)
+        self.scatter_analytical_ax.set_title(f'Alpha Angle vs Distance (Analytical Method - Combined: {total_points} points, ' +
+                                            f'Same Side: {case1_count}, Adjacent Sides: {case2_count})')
+        
+        # Update axes limits
+        if self.distances:
+            self.scatter_analytical_ax.set_xlim(0, max(self.distances) * 1.1)
+            self.scatter_analytical_ax.set_ylim(0, max(self.alphas_analytical) * 1.1)
+        else:
+            self.scatter_analytical_ax.set_xlim(0, 15)
+            self.scatter_analytical_ax.set_ylim(0, 90)
+            
+        # Redraw the canvas
+        self.scatter_analytical_fig.canvas.draw_idle()
+
+    def _update_comparison_plot(self):
+        """Update the comparison plot with both geometric and analytical methods"""
+        # Clear the comparison plot
+        self.comparison_ax.clear()
+        self.comparison_ax.grid(True, linestyle='--', alpha=0.7)
+        self.comparison_ax.set_xlabel('Distance (mm)')
+        self.comparison_ax.set_ylabel('Alpha Angle (degrees)')
+        
+        if not self.distances:
+            self.comparison_ax.set_title('Alpha Angle Comparison: Geometric vs Analytical Methods (0 points)')
+            self.comparison_ax.set_xlim(0, 15)
+            self.comparison_ax.set_ylim(0, 90)
+            return
+        
+        # Plot geometric method
+        geometric_scatter = self.comparison_ax.scatter(
+            self.distances, 
+            self.alphas_geometric, 
+            color='blue',
+            label='Geometric Method', 
+            s=30,
+            alpha=0.6, 
+            marker='o'
+        )
+        
+        # Plot analytical method
+        analytical_scatter = self.comparison_ax.scatter(
+            self.distances, 
+            self.alphas_analytical, 
+            color='red',
+            label='Analytical Method', 
+            s=30,
+            alpha=0.6, 
+            marker='^'
+        )
+        
+        # Add legend
+        self.comparison_ax.legend(loc='upper right')
+        
+        # Update title
+        total_points = len(self.distances)
+        self.comparison_ax.set_title(f'Alpha Angle Comparison: Geometric vs Analytical Methods ({total_points} points)')
+        
+        # Update axes limits
+        all_alphas = self.alphas_geometric + self.alphas_analytical
+        self.comparison_ax.set_xlim(0, max(self.distances) * 1.1)
+        self.comparison_ax.set_ylim(0, max(all_alphas) * 1.1)
+        
+        # Redraw the canvas
+        self.comparison_fig.canvas.draw_idle()
+            
+    def _update_analytical_case_plots(self):
+        """Update the separate analytical case plots with the current data"""
+        # Separate data by case
+        case1_distances = [d for d, t in zip(self.distances, self.point_types) if t == 1]
+        case1_alphas = [a for a, t in zip(self.alphas_analytical, self.point_types) if t == 1]
+        
+        case2_distances = [d for d, t in zip(self.distances, self.point_types) if t == 2]
+        case2_alphas = [a for a, t in zip(self.alphas_analytical, self.point_types) if t == 2]
+        
+        # Update case 1 plot (Same Side Case - Blue)
+        if hasattr(self, 'case1_analytical_scatter') and self.case1_analytical_scatter:
+            self.case1_analytical_scatter.remove()
+        
+        if case1_distances:
+            self.case1_analytical_scatter = self.case1_analytical_ax.scatter(
+                case1_distances, 
+                case1_alphas,
+                color='blue', 
+                s=50, 
+                alpha=0.7, 
+                edgecolors='black',
+                label='Same Side Case'
+            )
+            self.case1_analytical_ax.set_xlim(0, max(case1_distances) * 1.1)
+            self.case1_analytical_ax.set_ylim(0, max(case1_alphas) * 1.1)
+        else:
+            self.case1_analytical_ax.set_xlim(0, 15)
+            self.case1_analytical_ax.set_ylim(0, 90)
+        
+        # Add case count to the title
+        self.case1_analytical_ax.set_title(f'Alpha Angle vs Distance (Analytical Method - Same Side Case - {len(case1_distances)} points)')
+            
+        # Update case 2 plot (Adjacent Sides Case - Red)
+        if hasattr(self, 'case2_analytical_scatter') and self.case2_analytical_scatter:
+            self.case2_analytical_scatter.remove()
+            
+        if case2_distances:
+            self.case2_analytical_scatter = self.case2_analytical_ax.scatter(
+                case2_distances, 
+                case2_alphas,
+                color='red', 
+                s=50, 
+                alpha=0.7, 
+                edgecolors='black',
+                label='Adjacent Sides Case'
+            )
+            self.case2_analytical_ax.set_xlim(0, max(case2_distances) * 1.1)
+            self.case2_analytical_ax.set_ylim(0, max(case2_alphas) * 1.1)
+        else:
+            self.case2_analytical_ax.set_xlim(0, 15)
+            self.case2_analytical_ax.set_ylim(0, 90)
+            
+        # Add case count to the title
+        self.case2_analytical_ax.set_title(f'Alpha Angle vs Distance (Analytical Method - Adjacent Sides Case - {len(case2_distances)} points)')
+        
+        # Redraw the canvases
+        self.case1_analytical_fig.canvas.draw_idle()
+        self.case2_analytical_fig.canvas.draw_idle()
+
+    def _update_analytical_histogram(self):
+        """Update the analytical histogram of alpha angles"""
+        # Clear previous histogram if it exists
+        self.hist_analytical_ax.clear()
+        self.hist_analytical_ax.grid(True, linestyle='--', alpha=0.7)
+        self.hist_analytical_ax.set_xlabel('Alpha Angle (degrees)', fontsize=13)
+        self.hist_analytical_ax.set_ylabel('Count', fontsize=13)
+        self.hist_analytical_ax.tick_params(axis='both', which='major', labelsize=12)
+        
+        # If we have no data, just return
+        if not self.alphas_analytical:
+            self.hist_analytical_ax.set_title('Histogram of Alpha Angles - Analytical Method (0 points)', fontsize=14)
+            return
+        
+        # Use ROOT-like binning
+        num_bins = self.histogram_bins
+        
+        # Create separate histograms for each case
+        case1_alphas = [a for a, t in zip(self.alphas_analytical, self.point_types) if t == 1]
+        case2_alphas = [a for a, t in zip(self.alphas_analytical, self.point_types) if t == 2]
+        
+        # Set up the bins to cover the full range
+        all_alphas = self.alphas_analytical.copy()
+        if all_alphas:
+            min_alpha = min(all_alphas)
+            max_alpha = max(all_alphas)
+            buffer = (max_alpha - min_alpha) * 0.05 if max_alpha > min_alpha else 1.0
+            bins = np.linspace(min_alpha - buffer, max_alpha + buffer, num_bins)
+        else:
+            bins = num_bins
+            min_alpha = 0
+            max_alpha = 180
+            
+        # Add reference lines
+        self.hist_analytical_ax.axvline(x=90, color='darkgreen', linestyle='-', linewidth=2, alpha=0.7, zorder=1)
+        self.hist_analytical_ax.axvline(x=180, color='purple', linestyle='-', linewidth=2, alpha=0.7, zorder=1)
+        
+        # Calculate appropriate x-axis limits
+        x_min = max(0, min_alpha - buffer)
+        x_max = min(max(max_alpha + buffer, 185), 360)
+        
+        # Plot the histograms
+        hist_heights = []
+        
+        if case1_alphas:
+            hist1, _, _ = self.hist_analytical_ax.hist(case1_alphas, bins=bins, alpha=0.7, color='blue', 
+                                                      label=f'Same Side Case ({len(case1_alphas)} points)',
+                                                      rwidth=0.9)
+            if len(hist1) > 0:
+                hist_heights.append(max(hist1))
+        
+        if case2_alphas:
+            hist2, _, _ = self.hist_analytical_ax.hist(case2_alphas, bins=bins, alpha=0.7, color='red', 
+                                                      label=f'Adjacent Sides Case ({len(case2_alphas)} points)',
+                                                      rwidth=0.9)
+            if len(hist2) > 0:
+                hist_heights.append(max(hist2))
+        
+        # Add combined histogram as a line
+        if all_alphas:
+            hist_counts, bin_edges = np.histogram(all_alphas, bins=bins)
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+            
+            if len(hist_counts) > 0:
+                hist_heights.append(max(hist_counts))
+            
+            self.hist_analytical_ax.step(bin_centers, hist_counts, where='mid', color='black', 
+                                        linestyle='--', linewidth=2, 
+                                        label=f'Combined ({len(all_alphas)} points)')
+        
+        # Adjust y-axis
+        if hist_heights:
+            max_height = max(hist_heights)
+            self.hist_analytical_ax.set_ylim(0, max_height * 1.15)
+        
+        # Add text annotations for reference lines
+        y_lim = self.hist_analytical_ax.get_ylim()
+        y_max = y_lim[1]
+        y_middle = y_max * 0.5
+        
+        self.hist_analytical_ax.text(90, y_middle, '90°', color='darkgreen', fontsize=12, 
+                                    ha='center', va='center', weight='bold', 
+                                    bbox=dict(facecolor='white', alpha=0.7, pad=1))
+        self.hist_analytical_ax.text(180, y_middle, '180°', color='purple', fontsize=12, 
+                                    ha='center', va='center', weight='bold', 
+                                    bbox=dict(facecolor='white', alpha=0.7, pad=1))
+        
+        # Add legend and update title
+        self.hist_analytical_ax.legend(loc='upper right')
+        self.hist_analytical_ax.set_title(f'Histogram of Alpha Angles - Analytical Method ({len(all_alphas)} points)', fontsize=14)
+        
+        # Set x-axis limits
+        self.hist_analytical_ax.set_xlim(x_min, x_max)
+        
+        # Adjust layout
+        self.hist_analytical_fig.tight_layout(pad=2.0)
+        
+        # Redraw the canvas
+        self.hist_analytical_fig.canvas.draw_idle()
+
+    def _update_comparison_histogram(self):
+        """Update the comparison histogram showing both methods"""
+        # Clear previous histogram
+        self.hist_comparison_ax.clear()
+        self.hist_comparison_ax.grid(True, linestyle='--', alpha=0.7)
+        self.hist_comparison_ax.set_xlabel('Alpha Angle (degrees)', fontsize=13)
+        self.hist_comparison_ax.set_ylabel('Count', fontsize=13)
+        self.hist_comparison_ax.tick_params(axis='both', which='major', labelsize=12)
+        
+        # If we have no data, just return
+        if not self.alphas_geometric and not self.alphas_analytical:
+            self.hist_comparison_ax.set_title('Alpha Angle Histogram Comparison: Geometric vs Analytical Methods (0 points)', fontsize=14)
+            return
+        
+        # Use ROOT-like binning
+        num_bins = self.histogram_bins
+        
+        # Combine all data to determine bin range
+        all_alphas = self.alphas_geometric + self.alphas_analytical
+        if all_alphas:
+            min_alpha = min(all_alphas)
+            max_alpha = max(all_alphas)
+            buffer = (max_alpha - min_alpha) * 0.05 if max_alpha > min_alpha else 1.0
+            bins = np.linspace(min_alpha - buffer, max_alpha + buffer, num_bins)
+        else:
+            bins = num_bins
+            min_alpha = 0
+            max_alpha = 180
+            
+        # Add reference lines
+        self.hist_comparison_ax.axvline(x=90, color='darkgreen', linestyle='-', linewidth=2, alpha=0.7, zorder=1)
+        self.hist_comparison_ax.axvline(x=180, color='purple', linestyle='-', linewidth=2, alpha=0.7, zorder=1)
+        
+        # Calculate appropriate x-axis limits
+        x_min = max(0, min_alpha - buffer)
+        x_max = min(max(max_alpha + buffer, 185), 360)
+        
+        # Plot histograms for both methods
+        hist_heights = []
+        
+        if self.alphas_geometric:
+            hist1, _, _ = self.hist_comparison_ax.hist(self.alphas_geometric, bins=bins, alpha=0.6, color='blue', 
+                                                     label=f'Geometric Method ({len(self.alphas_geometric)} points)',
+                                                     rwidth=0.9)
+            if len(hist1) > 0:
+                hist_heights.append(max(hist1))
+        
+        if self.alphas_analytical:
+            hist2, _, _ = self.hist_comparison_ax.hist(self.alphas_analytical, bins=bins, alpha=0.6, color='red', 
+                                                     label=f'Analytical Method ({len(self.alphas_analytical)} points)',
+                                                     rwidth=0.9)
+            if len(hist2) > 0:
+                hist_heights.append(max(hist2))
+        
+        # Adjust y-axis
+        if hist_heights:
+            max_height = max(hist_heights)
+            self.hist_comparison_ax.set_ylim(0, max_height * 1.15)
+        
+        # Add text annotations for reference lines
+        y_lim = self.hist_comparison_ax.get_ylim()
+        y_max = y_lim[1]
+        y_middle = y_max * 0.5
+        
+        self.hist_comparison_ax.text(90, y_middle, '90°', color='darkgreen', fontsize=12, 
+                                    ha='center', va='center', weight='bold', 
+                                    bbox=dict(facecolor='white', alpha=0.7, pad=1))
+        self.hist_comparison_ax.text(180, y_middle, '180°', color='purple', fontsize=12, 
+                                    ha='center', va='center', weight='bold', 
+                                    bbox=dict(facecolor='white', alpha=0.7, pad=1))
+        
+        # Add legend and update title
+        self.hist_comparison_ax.legend(loc='upper right')
+        total_points = len(self.distances)
+        self.hist_comparison_ax.set_title(f'Alpha Angle Histogram Comparison: Geometric vs Analytical Methods ({total_points} points)', fontsize=14)
+        
+        # Set x-axis limits
+        self.hist_comparison_ax.set_xlim(x_min, x_max)
+        
+        # Adjust layout
+        self.hist_comparison_fig.tight_layout(pad=2.0)
+        
+        # Redraw the canvas
+        self.hist_comparison_fig.canvas.draw_idle()
 
     def clear_points(self, event=None):
         """Clear all points and visualizations"""
@@ -840,40 +1253,77 @@ class PixelDetectorVisualizer:
         
         # Clear scatter plot data
         self.distances.clear()
-        self.alphas.clear()
+        self.alphas_geometric.clear()
+        self.alphas_analytical.clear()
         self.point_types.clear()
         
-        # Clear main scatter plot
+        # Clear main scatter plot - GEOMETRIC METHOD
         if hasattr(self, 'scatter_plot_case1') and self.scatter_plot_case1:
             self.scatter_plot_case1.remove()
             self.scatter_plot_case1 = None
         if hasattr(self, 'scatter_plot_case2') and self.scatter_plot_case2:
             self.scatter_plot_case2.remove()
             self.scatter_plot_case2 = None
-        self.scatter_ax.set_title('Alpha Angle vs Distance (Combined Cases)')
+        self.scatter_ax.set_title('Alpha Angle vs Distance (Geometric Method - Combined Cases)')
         self.scatter_ax.set_xlim(0, 15)
         self.scatter_ax.set_ylim(0, 90)
         
-        # Clear case 1 scatter plot
+        # Clear main scatter plot - ANALYTICAL METHOD
+        if hasattr(self, 'analytical_scatter_plot_case1') and self.analytical_scatter_plot_case1:
+            self.analytical_scatter_plot_case1.remove()
+            self.analytical_scatter_plot_case1 = None
+        if hasattr(self, 'analytical_scatter_plot_case2') and self.analytical_scatter_plot_case2:
+            self.analytical_scatter_plot_case2.remove()
+            self.analytical_scatter_plot_case2 = None
+        self.scatter_analytical_ax.set_title('Alpha Angle vs Distance (Analytical Method - Combined Cases)')
+        self.scatter_analytical_ax.set_xlim(0, 15)
+        self.scatter_analytical_ax.set_ylim(0, 90)
+        
+        # Clear comparison plot
+        self.comparison_ax.clear()
+        self.comparison_ax.grid(True, linestyle='--', alpha=0.7)
+        self.comparison_ax.set_xlabel('Distance (mm)')
+        self.comparison_ax.set_ylabel('Alpha Angle (degrees)')
+        self.comparison_ax.set_title('Alpha Angle Comparison: Geometric vs Analytical Methods (0 points)')
+        self.comparison_ax.set_xlim(0, 15)
+        self.comparison_ax.set_ylim(0, 90)
+        
+        # Clear case 1 scatter plot - GEOMETRIC METHOD
         if hasattr(self, 'case1_scatter') and self.case1_scatter:
             self.case1_scatter.remove()
             self.case1_scatter = None
-        self.case1_ax.set_title('Alpha Angle vs Distance (Same Side Case - 0 points)')
+        self.case1_ax.set_title('Alpha Angle vs Distance (Geometric Method - Same Side Case - 0 points)')
         self.case1_ax.set_xlim(0, 15)
         self.case1_ax.set_ylim(0, 90)
         
-        # Clear case 2 scatter plot
+        # Clear case 2 scatter plot - GEOMETRIC METHOD
         if hasattr(self, 'case2_scatter') and self.case2_scatter:
             self.case2_scatter.remove()
             self.case2_scatter = None
-        self.case2_ax.set_title('Alpha Angle vs Distance (Adjacent Sides Case - 0 points)')
+        self.case2_ax.set_title('Alpha Angle vs Distance (Geometric Method - Adjacent Sides Case - 0 points)')
         self.case2_ax.set_xlim(0, 15)
         self.case2_ax.set_ylim(0, 90)
         
-        # Clear histogram
+        # Clear case 1 scatter plot - ANALYTICAL METHOD
+        if hasattr(self, 'case1_analytical_scatter') and self.case1_analytical_scatter:
+            self.case1_analytical_scatter.remove()
+            self.case1_analytical_scatter = None
+        self.case1_analytical_ax.set_title('Alpha Angle vs Distance (Analytical Method - Same Side Case - 0 points)')
+        self.case1_analytical_ax.set_xlim(0, 15)
+        self.case1_analytical_ax.set_ylim(0, 90)
+        
+        # Clear case 2 scatter plot - ANALYTICAL METHOD
+        if hasattr(self, 'case2_analytical_scatter') and self.case2_analytical_scatter:
+            self.case2_analytical_scatter.remove()
+            self.case2_analytical_scatter = None
+        self.case2_analytical_ax.set_title('Alpha Angle vs Distance (Analytical Method - Adjacent Sides Case - 0 points)')
+        self.case2_analytical_ax.set_xlim(0, 15)
+        self.case2_analytical_ax.set_ylim(0, 90)
+        
+        # Clear histogram - GEOMETRIC METHOD
         self.hist_ax.clear()
         self.hist_ax.grid(True, linestyle='--', alpha=0.7)
-        self.hist_ax.set_title('Histogram of Alpha Angles (0 points)', fontsize=14)
+        self.hist_ax.set_title('Histogram of Alpha Angles - Geometric Method (0 points)', fontsize=14)
         self.hist_ax.set_xlabel('Alpha Angle (degrees)', fontsize=13)
         self.hist_ax.set_ylabel('Count', fontsize=13)
         self.hist_ax.tick_params(axis='both', which='major', labelsize=12)
@@ -892,15 +1342,64 @@ class PixelDetectorVisualizer:
         self.hist_ax.set_xlim(0, 185)
         self.hist_ax.set_ylim(0, 10)
         
+        # Clear histogram - ANALYTICAL METHOD
+        self.hist_analytical_ax.clear()
+        self.hist_analytical_ax.grid(True, linestyle='--', alpha=0.7)
+        self.hist_analytical_ax.set_title('Histogram of Alpha Angles - Analytical Method (0 points)', fontsize=14)
+        self.hist_analytical_ax.set_xlabel('Alpha Angle (degrees)', fontsize=13)
+        self.hist_analytical_ax.set_ylabel('Count', fontsize=13)
+        self.hist_analytical_ax.tick_params(axis='both', which='major', labelsize=12)
+        
+        # Add the reference lines to empty histogram
+        self.hist_analytical_ax.axvline(x=90, color='darkgreen', linestyle='-', linewidth=2, alpha=0.7, zorder=1)
+        self.hist_analytical_ax.axvline(x=180, color='purple', linestyle='-', linewidth=2, alpha=0.7, zorder=1)
+        
+        # Add text annotations for reference lines
+        self.hist_analytical_ax.text(90, 5, '90°', color='darkgreen', fontsize=12, 
+                                    ha='center', va='bottom', weight='bold', bbox=dict(facecolor='white', alpha=0.7, pad=1))
+        self.hist_analytical_ax.text(180, 5, '180°', color='purple', fontsize=12, 
+                                    ha='center', va='bottom', weight='bold', bbox=dict(facecolor='white', alpha=0.7, pad=1))
+                                    
+        # Set appropriate axis limits for empty plot
+        self.hist_analytical_ax.set_xlim(0, 185)
+        self.hist_analytical_ax.set_ylim(0, 10)
+        
+        # Clear comparison histogram
+        self.hist_comparison_ax.clear()
+        self.hist_comparison_ax.grid(True, linestyle='--', alpha=0.7)
+        self.hist_comparison_ax.set_title('Alpha Angle Histogram Comparison: Geometric vs Analytical Methods (0 points)', fontsize=14)
+        self.hist_comparison_ax.set_xlabel('Alpha Angle (degrees)', fontsize=13)
+        self.hist_comparison_ax.set_ylabel('Count', fontsize=13)
+        self.hist_comparison_ax.tick_params(axis='both', which='major', labelsize=12)
+        
+        # Add the reference lines to empty histogram
+        self.hist_comparison_ax.axvline(x=90, color='darkgreen', linestyle='-', linewidth=2, alpha=0.7, zorder=1)
+        self.hist_comparison_ax.axvline(x=180, color='purple', linestyle='-', linewidth=2, alpha=0.7, zorder=1)
+        
+        # Add text annotations for reference lines
+        self.hist_comparison_ax.text(90, 5, '90°', color='darkgreen', fontsize=12, 
+                                    ha='center', va='bottom', weight='bold', bbox=dict(facecolor='white', alpha=0.7, pad=1))
+        self.hist_comparison_ax.text(180, 5, '180°', color='purple', fontsize=12, 
+                                    ha='center', va='bottom', weight='bold', bbox=dict(facecolor='white', alpha=0.7, pad=1))
+                                    
+        # Set appropriate axis limits for empty plot
+        self.hist_comparison_ax.set_xlim(0, 185)
+        self.hist_comparison_ax.set_ylim(0, 10)
+        
         # Redraw all canvases
         self.scatter_fig.canvas.draw_idle()
+        self.scatter_analytical_fig.canvas.draw_idle()
+        self.comparison_fig.canvas.draw_idle()
         self.case1_fig.canvas.draw_idle()
         self.case2_fig.canvas.draw_idle()
+        self.case1_analytical_fig.canvas.draw_idle()
+        self.case2_analytical_fig.canvas.draw_idle()
         self.hist_fig.canvas.draw_idle()
-        self.hist_fig.canvas.draw_idle()
+        self.hist_analytical_fig.canvas.draw_idle()
+        self.hist_comparison_fig.canvas.draw_idle()
         
         # Update info text
-        #self.update_info_text("All points cleared. Click in the detector to add points.")
+        self.update_info_text("All points cleared. Click in the detector to add points.")
         
         # Redraw
         self.fig.canvas.draw_idle()
@@ -915,7 +1414,7 @@ class PixelDetectorVisualizer:
         self.fig.canvas.draw_idle()
 
     def save_to_csv(self, filename=None):
-        """Save alpha angle and distance data to CSV files and plots to image files"""
+        """Save alpha angle and distance data to CSV files and plots to image files for both methods"""
         if filename is None:
             # Generate a default filename with timestamp
             timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -925,82 +1424,156 @@ class PixelDetectorVisualizer:
             filename_base = os.path.splitext(filename)[0]
         
         try:
-            # Save combined data to CSV
-            combined_filename = f"{filename_base}.csv"
+            # Create separate directories for each method
+            geometric_dir = f"{filename_base}_geometric_method"
+            analytical_dir = f"{filename_base}_analytical_method"
+            comparison_dir = f"{filename_base}_comparison"
+            
+            os.makedirs(geometric_dir, exist_ok=True)
+            os.makedirs(analytical_dir, exist_ok=True)
+            os.makedirs(comparison_dir, exist_ok=True)
+            
+            # Save combined data to CSV (both methods)
+            combined_filename = f"{comparison_dir}/combined_methods_data.csv"
             with open(combined_filename, 'w', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 # Write header
-                writer.writerow(['Distance (mm)', 'Alpha Angle (degrees)', 'Point Type'])
+                writer.writerow(['Distance (mm)', 'Alpha Geometric (degrees)', 'Alpha Analytical (degrees)', 'Point Type'])
                 # Write data rows
-                for d, a, t in zip(self.distances, self.alphas, self.point_types):
+                for d, a_geom, a_anal, t in zip(self.distances, self.alphas_geometric, self.alphas_analytical, self.point_types):
+                    writer.writerow([d, a_geom, a_anal, t])
+            
+            print(f"Combined methods data saved to {os.path.abspath(combined_filename)}")
+            
+            # Save geometric method data
+            geometric_filename = f"{geometric_dir}/geometric_method_data.csv"
+            with open(geometric_filename, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Distance (mm)', 'Alpha Angle (degrees)', 'Point Type'])
+                for d, a, t in zip(self.distances, self.alphas_geometric, self.point_types):
                     writer.writerow([d, a, t])
             
-            print(f"Combined data saved to {os.path.abspath(combined_filename)}")
+            print(f"Geometric method data saved to {os.path.abspath(geometric_filename)}")
             
-            # Save case 1 data (same side points)
-            case1_filename = f"{filename_base}_case1_same_side.csv"
-            case1_data = [(d, a) for d, a, t in zip(self.distances, self.alphas, self.point_types) if t == 1]
-            with open(case1_filename, 'w', newline='') as csvfile:
+            # Save analytical method data
+            analytical_filename = f"{analytical_dir}/analytical_method_data.csv"
+            with open(analytical_filename, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Distance (mm)', 'Alpha Angle (degrees)', 'Point Type'])
+                for d, a, t in zip(self.distances, self.alphas_analytical, self.point_types):
+                    writer.writerow([d, a, t])
+            
+            print(f"Analytical method data saved to {os.path.abspath(analytical_filename)}")
+            
+            # Save case 1 data for both methods
+            case1_geometric_filename = f"{geometric_dir}/case1_same_side.csv"
+            case1_data_geometric = [(d, a) for d, a, t in zip(self.distances, self.alphas_geometric, self.point_types) if t == 1]
+            with open(case1_geometric_filename, 'w', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(['Distance (mm)', 'Alpha Angle (degrees)'])
-                for d, a in case1_data:
+                for d, a in case1_data_geometric:
                     writer.writerow([d, a])
             
-            print(f"Case 1 data saved to {os.path.abspath(case1_filename)}")
-            
-            # Save case 2 data (adjacent sides points)
-            case2_filename = f"{filename_base}_case2_adjacent_sides.csv"
-            case2_data = [(d, a) for d, a, t in zip(self.distances, self.alphas, self.point_types) if t == 2]
-            with open(case2_filename, 'w', newline='') as csvfile:
+            case1_analytical_filename = f"{analytical_dir}/case1_same_side.csv"
+            case1_data_analytical = [(d, a) for d, a, t in zip(self.distances, self.alphas_analytical, self.point_types) if t == 1]
+            with open(case1_analytical_filename, 'w', newline='') as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(['Distance (mm)', 'Alpha Angle (degrees)'])
-                for d, a in case2_data:
+                for d, a in case1_data_analytical:
                     writer.writerow([d, a])
             
-            print(f"Case 2 data saved to {os.path.abspath(case2_filename)}")
+            # Save case 2 data for both methods
+            case2_geometric_filename = f"{geometric_dir}/case2_adjacent_sides.csv"
+            case2_data_geometric = [(d, a) for d, a, t in zip(self.distances, self.alphas_geometric, self.point_types) if t == 2]
+            with open(case2_geometric_filename, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Distance (mm)', 'Alpha Angle (degrees)'])
+                for d, a in case2_data_geometric:
+                    writer.writerow([d, a])
+            
+            case2_analytical_filename = f"{analytical_dir}/case2_adjacent_sides.csv"
+            case2_data_analytical = [(d, a) for d, a, t in zip(self.distances, self.alphas_analytical, self.point_types) if t == 2]
+            with open(case2_analytical_filename, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Distance (mm)', 'Alpha Angle (degrees)'])
+                for d, a in case2_data_analytical:
+                    writer.writerow([d, a])
+            
+            print(f"Case data saved for both methods")
             
             # Save scatter plots to image files
-            self._save_scatter_plots(filename_base)
+            self._save_all_plots(geometric_dir, analytical_dir, comparison_dir)
             
             return True
         except Exception as e:
             print(f"Error saving data: {e}")
             return False
     
-    def _save_scatter_plots(self, filename_base):
-        """Save all scatter plots to PNG, SVG, and PDF files"""
+    def _save_all_plots(self, geometric_dir, analytical_dir, comparison_dir):
+        """Save all plots to PNG, SVG, and PDF files in their respective directories"""
         try:
-            # Make sure all scatter plots are up to date
+            # Make sure all plots are up to date
             self._update_scatter_plot()
+            self._update_analytical_scatter_plot()
+            self._update_comparison_plot()
             self._update_case_plots()
+            self._update_analytical_case_plots()
+            self._update_histogram()
+            self._update_analytical_histogram()
+            self._update_comparison_histogram()
             
-            # Save combined plot
-            self.scatter_fig.savefig(f"{filename_base}_combined.png", dpi=300)
-            self.scatter_fig.savefig(f"{filename_base}_combined.svg", format='svg')
-            self.scatter_fig.savefig(f"{filename_base}_combined.pdf", format='pdf')
-            print(f"Combined scatter plot saved to {os.path.abspath(f'{filename_base}_combined.png/svg/pdf')}")
+            # Save geometric method plots
+            self.scatter_fig.savefig(f"{geometric_dir}/geometric_combined.png", dpi=300)
+            self.scatter_fig.savefig(f"{geometric_dir}/geometric_combined.svg", format='svg')
+            self.scatter_fig.savefig(f"{geometric_dir}/geometric_combined.pdf", format='pdf')
             
-            # Save case 1 plot
-            self.case1_fig.savefig(f"{filename_base}_case1_same_side.png", dpi=300)
-            self.case1_fig.savefig(f"{filename_base}_case1_same_side.svg", format='svg')
-            self.case1_fig.savefig(f"{filename_base}_case1_same_side.pdf", format='pdf')
-            print(f"Case 1 scatter plot saved to {os.path.abspath(f'{filename_base}_case1_same_side.png/svg/pdf')}")
+            self.case1_fig.savefig(f"{geometric_dir}/geometric_case1_same_side.png", dpi=300)
+            self.case1_fig.savefig(f"{geometric_dir}/geometric_case1_same_side.svg", format='svg')
+            self.case1_fig.savefig(f"{geometric_dir}/geometric_case1_same_side.pdf", format='pdf')
             
-            # Save case 2 plot
-            self.case2_fig.savefig(f"{filename_base}_case2_adjacent_sides.png", dpi=300)
-            self.case2_fig.savefig(f"{filename_base}_case2_adjacent_sides.svg", format='svg')
-            self.case2_fig.savefig(f"{filename_base}_case2_adjacent_sides.pdf", format='pdf')
-            print(f"Case 2 scatter plot saved to {os.path.abspath(f'{filename_base}_case2_adjacent_sides.png/svg/pdf')}")
+            self.case2_fig.savefig(f"{geometric_dir}/geometric_case2_adjacent_sides.png", dpi=300)
+            self.case2_fig.savefig(f"{geometric_dir}/geometric_case2_adjacent_sides.svg", format='svg')
+            self.case2_fig.savefig(f"{geometric_dir}/geometric_case2_adjacent_sides.pdf", format='pdf')
             
-            # Save histogram plot
-            self.hist_fig.savefig(f"{filename_base}_alpha_histogram.png", dpi=300)
-            self.hist_fig.savefig(f"{filename_base}_alpha_histogram.svg", format='svg')
-            self.hist_fig.savefig(f"{filename_base}_alpha_histogram.pdf", format='pdf')
-            print(f"Alpha histogram plot saved to {os.path.abspath(f'{filename_base}_alpha_histogram.png/svg/pdf')}")
+            self.hist_fig.savefig(f"{geometric_dir}/geometric_alpha_histogram.png", dpi=300)
+            self.hist_fig.savefig(f"{geometric_dir}/geometric_alpha_histogram.svg", format='svg')
+            self.hist_fig.savefig(f"{geometric_dir}/geometric_alpha_histogram.pdf", format='pdf')
+            
+            print(f"Geometric method plots saved to {os.path.abspath(geometric_dir)}")
+            
+            # Save analytical method plots
+            self.scatter_analytical_fig.savefig(f"{analytical_dir}/analytical_combined.png", dpi=300)
+            self.scatter_analytical_fig.savefig(f"{analytical_dir}/analytical_combined.svg", format='svg')
+            self.scatter_analytical_fig.savefig(f"{analytical_dir}/analytical_combined.pdf", format='pdf')
+            
+            self.case1_analytical_fig.savefig(f"{analytical_dir}/analytical_case1_same_side.png", dpi=300)
+            self.case1_analytical_fig.savefig(f"{analytical_dir}/analytical_case1_same_side.svg", format='svg')
+            self.case1_analytical_fig.savefig(f"{analytical_dir}/analytical_case1_same_side.pdf", format='pdf')
+            
+            self.case2_analytical_fig.savefig(f"{analytical_dir}/analytical_case2_adjacent_sides.png", dpi=300)
+            self.case2_analytical_fig.savefig(f"{analytical_dir}/analytical_case2_adjacent_sides.svg", format='svg')
+            self.case2_analytical_fig.savefig(f"{analytical_dir}/analytical_case2_adjacent_sides.pdf", format='pdf')
+            
+            self.hist_analytical_fig.savefig(f"{analytical_dir}/analytical_alpha_histogram.png", dpi=300)
+            self.hist_analytical_fig.savefig(f"{analytical_dir}/analytical_alpha_histogram.svg", format='svg')
+            self.hist_analytical_fig.savefig(f"{analytical_dir}/analytical_alpha_histogram.pdf", format='pdf')
+            
+            print(f"Analytical method plots saved to {os.path.abspath(analytical_dir)}")
+            
+            # Save comparison plots
+            self.comparison_fig.savefig(f"{comparison_dir}/methods_comparison_scatter.png", dpi=300)
+            self.comparison_fig.savefig(f"{comparison_dir}/methods_comparison_scatter.svg", format='svg')
+            self.comparison_fig.savefig(f"{comparison_dir}/methods_comparison_scatter.pdf", format='pdf')
+            
+            self.hist_comparison_fig.savefig(f"{comparison_dir}/methods_comparison_histogram.png", dpi=300)
+            self.hist_comparison_fig.savefig(f"{comparison_dir}/methods_comparison_histogram.svg", format='svg')
+            self.hist_comparison_fig.savefig(f"{comparison_dir}/methods_comparison_histogram.pdf", format='pdf')
+            
+            print(f"Comparison plots saved to {os.path.abspath(comparison_dir)}")
             
             return True
         except Exception as e:
-            print(f"Error saving scatter plots: {e}")
+            print(f"Error saving plots: {e}")
             return False
 
     def save_detector_visualization(self, filename_base=None):
@@ -1027,17 +1600,21 @@ class PixelDetectorVisualizer:
             return False
 
     def run(self):
-        """Run the interactive visualization"""
+        """Run the interactive visualization with both alpha calculation methods"""
         plt.tight_layout()
         
         start_time = time.time()
         print("Generating random points...")
+        print(f"Using analytical formula: α = tan^(-1) [(l/2 * √2) / (l/2 * √2 + d)]")
+        print(f"where l = pixel size = {self.pixel_size} mm, d = distance to pixel center")
         
         # Generate initial set of random points automatically
         self.generate_random_points()
         
-        # Make sure histogram is updated
+        # Make sure all histograms and plots are updated
         self._update_histogram()
+        self._update_analytical_histogram()
+        self._update_comparison_histogram()
         
         end_time = time.time()
         print(f"Point generation completed in {end_time - start_time:.2f} seconds")
@@ -1046,17 +1623,37 @@ class PixelDetectorVisualizer:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         filename_base = f"alpha_distance_data_{timestamp}"
         
-        # Save data to CSV file
+        # Save data to CSV files and plots
         self.save_to_csv(filename_base)
         
         # Save detector visualization
         self.save_detector_visualization(filename_base)
         
+        # Print summary statistics
+        if self.distances:
+            print(f"\nSummary Statistics:")
+            print(f"Total points: {len(self.distances)}")
+            print(f"Distance range: {min(self.distances):.3f} - {max(self.distances):.3f} mm")
+            print(f"Geometric method alpha range: {min(self.alphas_geometric):.1f} - {max(self.alphas_geometric):.1f}°")
+            print(f"Analytical method alpha range: {min(self.alphas_analytical):.1f} - {max(self.alphas_analytical):.1f}°")
+            
+            # Calculate correlation between methods
+            import numpy as np
+            correlation = np.corrcoef(self.alphas_geometric, self.alphas_analytical)[0, 1]
+            print(f"Correlation between methods: {correlation:.3f}")
+            
+            # Calculate mean differences
+            differences = [abs(g - a) for g, a in zip(self.alphas_geometric, self.alphas_analytical)]
+            mean_diff = sum(differences) / len(differences)
+            max_diff = max(differences)
+            print(f"Mean absolute difference: {mean_diff:.2f}°")
+            print(f"Maximum absolute difference: {max_diff:.2f}°")
+        
         plt.show()
 
 def create_detector_visualization(histogram_bins=100):
     """
-    Create and run the detector visualization
+    Create and run the detector visualization with both alpha calculation methods
     
     Parameters:
     -----------
