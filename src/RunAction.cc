@@ -58,7 +58,29 @@ RunAction::RunAction()
   fTrackID(-1),
   fParentID(-1),
   fStepNum(-1),
-  fStepLen(0)
+  fStepLen(0),
+  fFitAmplitude(0),
+  fFitX0(0),
+  fFitY0(0),
+  fFitSigmaX(0),
+  fFitSigmaY(0),
+  fFitTheta(0),
+  fFitOffset(0),
+  fFitAmplitudeErr(0),
+  fFitX0Err(0),
+  fFitY0Err(0),
+  fFitSigmaXErr(0),
+  fFitSigmaYErr(0),
+  fFitThetaErr(0),
+  fFitOffsetErr(0),
+  fFitChi2(0),
+  fFitNDF(0),
+  fFitProb(0),
+  fFitRSquared(0),
+  fFitNPoints(0),
+  fFitSuccessful(false),
+  fFitResidualMean(0),
+  fFitResidualStd(0)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize trajectory vectors (they are automatically initialized empty)
@@ -192,6 +214,32 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("AllStepTime", &fAllStepTimeVec)->SetTitle("Time of Each Step [ns]");
     fTree->Branch("AllStepLengthVector", &fAllStepLenVec)->SetTitle("Length of Each Step [mm]");
     fTree->Branch("AllStepNumberVector", &fAllStepNumVec)->SetTitle("Step Number for Each Step");
+    
+    // Add branches for 3D Gaussian fit results
+    fTree->Branch("FitAmplitude", &fFitAmplitude, "FitAmplitude/D")->SetTitle("Fitted Gaussian Amplitude");
+    fTree->Branch("FitX0", &fFitX0, "FitX0/D")->SetTitle("Fitted Gaussian Center X [mm]");
+    fTree->Branch("FitY0", &fFitY0, "FitY0/D")->SetTitle("Fitted Gaussian Center Y [mm]");
+    fTree->Branch("FitSigmaX", &fFitSigmaX, "FitSigmaX/D")->SetTitle("Fitted Gaussian Sigma X [mm]");
+    fTree->Branch("FitSigmaY", &fFitSigmaY, "FitSigmaY/D")->SetTitle("Fitted Gaussian Sigma Y [mm]");
+    fTree->Branch("FitTheta", &fFitTheta, "FitTheta/D")->SetTitle("Fitted Gaussian Rotation Angle [rad]");
+    fTree->Branch("FitOffset", &fFitOffset, "FitOffset/D")->SetTitle("Fitted Gaussian Offset");
+    
+    fTree->Branch("FitAmplitudeErr", &fFitAmplitudeErr, "FitAmplitudeErr/D")->SetTitle("Error in Fitted Amplitude");
+    fTree->Branch("FitX0Err", &fFitX0Err, "FitX0Err/D")->SetTitle("Error in Fitted Center X [mm]");
+    fTree->Branch("FitY0Err", &fFitY0Err, "FitY0Err/D")->SetTitle("Error in Fitted Center Y [mm]");
+    fTree->Branch("FitSigmaXErr", &fFitSigmaXErr, "FitSigmaXErr/D")->SetTitle("Error in Fitted Sigma X [mm]");
+    fTree->Branch("FitSigmaYErr", &fFitSigmaYErr, "FitSigmaYErr/D")->SetTitle("Error in Fitted Sigma Y [mm]");
+    fTree->Branch("FitThetaErr", &fFitThetaErr, "FitThetaErr/D")->SetTitle("Error in Fitted Rotation Angle [rad]");
+    fTree->Branch("FitOffsetErr", &fFitOffsetErr, "FitOffsetErr/D")->SetTitle("Error in Fitted Offset");
+    
+    fTree->Branch("FitChi2", &fFitChi2, "FitChi2/D")->SetTitle("Fit Chi-squared Value");
+    fTree->Branch("FitNDF", &fFitNDF, "FitNDF/D")->SetTitle("Fit Number of Degrees of Freedom");
+    fTree->Branch("FitProb", &fFitProb, "FitProb/D")->SetTitle("Fit Probability");
+    fTree->Branch("FitRSquared", &fFitRSquared, "FitRSquared/D")->SetTitle("Fit R-squared Value");
+    fTree->Branch("FitNPoints", &fFitNPoints, "FitNPoints/I")->SetTitle("Number of Points Used in Fit");
+    fTree->Branch("FitSuccessful", &fFitSuccessful, "FitSuccessful/O")->SetTitle("Whether Fit was Successful");
+    fTree->Branch("FitResidualMean", &fFitResidualMean, "FitResidualMean/D")->SetTitle("Mean of Fit Residuals");
+    fTree->Branch("FitResidualStd", &fFitResidualStd, "FitResidualStd/D")->SetTitle("Standard Deviation of Fit Residuals");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -638,4 +686,39 @@ void RunAction::SetAllStepInfo(const std::vector<G4double>& stepEdep,
     fAllStepTimeVec = stepTime;
     fAllStepLenVec = stepLength;
     fAllStepNumVec = stepNumber;
+}
+
+void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
+                                     G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
+                                     G4double amplitude_err, G4double x0_err, G4double y0_err,
+                                     G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
+                                     G4double chi2, G4double ndf, G4double prob, G4double r_squared,
+                                     G4int n_points, G4bool fit_successful,
+                                     G4double residual_mean, G4double residual_std)
+{
+    // Store 3D Gaussian fit results
+    fFitAmplitude = amplitude;
+    fFitX0 = x0;
+    fFitY0 = y0;
+    fFitSigmaX = sigma_x;
+    fFitSigmaY = sigma_y;
+    fFitTheta = theta;
+    fFitOffset = offset;
+    
+    fFitAmplitudeErr = amplitude_err;
+    fFitX0Err = x0_err;
+    fFitY0Err = y0_err;
+    fFitSigmaXErr = sigma_x_err;
+    fFitSigmaYErr = sigma_y_err;
+    fFitThetaErr = theta_err;
+    fFitOffsetErr = offset_err;
+    
+    fFitChi2 = chi2;
+    fFitNDF = ndf;
+    fFitProb = prob;
+    fFitRSquared = r_squared;
+    fFitNPoints = n_points;
+    fFitSuccessful = fit_successful;
+    fFitResidualMean = residual_mean;
+    fFitResidualStd = residual_std;
 }
