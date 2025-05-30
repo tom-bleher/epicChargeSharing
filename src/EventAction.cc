@@ -17,6 +17,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
 : G4UserEventAction(),
   fRunAction(runAction),
   fDetector(detector),
+  fNeighborhoodRadius(4),
   fEdep(0.),
   fPosition(G4ThreeVector(0.,0.,0.)),
   fInitialPosition(G4ThreeVector(0.,0.,0.)),
@@ -504,7 +505,7 @@ G4double EventAction::CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4in
   return alphaInDegrees;
 }
 
-// Calculate angles from hit position to all pixels in a 9x9 grid around the hit pixel
+// Calculate angles from hit position to all pixels in a neighborhood grid around the hit pixel
 void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ)
 {
   // Clear previous data
@@ -515,9 +516,11 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
   // Check if hit is inside a pixel - if so, all angles should be invalid
   G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
   if (isInsidePixel) {
-    // Fill all 81 positions with NaN for inside-pixel hits
-    for (G4int di = -4; di <= 4; di++) {
-      for (G4int dj = -4; dj <= 4; dj++) {
+    // Fill all positions with NaN for inside-pixel hits
+    G4int gridSize = 2 * fNeighborhoodRadius + 1;
+    G4int totalPixels = gridSize * gridSize;
+    for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
+      for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
         // Calculate the pixel indices for this grid position
         G4int gridPixelI = hitPixelI + di;
         G4int gridPixelJ = hitPixelJ + dj;
@@ -542,9 +545,9 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
   // Calculate the first pixel position (corner)
   G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
   
-  // Define the 9x9 grid: 4 pixels in each direction from the center
-  for (G4int di = -4; di <= 4; di++) {
-    for (G4int dj = -4; dj <= 4; dj++) {
+  // Define the neighborhood grid: fNeighborhoodRadius pixels in each direction from the center
+  for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
+    for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
       // Calculate the pixel indices for this grid position
       G4int gridPixelI = hitPixelI + di;
       G4int gridPixelJ = hitPixelJ + dj;
@@ -654,7 +657,7 @@ G4double EventAction::CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
   return alpha; // Return in radians
 }
 
-// Calculate charge sharing for pixels in a 9x9 grid around the hit pixel
+// Calculate charge sharing for pixels in a neighborhood grid around the hit pixel
 void EventAction::CalculateNeighborhoodChargeSharing()
 {
   // Clear previous data
@@ -665,9 +668,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   
   // Check if no energy was deposited
   if (fEdep <= 0) {
-    // Fill all 81 positions with zero for no-energy events
-    for (G4int di = -4; di <= 4; di++) {
-      for (G4int dj = -4; dj <= 4; dj++) {
+    // Fill all positions with zero for no-energy events
+    for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
+      for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
         G4int gridPixelI = fPixelIndexI + di;
         G4int gridPixelJ = fPixelIndexJ + dj;
         
@@ -688,9 +691,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
     G4double numElectrons = edepInEV / fIonizationEnergy;
     G4double totalCharge = numElectrons * fAmplificationFactor;
     
-    // Fill all 81 positions, giving all charge to the hit pixel and zero to others
-    for (G4int di = -4; di <= 4; di++) {
-      for (G4int dj = -4; dj <= 4; dj++) {
+    // Fill all positions, giving all charge to the hit pixel and zero to others
+    for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
+      for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
         G4int gridPixelI = fPixelIndexI + di;
         G4int gridPixelJ = fPixelIndexJ + dj;
         
@@ -766,9 +769,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
     // Calculate the charge without charge sharing
     G4double totalChargeValue = totalCharge;
     
-    // Fill all 81 positions, giving all charge to the identified pixel (fPixelIndexI, fPixelIndexJ) and zero to others
-    for (G4int di = -4; di <= 4; di++) {
-      for (G4int dj = -4; dj <= 4; dj++) {
+    // Fill all positions, giving all charge to the identified pixel (fPixelIndexI, fPixelIndexJ) and zero to others
+    for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
+      for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
         G4int gridPixelI = fPixelIndexI + di;
         G4int gridPixelJ = fPixelIndexJ + dj;
         
@@ -789,7 +792,7 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         G4double distance = std::sqrt(std::pow(fPosition.x() - currentPixelCenterX, 2) + 
                                      std::pow(fPosition.y() - currentPixelCenterY, 2));
         
-        // Check if this is the identified pixel (center of the 9x9 grid)
+        // Check if this is the identified pixel (center of the neighborhood grid)
         if (di == 0 && dj == 0) {
           // This is the identified pixel (fPixelIndexI, fPixelIndexJ) - assign all charge here
           fGridNeighborhoodChargeFractions.push_back(1.0);
@@ -816,9 +819,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   std::vector<G4int> validPixelI;
   std::vector<G4int> validPixelJ;
   
-  // Define the 9x9 grid: 4 pixels in each direction from the center
-  for (G4int di = -4; di <= 4; di++) {
-    for (G4int dj = -4; dj <= 4; dj++) {
+  // Define the neighborhood grid: fNeighborhoodRadius pixels in each direction from the center
+  for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
+    for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
       // Calculate the pixel indices for this grid position
       G4int gridPixelI = fPixelIndexI + di;
       G4int gridPixelJ = fPixelIndexJ + dj;
@@ -878,8 +881,8 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   
   // Second pass: calculate charge fractions and values
   size_t validIndex = 0;
-  for (G4int di = -4; di <= 4; di++) {
-    for (G4int dj = -4; dj <= 4; dj++) {
+  for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
+    for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
       // Calculate the pixel indices for this grid position
       G4int gridPixelI = fPixelIndexI + di;
       G4int gridPixelJ = fPixelIndexJ + dj;

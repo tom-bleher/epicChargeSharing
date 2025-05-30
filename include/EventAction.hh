@@ -42,6 +42,10 @@ public:
     // Method to calculate charge sharing in the neighborhood (9x9) grid
     void CalculateNeighborhoodChargeSharing();
     
+    // Method to set neighborhood radius (default is 4 for 9x9 grid)
+    void SetNeighborhoodRadius(G4int radius) { fNeighborhoodRadius = radius; }
+    G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
+    
     // Public setters for additional information from SteppingAction
     void SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime);
     void SetPhysicsProcessInfo(const G4String& processName, G4int trackID, G4int parentID, 
@@ -60,6 +64,10 @@ public:
 private:
     RunAction* fRunAction;
     DetectorConstruction* fDetector;
+    
+    // Neighborhood configuration
+    G4int fNeighborhoodRadius;  // Radius of neighborhood grid (4 = 9x9, 3 = 7x7, etc.)
+    
     G4double fEdep;   // Total energy deposit in the event
     G4ThreeVector fPosition;  // Position of energy deposit (weighted average)
     G4ThreeVector fInitialPosition; // Initial particle position

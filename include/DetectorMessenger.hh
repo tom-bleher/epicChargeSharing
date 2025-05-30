@@ -3,11 +3,13 @@
 
 #include "globals.hh"
 #include "G4UImessenger.hh"
+#include "G4UIcmdWithADoubleAndUnit.hh"
+#include "G4UIcmdWithAnInteger.hh"
+#include "G4SystemOfUnits.hh"
 
 class DetectorConstruction;
 class G4UIdirectory;
-class G4UIcmdWithADoubleAndUnit;
-class G4UIcmdWithAnInteger;
+class EventAction;
 
 class DetectorMessenger : public G4UImessenger
 {
@@ -15,10 +17,14 @@ public:
     DetectorMessenger(DetectorConstruction* detector);
     virtual ~DetectorMessenger();
     
+    // Set EventAction pointer for neighborhood configuration
+    void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
+    
     virtual void SetNewValue(G4UIcommand*, G4String);
     
 private:
     DetectorConstruction* fDetector;
+    EventAction* fEventAction;
     
     G4UIdirectory* fEpicDirectory;
     G4UIdirectory* fDetDirectory;
@@ -27,6 +33,7 @@ private:
     G4UIcmdWithADoubleAndUnit* fBlockSpacingCmd;
     G4UIcmdWithADoubleAndUnit* fCornerOffsetCmd;
     G4UIcmdWithAnInteger*      fNumBlocksCmd;
+    G4UIcmdWithAnInteger* fNeighborhoodRadiusCmd;
 };
 
 #endif

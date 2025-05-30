@@ -1,5 +1,6 @@
 #include "DetectorMessenger.hh"
 #include "DetectorConstruction.hh"
+#include "EventAction.hh"
 
 #include "G4UIdirectory.hh"
 #include "G4UIcmdWithADoubleAndUnit.hh"
@@ -7,7 +8,7 @@
 #include "G4SystemOfUnits.hh"
 
 DetectorMessenger::DetectorMessenger(DetectorConstruction* detector)
-: fDetector(detector)
+: fDetector(detector), fEventAction(nullptr)
 {
     // Create directories for commands
     fEpicDirectory = new G4UIdirectory("/epicToy/");
@@ -39,6 +40,13 @@ DetectorMessenger::DetectorMessenger(DetectorConstruction* detector)
     fCornerOffsetCmd->SetRange("Offset>=0.");
     fCornerOffsetCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
     
+    fNeighborhoodRadiusCmd = new G4UIcmdWithAnInteger("/epicToy/detector/setNeighborhoodRadius", this);
+    fNeighborhoodRadiusCmd->SetGuidance("Set the neighborhood radius for charge sharing analysis");
+    fNeighborhoodRadiusCmd->SetGuidance("Radius 4 = 9x9 grid, Radius 3 = 7x7 grid, Radius 2 = 5x5 grid, etc.");
+    fNeighborhoodRadiusCmd->SetParameterName("Radius", false);
+    fNeighborhoodRadiusCmd->SetRange("Radius>=1");
+    fNeighborhoodRadiusCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+    
 }
 
 DetectorMessenger::~DetectorMessenger()
@@ -47,6 +55,7 @@ DetectorMessenger::~DetectorMessenger()
     delete fBlockSpacingCmd;
     delete fCornerOffsetCmd;
     delete fNumBlocksCmd;
+    delete fNeighborhoodRadiusCmd;
     delete fDetDirectory;
     delete fEpicDirectory;
 }
@@ -80,5 +89,11 @@ void DetectorMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
         // Number of blocks is now calculated automatically, warn user
         G4cerr << "WARNING: Number of blocks is now calculated automatically based on pixel size, spacing, and detector size." << G4endl;
         G4cerr << "This parameter is read-only." << G4endl;
+    }
+    else if (command == fNeighborhoodRadiusCmd) {
+        // Update the neighborhood radius parameter
+        G4int newRadius = fNeighborhoodRadiusCmd->GetNewIntValue(newValue);
+        G4cout << "Setting neighborhood radius to: " << newRadius << G4endl;
+        fDetector->SetNeighborhoodRadius(newRadius);
     }
 }

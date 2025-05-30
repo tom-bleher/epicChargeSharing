@@ -1,5 +1,6 @@
 #include "DetectorConstruction.hh"
 #include "DetectorMessenger.hh"
+#include "EventAction.hh"
 #include "RunAction.hh"
 #include "G4RunManager.hh"
 #include <fstream>
@@ -23,6 +24,7 @@ DetectorConstruction::DetectorConstruction()
       fPixelWidth(0.001*mm),   // 1 micron thickness
       fNumBlocksPerSide(0),    // Will be calculated
       fCheckOverlaps(true),
+      fEventAction(nullptr),   // Initialize EventAction pointer
       fDetectorMessenger(nullptr)
 {
     // ————————————————————————
@@ -395,6 +397,20 @@ void DetectorConstruction::SaveGridParametersToFile() const
         G4cout << "Grid parameters saved to grid_parameters.txt for ROOT merging" << G4endl;
     } else {
         G4cerr << "ERROR: Could not save grid parameters to file" << G4endl;
+    }
+}
+
+void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
+{
+    G4cout << "Setting neighborhood radius to: " << radius << G4endl;
+    G4cout << "This corresponds to a " << (2*radius + 1) << "x" << (2*radius + 1) << " grid" << G4endl;
+    
+    // Pass the radius to EventAction if it's available
+    if (fEventAction) {
+        fEventAction->SetNeighborhoodRadius(radius);
+        G4cout << "Updated EventAction with new neighborhood radius: " << radius << G4endl;
+    } else {
+        G4cout << "EventAction not yet available - radius will be set when EventAction is connected" << G4endl;
     }
 }
 

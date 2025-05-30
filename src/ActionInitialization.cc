@@ -1,4 +1,5 @@
 #include "ActionInitialization.hh"
+#include "DetectorMessenger.hh"
 
 
 ActionInitialization::ActionInitialization(DetectorConstruction* detector)
@@ -26,7 +27,6 @@ void ActionInitialization::BuildForMaster() const
     );
 }
 
-
 void ActionInitialization::Build() const
 {
     // Create and register the primary generator with detector information
@@ -50,6 +50,16 @@ void ActionInitialization::Build() const
     EventAction* eventAction = new EventAction(runAction, fDetector);
     // Don't set initial position here - it will be set for each event
     SetUserAction(eventAction);
+    
+    // Connect EventAction and DetectorConstruction bidirectionally
+    fDetector->SetEventAction(eventAction);
+    
+    // Set up DetectorMessenger with EventAction for neighborhood configuration
+    // Note: The DetectorMessenger is created in DetectorConstruction constructor,
+    // but we need to connect it to EventAction here
+    if (fDetector->GetDetectorMessenger()) {
+        fDetector->GetDetectorMessenger()->SetEventAction(eventAction);
+    }
     
     // Create and register SteppingAction
     SetUserAction(new SteppingAction(eventAction));
