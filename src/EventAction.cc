@@ -13,6 +13,15 @@
 #include <algorithm>
 #include <limits>
 
+// Alpha calculation method: ANALYTICAL
+// This implementation uses the analytical formula for calculating the alpha angle:
+// α = tan^(-1) [(l/2 * √2) / (l/2 * √2 + d)]
+// where:
+//   l = side length of the pixel pad (pixel_size)
+//   d = distance from event hit to center of pixel pad
+// This replaces the previous geometric method that calculated angles to pixel corners.
+// See Page 9: https://indico.cern.ch/event/813597/contributions/3727782/attachments/1989546/3540780/TREDI_Cartiglia.pdf
+
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
 : G4UserEventAction(),
   fRunAction(runAction),
@@ -406,98 +415,24 @@ G4double EventAction::CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4in
   G4double pixelCenterY = firstPixelPos + pixelJ * pixelSpacing;
   G4double pixelCenterZ = detectorPosition.z();
   
-  // Calculate the four corners of the pixel
-  G4double halfPixel = pixelSize / 2.0;
-  G4ThreeVector corners[4];
-  // Bottom-left (0)
-  corners[0] = G4ThreeVector(pixelCenterX - halfPixel, pixelCenterY - halfPixel, pixelCenterZ);
-  // Bottom-right (1)
-  corners[1] = G4ThreeVector(pixelCenterX + halfPixel, pixelCenterY - halfPixel, pixelCenterZ);
-  // Top-right (2)
-  corners[2] = G4ThreeVector(pixelCenterX + halfPixel, pixelCenterY + halfPixel, pixelCenterZ);
-  // Top-left (3)
-  corners[3] = G4ThreeVector(pixelCenterX - halfPixel, pixelCenterY + halfPixel, pixelCenterZ);
+  // Calculate distance from hit position to pixel center (2D distance in XY plane)
+  G4double d = std::sqrt(std::pow(hitPosition.x() - pixelCenterX, 2) + 
+                        std::pow(hitPosition.y() - pixelCenterY, 2));
   
-  // Create a vector to store angles and corner indices
-  struct AngleInfo {
-    G4double angle;
-    G4int cornerIndex;
-    
-    // Custom comparison operator for sorting
-    bool operator<(const AngleInfo& other) const {
-      return angle < other.angle;
-    }
-  };
+  // Use the pixel size as l (side of the pixel pad)
+  G4double l = pixelSize;
   
-  std::vector<AngleInfo> angles;
+  // Apply the analytical formula: α = tan^(-1) [(l/2 * √2) / (l/2 * √2 + d)]
+  G4double numerator = (l/2.0) * std::sqrt(2.0);
+  G4double denominator = numerator + d;
   
-  // Calculate angles to each corner (in the XY plane)
-  for (G4int i = 0; i < 4; i++) {
-    // Calculate relative position vector from hit to corner
-    G4double dx = corners[i].x() - hitPosition.x();
-    G4double dy = corners[i].y() - hitPosition.y();
-    
-    // Calculate angle using atan2
-    G4double angle = std::atan2(dy, dx);
-    angles.push_back({angle, i});
-  }
-  
-  // Sort by angle
-  std::sort(angles.begin(), angles.end());
-  
-  // Calculate differences between consecutive angles
-  std::vector<G4double> angleDiffs;
-  for (size_t i = 0; i < angles.size(); i++) {
-    size_t nextI = (i + 1) % angles.size();
-    G4double diff = angles[nextI].angle - angles[i].angle;
-    
-    // Handle wrap-around (angles close to 2π)
-    if (diff < 0) {
-      diff += 2.0 * CLHEP::pi;
-    }
-    
-    angleDiffs.push_back(diff);
-  }
-  
-  // Find the largest angle difference
-  G4double maxDiff = angleDiffs[0];
-  size_t maxDiffIdx = 0;
-  for (size_t i = 1; i < angleDiffs.size(); i++) {
-    if (angleDiffs[i] > maxDiff) {
-      maxDiff = angleDiffs[i];
-      maxDiffIdx = i;
-    }
-  }
-  
-  // Calculate alpha as 2π minus the largest difference (matching Python implementation)
-  G4double alpha = 2.0 * CLHEP::pi - maxDiff;
-  
-  // Get corner indices that define the alpha angle
-  G4int corner1Idx = angles[maxDiffIdx].cornerIndex;
-  G4int corner2Idx = angles[(maxDiffIdx + 1) % angles.size()].cornerIndex;
-  
-  // Determine if this is a same side case or adjacent sides case
-  // This information could be used for further analysis (not returning it now)
-  G4int pointType = 0;
-  
-  // Same side pairs are (0,1), (1,2), (2,3), or (3,0)
-  std::vector<std::pair<G4int, G4int>> sameSidePairs = {{0,1}, {1,2}, {2,3}, {0,3}};
-  std::pair<G4int, G4int> cornerPair;
-  if (corner1Idx < corner2Idx) {
-    cornerPair = {corner1Idx, corner2Idx};
+  // Handle edge case where denominator could be very small
+  G4double alpha;
+  if (denominator < 1e-10) {
+    alpha = CLHEP::pi/2.0;  // Maximum possible angle (90 degrees)
   } else {
-    cornerPair = {corner2Idx, corner1Idx};
+    alpha = std::atan(numerator / denominator);
   }
-  
-  bool isSameSide = false;
-  for (const auto& pair : sameSidePairs) {
-    if (pair.first == cornerPair.first && pair.second == cornerPair.second) {
-      isSameSide = true;
-      break;
-    }
-  }
-  
-  pointType = isSameSide ? 1 : 2;
   
   // Convert to degrees for storage
   G4double alphaInDegrees = alpha * (180.0 / CLHEP::pi);
@@ -583,76 +518,30 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
 }
 
 // Calculate the angular size subtended by a pixel as seen from a hit point (2D calculation)
-// This matches the algorithm used in the Python alpha_demo.py
+// This now uses the analytical formula: α = tan^(-1) [(l/2 * √2) / (l/2 * √2 + d)]
 G4double EventAction::CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
                                                   G4double pixelCenterX, G4double pixelCenterY,
                                                   G4double pixelWidth, G4double pixelHeight)
 {
-  // Calculate the four corners of the pixel
-  G4double halfWidth = pixelWidth / 2.0;
-  G4double halfHeight = pixelHeight / 2.0;
+  // Calculate distance from hit position to pixel center (2D distance in XY plane)
+  G4double d = std::sqrt(std::pow(hitX - pixelCenterX, 2) + 
+                        std::pow(hitY - pixelCenterY, 2));
   
-  G4ThreeVector corners[4];
-  // Bottom-left (0)
-  corners[0] = G4ThreeVector(pixelCenterX - halfWidth, pixelCenterY - halfHeight, 0);
-  // Bottom-right (1)
-  corners[1] = G4ThreeVector(pixelCenterX + halfWidth, pixelCenterY - halfHeight, 0);
-  // Top-right (2)
-  corners[2] = G4ThreeVector(pixelCenterX + halfWidth, pixelCenterY + halfHeight, 0);
-  // Top-left (3)
-  corners[3] = G4ThreeVector(pixelCenterX - halfWidth, pixelCenterY + halfHeight, 0);
+  // Use the pixel size as l (side of the pixel pad)
+  // For simplicity, use the average of width and height if they differ
+  G4double l = (pixelWidth + pixelHeight) / 2.0;
   
-  // Calculate angles to each corner from the hit point (2D only - XY plane)
-  struct AngleInfo {
-    G4double angle;
-    G4int cornerIndex;
-    
-    // Custom comparison operator for sorting
-    bool operator<(const AngleInfo& other) const {
-      return angle < other.angle;
-    }
-  };
+  // Apply the analytical formula: α = tan^(-1) [(l/2 * √2) / (l/2 * √2 + d)]
+  G4double numerator = (l/2.0) * std::sqrt(2.0);
+  G4double denominator = numerator + d;
   
-  std::vector<AngleInfo> angles;
-  
-  for (G4int i = 0; i < 4; i++) {
-    // Calculate relative position vector from hit to corner (2D only)
-    G4double dx = corners[i].x() - hitX;
-    G4double dy = corners[i].y() - hitY;
-    
-    // Calculate angle using atan2 (this gives angle in XY plane)
-    G4double angle = std::atan2(dy, dx);
-    angles.push_back({angle, i});
+  // Handle edge case where denominator could be very small
+  G4double alpha;
+  if (denominator < 1e-10) {
+    alpha = CLHEP::pi/2.0;  // Maximum possible angle (90 degrees)
+  } else {
+    alpha = std::atan(numerator / denominator);
   }
-  
-  // Sort by angle
-  std::sort(angles.begin(), angles.end());
-  
-  // Calculate differences between consecutive angles
-  std::vector<G4double> angleDiffs;
-  for (size_t i = 0; i < angles.size(); i++) {
-    size_t nextI = (i + 1) % angles.size();
-    G4double diff = angles[nextI].angle - angles[i].angle;
-    
-    // Handle wrap-around (angles close to 2π)
-    if (diff < 0) {
-      diff += 2.0 * CLHEP::pi;
-    }
-    
-    angleDiffs.push_back(diff);
-  }
-  
-  // Find the largest angle difference
-  G4double maxDiff = angleDiffs[0];
-  for (size_t i = 1; i < angleDiffs.size(); i++) {
-    if (angleDiffs[i] > maxDiff) {
-      maxDiff = angleDiffs[i];
-    }
-  }
-  
-  // Calculate alpha as 2π minus the largest difference
-  // This gives the angular size subtended by the pixel as seen from the hit point
-  G4double alpha = 2.0 * CLHEP::pi - maxDiff;
   
   return alpha; // Return in radians
 }
