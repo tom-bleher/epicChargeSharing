@@ -25,7 +25,8 @@ DetectorConstruction::DetectorConstruction()
       fNumBlocksPerSide(0),    // Will be calculated
       fCheckOverlaps(true),
       fEventAction(nullptr),   // Initialize EventAction pointer
-      fDetectorMessenger(nullptr)
+      fDetectorMessenger(nullptr),
+      fNeighborhoodRadius(4)   // Default neighborhood radius for 9x9 grid
 {
     // ————————————————————————
     // Parameters (all lengths are center–to–center except fPixelCornerOffset)
@@ -45,7 +46,7 @@ DetectorConstruction::DetectorConstruction()
     
     // Create the messenger
     fDetectorMessenger = new DetectorMessenger(this);
-};
+}
 
 DetectorConstruction::~DetectorConstruction()
 {
@@ -404,6 +405,9 @@ void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
 {
     G4cout << "Setting neighborhood radius to: " << radius << G4endl;
     G4cout << "This corresponds to a " << (2*radius + 1) << "x" << (2*radius + 1) << " grid" << G4endl;
+    
+    // Store the radius in DetectorConstruction
+    fNeighborhoodRadius = radius;
     
     // Pass the radius to EventAction if it's available
     if (fEventAction) {

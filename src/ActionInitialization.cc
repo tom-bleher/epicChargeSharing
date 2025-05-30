@@ -54,6 +54,9 @@ void ActionInitialization::Build() const
     // Connect EventAction and DetectorConstruction bidirectionally
     fDetector->SetEventAction(eventAction);
     
+    // Set the current neighborhood radius in EventAction
+    eventAction->SetNeighborhoodRadius(fDetector->GetNeighborhoodRadius());
+    
     // Set up DetectorMessenger with EventAction for neighborhood configuration
     // Note: The DetectorMessenger is created in DetectorConstruction constructor,
     // but we need to connect it to EventAction here
