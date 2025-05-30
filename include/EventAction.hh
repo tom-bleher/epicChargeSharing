@@ -8,6 +8,7 @@
 
 class RunAction;
 class DetectorConstruction;
+class Gaussian3DFitter;
 
 class EventAction : public G4UserEventAction
 {
@@ -125,6 +126,9 @@ private:
     std::vector<G4double> fAllStepTimeVec;    // Time of each step
     std::vector<G4double> fAllStepLenVec;     // Length of each step
     std::vector<G4int> fAllStepNumVec;        // Step number for each step
+    
+    // 3D Gaussian fitter instance
+    Gaussian3DFitter* fGaussianFitter;
 };
 
 #endif

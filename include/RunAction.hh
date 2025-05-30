@@ -91,6 +91,15 @@ public:
                        const std::vector<G4double>& stepLength,
                        const std::vector<G4int>& stepNumber);
     
+    // Method to set 3D Gaussian fit results
+    void SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
+                              G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
+                              G4double amplitude_err, G4double x0_err, G4double y0_err,
+                              G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
+                              G4double chi2, G4double ndf, G4double prob, G4double r_squared,
+                              G4int n_points, G4bool fit_successful,
+                              G4double residual_mean, G4double residual_std);
+    
     // Fill the ROOT tree with current event data
     void FillTree();
 
@@ -181,6 +190,32 @@ private:
     std::vector<G4double> fAllStepTimeVec;    // Time of each step [ns]
     std::vector<G4double> fAllStepLenVec;     // Length of each step [mm]
     std::vector<G4int> fAllStepNumVec;        // Step number for each step
+    
+    // Variables for 3D Gaussian fit results
+    G4double fFitAmplitude;         // Fitted amplitude
+    G4double fFitX0;               // Fitted X center [mm]
+    G4double fFitY0;               // Fitted Y center [mm]
+    G4double fFitSigmaX;           // Fitted sigma X [mm]
+    G4double fFitSigmaY;           // Fitted sigma Y [mm]
+    G4double fFitTheta;            // Fitted rotation angle [rad]
+    G4double fFitOffset;           // Fitted offset
+    
+    G4double fFitAmplitudeErr;     // Error in amplitude
+    G4double fFitX0Err;           // Error in X center [mm]
+    G4double fFitY0Err;           // Error in Y center [mm]
+    G4double fFitSigmaXErr;       // Error in sigma X [mm]
+    G4double fFitSigmaYErr;       // Error in sigma Y [mm]
+    G4double fFitThetaErr;        // Error in rotation angle [rad]
+    G4double fFitOffsetErr;       // Error in offset
+    
+    G4double fFitChi2;            // Chi-squared value
+    G4double fFitNDF;             // Number of degrees of freedom
+    G4double fFitProb;            // Fit probability
+    G4double fFitRSquared;        // R-squared value
+    G4int fFitNPoints;            // Number of points used in fit
+    G4bool fFitSuccessful;        // Whether fit was successful
+    G4double fFitResidualMean;    // Mean of residuals
+    G4double fFitResidualStd;     // Standard deviation of residuals
 };
 
 #endif

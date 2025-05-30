@@ -1,6 +1,7 @@
 #include "EventAction.hh"
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
+#include "Gaussian3DFitter.hh"
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
@@ -36,12 +37,20 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fTrackID(-1),
   fParentID(-1),
   fStepCount(0),
-  fTotalStepLength(0.)
+  fTotalStepLength(0.),
+  fGaussianFitter(nullptr)
 { 
+  // Create the 3D Gaussian fitter instance
+  fGaussianFitter = new Gaussian3DFitter();
 }
 
 EventAction::~EventAction()
 { 
+  // Clean up the 3D Gaussian fitter
+  if (fGaussianFitter) {
+    delete fGaussianFitter;
+    fGaussianFitter = nullptr;
+  }
 }
 
 void EventAction::BeginOfEventAction(const G4Event* event)
@@ -181,6 +190,73 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Pass ALL step information to RunAction
   fRunAction->SetAllStepInfo(fAllStepEdepVec, fAllStepZVec, fAllStepTimeVec, 
                             fAllStepLenVec, fAllStepNumVec);
+  
+  // Perform 3D Gaussian fitting on charge distribution data
+  if (fGaussianFitter && !fGridNeighborhoodChargeFractions.empty()) {
+    // Extract coordinates and charge values for fitting
+    std::vector<G4double> x_coords, y_coords, z_values;
+    
+    // Get detector parameters for coordinate calculation
+    G4double pixelSpacing = fDetector->GetPixelSpacing();
+    
+    // Convert grid indices to actual coordinates
+    for (size_t i = 0; i < fGridNeighborhoodChargeFractions.size(); ++i) {
+      if (fGridNeighborhoodChargeFractions[i] > 0) { // Only include pixels with charge
+        // Calculate position relative to the nearest pixel center
+        G4int pixelI = fGridNeighborhoodPixelI[i];
+        G4int pixelJ = fGridNeighborhoodPixelJ[i];
+        
+        // Calculate offset from center pixel (which is at index 4,4 in 9x9 grid)
+        G4int centerI = fPixelIndexI;
+        G4int centerJ = fPixelIndexJ;
+        
+        G4double x_pos = nearestPixel.x() + (pixelI - centerI) * pixelSpacing;
+        G4double y_pos = nearestPixel.y() + (pixelJ - centerJ) * pixelSpacing;
+        
+        x_coords.push_back(x_pos);
+        y_coords.push_back(y_pos);
+        z_values.push_back(fGridNeighborhoodChargeFractions[i]);
+      }
+    }
+    
+    // Perform fitting if we have enough data points
+    if (x_coords.size() >= 4) { // Need at least 4 points for meaningful fit
+      Gaussian3DFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
+        x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
+      
+      // Pass fit results to RunAction
+      fRunAction->SetGaussianFitResults(
+        fitResults.amplitude, fitResults.x0, fitResults.y0,
+        fitResults.sigma_x, fitResults.sigma_y, fitResults.theta, fitResults.offset,
+        fitResults.amplitude_err, fitResults.x0_err, fitResults.y0_err,
+        fitResults.sigma_x_err, fitResults.sigma_y_err, fitResults.theta_err, fitResults.offset_err,
+        fitResults.chi2, fitResults.ndf, fitResults.prob, fitResults.r_squared,
+        fitResults.n_points, fitResults.fit_successful,
+        fitResults.residual_mean, fitResults.residual_std);
+        
+      // Optional: Print fit results for debugging (only for first few events)
+      if (eventID < 5 && fitResults.fit_successful) {
+        G4cout << "Event " << eventID << " - 3D Gaussian Fit Results:" << G4endl;
+        G4cout << "  Center: (" << fitResults.x0 << ", " << fitResults.y0 << ") mm" << G4endl;
+        G4cout << "  Sigma: (" << fitResults.sigma_x << ", " << fitResults.sigma_y << ") mm" << G4endl;
+        G4cout << "  R²: " << fitResults.r_squared << G4endl;
+      }
+    } else {
+      // Not enough data points for fitting - set default values
+      fRunAction->SetGaussianFitResults(
+        0, 0, 0, 0, 0, 0, 0,  // parameters
+        0, 0, 0, 0, 0, 0, 0,  // errors
+        0, 0, 0, 0,           // chi2, ndf, prob, r_squared
+        x_coords.size(), false, 0, 0); // n_points, fit_successful, residual stats
+    }
+  } else {
+    // No fitter or no charge data - set default values
+    fRunAction->SetGaussianFitResults(
+      0, 0, 0, 0, 0, 0, 0,  // parameters
+      0, 0, 0, 0, 0, 0, 0,  // errors
+      0, 0, 0, 0,           // chi2, ndf, prob, r_squared
+      0, false, 0, 0);      // n_points, fit_successful, residual stats
+  }
   
   fRunAction->FillTree();
 }
