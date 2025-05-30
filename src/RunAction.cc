@@ -111,11 +111,7 @@ RunAction::RunAction()
   fFitSuccessful_alldata(false),
   fFitResidualMean_alldata(0),
   fFitResidualStd_alldata(0),
-  // fFitNOutliersRemoved_alldata(0), // COMMENTED OUT - outlier-related
-  fFitConstraintsSatisfied_alldata(false),
-  fFitCenterDistFromEdge_alldata(0),
-  fFitMinDistToPixel_alldata(0),
-  fFitAttemptNumber_alldata(0)
+  fFitConstraintsSatisfied_alldata(false)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize trajectory vectors (they are automatically initialized empty)
@@ -277,7 +273,6 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("FitResidualStd", &fFitResidualStd, "FitResidualStd/D")->SetTitle("Standard Deviation of Fit Residuals");
     
     // Add branches for enhanced robustness metrics
-    // fTree->Branch("FitNOutliersRemoved", &fFitNOutliersRemoved, "FitNOutliersRemoved/I")->SetTitle("Number of Outliers Removed"); // COMMENTED OUT - outlier-related
     fTree->Branch("FitConstraintsSatisfied", &fFitConstraintsSatisfied, "FitConstraintsSatisfied/O")->SetTitle("Whether Geometric Constraints were Satisfied");
     fTree->Branch("FitCenterDistFromEdge", &fFitCenterDistFromEdge, "FitCenterDistFromEdge/D")->SetTitle("Distance from Fit Center to Detector Edge [mm]");
     fTree->Branch("FitMinDistToPixel", &fFitMinDistToPixel, "FitMinDistToPixel/D")->SetTitle("Minimum Distance from Fit Center to Any Pixel [mm]");
@@ -312,11 +307,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("FitResidualStd_alldata", &fFitResidualStd_alldata, "FitResidualStd_alldata/D")->SetTitle("Standard Deviation of Fit Residuals (All Data)");
     
     // Add branches for enhanced robustness metrics (all data)
-    // fTree->Branch("FitNOutliersRemoved_alldata", &fFitNOutliersRemoved_alldata, "FitNOutliersRemoved_alldata/I")->SetTitle("Number of Outliers Removed (All Data)");
     fTree->Branch("FitConstraintsSatisfied_alldata", &fFitConstraintsSatisfied_alldata, "FitConstraintsSatisfied_alldata/O")->SetTitle("Whether Geometric Constraints were Satisfied (All Data)");
-    fTree->Branch("FitCenterDistFromEdge_alldata", &fFitCenterDistFromEdge_alldata, "FitCenterDistFromEdge_alldata/D")->SetTitle("Distance from Fit Center to Detector Edge [mm] (All Data)");
-    fTree->Branch("FitMinDistToPixel_alldata", &fFitMinDistToPixel_alldata, "FitMinDistToPixel_alldata/D")->SetTitle("Minimum Distance from Fit Center to Any Pixel [mm] (All Data)");
-    fTree->Branch("FitAttemptNumber_alldata", &fFitAttemptNumber_alldata, "FitAttemptNumber_alldata/I")->SetTitle("Which Fitting Attempt Succeeded (1-based) (All Data)");
     
     // Add convenient alias branches for Gaussian center coordinates and distance calculation
     fTree->Branch("GaussX", &fGaussX, "GaussX/D")->SetTitle("Gaussian Center X [mm]");
@@ -777,7 +768,7 @@ void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double 
                                      G4double chi2, G4double ndf, G4double prob, G4double r_squared,
                                      G4int n_points, G4bool fit_successful,
                                      G4double residual_mean, G4double residual_std,
-                                     /* G4int n_outliers_removed, */ G4bool constraints_satisfied,
+                                     G4bool constraints_satisfied,
                                      G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
                                      G4int fit_attempt_number)
 {
@@ -808,7 +799,6 @@ void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double 
     fFitResidualStd = residual_std;
     
     // Store enhanced robustness metrics
-    // fFitNOutliersRemoved = n_outliers_removed; // COMMENTED OUT - outlier-related
     fFitConstraintsSatisfied = constraints_satisfied;
     fFitCenterDistFromEdge = center_distance_from_detector_edge;
     fFitMinDistToPixel = min_distance_to_pixel;
@@ -833,7 +823,7 @@ void RunAction::SetGaussianFitResultsAllData(G4double amplitude, G4double x0, G4
                                              G4double chi2, G4double ndf, G4double prob, G4double r_squared,
                                              G4int n_points, G4bool fit_successful,
                                              G4double residual_mean, G4double residual_std,
-                                             /* G4int n_outliers_removed, */ G4bool constraints_satisfied,
+                                             G4bool constraints_satisfied,
                                              G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
                                              G4int fit_attempt_number)
 {
@@ -864,9 +854,5 @@ void RunAction::SetGaussianFitResultsAllData(G4double amplitude, G4double x0, G4
     fFitResidualStd_alldata = residual_std;
     
     // Store enhanced robustness metrics for all data fit
-    // fFitNOutliersRemoved_alldata = n_outliers_removed; // COMMENTED OUT - outlier-related
     fFitConstraintsSatisfied_alldata = constraints_satisfied;
-    fFitCenterDistFromEdge_alldata = center_distance_from_detector_edge;
-    fFitMinDistToPixel_alldata = min_distance_to_pixel;
-    fFitAttemptNumber_alldata = fit_attempt_number;
 }
