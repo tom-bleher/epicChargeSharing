@@ -18,6 +18,7 @@
 #include <thread>
 #include <cstdio> // For std::remove
 #include <fstream>
+#include <limits>
 
 // Initialize the static mutex
 std::mutex RunAction::fRootMutex;
@@ -51,15 +52,6 @@ RunAction::RunAction()
   fFinalEnergy(0),
   fMomentum(0),
   fParticleName(""),
-  fCreatorProcess(""),
-  fGlobalTime(0),
-  fLocalTime(0),
-  fProperTime(0),
-  fPhysicsProcess(""),
-  fTrackID(-1),
-  fParentID(-1),
-  fStepNum(-1),
-  fStepLen(0),
   fFitAmplitude(0),
   fFitX0(0),
   fFitY0(0),
@@ -77,44 +69,18 @@ RunAction::RunAction()
   fFitChi2(0),
   fFitNDF(0),
   fFitProb(0),
-  fFitRSquared(0),
   fFitNPoints(0),
-  fFitSuccessful(false),
   fFitResidualMean(0),
   fFitResidualStd(0),
   fGaussX(0),
   fGaussY(0), 
-  fGaussTrueDistance(0),
+  fGaussTrueDistance(std::numeric_limits<G4double>::quiet_NaN()),
   fFitConstraintsSatisfied(false),
   fFitCenterDistFromEdge(0),
   fFitMinDistToPixel(0),
-  fFitAttemptNumber(0),
-  fFitAmplitude_alldata(0),
-  fFitX0_alldata(0),
-  fFitY0_alldata(0),
-  fFitSigmaX_alldata(0),
-  fFitSigmaY_alldata(0),
-  fFitTheta_alldata(0),
-  fFitOffset_alldata(0),
-  fFitAmplitudeErr_alldata(0),
-  fFitX0Err_alldata(0),
-  fFitY0Err_alldata(0),
-  fFitSigmaXErr_alldata(0),
-  fFitSigmaYErr_alldata(0),
-  fFitThetaErr_alldata(0),
-  fFitOffsetErr_alldata(0),
-  fFitChi2_alldata(0),
-  fFitNDF_alldata(0),
-  fFitProb_alldata(0),
-  fFitRSquared_alldata(0),
-  fFitNPoints_alldata(0),
-  fFitSuccessful_alldata(false),
-  fFitResidualMean_alldata(0),
-  fFitResidualStd_alldata(0),
-  fFitConstraintsSatisfied_alldata(false)
+  fFitAttemptNumber(0)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
-  // Initialize trajectory vectors (they are automatically initialized empty)
   // Initialize step energy deposition vectors (they are automatically initialized empty)
 }
 
@@ -212,39 +178,16 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("FinalEnergy", &fFinalEnergy, "FinalEnergy/D")->SetTitle("Final Particle Energy [MeV]");
     fTree->Branch("Momentum", &fMomentum, "Momentum/D")->SetTitle("Particle Momentum [MeV/c]");
     fTree->Branch("ParticleName", &fParticleName)->SetTitle("Particle Type Name");
-    fTree->Branch("CreatorProcess", &fCreatorProcess)->SetTitle("Creator Process Name");
-    
-    // Add branches for timing information
-    fTree->Branch("GlobalTime", &fGlobalTime, "GlobalTime/D")->SetTitle("Global Time [ns]");
-    fTree->Branch("LocalTime", &fLocalTime, "LocalTime/D")->SetTitle("Local Time [ns]");
-    fTree->Branch("ProperTime", &fProperTime, "ProperTime/D")->SetTitle("Proper Time [ns]");
-    
-    // Add branches for physics process information
-    fTree->Branch("PhysicsProcess", &fPhysicsProcess)->SetTitle("Physics Process Name");
-    fTree->Branch("TrackID", &fTrackID, "TrackID/I")->SetTitle("Track ID");
-    fTree->Branch("ParentID", &fParentID, "ParentID/I")->SetTitle("Parent Track ID");
-    fTree->Branch("StepNumber", &fStepNum, "StepNumber/I")->SetTitle("Step Number in Track");
-    fTree->Branch("StepLength", &fStepLen, "StepLength/D")->SetTitle("Total Step Length [mm]");
-    
-    // Add branches for track trajectory information
-    fTree->Branch("TrajectoryX", &fTrajectoryX)->SetTitle("X Positions Along Track [mm]");
-    fTree->Branch("TrajectoryY", &fTrajectoryY)->SetTitle("Y Positions Along Track [mm]");
-    fTree->Branch("TrajectoryZ", &fTrajectoryZ)->SetTitle("Z Positions Along Track [mm]");
-    fTree->Branch("TrajectoryTime", &fTrajectoryTime)->SetTitle("Time at Each Trajectory Point [ns]");
     
     // Add branches for step-by-step energy deposition information
     fTree->Branch("StepEnergyDeposition", &fStepEdepVec)->SetTitle("Energy Deposited Per Step [MeV]");
     fTree->Branch("StepZPosition", &fStepZVec)->SetTitle("Z Position of Each Energy Deposit [mm]");
     fTree->Branch("StepTime", &fStepTimeVec)->SetTitle("Time of Each Energy Deposit [ns]");
-    fTree->Branch("StepLengthVector", &fStepLenVec)->SetTitle("Length of Each Energy Depositing Step [mm]");
-    fTree->Branch("StepNumberVector", &fStepNumVec)->SetTitle("Step Number for Each Energy Deposit");
     
     // Add branches for ALL step information (including non-energy depositing steps)
     fTree->Branch("AllStepEnergyDeposition", &fAllStepEdepVec)->SetTitle("Energy Deposited Per Step (All Steps) [MeV]");
     fTree->Branch("AllStepZPosition", &fAllStepZVec)->SetTitle("Z Position of Each Step [mm]");
     fTree->Branch("AllStepTime", &fAllStepTimeVec)->SetTitle("Time of Each Step [ns]");
-    fTree->Branch("AllStepLengthVector", &fAllStepLenVec)->SetTitle("Length of Each Step [mm]");
-    fTree->Branch("AllStepNumberVector", &fAllStepNumVec)->SetTitle("Step Number for Each Step");
     
     // Add branches for 3D Gaussian fit results
     fTree->Branch("FitAmplitude", &fFitAmplitude, "FitAmplitude/D")->SetTitle("Fitted Gaussian Amplitude");
@@ -266,9 +209,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("FitChi2", &fFitChi2, "FitChi2/D")->SetTitle("Fit Chi-squared Value");
     fTree->Branch("FitNDF", &fFitNDF, "FitNDF/D")->SetTitle("Fit Number of Degrees of Freedom");
     fTree->Branch("FitProb", &fFitProb, "FitProb/D")->SetTitle("Fit Probability");
-    fTree->Branch("FitRSquared", &fFitRSquared, "FitRSquared/D")->SetTitle("Fit R-squared Value");
     fTree->Branch("FitNPoints", &fFitNPoints, "FitNPoints/I")->SetTitle("Number of Points Used in Fit");
-    fTree->Branch("FitSuccessful", &fFitSuccessful, "FitSuccessful/O")->SetTitle("Whether Fit was Successful");
     fTree->Branch("FitResidualMean", &fFitResidualMean, "FitResidualMean/D")->SetTitle("Mean of Fit Residuals");
     fTree->Branch("FitResidualStd", &fFitResidualStd, "FitResidualStd/D")->SetTitle("Standard Deviation of Fit Residuals");
     
@@ -277,37 +218,6 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("FitCenterDistFromEdge", &fFitCenterDistFromEdge, "FitCenterDistFromEdge/D")->SetTitle("Distance from Fit Center to Detector Edge [mm]");
     fTree->Branch("FitMinDistToPixel", &fFitMinDistToPixel, "FitMinDistToPixel/D")->SetTitle("Minimum Distance from Fit Center to Any Pixel [mm]");
     fTree->Branch("FitAttemptNumber", &fFitAttemptNumber, "FitAttemptNumber/I")->SetTitle("Which Fitting Attempt Succeeded (1-based)");
-    
-    // Add branches for 3D Gaussian fit results (ALL DATA - no outlier removal)
-    fTree->Branch("FitAmplitude_alldata", &fFitAmplitude_alldata, "FitAmplitude_alldata/D")->SetTitle("Fitted Gaussian Amplitude (All Data)");
-    fTree->Branch("FitX0_alldata", &fFitX0_alldata, "FitX0_alldata/D")->SetTitle("Fitted Gaussian Center X [mm] (All Data)");
-    fTree->Branch("FitY0_alldata", &fFitY0_alldata, "FitY0_alldata/D")->SetTitle("Fitted Gaussian Center Y [mm] (All Data)");
-    fTree->Branch("FitSigmaX_alldata", &fFitSigmaX_alldata, "FitSigmaX_alldata/D")->SetTitle("Fitted Gaussian Sigma X [mm] (All Data)");
-    fTree->Branch("FitSigmaY_alldata", &fFitSigmaY_alldata, "FitSigmaY_alldata/D")->SetTitle("Fitted Gaussian Sigma Y [mm] (All Data)");
-    fTree->Branch("FitTheta_alldata", &fFitTheta_alldata, "FitTheta_alldata/D")->SetTitle("Fitted Gaussian Rotation Angle [rad] (All Data)");
-    fTree->Branch("FitOffset_alldata", &fFitOffset_alldata, "FitOffset_alldata/D")->SetTitle("Fitted Gaussian Offset (All Data)");
-    
-    // Add branches for fit parameter errors (all data)
-    fTree->Branch("FitAmplitudeErr_alldata", &fFitAmplitudeErr_alldata, "FitAmplitudeErr_alldata/D")->SetTitle("Error in Fitted Amplitude (All Data)");
-    fTree->Branch("FitX0Err_alldata", &fFitX0Err_alldata, "FitX0Err_alldata/D")->SetTitle("Error in Fitted Center X [mm] (All Data)");
-    fTree->Branch("FitY0Err_alldata", &fFitY0Err_alldata, "FitY0Err_alldata/D")->SetTitle("Error in Fitted Center Y [mm] (All Data)");
-    fTree->Branch("FitSigmaXErr_alldata", &fFitSigmaXErr_alldata, "FitSigmaXErr_alldata/D")->SetTitle("Error in Fitted Sigma X [mm] (All Data)");
-    fTree->Branch("FitSigmaYErr_alldata", &fFitSigmaYErr_alldata, "FitSigmaYErr_alldata/D")->SetTitle("Error in Fitted Sigma Y [mm] (All Data)");
-    fTree->Branch("FitThetaErr_alldata", &fFitThetaErr_alldata, "FitThetaErr_alldata/D")->SetTitle("Error in Fitted Rotation Angle [rad] (All Data)");
-    fTree->Branch("FitOffsetErr_alldata", &fFitOffsetErr_alldata, "FitOffsetErr_alldata/D")->SetTitle("Error in Fitted Offset (All Data)");
-    
-    // Add branches for fit statistics (all data)
-    fTree->Branch("FitChi2_alldata", &fFitChi2_alldata, "FitChi2_alldata/D")->SetTitle("Fit Chi-squared Value (All Data)");
-    fTree->Branch("FitNDF_alldata", &fFitNDF_alldata, "FitNDF_alldata/D")->SetTitle("Fit Number of Degrees of Freedom (All Data)");
-    fTree->Branch("FitProb_alldata", &fFitProb_alldata, "FitProb_alldata/D")->SetTitle("Fit Probability (All Data)");
-    fTree->Branch("FitRSquared_alldata", &fFitRSquared_alldata, "FitRSquared_alldata/D")->SetTitle("Fit R-squared Value (All Data)");
-    fTree->Branch("FitNPoints_alldata", &fFitNPoints_alldata, "FitNPoints_alldata/I")->SetTitle("Number of Points Used in Fit (All Data)");
-    fTree->Branch("FitSuccessful_alldata", &fFitSuccessful_alldata, "FitSuccessful_alldata/O")->SetTitle("Whether Fit was Successful (All Data)");
-    fTree->Branch("FitResidualMean_alldata", &fFitResidualMean_alldata, "FitResidualMean_alldata/D")->SetTitle("Mean of Fit Residuals (All Data)");
-    fTree->Branch("FitResidualStd_alldata", &fFitResidualStd_alldata, "FitResidualStd_alldata/D")->SetTitle("Standard Deviation of Fit Residuals (All Data)");
-    
-    // Add branches for enhanced robustness metrics (all data)
-    fTree->Branch("FitConstraintsSatisfied_alldata", &fFitConstraintsSatisfied_alldata, "FitConstraintsSatisfied_alldata/O")->SetTitle("Whether Geometric Constraints were Satisfied (All Data)");
     
     // Add convenient alias branches for Gaussian center coordinates and distance calculation
     fTree->Branch("GaussX", &fGaussX, "GaussX/D")->SetTitle("Gaussian Center X [mm]");
@@ -688,8 +598,7 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
 }
 
 void RunAction::SetParticleInfo(G4int eventID, G4double initialEnergy, G4double finalEnergy, 
-                               G4double momentum, const G4String& particleName, 
-                               const G4String& creatorProcess)
+                               G4double momentum, const G4String& particleName)
 {
     // Store particle information
     fEventID = eventID;
@@ -697,82 +606,40 @@ void RunAction::SetParticleInfo(G4int eventID, G4double initialEnergy, G4double 
     fFinalEnergy = finalEnergy;
     fMomentum = momentum;
     fParticleName = particleName;
-    fCreatorProcess = creatorProcess;
-}
-
-void RunAction::SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime)
-{
-    // Store timing information (convert to ns if needed)
-    fGlobalTime = globalTime / CLHEP::ns;  // Convert to ns
-    fLocalTime = localTime / CLHEP::ns;    // Convert to ns
-    fProperTime = properTime / CLHEP::ns;  // Convert to ns
-}
-
-void RunAction::SetPhysicsInfo(const G4String& physicsProcess, G4int trackID, G4int parentID, 
-                              G4int stepNumber, G4double stepLength)
-{
-    // Store physics process information
-    fPhysicsProcess = physicsProcess;
-    fTrackID = trackID;
-    fParentID = parentID;
-    fStepNum = stepNumber;
-    fStepLen = stepLength;
-}
-
-void RunAction::SetTrajectoryInfo(const std::vector<G4double>& trackX, 
-                                 const std::vector<G4double>& trackY, 
-                                 const std::vector<G4double>& trackZ,
-                                 const std::vector<G4double>& trackTime)
-{
-    // Store trajectory information
-    fTrajectoryX = trackX;
-    fTrajectoryY = trackY;
-    fTrajectoryZ = trackZ;
-    fTrajectoryTime = trackTime;
 }
 
 void RunAction::SetStepEnergyDeposition(const std::vector<G4double>& stepEdep,
                                        const std::vector<G4double>& stepZ,
-                                       const std::vector<G4double>& stepTime,
-                                       const std::vector<G4double>& stepLength,
-                                       const std::vector<G4int>& stepNumber)
+                                       const std::vector<G4double>& stepTime)
 {
     // Store step-by-step energy deposition information
     fStepEdepVec = stepEdep;
     fStepZVec = stepZ;
     fStepTimeVec = stepTime;
-    fStepLenVec = stepLength;
-    fStepNumVec = stepNumber;
-    
-    // Store step-by-step energy deposition information
 }
 
 void RunAction::SetAllStepInfo(const std::vector<G4double>& stepEdep,
                               const std::vector<G4double>& stepZ,
-                              const std::vector<G4double>& stepTime,
-                              const std::vector<G4double>& stepLength,
-                              const std::vector<G4int>& stepNumber)
+                              const std::vector<G4double>& stepTime)
 {
     // Store ALL step information (including non-energy depositing steps)
     fAllStepEdepVec = stepEdep;
     fAllStepZVec = stepZ;
     fAllStepTimeVec = stepTime;
-    fAllStepLenVec = stepLength;
-    fAllStepNumVec = stepNumber;
 }
 
 void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
                                      G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
                                      G4double amplitude_err, G4double x0_err, G4double y0_err,
                                      G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
-                                     G4double chi2, G4double ndf, G4double prob, G4double r_squared,
-                                     G4int n_points, G4bool fit_successful,
+                                     G4double chi2, G4double ndf, G4double prob,
+                                     G4int n_points,
                                      G4double residual_mean, G4double residual_std,
                                      G4bool constraints_satisfied,
                                      G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
                                      G4int fit_attempt_number)
 {
-    // Store 3D Gaussian fit results (ALL DATA)
+    // Store 3D Gaussian fit results
     fFitAmplitude = amplitude;
     fFitX0 = x0;
     fFitY0 = y0;
@@ -792,9 +659,7 @@ void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double 
     fFitChi2 = chi2;
     fFitNDF = ndf;
     fFitProb = prob;
-    fFitRSquared = r_squared;
     fFitNPoints = n_points;
-    fFitSuccessful = fit_successful;
     fFitResidualMean = residual_mean;
     fFitResidualStd = residual_std;
     
@@ -809,50 +674,5 @@ void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double 
     fGaussY = y0;  // Alias for fFitY0
     
     // Calculate distance from Gaussian center to true position
-    if (fit_successful) {
-        fGaussTrueDistance = std::sqrt(std::pow(fGaussX - fTrueX, 2) + std::pow(fGaussY - fTrueY, 2));
-    } else {
-        fGaussTrueDistance = -1.0;  // Set to -1 if fit was unsuccessful
-    }
-}
-
-void RunAction::SetGaussianFitResultsAllData(G4double amplitude, G4double x0, G4double y0,
-                                             G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
-                                             G4double amplitude_err, G4double x0_err, G4double y0_err,
-                                             G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
-                                             G4double chi2, G4double ndf, G4double prob, G4double r_squared,
-                                             G4int n_points, G4bool fit_successful,
-                                             G4double residual_mean, G4double residual_std,
-                                             G4bool constraints_satisfied,
-                                             G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
-                                             G4int fit_attempt_number)
-{
-    // Store 3D Gaussian fit results for ALL DATA
-    fFitAmplitude_alldata = amplitude;
-    fFitX0_alldata = x0;
-    fFitY0_alldata = y0;
-    fFitSigmaX_alldata = sigma_x;
-    fFitSigmaY_alldata = sigma_y;
-    fFitTheta_alldata = theta;
-    fFitOffset_alldata = offset;
-    
-    fFitAmplitudeErr_alldata = amplitude_err;
-    fFitX0Err_alldata = x0_err;
-    fFitY0Err_alldata = y0_err;
-    fFitSigmaXErr_alldata = sigma_x_err;
-    fFitSigmaYErr_alldata = sigma_y_err;
-    fFitThetaErr_alldata = theta_err;
-    fFitOffsetErr_alldata = offset_err;
-    
-    fFitChi2_alldata = chi2;
-    fFitNDF_alldata = ndf;
-    fFitProb_alldata = prob;
-    fFitRSquared_alldata = r_squared;
-    fFitNPoints_alldata = n_points;
-    fFitSuccessful_alldata = fit_successful;
-    fFitResidualMean_alldata = residual_mean;
-    fFitResidualStd_alldata = residual_std;
-    
-    // Store enhanced robustness metrics for all data fit
-    fFitConstraintsSatisfied_alldata = constraints_satisfied;
+    fGaussTrueDistance = std::sqrt(std::pow(fGaussX - fTrueX, 2) + std::pow(fGaussY - fTrueY, 2));
 }

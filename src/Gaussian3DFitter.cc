@@ -10,7 +10,6 @@
 #include "TMath.h"
 
 // Define static constants
-// const G4double Gaussian3DFitter::fOutlierThreshold = 3.0;  // 3-sigma outlier threshold - COMMENTED OUT
 const G4double Gaussian3DFitter::fConstraintPenalty = 1000.0;  // Large penalty for constraint violations
 
 Gaussian3DFitter::Gaussian3DFitter(const DetectorGeometry& detector_geometry) 
@@ -218,76 +217,6 @@ void Gaussian3DFitter::ApplyParameterBounds(G4double* params) const
     while (params[5] < -TMath::Pi()) params[5] += 2.0 * TMath::Pi();
 }
 
-/*
-void Gaussian3DFitter::RemoveOutliers(std::vector<G4double>& x_coords,
-                                     std::vector<G4double>& y_coords,
-                                     std::vector<G4double>& z_values,
-                                     std::vector<G4double>& z_errors,
-                                     G4int& n_outliers_removed,
-                                     G4bool verbose)
-{
-    if (z_values.size() < 10) {
-        n_outliers_removed = 0;
-        return; // Too few points for outlier removal
-    }
-    
-    // Calculate robust statistics using median absolute deviation (MAD)
-    std::vector<G4double> z_sorted = z_values;
-    std::sort(z_sorted.begin(), z_sorted.end());
-    
-    const G4double median = z_sorted[z_sorted.size() / 2];
-    
-    // Calculate MAD
-    std::vector<G4double> abs_deviations;
-    for (const G4double& z : z_values) {
-        abs_deviations.push_back(TMath::Abs(z - median));
-    }
-    std::sort(abs_deviations.begin(), abs_deviations.end());
-    const G4double mad = abs_deviations[abs_deviations.size() / 2];
-    
-    // Use modified Z-score with MAD (more robust than standard deviation)
-    const G4double mad_threshold = fOutlierThreshold * 1.4826 * mad; // 1.4826 converts MAD to std dev equivalent
-    
-    if (verbose) {
-        G4cout << "  Outlier detection: median=" << median << ", MAD=" << mad 
-               << ", threshold=" << mad_threshold << G4endl;
-    }
-    
-    // Remove outliers
-    std::vector<G4double> x_cleaned, y_cleaned, z_cleaned, z_err_cleaned;
-    n_outliers_removed = 0;
-    
-    for (size_t i = 0; i < z_values.size(); ++i) {
-        const G4double modified_z_score = TMath::Abs(z_values[i] - median);
-        
-        if (modified_z_score <= mad_threshold) {
-            x_cleaned.push_back(x_coords[i]);
-            y_cleaned.push_back(y_coords[i]);
-            z_cleaned.push_back(z_values[i]);
-            if (!z_errors.empty() && i < z_errors.size()) {
-                z_err_cleaned.push_back(z_errors[i]);
-            }
-        } else {
-            n_outliers_removed++;
-            if (verbose) {
-                G4cout << "    Removed outlier at (" << x_coords[i] << ", " << y_coords[i] 
-                       << ") with value " << z_values[i] << " (modified Z=" << modified_z_score/mad_threshold << ")" << G4endl;
-            }
-        }
-    }
-    
-    // Replace original vectors
-    x_coords = x_cleaned;
-    y_coords = y_cleaned;
-    z_values = z_cleaned;
-    z_errors = z_err_cleaned;
-    
-    if (verbose && n_outliers_removed > 0) {
-        G4cout << "  Removed " << n_outliers_removed << " outliers, " << z_values.size() << " points remaining" << G4endl;
-    }
-}
-*/
-
 void Gaussian3DFitter::CalculateInitialGuess(const std::vector<G4double>& x_coords,
                                              const std::vector<G4double>& y_coords,
                                              const std::vector<G4double>& z_values,
@@ -446,32 +375,6 @@ G4double Gaussian3DFitter::CalculateConstrainedChiSquared(const std::vector<G4do
     if (params[0] <= 0) penalty += fConstraintPenalty * (-params[0] + 1.0) * 1000.0;
     
     return chi2 + penalty;
-}
-
-G4double Gaussian3DFitter::CalculateRSquared(const std::vector<G4double>& x_coords,
-                                             const std::vector<G4double>& y_coords,
-                                             const std::vector<G4double>& z_values,
-                                             const G4double* fitParams)
-{
-    if (z_values.empty()) return 0.0;
-    
-    // Calculate mean of observed values
-    const G4double z_mean = std::accumulate(z_values.begin(), z_values.end(), 0.0) / z_values.size();
-    
-    G4double ss_tot = 0.0; // Total sum of squares
-    G4double ss_res = 0.0; // Residual sum of squares
-    
-    for (size_t i = 0; i < x_coords.size(); ++i) {
-        const G4double z_obs = z_values[i];
-        const G4double z_fit = Gaussian3DFunction(x_coords[i], y_coords[i], fitParams);
-        
-        ss_tot += (z_obs - z_mean) * (z_obs - z_mean);
-        ss_res += (z_obs - z_fit) * (z_obs - z_fit);
-    }
-    
-    if (ss_tot == 0.0) return 0.0;
-    
-    return 1.0 - (ss_res / ss_tot);
 }
 
 void Gaussian3DFitter::CalculateResidualStats(const std::vector<G4double>& x_coords,
@@ -731,7 +634,6 @@ void Gaussian3DFitter::RobustSimplexFit(const std::vector<G4double>& x_coords,
     }
 }
 
-/*
 Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G4double>& x_coords,
                                                             const std::vector<G4double>& y_coords,
                                                             const std::vector<G4double>& z_values,
@@ -739,14 +641,13 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
                                                             G4bool verbose)
 {
     FitResults results;
-    // results.fit_type = OUTLIER_CLEANED; // This method performs outlier removal - COMMENTED OUT
     
     // Check input data validity
     if (x_coords.size() != y_coords.size() || x_coords.size() != z_values.size()) {
         if (verbose) {
             G4cout << "Gaussian3DFitter::FitGaussian3D - Error: Inconsistent input array sizes" << G4endl;
         }
-        return results; // fit_successful remains false
+        return results;
     }
     
     if (x_coords.size() < 7) { // Need at least as many points as parameters
@@ -754,220 +655,20 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
             G4cout << "Gaussian3DFitter::FitGaussian3D - Error: Insufficient data points (" 
                    << x_coords.size() << " < 7)" << G4endl;
         }
-        return results; // fit_successful remains false
-    }
-    
-    if (verbose) {
-        G4cout << "\n=== Robust Gaussian3D Fitting (WITH outlier removal) ===" << G4endl;
-        G4cout << "Initial data points: " << x_coords.size() << G4endl;
-        G4cout << "Detector geometry: " << fDetectorGeometry.detector_size << "×" << fDetectorGeometry.detector_size 
-               << " mm, " << fDetectorGeometry.num_blocks_per_side << "×" << fDetectorGeometry.num_blocks_per_side << " pixels" << G4endl;
-        G4cout << "Pixel exclusion buffer: " << fDetectorGeometry.pixel_exclusion_buffer << " mm" << G4endl;
-    }
-    
-    // Make copies of input data for outlier removal
-    std::vector<G4double> x_clean = x_coords;
-    std::vector<G4double> y_clean = y_coords;
-    std::vector<G4double> z_clean = z_values;
-    std::vector<G4double> z_err_clean = z_errors;
-    
-    // Step 1: Remove outliers
-    RemoveOutliers(x_clean, y_clean, z_clean, z_err_clean, results.n_outliers_removed, verbose);
-    
-    // Check if we still have enough points
-    if (x_clean.size() < 7) {
-        if (verbose) {
-            G4cout << "Error: Insufficient data points after outlier removal (" 
-                   << x_clean.size() << " < 7)" << G4endl;
-        }
         return results;
     }
     
-    results.n_points = x_clean.size();
-    
-    // Step 2: Try multiple fitting strategies
-    G4bool fit_found = false;
-    G4double best_chi2 = 1e10;
-    G4double best_params[fNParams];
-    
-    for (G4int attempt = 0; attempt < fMaxFitAttempts && !fit_found; ++attempt) {
-        if (verbose) {
-            G4cout << "\n--- Fit Attempt " << (attempt + 1) << " ---" << G4endl;
-        }
-        
-        try {
-            // Calculate initial parameter estimates with different strategies
-            G4double fitParams[fNParams];
-            CalculateInitialGuess(x_clean, y_clean, z_clean, fitParams, attempt);
-            
-            if (verbose) {
-                G4cout << "Initial parameters (strategy " << attempt << "):" << G4endl;
-                G4cout << "  Amplitude: " << fitParams[0] << G4endl;
-                G4cout << "  Center: (" << fitParams[1] << ", " << fitParams[2] << ") mm" << G4endl;
-                G4cout << "  Sigma: (" << fitParams[3] << ", " << fitParams[4] << ") mm" << G4endl;
-                G4cout << "  Theta: " << fitParams[5] << " rad" << G4endl;
-                G4cout << "  Offset: " << fitParams[6] << G4endl;
-            }
-            
-            // Perform robust simplex optimization
-            RobustSimplexFit(x_clean, y_clean, z_clean, z_err_clean, fitParams, verbose);
-            
-            // Check constraints
-            G4bool constraints_ok = CheckConstraints(fitParams, verbose);
-            
-            // Calculate final chi-squared (without penalties)
-            G4double final_chi2 = CalculateChiSquared(x_clean, y_clean, z_clean, z_err_clean, fitParams);
-            
-            if (verbose) {
-                G4cout << "  Final chi2: " << final_chi2 << G4endl;
-                G4cout << "  Constraints satisfied: " << (constraints_ok ? "Yes" : "No") << G4endl;
-            }
-            
-            // Accept fit if constraints are satisfied and chi2 is reasonable
-            if (constraints_ok && final_chi2 < best_chi2 && final_chi2 > 0) {
-                best_chi2 = final_chi2;
-                for (G4int i = 0; i < fNParams; ++i) {
-                    best_params[i] = fitParams[i];
-                }
-                results.fit_attempt_number = attempt + 1;
-                results.constraints_satisfied = true;
-                fit_found = true;
-                
-                if (verbose) {
-                    G4cout << "  ✓ Fit accepted!" << G4endl;
-                }
-            } else if (verbose) {
-                G4cout << "  ✗ Fit rejected (constraints: " << constraints_ok 
-                       << ", chi2: " << final_chi2 << ")" << G4endl;
-            }
-            
-        } catch (const std::exception& e) {
-            if (verbose) {
-                G4cout << "  Exception during fitting attempt " << (attempt + 1) << ": " << e.what() << G4endl;
-            }
-        } catch (...) {
-            if (verbose) {
-                G4cout << "  Unknown exception during fitting attempt " << (attempt + 1) << G4endl;
-            }
-        }
-    }
-    
-    if (!fit_found) {
-        if (verbose) {
-            G4cout << "\nAll fitting attempts failed!" << G4endl;
-        }
-        return results;
-    }
-    
-    // Step 3: Store final results
-    results.amplitude = best_params[0];
-    results.x0 = best_params[1];
-    results.y0 = best_params[2];
-    results.sigma_x = best_params[3];
-    results.sigma_y = best_params[4];
-    results.theta = best_params[5];
-    results.offset = best_params[6];
-    
-    // Calculate statistics
-    results.chi2 = best_chi2;
-    results.ndf = results.n_points - fNParams;
-    results.chi2 = (results.ndf > 0) ? best_chi2 / results.ndf : best_chi2;
-    results.prob = (results.ndf > 0) ? TMath::Prob(best_chi2, results.ndf) : 0.0;
-    results.r_squared = CalculateRSquared(x_clean, y_clean, z_clean, best_params);
-    
-    // Calculate residual statistics
-    CalculateResidualStats(x_clean, y_clean, z_clean, best_params, 
-                         results.residual_mean, results.residual_std);
-    
-    // Calculate robustness metrics
-    const G4double half_det = fDetectorGeometry.detector_size / 2.0;
-    results.center_distance_from_detector_edge = TMath::Min(
-        TMath::Min(half_det - TMath::Abs(results.x0), half_det - TMath::Abs(results.y0)),
-        TMath::Min(half_det + results.x0, half_det + results.y0)
-    );
-    results.min_distance_to_pixel = CalculateMinDistanceToPixel(results.x0, results.y0);
-    
-    // Enhanced error estimates based on parameter sensitivity
-    const G4double reduced_chi2 = results.ndf > 0 ? results.chi2 : 1.0;
-    const G4double error_scale = TMath::Sqrt(TMath::Max(1.0, reduced_chi2));
-    
-    // More sophisticated error estimates
-    results.amplitude_err = TMath::Abs(results.amplitude) * 0.05 * error_scale;
-    results.x0_err = 0.005 * error_scale; // 5 microns base uncertainty
-    results.y0_err = 0.005 * error_scale;
-    results.sigma_x_err = TMath::Abs(results.sigma_x) * 0.08 * error_scale;
-    results.sigma_y_err = TMath::Abs(results.sigma_y) * 0.08 * error_scale;
-    results.theta_err = 0.05 * error_scale; // ~3 degrees
-    results.offset_err = TMath::Abs(results.offset) * 0.1 * error_scale;
-    
-    // Final validation
-    results.fit_successful = (results.r_squared > 0.3 && results.constraints_satisfied);
-    
     if (verbose) {
-        G4cout << "\n=== Final Fit Results (WITH outlier removal) ===" << G4endl;
-        G4cout << "✓ Fit successful: " << (results.fit_successful ? "Yes" : "No") << G4endl;
-        G4cout << "Parameters:" << G4endl;
-        G4cout << "  Amplitude: " << results.amplitude << " ± " << results.amplitude_err << G4endl;
-        G4cout << "  Center: (" << results.x0 << " ± " << results.x0_err << ", " 
-               << results.y0 << " ± " << results.y0_err << ") mm" << G4endl;
-        G4cout << "  Sigma: (" << results.sigma_x << " ± " << results.sigma_x_err << ", " 
-               << results.sigma_y << " ± " << results.sigma_y_err << ") mm" << G4endl;
-        G4cout << "  Theta: " << results.theta << " ± " << results.theta_err << " rad ("
-               << results.theta * 180.0 / TMath::Pi() << "° ± " 
-               << results.theta_err * 180.0 / TMath::Pi() << "°)" << G4endl;
-        G4cout << "  Offset: " << results.offset << " ± " << results.offset_err << G4endl;
-        G4cout << "Statistics:" << G4endl;
-        G4cout << "  Chi2/NDF: " << results.chi2 << G4endl;
-        G4cout << "  Probability: " << results.prob << G4endl;
-        G4cout << "  R-squared: " << results.r_squared << G4endl;
-        G4cout << "  Data points: " << results.n_points << " (outliers removed: " << results.n_outliers_removed << ")" << G4endl;
-        G4cout << "Robustness:" << G4endl;
-        G4cout << "  Distance from detector edge: " << results.center_distance_from_detector_edge << " mm" << G4endl;
-        G4cout << "  Min distance to pixel: " << results.min_distance_to_pixel << " mm" << G4endl;
-        G4cout << "  Fit attempt: " << results.fit_attempt_number << "/" << fMaxFitAttempts << G4endl;
-        G4cout << "===========================" << G4endl;
-    }
-    
-    return results;
-}
-*/
-
-Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::vector<G4double>& x_coords,
-                                                                   const std::vector<G4double>& y_coords,
-                                                                   const std::vector<G4double>& z_values,
-                                                                   const std::vector<G4double>& z_errors,
-                                                                   G4bool verbose)
-{
-    FitResults results;
-    results.fit_type = ALL_DATA; // This method uses all data without outlier removal
-    
-    // Check input data validity
-    if (x_coords.size() != y_coords.size() || x_coords.size() != z_values.size()) {
-        if (verbose) {
-            G4cout << "Gaussian3DFitter::FitGaussian3DAllData - Error: Inconsistent input array sizes" << G4endl;
-        }
-        return results; // fit_successful remains false
-    }
-    
-    if (x_coords.size() < 7) { // Need at least as many points as parameters
-        if (verbose) {
-            G4cout << "Gaussian3DFitter::FitGaussian3DAllData - Error: Insufficient data points (" 
-                   << x_coords.size() << " < 7)" << G4endl;
-        }
-        return results; // fit_successful remains false
-    }
-    
-    if (verbose) {
-        G4cout << "\n=== Gaussian3D Fitting (ALL data) ===" << G4endl;
+        G4cout << "\n=== Gaussian3D Fitting ===" << G4endl;
         G4cout << "Data points: " << x_coords.size() << G4endl;
         G4cout << "Detector geometry: " << fDetectorGeometry.detector_size << "×" << fDetectorGeometry.detector_size 
                << " mm, " << fDetectorGeometry.num_blocks_per_side << "×" << fDetectorGeometry.num_blocks_per_side << " pixels" << G4endl;
         G4cout << "Pixel exclusion buffer: " << fDetectorGeometry.pixel_exclusion_buffer << " mm" << G4endl;
     }
     
-    // Use all data points
+    results.fit_type = ALL_DATA; // This method uses all data
     results.n_points = x_coords.size();
-
+    
     // Try multiple fitting strategies
     G4bool fit_found = false;
     G4double best_chi2 = 1e10;
@@ -1054,9 +755,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
     // Calculate statistics
     results.chi2 = best_chi2;
     results.ndf = results.n_points - fNParams;
-    results.chi2 = (results.ndf > 0) ? best_chi2 / results.ndf : best_chi2;
     results.prob = (results.ndf > 0) ? TMath::Prob(best_chi2, results.ndf) : 0.0;
-    results.r_squared = CalculateRSquared(x_coords, y_coords, z_values, best_params);
     
     // Calculate residual statistics
     CalculateResidualStats(x_coords, y_coords, z_values, best_params, 
@@ -1083,12 +782,8 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
     results.theta_err = 0.05 * error_scale; // ~3 degrees
     results.offset_err = TMath::Abs(results.offset) * 0.1 * error_scale;
     
-    // Final validation
-    results.fit_successful = (results.r_squared > 0.3 && results.constraints_satisfied);
-    
     if (verbose) {
-        G4cout << "\n=== Final Fit Results (ALL data) ===" << G4endl;
-        G4cout << "✓ Fit successful: " << (results.fit_successful ? "Yes" : "No") << G4endl;
+        G4cout << "\n=== Final Fit Results ===" << G4endl;
         G4cout << "Parameters:" << G4endl;
         G4cout << "  Amplitude: " << results.amplitude << " ± " << results.amplitude_err << G4endl;
         G4cout << "  Center: (" << results.x0 << " ± " << results.x0_err << ", " 
@@ -1102,7 +797,6 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3DAllData(const std::v
         G4cout << "Statistics:" << G4endl;
         G4cout << "  Chi2/NDF: " << results.chi2 << G4endl;
         G4cout << "  Probability: " << results.prob << G4endl;
-        G4cout << "  R-squared: " << results.r_squared << G4endl;
         G4cout << "  Data points: " << results.n_points << G4endl;
         G4cout << "Robustness:" << G4endl;
         G4cout << "  Distance from detector edge: " << results.center_distance_from_detector_edge << " mm" << G4endl;

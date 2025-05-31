@@ -61,59 +61,29 @@ public:
     
     // Method to set particle information
     void SetParticleInfo(G4int eventID, G4double initialEnergy, G4double finalEnergy, 
-                        G4double momentum, const G4String& particleName, 
-                        const G4String& creatorProcess);
-    
-    // Method to set timing information
-    void SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime);
-    
-    // Method to set physics process information
-    void SetPhysicsInfo(const G4String& physicsProcess, G4int trackID, G4int parentID, 
-                       G4int stepNumber, G4double stepLength);
-    
-    // Method to set track trajectory information
-    void SetTrajectoryInfo(const std::vector<G4double>& trackX, 
-                          const std::vector<G4double>& trackY, 
-                          const std::vector<G4double>& trackZ,
-                          const std::vector<G4double>& trackTime);
+                        G4double momentum, const G4String& particleName);
     
     // Method to set step-by-step energy deposition information
     void SetStepEnergyDeposition(const std::vector<G4double>& stepEdep,
                                 const std::vector<G4double>& stepZ,
-                                const std::vector<G4double>& stepTime,
-                                const std::vector<G4double>& stepLength,
-                                const std::vector<G4int>& stepNumber);
+                                const std::vector<G4double>& stepTime);
     
     // Method to set ALL step information (including non-energy depositing steps)
     void SetAllStepInfo(const std::vector<G4double>& stepEdep,
                        const std::vector<G4double>& stepZ,
-                       const std::vector<G4double>& stepTime,
-                       const std::vector<G4double>& stepLength,
-                       const std::vector<G4int>& stepNumber);
+                       const std::vector<G4double>& stepTime);
     
-    // Method to set 3D Gaussian fit results (ALL DATA)
+    // Method to set 3D Gaussian fit results
     void SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
                               G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
                               G4double amplitude_err, G4double x0_err, G4double y0_err,
                               G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
-                              G4double chi2, G4double ndf, G4double prob, G4double r_squared,
-                              G4int n_points, G4bool fit_successful,
+                              G4double chi2, G4double ndf, G4double prob,
+                              G4int n_points,
                               G4double residual_mean, G4double residual_std,
-                              /* G4int n_outliers_removed, */ G4bool constraints_satisfied,
+                              G4bool constraints_satisfied,
                               G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
                               G4int fit_attempt_number);
-    
-    // Method to set 3D Gaussian fit results for ALL DATA
-    void SetGaussianFitResultsAllData(G4double amplitude, G4double x0, G4double y0,
-                                      G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
-                                      G4double amplitude_err, G4double x0_err, G4double y0_err,
-                                      G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
-                                      G4double chi2, G4double ndf, G4double prob, G4double r_squared,
-                                      G4int n_points, G4bool fit_successful,
-                                      G4double residual_mean, G4double residual_std,
-                                      /* G4int n_outliers_removed, */ G4bool constraints_satisfied,
-                                      G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
-                                      G4int fit_attempt_number);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -172,32 +142,11 @@ private:
     G4double fFinalEnergy;          // Final particle energy [MeV]
     G4double fMomentum;             // Particle momentum [MeV/c]
     std::string fParticleName;      // Particle type name
-    std::string fCreatorProcess;    // Creator process name
-    
-    // Variables for timing information
-    G4double fGlobalTime;           // Global time [ns]
-    G4double fLocalTime;            // Local time [ns]
-    G4double fProperTime;           // Proper time [ns]
-    
-    // Variables for physics process information
-    std::string fPhysicsProcess;    // Physics process name
-    G4int fTrackID;                 // Track ID
-    G4int fParentID;                // Parent track ID
-    G4int fStepNum;                 // Step number in track (renamed to avoid conflict)
-    G4double fStepLen;              // Step length [mm] (renamed to avoid conflict)
-    
-    // Variables for track trajectory information
-    std::vector<G4double> fTrajectoryX;    // X positions along track [mm]
-    std::vector<G4double> fTrajectoryY;    // Y positions along track [mm]
-    std::vector<G4double> fTrajectoryZ;    // Z positions along track [mm]
-    std::vector<G4double> fTrajectoryTime; // Time at each trajectory point [ns]
     
     // Variables for step-by-step energy deposition information
     std::vector<G4double> fStepEdepVec;    // Energy deposited per step [MeV]
     std::vector<G4double> fStepZVec;       // Z position of each energy deposit [mm]
     std::vector<G4double> fStepTimeVec;    // Time of each energy deposit [ns]
-    std::vector<G4double> fStepLenVec;     // Length of each step [mm]
-    std::vector<G4int> fStepNumVec;        // Step number for each energy deposit
     
     // Variables for ALL step information (including non-energy depositing steps)
     std::vector<G4double> fAllStepEdepVec;    // Energy deposited per step (including 0) [MeV]
@@ -226,48 +175,15 @@ private:
     G4double fFitChi2;            // Chi-squared value
     G4double fFitNDF;             // Number of degrees of freedom
     G4double fFitProb;            // Fit probability
-    G4double fFitRSquared;        // R-squared value
     G4int fFitNPoints;            // Number of points used in fit
-    G4bool fFitSuccessful;        // Whether fit was successful
     G4double fFitResidualMean;    // Mean of residuals
     G4double fFitResidualStd;     // Standard deviation of residuals
     
     // Enhanced robustness metrics
-    // G4int fFitNOutliersRemoved;   // Number of outliers removed - COMMENTED OUT
     G4bool fFitConstraintsSatisfied; // Whether geometric constraints were satisfied
     G4double fFitCenterDistFromEdge; // Distance from fit center to detector edge [mm]
     G4double fFitMinDistToPixel;  // Minimum distance from fit center to any pixel [mm]
     G4int fFitAttemptNumber;      // Which fitting attempt succeeded (1-based)
-    
-    // Variables for 3D Gaussian fit results for ALL DATA (no outlier removal)
-    G4double fFitAmplitude_alldata;         // Fitted amplitude (all data)
-    G4double fFitX0_alldata;               // Fitted X center [mm] (all data)
-    G4double fFitY0_alldata;               // Fitted Y center [mm] (all data)
-    G4double fFitSigmaX_alldata;           // Fitted sigma X [mm] (all data)
-    G4double fFitSigmaY_alldata;           // Fitted sigma Y [mm] (all data)
-    G4double fFitTheta_alldata;            // Fitted rotation angle [rad] (all data)
-    G4double fFitOffset_alldata;           // Fitted offset (all data)
-    
-    G4double fFitAmplitudeErr_alldata;     // Error in amplitude (all data)
-    G4double fFitX0Err_alldata;           // Error in X center [mm] (all data)
-    G4double fFitY0Err_alldata;           // Error in Y center [mm] (all data)
-    G4double fFitSigmaXErr_alldata;       // Error in sigma X [mm] (all data)
-    G4double fFitSigmaYErr_alldata;       // Error in sigma Y [mm] (all data)
-    G4double fFitThetaErr_alldata;        // Error in rotation angle [rad] (all data)
-    G4double fFitOffsetErr_alldata;       // Error in offset (all data)
-    
-    G4double fFitChi2_alldata;            // Chi-squared value (all data)
-    G4double fFitNDF_alldata;             // Number of degrees of freedom (all data)
-    G4double fFitProb_alldata;            // Fit probability (all data)
-    G4double fFitRSquared_alldata;        // R-squared value (all data)
-    G4int fFitNPoints_alldata;            // Number of points used in fit (all data)
-    G4bool fFitSuccessful_alldata;        // Whether fit was successful (all data)
-    G4double fFitResidualMean_alldata;    // Mean of residuals (all data)
-    G4double fFitResidualStd_alldata;     // Standard deviation of residuals (all data)
-    
-    // Enhanced robustness metrics for all data fit
-    // G4int fFitNOutliersRemoved_alldata;   // Number of outliers removed (all data, should be 0) - COMMENTED OUT
-    G4bool fFitConstraintsSatisfied_alldata; // Whether geometric constraints were satisfied (all data)
     
     // Additional variables for convenient access to Gaussian center and distance calculation
     G4double fGaussX;             // Gaussian X center [mm] (alias for fFitX0)

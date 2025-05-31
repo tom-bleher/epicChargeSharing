@@ -26,7 +26,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
 : G4UserEventAction(),
   fRunAction(runAction),
   fDetector(detector),
-  fNeighborhoodRadius(4),
+  fNeighborhoodRadius(4), // Default to 9x9 grid (radius 4)
   fEdep(0.),
   fPosition(G4ThreeVector(0.,0.,0.)),
   fInitialPosition(G4ThreeVector(0.,0.,0.)),
@@ -39,15 +39,6 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fFinalParticleEnergy(0.),
   fParticleMomentum(0.),
   fParticleName(""),
-  fCreatorProcess(""),
-  fGlobalTime(0.),
-  fLocalTime(0.),
-  fProperTime(0.),
-  fPhysicsProcess(""),
-  fTrackID(-1),
-  fParentID(-1),
-  fStepCount(0),
-  fTotalStepLength(0.),
   fGaussianFitter(nullptr)
 { 
   // Create the 3D Gaussian fitter instance with detector geometry constraints
@@ -103,36 +94,17 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fFinalParticleEnergy = 0.;
   fParticleMomentum = 0.;
   fParticleName = "";
-  fCreatorProcess = "";
-  fGlobalTime = 0.;
-  fLocalTime = 0.;
-  fProperTime = 0.;
-  fPhysicsProcess = "";
-  fTrackID = -1;
-  fParentID = -1;
-  fStepCount = 0;
-  fTotalStepLength = 0.;
-  
-  // Reset trajectory data
-  fTrajectoryX.clear();
-  fTrajectoryY.clear();
-  fTrajectoryZ.clear();
-  fTrajectoryTime.clear();
   
   // Reset step energy deposition data
   fStepEdepVec.clear();
   fStepZVec.clear();
   fStepTimeVec.clear();
-  fStepLenVec.clear();
-  fStepNumVec.clear();
-  fStepLenVec.clear();
   fStepNumVec.clear();
   
   // Reset ALL step data
   fAllStepEdepVec.clear();
   fAllStepZVec.clear();
   fAllStepTimeVec.clear();
-  fAllStepLenVec.clear();
   fAllStepNumVec.clear();
 }
 
@@ -190,24 +162,13 @@ void EventAction::EndOfEventAction(const G4Event* event)
   
   // Pass particle information to RunAction
   fRunAction->SetParticleInfo(eventID, fInitialParticleEnergy, fFinalParticleEnergy, 
-                             fParticleMomentum, fParticleName, fCreatorProcess);
-  
-  // Pass timing information to RunAction
-  fRunAction->SetTimingInfo(fGlobalTime, fLocalTime, fProperTime);
-  
-  // Pass physics information to RunAction
-  fRunAction->SetPhysicsInfo(fPhysicsProcess, fTrackID, fParentID, fStepCount, fTotalStepLength);
-  
-  // Pass trajectory information to RunAction
-  fRunAction->SetTrajectoryInfo(fTrajectoryX, fTrajectoryY, fTrajectoryZ, fTrajectoryTime);
+                             fParticleMomentum, fParticleName);
   
   // Pass step energy deposition information to RunAction
-  fRunAction->SetStepEnergyDeposition(fStepEdepVec, fStepZVec, fStepTimeVec, 
-                                     fStepLenVec, fStepNumVec);
+  fRunAction->SetStepEnergyDeposition(fStepEdepVec, fStepZVec, fStepTimeVec);
   
   // Pass ALL step information to RunAction
-  fRunAction->SetAllStepInfo(fAllStepEdepVec, fAllStepZVec, fAllStepTimeVec, 
-                            fAllStepLenVec, fAllStepNumVec);
+  fRunAction->SetAllStepInfo(fAllStepEdepVec, fAllStepZVec, fAllStepTimeVec);
   
   // Perform 3D Gaussian fitting on charge distribution data
   if (fGaussianFitter && !fGridNeighborhoodChargeFractions.empty()) {
@@ -241,99 +202,43 @@ void EventAction::EndOfEventAction(const G4Event* event)
     if (x_coords.size() >= 4) { // Need at least 4 points for meaningful fit
       // Perform fitting with all data
       
-      // Fit: All data
-      Gaussian3DFitter::FitResults fitResults_alldata = fGaussianFitter->FitGaussian3DAllData(
-        x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
-      
-      // The outlier-related fit is commented out:
-      /*
       Gaussian3DFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
         x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
-
-      // Pass fit results with outlier removal to RunAction
+      
+      // Pass fit results to RunAction
       fRunAction->SetGaussianFitResults(
         fitResults.amplitude, fitResults.x0, fitResults.y0,
         fitResults.sigma_x, fitResults.sigma_y, fitResults.theta, fitResults.offset,
         fitResults.amplitude_err, fitResults.x0_err, fitResults.y0_err,
         fitResults.sigma_x_err, fitResults.sigma_y_err, fitResults.theta_err, fitResults.offset_err,
-        fitResults.chi2, fitResults.ndf, fitResults.prob, fitResults.r_squared,
-        fitResults.n_points, fitResults.fit_successful,
+        fitResults.chi2, fitResults.ndf, fitResults.prob,
+        fitResults.n_points,
         fitResults.residual_mean, fitResults.residual_std,
-        fitResults.n_outliers_removed, fitResults.constraints_satisfied,
+        fitResults.constraints_satisfied,
         fitResults.center_distance_from_detector_edge, fitResults.min_distance_to_pixel,
         fitResults.fit_attempt_number);
-      */
-        
-      // Pass fit results for all data to RunAction
-      fRunAction->SetGaussianFitResultsAllData(
-        fitResults_alldata.amplitude, fitResults_alldata.x0, fitResults_alldata.y0,
-        fitResults_alldata.sigma_x, fitResults_alldata.sigma_y, fitResults_alldata.theta, fitResults_alldata.offset,
-        fitResults_alldata.amplitude_err, fitResults_alldata.x0_err, fitResults_alldata.y0_err,
-        fitResults_alldata.sigma_x_err, fitResults_alldata.sigma_y_err, fitResults_alldata.theta_err, fitResults_alldata.offset_err,
-        fitResults_alldata.chi2, fitResults_alldata.ndf, fitResults_alldata.prob, fitResults_alldata.r_squared,
-        fitResults_alldata.n_points, fitResults_alldata.fit_successful,
-        fitResults_alldata.residual_mean, fitResults_alldata.residual_std,
-        /* fitResults_alldata.n_outliers_removed, */ fitResults_alldata.constraints_satisfied,
-        fitResults_alldata.center_distance_from_detector_edge, fitResults_alldata.min_distance_to_pixel,
-        fitResults_alldata.fit_attempt_number);
-
-      // Also pass the all-data results to the main fit results method (using all data as the primary fit)
-      fRunAction->SetGaussianFitResults(
-        fitResults_alldata.amplitude, fitResults_alldata.x0, fitResults_alldata.y0,
-        fitResults_alldata.sigma_x, fitResults_alldata.sigma_y, fitResults_alldata.theta, fitResults_alldata.offset,
-        fitResults_alldata.amplitude_err, fitResults_alldata.x0_err, fitResults_alldata.y0_err,
-        fitResults_alldata.sigma_x_err, fitResults_alldata.sigma_y_err, fitResults_alldata.theta_err, fitResults_alldata.offset_err,
-        fitResults_alldata.chi2, fitResults_alldata.ndf, fitResults_alldata.prob, fitResults_alldata.r_squared,
-        fitResults_alldata.n_points, fitResults_alldata.fit_successful,
-        fitResults_alldata.residual_mean, fitResults_alldata.residual_std,
-        /* fitResults_alldata.n_outliers_removed, */ fitResults_alldata.constraints_satisfied,
-        fitResults_alldata.center_distance_from_detector_edge, fitResults_alldata.min_distance_to_pixel,
-        fitResults_alldata.fit_attempt_number);
         
       // Optional: Print fit results for debugging (only for first few events)
       if (eventID < 5) {
-        if (fitResults_alldata.fit_successful) {
-          G4cout << "Event " << eventID << " - All Data Fit Results:" << G4endl;
-          G4cout << "  Center: (" << fitResults_alldata.x0 << ", " << fitResults_alldata.y0 << ") mm" << G4endl;
-          G4cout << "  Sigma: (" << fitResults_alldata.sigma_x << ", " << fitResults_alldata.sigma_y << ") mm" << G4endl;
-          G4cout << "  R²: " << fitResults_alldata.r_squared << G4endl;
-        }
-        /* COMMENTED OUT - Outlier-related fit results
-        if (fitResults.fit_successful) {
-          G4cout << "Event " << eventID << " - Outlier-Cleaned Fit Results:" << G4endl;
+          G4cout << "Event " << eventID << " - Fit Results:" << G4endl;
           G4cout << "  Center: (" << fitResults.x0 << ", " << fitResults.y0 << ") mm" << G4endl;
           G4cout << "  Sigma: (" << fitResults.sigma_x << ", " << fitResults.sigma_y << ") mm" << G4endl;
-          G4cout << "  R²: " << fitResults.r_squared << ", Outliers removed: " << fitResults.n_outliers_removed << G4endl;
-        }
-        */
       }
     } else {
-      // Not enough data points for fitting - set default values for both fits
+      // Not enough data points for fitting - set default values
       fRunAction->SetGaussianFitResults(
         0, 0, 0, 0, 0, 0, 0,  // parameters
         0, 0, 0, 0, 0, 0, 0,  // errors
-        0, 0, 0, 0,           // chi2, ndf, prob, r_squared
-        x_coords.size(), false, 0, 0, /* 0, */ 0, 0, 0, 0); // n_points, fit_successful, residual stats
-      
-      fRunAction->SetGaussianFitResultsAllData(
-        0, 0, 0, 0, 0, 0, 0,  // parameters
-        0, 0, 0, 0, 0, 0, 0,  // errors
-        0, 0, 0, 0,           // chi2, ndf, prob, r_squared
-        x_coords.size(), false, 0, 0, /* 0, */ 0, 0, 0, 0); // n_points, fit_successful, residual stats
+        0, 0, 0,              // chi2, ndf, prob
+        0, 0, 0, 0, 0, 0, 0); // n_points, residual stats
     }
   } else {
-    // No fitter or no charge data - set default values for both fits
+    // No fitter or no charge data - set default values
     fRunAction->SetGaussianFitResults(
       0, 0, 0, 0, 0, 0, 0,  // parameters
       0, 0, 0, 0, 0, 0, 0,  // errors
-      0, 0, 0, 0,           // chi2, ndf, prob, r_squared
-      0, false, 0, 0, /* 0, */ 0, 0, 0, 0);      // n_points, fit_successful, residual stats
-    
-    fRunAction->SetGaussianFitResultsAllData(
-      0, 0, 0, 0, 0, 0, 0,  // parameters
-      0, 0, 0, 0, 0, 0, 0,  // errors
-      0, 0, 0, 0,           // chi2, ndf, prob, r_squared
-      0, false, 0, 0, /* 0, */ 0, 0, 0, 0);      // n_points, fit_successful, residual stats
+      0, 0, 0,              // chi2, ndf, prob
+      0, 0, 0, 0, 0, 0, 0); // n_points, residual stats
   }
   
   fRunAction->FillTree();
@@ -819,65 +724,25 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   }
 }
 
-// Implementation of new setter methods for additional information
-void EventAction::SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime)
-{
-  // Only set timing on first call (first energy depositing step)
-  if (fGlobalTime == 0.) {
-    fGlobalTime = globalTime;
-    fLocalTime = localTime;
-    fProperTime = properTime;
-  }
-}
-
-void EventAction::SetPhysicsProcessInfo(const G4String& processName, G4int trackID, G4int parentID, 
-                                       G4int stepCount, G4double stepLength)
-{
-  // Store the dominant physics process (first one or most significant)
-  if (fPhysicsProcess.empty()) {
-    fPhysicsProcess = processName;
-  }
-  
-  fTrackID = trackID;
-  fParentID = parentID;
-  fStepCount = stepCount;
-  fTotalStepLength += stepLength;
-}
-
-void EventAction::AddTrajectoryPoint(G4double x, G4double y, G4double z, G4double time)
-{
-  fTrajectoryX.push_back(x);
-  fTrajectoryY.push_back(y);
-  fTrajectoryZ.push_back(z);
-  fTrajectoryTime.push_back(time);
-}
-
 void EventAction::SetFinalParticleEnergy(G4double finalEnergy)
 {
   fFinalParticleEnergy = finalEnergy;
 }
 
-void EventAction::AddStepEnergyDeposition(G4double edep, G4double z, G4double time, 
-                                         G4double stepLength, G4int stepCount)
+void EventAction::AddStepEnergyDeposition(G4double edep, G4double z, G4double time)
 {
   // Only store steps that actually deposit energy
   if (edep > 0.) {
     fStepEdepVec.push_back(edep);
     fStepZVec.push_back(z);
     fStepTimeVec.push_back(time / CLHEP::ns); // Convert to ns
-    fStepLenVec.push_back(stepLength);
-    fStepNumVec.push_back(stepCount);
   }
-  
 }
 
-void EventAction::AddAllStepInfo(G4double edep, G4double z, G4double time, 
-                                G4double stepLength, G4int stepCount)
+void EventAction::AddAllStepInfo(G4double edep, G4double z, G4double time)
 {
   // Store ALL steps, including those with zero energy deposition
   fAllStepEdepVec.push_back(edep);
   fAllStepZVec.push_back(z);
   fAllStepTimeVec.push_back(time / CLHEP::ns); // Convert to ns
-  fAllStepLenVec.push_back(stepLength);
-  fAllStepNumVec.push_back(stepCount);
 }

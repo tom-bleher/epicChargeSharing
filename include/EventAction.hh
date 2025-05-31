@@ -46,20 +46,13 @@ public:
     void SetNeighborhoodRadius(G4int radius) { fNeighborhoodRadius = radius; }
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
     
-    // Public setters for additional information from SteppingAction
-    void SetTimingInfo(G4double globalTime, G4double localTime, G4double properTime);
-    void SetPhysicsProcessInfo(const G4String& processName, G4int trackID, G4int parentID, 
-                              G4int stepNumber, G4double stepLength);
-    void AddTrajectoryPoint(G4double x, G4double y, G4double z, G4double time);
     void SetFinalParticleEnergy(G4double finalEnergy);
     
     // Method to add step-by-step energy deposition information
-    void AddStepEnergyDeposition(G4double edep, G4double z, G4double time, 
-                                G4double stepLength, G4int stepNumber);
+    void AddStepEnergyDeposition(G4double edep, G4double z, G4double time);
     
     // Method to add ALL step information (including non-energy depositing steps)
-    void AddAllStepInfo(G4double edep, G4double z, G4double time, 
-                       G4double stepLength, G4int stepNumber);
+    void AddAllStepInfo(G4double edep, G4double z, G4double time);
     
 private:
     RunAction* fRunAction;
@@ -101,38 +94,17 @@ private:
     G4double fFinalParticleEnergy;     // Final particle energy  
     G4double fParticleMomentum;        // Particle momentum
     G4String fParticleName;            // Particle type name
-    G4String fCreatorProcess;          // Creator process
-    
-    // Timing information
-    G4double fGlobalTime;              // Global time of first hit
-    G4double fLocalTime;               // Local time of first hit
-    G4double fProperTime;              // Proper time of first hit
-    
-    // Physics process information
-    std::string fPhysicsProcess;          // Dominant physics process
-    G4int fTrackID;                    // Primary track ID
-    G4int fParentID;                   // Parent track ID
-    G4int fStepCount;                  // Total number of steps (renamed to avoid conflict)
-    G4double fTotalStepLength;         // Total step length
-    
-    // Track trajectory information
-    std::vector<G4double> fTrajectoryX;    // X positions along track
-    std::vector<G4double> fTrajectoryY;    // Y positions along track
-    std::vector<G4double> fTrajectoryZ;    // Z positions along track
-    std::vector<G4double> fTrajectoryTime; // Time at each point
     
     // Step-by-step energy deposition information
     std::vector<G4double> fStepEdepVec;    // Energy deposited per step
     std::vector<G4double> fStepZVec;       // Z position of each energy deposit
     std::vector<G4double> fStepTimeVec;    // Time of each energy deposit
-    std::vector<G4double> fStepLenVec;     // Length of each step
     std::vector<G4int> fStepNumVec;        // Step number for each energy deposit
     
     // ALL step information (including non-energy depositing steps)
     std::vector<G4double> fAllStepEdepVec;    // Energy deposited per step (including 0)
     std::vector<G4double> fAllStepZVec;       // Z position of each step
     std::vector<G4double> fAllStepTimeVec;    // Time of each step
-    std::vector<G4double> fAllStepLenVec;     // Length of each step
     std::vector<G4int> fAllStepNumVec;        // Step number for each step
     
     // 3D Gaussian fitter instance
