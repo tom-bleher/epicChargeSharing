@@ -61,7 +61,7 @@ def calculate_statistics(data):
 
 def plot_chi2_distribution(data, output_dir="plots", save_format="png"):
     """
-    Plot chi2 distribution along with mean, stdev, and median in the histogram's legend.
+    Plot chi2red distribution along with mean, stdev, and median in the histogram's legend.
     
     Args:
         data (pd.DataFrame): DataFrame containing ROOT file data
@@ -70,11 +70,11 @@ def plot_chi2_distribution(data, output_dir="plots", save_format="png"):
     """
     plt.figure(figsize=(12, 8))
     
-    # Get chi2 data (use all data version for comprehensive analysis)
-    chi2_data = data['FitChi2_alldata'].dropna()
+    # Get chi2red data (use all data version for comprehensive analysis)
+    chi2_data = data['FitChi2red'].dropna()
     
     if len(chi2_data) == 0:
-        print("No valid chi2 data found")
+        print("No valid chi2red data found")
         return
     
     # Calculate statistics
@@ -105,7 +105,7 @@ def plot_chi2_distribution(data, output_dir="plots", save_format="png"):
     os.makedirs(output_dir, exist_ok=True)
     filename = os.path.join(output_dir, f"chi2_distribution.{save_format}")
     plt.savefig(filename, dpi=300, bbox_inches='tight')
-    print(f"Chi2 distribution plot saved to {filename}")
+    print(f"chi2red distribution plot saved to {filename}")
 
 def plot_pvalue_distribution(data, output_dir="plots", save_format="png"):
     """
@@ -119,7 +119,7 @@ def plot_pvalue_distribution(data, output_dir="plots", save_format="png"):
     plt.figure(figsize=(12, 8))
     
     # Get P-value data (use all data version for comprehensive analysis)
-    pvalue_data = data['FitProb_alldata'].dropna()
+    pvalue_data = data['FitPp'].dropna()
     
     if len(pvalue_data) == 0:
         print("No valid P-value data found")
@@ -223,17 +223,17 @@ def calculate_residuals(data):
     print("Calculating residuals from charge sharing data...")
     
     # Access data more efficiently to avoid the awkward array reshape issue
-    successful_fits = data['FitSuccessful_alldata'].values
+    successful_fits = data['FitSuccessful'].values
     event_id_vals = data['EventID'].values
     
     # Fit parameters
-    fit_amplitude = data['FitAmplitude_alldata'].values
-    fit_x0 = data['FitX0_alldata'].values
-    fit_y0 = data['FitY0_alldata'].values
-    fit_sigma_x = data['FitSigmaX_alldata'].values
-    fit_sigma_y = data['FitSigmaY_alldata'].values
-    fit_theta = data['FitTheta_alldata'].values
-    fit_offset = data['FitOffset_alldata'].values
+    fit_amplitude = data['FitAmplitude'].values
+    fit_x0 = data['FitX0'].values
+    fit_y0 = data['FitY0'].values
+    fit_sigma_x = data['FitSigmaX'].values
+    fit_sigma_y = data['FitSigmaY'].values
+    fit_theta = data['FitTheta'].values
+    fit_offset = data['FitOffset'].values
     
     # Process events one by one using index-based access
     for i in range(len(data)):
