@@ -171,6 +171,21 @@ private:
     G4bool CheckConstraints(const G4double* params, G4bool verbose = false) const;
     
     /**
+     * @brief Get the pixel boundaries for a given pixel center position
+     * @param center_x X coordinate of pixel center [mm]
+     * @param center_y Y coordinate of pixel center [mm] 
+     * @param bounds Array to store bounds [x_min, x_max, y_min, y_max]
+     */
+    void GetPixelBounds(G4double center_x, G4double center_y, G4double* bounds) const;
+    
+    /**
+     * @brief Set the center pixel position for constraint enforcement
+     * @param center_x X coordinate of center pixel [mm]
+     * @param center_y Y coordinate of center pixel [mm]
+     */
+    void SetCenterPixelPosition(G4double center_x, G4double center_y);
+    
+    /**
      * @brief Apply parameter bounds during optimization
      */
     void ApplyParameterBounds(G4double* params) const;
@@ -214,6 +229,11 @@ private:
     
     // Detector geometry constraints
     DetectorGeometry fDetectorGeometry;
+    
+    // Center pixel constraint
+    G4double fCenterPixelX;
+    G4double fCenterPixelY;
+    G4bool fConstrainToCenterPixel;
     
     // Legacy ROOT fitting objects (kept for compatibility but not used)
     void* fGaussianFunction;  // Changed to void* to avoid ROOT dependencies

@@ -12,7 +12,7 @@
 
 # Set particle gun parameters
 /gun/particle e-
-/gun/energy 1 MeV
+/gun/energy 10 GeV
 
 # Run events to test fitting
-/run/beamOn 10000
+/run/beamOn 3

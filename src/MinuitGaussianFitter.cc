@@ -19,7 +19,8 @@ std::vector<G4double> MinuitGaussianFitter::fStaticZErrors;
 const MinuitGaussianFitter* MinuitGaussianFitter::fStaticInstance = nullptr;
 
 MinuitGaussianFitter::MinuitGaussianFitter(const DetectorGeometry& detector_geometry) 
-    : fDetectorGeometry(detector_geometry), fMinuit(nullptr)
+    : fDetectorGeometry(detector_geometry), fMinuit(nullptr),
+      fCenterPixelX(0.0), fCenterPixelY(0.0), fConstrainToCenterPixel(false)
 {
     // Initialize Minuit with 7 parameters
     fMinuit = new TMinuit(fNParams);
@@ -110,15 +111,30 @@ void MinuitGaussianFitter::MinuitFcn(G4int& npar, G4double* gin, G4double& f, G4
         if (TMath::Abs(x0) > half_det) penalty += penalty_factor * (TMath::Abs(x0) - half_det) * 100.0;
         if (TMath::Abs(y0) > half_det) penalty += penalty_factor * (TMath::Abs(y0) - half_det) * 100.0;
         
-        // Penalty for being too close to pixel center or inside pixel area
-        const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
-        if (fStaticInstance->IsPointInsidePixelZone(x0, y0, d0)) {
-            G4double min_dist = fStaticInstance->CalculateMinDistanceToPixelCenter(x0, y0);
-            if (min_dist < d0) {
-                penalty += penalty_factor * (d0 - min_dist) * 100.0;
-            } else {
-                // Inside pixel area but outside d0 radius - still penalize
-                penalty += penalty_factor * 100.0;
+        // Apply different constraint penalty based on center pixel constraint mode
+        if (fStaticInstance->fConstrainToCenterPixel) {
+            // Penalty for being outside center pixel bounds
+            G4double bounds[4];
+            fStaticInstance->GetPixelBounds(fStaticInstance->fCenterPixelX, fStaticInstance->fCenterPixelY, bounds);
+            
+            G4double pixel_penalty = 0.0;
+            if (x0 < bounds[0]) pixel_penalty += (bounds[0] - x0);
+            if (x0 > bounds[1]) pixel_penalty += (x0 - bounds[1]);
+            if (y0 < bounds[2]) pixel_penalty += (bounds[2] - y0);
+            if (y0 > bounds[3]) pixel_penalty += (y0 - bounds[3]);
+            
+            penalty += penalty_factor * pixel_penalty * 1000.0; // Strong penalty for leaving center pixel
+        } else {
+            // Original penalty for being too close to pixel center or inside pixel area
+            const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
+            if (fStaticInstance->IsPointInsidePixelZone(x0, y0, d0)) {
+                G4double min_dist = fStaticInstance->CalculateMinDistanceToPixelCenter(x0, y0);
+                if (min_dist < d0) {
+                    penalty += penalty_factor * (d0 - min_dist) * 100.0;
+                } else {
+                    // Inside pixel area but outside d0 radius - still penalize
+                    penalty += penalty_factor * 100.0;
+                }
             }
         }
         
@@ -228,6 +244,22 @@ G4double MinuitGaussianFitter::CalculateMinDistanceToPixelCenter(G4double x, G4d
     return min_distance;
 }
 
+void MinuitGaussianFitter::GetPixelBounds(G4double center_x, G4double center_y, G4double* bounds) const
+{
+    const G4double pixel_half_size = fDetectorGeometry.pixel_size / 2.0;
+    bounds[0] = center_x - pixel_half_size; // x_min
+    bounds[1] = center_x + pixel_half_size; // x_max
+    bounds[2] = center_y - pixel_half_size; // y_min
+    bounds[3] = center_y + pixel_half_size; // y_max
+}
+
+void MinuitGaussianFitter::SetCenterPixelPosition(G4double center_x, G4double center_y)
+{
+    fCenterPixelX = center_x;
+    fCenterPixelY = center_y;
+    fConstrainToCenterPixel = true;
+}
+
 G4bool MinuitGaussianFitter::CheckConstraints(const G4double* params, G4bool verbose) const
 {
     const G4double x0 = params[1];
@@ -243,16 +275,31 @@ G4bool MinuitGaussianFitter::CheckConstraints(const G4double* params, G4bool ver
         return false;
     }
     
-    // Check 2: Center must be outside pixel area and d0 (10 micron) radius from pixel center
-    const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
-    if (IsPointInsidePixelZone(x0, y0, d0)) {
-        if (verbose) {
-            G4double min_dist = CalculateMinDistanceToPixelCenter(x0, y0);
-            G4cout << "  Constraint violation: Center (" << x0 << ", " << y0 
-                   << ") too close to pixel center (min distance: " << min_dist 
-                   << " mm, required: " << d0 << " mm)" << G4endl;
+    // Check 2: If center pixel constraint is enabled, center must be within center pixel bounds
+    if (fConstrainToCenterPixel) {
+        G4double bounds[4];
+        GetPixelBounds(fCenterPixelX, fCenterPixelY, bounds);
+        
+        if (x0 < bounds[0] || x0 > bounds[1] || y0 < bounds[2] || y0 > bounds[3]) {
+            if (verbose) {
+                G4cout << "  Constraint violation: Center (" << x0 << ", " << y0 
+                       << ") outside center pixel bounds [" << bounds[0] << ", " << bounds[1] 
+                       << "] × [" << bounds[2] << ", " << bounds[3] << "] mm" << G4endl;
+            }
+            return false;
         }
-        return false;
+    } else {
+        // Check 2 (original): Center must be outside pixel area and d0 (10 micron) radius from pixel center
+        const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
+        if (IsPointInsidePixelZone(x0, y0, d0)) {
+            if (verbose) {
+                G4double min_dist = CalculateMinDistanceToPixelCenter(x0, y0);
+                G4cout << "  Constraint violation: Center (" << x0 << ", " << y0 
+                       << ") too close to pixel center (min distance: " << min_dist 
+                       << " mm, required: " << d0 << " mm)" << G4endl;
+            }
+            return false;
+        }
     }
     
     return true;
