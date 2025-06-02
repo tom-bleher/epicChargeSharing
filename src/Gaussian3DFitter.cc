@@ -119,36 +119,6 @@ G4bool Gaussian3DFitter::IsPointInsidePixelZone(G4double x, G4double y, G4double
     return false; // Not in any pixel zone
 }
 
-G4double Gaussian3DFitter::CalculateMinDistanceToPixelCenter(G4double x, G4double y) const
-{
-    const G4double half_det = fDetectorGeometry.detector_size / 2.0;
-    
-    // Check if point is inside detector bounds
-    if (TMath::Abs(x) > half_det || TMath::Abs(y) > half_det) {
-        return 1e6; // Outside detector, return large distance
-    }
-    
-    G4double min_distance = 1e6; // Large initial value
-    const G4double first_pixel_pos = -half_det + fDetectorGeometry.pixel_corner_offset + fDetectorGeometry.pixel_size / 2.0;
-    
-    // Check distance to each pixel center
-    for (G4int i = 0; i < fDetectorGeometry.num_blocks_per_side; i++) {
-        for (G4int j = 0; j < fDetectorGeometry.num_blocks_per_side; j++) {
-            const G4double pixel_center_x = first_pixel_pos + i * fDetectorGeometry.pixel_spacing;
-            const G4double pixel_center_y = first_pixel_pos + j * fDetectorGeometry.pixel_spacing;
-            
-            // Calculate distance to pixel center
-            const G4double dx = x - pixel_center_x;
-            const G4double dy = y - pixel_center_y;
-            const G4double distance = TMath::Sqrt(dx*dx + dy*dy);
-            
-            min_distance = TMath::Min(min_distance, distance);
-        }
-    }
-    
-    return min_distance;
-}
-
 G4double Gaussian3DFitter::CalculateMinDistanceToPixel(G4double x, G4double y) const
 {
     const G4double half_det = fDetectorGeometry.detector_size / 2.0;
@@ -171,6 +141,36 @@ G4double Gaussian3DFitter::CalculateMinDistanceToPixel(G4double x, G4double y) c
             // Calculate distance to pixel edge (rectangular)
             const G4double dx = TMath::Max(0.0, TMath::Abs(x - pixel_center_x) - pixel_half_size);
             const G4double dy = TMath::Max(0.0, TMath::Abs(y - pixel_center_y) - pixel_half_size);
+            const G4double distance = TMath::Sqrt(dx*dx + dy*dy);
+            
+            min_distance = TMath::Min(min_distance, distance);
+        }
+    }
+    
+    return min_distance;
+}
+
+G4double Gaussian3DFitter::CalculateMinDistanceToPixelCenter(G4double x, G4double y) const
+{
+    const G4double half_det = fDetectorGeometry.detector_size / 2.0;
+    
+    // Check if point is inside detector bounds
+    if (TMath::Abs(x) > half_det || TMath::Abs(y) > half_det) {
+        return 1e6; // Outside detector, return large distance
+    }
+    
+    G4double min_distance = 1e6; // Large initial value
+    const G4double first_pixel_pos = -half_det + fDetectorGeometry.pixel_corner_offset + fDetectorGeometry.pixel_size / 2.0;
+    
+    // Check distance to each pixel center
+    for (G4int i = 0; i < fDetectorGeometry.num_blocks_per_side; i++) {
+        for (G4int j = 0; j < fDetectorGeometry.num_blocks_per_side; j++) {
+            const G4double pixel_center_x = first_pixel_pos + i * fDetectorGeometry.pixel_spacing;
+            const G4double pixel_center_y = first_pixel_pos + j * fDetectorGeometry.pixel_spacing;
+            
+            // Calculate distance to pixel center
+            const G4double dx = x - pixel_center_x;
+            const G4double dy = y - pixel_center_y;
             const G4double distance = TMath::Sqrt(dx*dx + dy*dy);
             
             min_distance = TMath::Min(min_distance, distance);

@@ -42,7 +42,6 @@ RunAction::RunAction()
   fPixelDist(0),
   fIsPixelHit(false),
   fIsWithinD0(false),
-  fDistanceToPixelCenter(0),
   fPixelHit_PixelAlpha(0),
   fNonPixel_FitAmplitude(0),
   fNonPixel_FitX0(0),
@@ -159,7 +158,6 @@ void RunAction::BeginOfRunAction(const G4Run*)
     // ==============================================
     fTree->Branch("IsPixelHit", &fIsPixelHit, "IsPixelHit/O")->SetTitle("Hit on Pixel OR distance <= D0");
     fTree->Branch("IsWithinD0", &fIsWithinD0, "IsWithinD0/O")->SetTitle("Distance <= D0 (10 microns)");
-    fTree->Branch("DistanceToPixelCenter", &fDistanceToPixelCenter, "DistanceToPixelCenter/D")->SetTitle("Distance to Nearest Pixel Center [mm]");
     
     // ==============================================
     // PIXEL HIT DATA (distance <= D0 or on pixel)
@@ -536,18 +534,17 @@ void RunAction::SetPixelAlpha(G4double alpha)
     fPixelHit_PixelAlpha = alpha;
 }
 
-void RunAction::SetPixelHitInfo(G4bool hit, G4double distanceToPixelCenter)
-{
-    // Store pixel hit information
-    fIsPixelHit = hit;
-    fDistanceToPixelCenter = distanceToPixelCenter;
-}
-
-void RunAction::SetPixelClassification(G4bool isWithinD0, G4double distanceToPixelCenter)
+void RunAction::SetPixelClassification(G4bool isWithinD0, G4double fPixelTrueDistance)
 {
     // Store pixel classification based on D0 threshold
     fIsWithinD0 = isWithinD0;
-    fDistanceToPixelCenter = distanceToPixelCenter;
+    // Note: Distance is already stored in fPixelDist by SetPixelIndices()
+}
+
+void RunAction::SetPixelHitStatus(G4bool isPixelHit)
+{
+    // Store pixel hit status (true if on pixel OR distance <= D0)
+    fIsPixelHit = isPixelHit;
 }
 
 void RunAction::SetNeighborhoodGridData(const std::vector<G4double>& angles, 

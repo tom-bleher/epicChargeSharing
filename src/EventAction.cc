@@ -160,7 +160,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
   
   // Pass classification data to RunAction
   fRunAction->SetPixelClassification(fIsWithinD0, fPixelTrueDist);
-  fRunAction->SetPixelHitInfo(isPixelHit, fPixelTrueDist);
+  fRunAction->SetPixelHitStatus(isPixelHit);
   
   // Only calculate and store pixel-specific data for pixel hits (distance <= D0 or on pixel)
   if (isPixelHit) {

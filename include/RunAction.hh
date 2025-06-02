@@ -41,11 +41,11 @@ public:
     // Method to set pixel alpha angle
     void SetPixelAlpha(G4double alpha);
     
-    // Method to set pixel hit flag and distance to pixel center
-    void SetPixelHitInfo(G4bool hit, G4double distanceToPixelCenter);
-    
     // Method to set pixel classification based on D0 threshold
-    void SetPixelClassification(G4bool isWithinD0, G4double distanceToPixelCenter);
+    void SetPixelClassification(G4bool isWithinD0, G4double fPixelTrueDistance);
+    
+    // Method to set pixel hit status
+    void SetPixelHitStatus(G4bool isPixelHit);
     
     // Method to set neighborhood (9x9) grid angle data for non-pixel hits
     void SetNeighborhoodGridData(const std::vector<G4double>& angles, 
@@ -125,7 +125,6 @@ private:
     // =============================================
     G4bool fIsPixelHit;  // True if hit is on pixel OR distance <= D0
     G4bool fIsWithinD0;  // True if distance <= D0 (10 microns)
-    G4double fDistanceToPixelCenter; // Distance to nearest pixel center [mm]
     
     // =============================================
     // PIXEL HIT DATA (distance <= D0 or on pixel)

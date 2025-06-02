@@ -5,7 +5,7 @@ Reads pre-computed Gaussian fit parameters from Geant4 simulation and creates pl
 
 UPDATED FOR NEW SEPARATED DATA STRUCTURE:
 - Uses new NonPixel_ prefixed branch names for non-pixel hit data
-- Uses new classification variables: IsPixelHit, IsWithinD0, DistanceToPixelCenter
+- Uses new classification variables: IsPixelHit, IsWithinD0
 - Updated to work with separated pixel/non-pixel data structure
 - Gaussian fitting is only available for non-pixel hits (distance > D0)
 
@@ -121,7 +121,6 @@ class GaussianRootPlotter:
                     # NEW: Hit classification data
                     'IsPixelHit': tree['IsPixelHit'].array(library="np"),
                     'IsWithinD0': tree['IsWithinD0'].array(library="np"),
-                    'DistanceToPixelCenter': tree['DistanceToPixelCenter'].array(library="np"),
                     
                     # NEW: Pixel hit data (only meaningful for pixel hits)
                     'PixelHit_PixelAlpha': tree['PixelHit_PixelAlpha'].array(library="np"),
@@ -925,7 +924,7 @@ class GaussianRootPlotter:
         true_y = data['TrueY'][event_idx]
         pixel_x = data['PixelX'][event_idx]
         pixel_y = data['PixelY'][event_idx]
-        distance = data['DistanceToPixelCenter'][event_idx]
+        distance = data['PixelTrueDistance'][event_idx]
         is_within_d0 = data['IsWithinD0'][event_idx]
         edep = data['Edep'][event_idx]
         
@@ -1341,7 +1340,7 @@ def plot_all_events_from_root(root_filename, charge_type='fraction',
             # Determine event type for filename
             is_pixel = is_pixel_hit[event_idx]
             has_successful_fit = fit_success[event_idx]
-            distance = data['DistanceToPixelCenter'][event_idx]
+            distance = data['PixelTrueDistance'][event_idx]
             
             if is_pixel:
                 event_type = "pixel_hit"
@@ -1661,7 +1660,7 @@ if __name__ == "__main__":
                     print(f"\nPlotting successful fit {i+1}/{len(events_to_plot_success)}: Event {event_idx}")
                     
                     # Print event classification info
-                    distance = data['DistanceToPixelCenter'][event_idx]
+                    distance = data['PixelTrueDistance'][event_idx]
                     print(f"  Event classification: Non-pixel hit (distance = {distance:.6f} mm > D0)")
                     print(f"  IsPixelHit: {data['IsPixelHit'][event_idx]}")
                     print(f"  IsWithinD0: {data['IsWithinD0'][event_idx]}")
@@ -1685,7 +1684,7 @@ if __name__ == "__main__":
                     print(f"WARNING: This event has FitConstraintsSatisfied = False")
                     
                     # Print event classification info
-                    distance = data['DistanceToPixelCenter'][event_idx]
+                    distance = data['PixelTrueDistance'][event_idx]
                     print(f"  Event classification: Non-pixel hit (distance = {distance:.6f} mm > D0)")
                     print(f"  IsPixelHit: {data['IsPixelHit'][event_idx]}")
                     print(f"  IsWithinD0: {data['IsWithinD0'][event_idx]}")
@@ -1702,7 +1701,7 @@ if __name__ == "__main__":
                         print(f"  True Position: ({data['TrueX'][event_idx]:.6f}, {data['TrueY'][event_idx]:.6f}) mm")
                         print(f"  Pixel Position: ({data['PixelX'][event_idx]:.6f}, {data['PixelY'][event_idx]:.6f}) mm")
                         print(f"  Pixel-True Distance: {data['PixelTrueDistance'][event_idx]:.6f} mm")
-                        print(f"  Distance to Pixel Center: {data['DistanceToPixelCenter'][event_idx]:.6f} mm")
+                        print(f"  Distance to Pixel Center: {data['PixelTrueDistance'][event_idx]:.6f} mm")
                         print(f"  Fit Parameters (may be unreliable):")
                         print(f"    Amplitude: {data['FitAmplitude'][event_idx]:.6f}")
                         print(f"    Center: ({data['FitX0'][event_idx]:.6f}, {data['FitY0'][event_idx]:.6f}) mm")
@@ -1740,7 +1739,7 @@ if __name__ == "__main__":
             print(f"\nData structure notes:")
             print(f"  - Pixel hits (distance <= D0 or on pixel): No Gaussian fitting performed")
             print(f"  - Non-pixel hits (distance > D0): Gaussian fitting attempted")
-            print(f"  - Hit classification stored in IsPixelHit, IsWithinD0, DistanceToPixelCenter")
+            print(f"  - Hit classification stored in IsPixelHit, IsWithinD0, PixelTrueDistance")
             print(f"  - Charge data for non-pixel hits stored with NonPixel_ prefix")
         
         except Exception as e:
