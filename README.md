@@ -141,7 +141,7 @@ The simulation generates `epicToyOutput.root` with the following branches:
 | `InitX`, `InitY`, `InitZ`        | Double          | mm      | Initial particle position    |
 | `PixelX`, `PixelY`, `PixelZ`     | Double          | mm      | Nearest pixel center         |
 | `PixelI`, `PixelJ`               | Integer         | -       | Pixel grid indices           |
-| `PixelDist`                      | Double          | mm      | Distance to nearest pixel    |
+| `PixelTrueDistance`                      | Double          | mm      | Distance to nearest pixel    |
 | `PixelAlpha`                     | Double          | degrees | Angular size of pixel        |
 | `PixelHit`                       | Boolean         | -       | Direct pixel hit flag        |
 | `Grid9x9Angles`                  | Vector<Double>  | degrees | Angles to 9×9 pixel grid     |
