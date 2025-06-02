@@ -70,13 +70,13 @@ class RandomHitChargeGridGenerator:
         edep = self.data['Edep'][event_idx]
         pixel_x = self.data['PixelX'][event_idx]
         pixel_y = self.data['PixelY'][event_idx]
-        pixel_dist = self.data['PixelDist'][event_idx]
+        pixel_dist = self.data['PixelTrueDistance'][event_idx]
         pixel_hit = self.data['PixelHit'][event_idx]
         
         # Get charge data
         charge_fractions = self.data['GridNeighborhoodChargeFractions'][event_idx]
         charge_values = self.data['GridNeighborhoodChargeValues'][event_idx]
-        charge_coulombs = self.data['GridNeighborhoodChargeCoulombs'][event_idx] if 'GridNeighborhoodChargeCoulombs' in self.data else None
+        charge_coulombs = self.data['GridNeighborhoodCharge'][event_idx] if 'GridNeighborhoodCharge' in self.data else None
         charge_distances = self.data['GridNeighborhoodDistances'][event_idx]
         
         # Select which data to display
@@ -357,9 +357,9 @@ class RandomHitChargeGridGenerator:
             data_label = 'Mean Charge Value'
             data_unit = ' e⁻'
         elif charge_type == 'coulomb':
-            if 'GridNeighborhoodChargeCoulombs' not in self.data:
+            if 'GridNeighborhoodCharge' not in self.data:
                 raise ValueError("Coulomb charge data not available in this ROOT file")
-            data_key = 'GridNeighborhoodChargeCoulombs'
+            data_key = 'GridNeighborhoodCharge'
             data_label = 'Mean Charge'
             data_unit = ' C'
         elif charge_type == 'distance':
@@ -769,12 +769,12 @@ class RandomHitChargeGridGenerator:
 
     def find_inside_pixel_event(self):
         """Find an event where the hit was inside a pixel, or the closest one with energy deposition"""
-        if 'PixelHit' not in self.data or 'PixelDist' not in self.data:
-            print("PixelHit or PixelDist data not available")
+        if 'PixelHit' not in self.data or 'PixelTrueDistance' not in self.data:
+            print("PixelHit or PixelTrueDistance data not available")
             return None
             
         pixel_hit = self.data['PixelHit']
-        pixel_dist = self.data['PixelDist']
+        pixel_dist = self.data['PixelTrueDistance']
         edep = self.data['Edep']
         
         # First, check if there are any events where hit is inside pixel with energy deposition

@@ -60,7 +60,7 @@ class RandomHitGridGenerator:
         hit_z = self.data['PosZ'][event_idx]
         pixel_x = self.data['PixelX'][event_idx]
         pixel_y = self.data['PixelY'][event_idx]
-        pixel_dist = self.data['PixelDist'][event_idx]
+        pixel_dist = self.data['PixelTrueDistance'][event_idx]
         pixel_hit = self.data['PixelHit'][event_idx]
         grid_angles = self.data['GridNeighborhoodAngles'][event_idx]
         
@@ -598,12 +598,12 @@ class RandomHitGridGenerator:
 
     def find_inside_pixel_event(self):
         """Find an event where the hit was inside a pixel, or the closest one"""
-        if 'PixelHit' not in self.data or 'PixelDist' not in self.data:
-            print("PixelHit or PixelDist data not available")
+        if 'PixelHit' not in self.data or 'PixelTrueDistance' not in self.data:
+            print("PixelHit or PixelTrueDistance data not available")
             return None
             
         pixel_hit = self.data['PixelHit']
-        pixel_dist = self.data['PixelDist']
+        pixel_dist = self.data['PixelTrueDistance']
         
         # First, check if there are any events where hit is inside pixel
         inside_pixel_indices = np.where(pixel_hit == True)[0]

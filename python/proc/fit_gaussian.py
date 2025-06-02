@@ -145,7 +145,7 @@ class Gaussian3DODR:
             ss_res = np.sum(residuals**2)
             ss_tot = np.sum((z - np.mean(z))**2)
             r_squared = 1 - (ss_res / ss_tot)
-            reduced_chi_squared = ss_res / (len(z) - len(self.popt))
+            FitChi2red = ss_res / (len(z) - len(self.popt))
             
             # Prepare results dictionary
             param_names = ['amplitude', 'x0', 'y0', 'sigma_x', 'sigma_y', 'theta', 'offset']
@@ -154,8 +154,8 @@ class Gaussian3DODR:
                 'parameters': dict(zip(param_names, self.popt)),
                 'parameter_errors': dict(zip(param_names, self.perr)),
                 'fit_info': {
-                    'r_squared': r_squared,
-                    'reduced_chi_squared': reduced_chi_squared,
+                    'FitChi2red': FitChi2red,
+                    'FitPp': FitPp,
                     'residual_variance': output.res_var,
                     'sum_of_squares': output.sum_square,
                     'degrees_of_freedom': len(z) - len(self.popt),
@@ -196,7 +196,7 @@ class Gaussian3DODR:
         print("\nFIT STATISTICS:")
         info = results['fit_info']
         print(f"R-squared:           {info['r_squared']:.6f}")
-        print(f"Reduced Chi-squared: {info['reduced_chi_squared']:.6f}")
+        print(f"Reduced Chi-squared: {info['FitChi2red']:.6f}")
         print(f"Residual Variance:   {info['residual_variance']:.6f}")
         print(f"Data Points:         {info['n_data_points']}")
         print(f"Degrees of Freedom:  {info['degrees_of_freedom']}")
@@ -403,16 +403,16 @@ class Gaussian3DODR:
         
         param_text += "FIT STATISTICS:\n\n"
         param_text += f"R²: {fit_info['r_squared']:.6f}\n"
-        param_text += f"χ²ᵣₑᵈ: {fit_info['reduced_chi_squared']:.6f}\n"
+        param_text += f"χ²ᵣₑᵈ: {fit_info['FitChi2red']:.6f}\n"
         param_text += f"Data Points: {fit_info['n_data_points']}\n"
         param_text += f"DOF: {fit_info['degrees_of_freedom']}\n"
         param_text += f"Residual Std: {np.std(residuals):.6f}\n"
         
         # Calculate p-value from chi-squared
-        from scipy.stats import chi2
-        chi_squared_stat = fit_info['reduced_chi_squared'] * fit_info['degrees_of_freedom']
-        p_value = chi2.sf(chi_squared_stat, fit_info['degrees_of_freedom'])
-        param_text += f"P-value: {p_value:.4e}\n"
+        from scipy.stats import chi2red
+        chi_squared_stat = fit_info['FitChi2red'] * fit_info['degrees_of_freedom']
+        FitPp = chi2red.sf(chi_squared_stat, fit_info['degrees_of_freedom'])
+        param_text += f"P-value: {FitPp:.4e}\n"
         
         ax9.text(0.05, 0.95, param_text, transform=ax9.transAxes, fontsize=11, 
                 verticalalignment='top', fontfamily='monospace',
@@ -459,8 +459,8 @@ class Gaussian3DODR:
         fit_info = results['fit_info']
         
         # Calculate p-value from chi-squared
-        chi_squared_stat = fit_info['reduced_chi_squared'] * fit_info['degrees_of_freedom']
-        p_value = stats.chi2.sf(chi_squared_stat, fit_info['degrees_of_freedom'])
+        chi_squared_stat = fit_info['FitChi2red'] * fit_info['degrees_of_freedom']
+        FitPp = stats.chi2red.sf(chi_squared_stat, fit_info['degrees_of_freedom'])
         
         # Create figure with 2 subplots (side by side)
         plt.close('all')
@@ -773,7 +773,7 @@ class Gaussian3DODR:
         
         # Add overall title with fit statistics
         fig.suptitle(f'3D Gaussian Fit Visualization - Event {event_idx if event_idx is not None else "N/A"}\n'
-                    f'R² = {fit_info["r_squared"]:.6f}, χ²ᵣₑᵈ = {fit_info["reduced_chi_squared"]:.6f}, ' +
+                    f'R² = {fit_info["r_squared"]:.6f}, χ²ᵣₑᵈ = {fit_info["FitChi2red"]:.6f}, ' +
                     f'Data Points = {fit_info["n_data_points"]}', 
                     fontsize=16, y=0.95)
         
@@ -842,9 +842,9 @@ class Gaussian3DODR:
         elif charge_type == 'value':
             charge_data = generator.data['GridNeighborhoodChargeValues'][event_idx]
         elif charge_type == 'coulomb':
-            if 'GridNeighborhoodChargeCoulombs' not in generator.data:
+            if 'GridNeighborhoodCharge' not in generator.data:
                 raise ValueError("Coulomb charge data not available in this ROOT file")
-            charge_data = generator.data['GridNeighborhoodChargeCoulombs'][event_idx]
+            charge_data = generator.data['GridNeighborhoodCharge'][event_idx]
         else:
             raise ValueError("charge_type must be 'fraction', 'value', or 'coulomb'")
         
@@ -1173,9 +1173,9 @@ def extract_charge_data_for_fitting(root_filename, event_idx, charge_type='fract
     elif charge_type == 'value':
         charge_data = generator.data['GridNeighborhoodChargeValues'][event_idx]
     elif charge_type == 'coulomb':
-        if 'GridNeighborhoodChargeCoulombs' not in generator.data:
+        if 'GridNeighborhoodCharge' not in generator.data:
             raise ValueError("Coulomb charge data not available in this ROOT file")
-        charge_data = generator.data['GridNeighborhoodChargeCoulombs'][event_idx]
+        charge_data = generator.data['GridNeighborhoodCharge'][event_idx]
     else:
         raise ValueError("charge_type must be 'fraction', 'value', or 'coulomb'")
     

@@ -883,7 +883,7 @@ def main():
             print("Available branches:", tree.keys())
             
             # Read the position and pixel data
-            data = tree.arrays(["TrueX", "TrueY", "PixelX", "PixelY", "PixelDist", "PixelI", "PixelJ", "PixelHit", "PixelAlpha"])
+            data = tree.arrays(["TrueX", "TrueY", "PixelX", "PixelY", "PixelTrueDistance", "PixelI", "PixelJ", "PixelHit", "PixelAlpha"])
             
             # Convert awkward arrays to numpy arrays for plotting
             # Use ak.to_numpy() instead of np.array() to avoid deprecation warnings
@@ -892,7 +892,7 @@ def main():
             pos_y = ak.to_numpy(data["TrueY"])
             pixel_x = ak.to_numpy(data["PixelX"])
             pixel_y = ak.to_numpy(data["PixelY"])
-            pixel_dist = ak.to_numpy(data["PixelDist"])
+            pixel_dist = ak.to_numpy(data["PixelTrueDistance"])
             pixel_i = ak.to_numpy(data["PixelI"])
             pixel_hit = ak.to_numpy(data["PixelHit"])
             pixel_j = ak.to_numpy(data["PixelJ"])
