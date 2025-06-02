@@ -14,9 +14,10 @@
 const G4double Gaussian3DFitter::fConstraintPenalty = Constants::CONSTRAINT_PENALTY;  // Large penalty for constraint violations
 
 Gaussian3DFitter::Gaussian3DFitter(const DetectorGeometry& detector_geometry) 
-    : fDetectorGeometry(detector_geometry), fGaussianFunction(nullptr), fDataGraph(nullptr)
+    : fDetectorGeometry(detector_geometry), fGaussianFunction(nullptr), fDataGraph(nullptr),
+      fCenterPixelX(0.0), fCenterPixelY(0.0), fConstrainToCenterPixel(false)
 {
-    // No ROOT objects initialization to avoid Minuit issues
+    // Initialize with detector geometry constraints
 }
 
 Gaussian3DFitter::~Gaussian3DFitter()
@@ -193,16 +194,31 @@ G4bool Gaussian3DFitter::CheckConstraints(const G4double* params, G4bool verbose
         return false;
     }
     
-    // Check 2: Center must be outside pixel area and d0 (10 micron) radius from pixel center
-    const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
-    if (IsPointInsidePixelZone(x0, y0, d0)) {
-        if (verbose) {
-            G4double min_dist = CalculateMinDistanceToPixelCenter(x0, y0);
-            G4cout << "  Constraint violation: Center (" << x0 << ", " << y0 
-                   << ") too close to pixel center (min distance: " << min_dist 
-                   << " mm, required: " << d0 << " mm)" << G4endl;
+    // Check 2: If center pixel constraint is enabled, center must be within center pixel bounds
+    if (fConstrainToCenterPixel) {
+        G4double bounds[4];
+        GetPixelBounds(fCenterPixelX, fCenterPixelY, bounds);
+        
+        if (x0 < bounds[0] || x0 > bounds[1] || y0 < bounds[2] || y0 > bounds[3]) {
+            if (verbose) {
+                G4cout << "  Constraint violation: Center (" << x0 << ", " << y0 
+                       << ") outside center pixel bounds [" << bounds[0] << ", " << bounds[1] 
+                       << "] × [" << bounds[2] << ", " << bounds[3] << "] mm" << G4endl;
+            }
+            return false;
         }
-        return false;
+    } else {
+        // Check 2 (original): Center must be outside pixel area and d0 (10 micron) radius from pixel center
+        const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
+        if (IsPointInsidePixelZone(x0, y0, d0)) {
+            if (verbose) {
+                G4double min_dist = CalculateMinDistanceToPixelCenter(x0, y0);
+                G4cout << "  Constraint violation: Center (" << x0 << ", " << y0 
+                       << ") too close to pixel center (min distance: " << min_dist 
+                       << " mm, required: " << d0 << " mm)" << G4endl;
+            }
+            return false;
+        }
     }
     
     return true;
@@ -363,15 +379,30 @@ G4double Gaussian3DFitter::CalculateConstrainedChiSquared(const std::vector<G4do
         penalty += fConstraintPenalty * (TMath::Abs(y0) - half_det);
     }
     
-    // Penalty for being too close to pixel center or inside pixel area
-    const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
-    if (IsPointInsidePixelZone(x0, y0, d0)) {
-        G4double min_dist = CalculateMinDistanceToPixelCenter(x0, y0);
-        if (min_dist < d0) {
-            penalty += fConstraintPenalty * (d0 - min_dist) * 100.0; // Scale up the penalty
-        } else {
-            // Inside pixel area but outside d0 radius - still penalize
-            penalty += fConstraintPenalty * 100.0;
+    // Apply different constraint penalty based on center pixel constraint mode
+    if (fConstrainToCenterPixel) {
+        // Penalty for being outside center pixel bounds
+        G4double bounds[4];
+        GetPixelBounds(fCenterPixelX, fCenterPixelY, bounds);
+        
+        G4double pixel_penalty = 0.0;
+        if (x0 < bounds[0]) pixel_penalty += (bounds[0] - x0);
+        if (x0 > bounds[1]) pixel_penalty += (x0 - bounds[1]);
+        if (y0 < bounds[2]) pixel_penalty += (bounds[2] - y0);
+        if (y0 > bounds[3]) pixel_penalty += (y0 - bounds[3]);
+        
+        penalty += fConstraintPenalty * pixel_penalty * 1000.0; // Strong penalty for leaving center pixel
+    } else {
+        // Original penalty for being too close to pixel center or inside pixel area
+        const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
+        if (IsPointInsidePixelZone(x0, y0, d0)) {
+            G4double min_dist = CalculateMinDistanceToPixelCenter(x0, y0);
+            if (min_dist < d0) {
+                penalty += fConstraintPenalty * (d0 - min_dist) * 100.0; // Scale up the penalty
+            } else {
+                // Inside pixel area but outside d0 radius - still penalize
+                penalty += fConstraintPenalty * 100.0;
+            }
         }
     }
     
@@ -794,4 +825,20 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
     }
     
     return results;
+}
+
+void Gaussian3DFitter::GetPixelBounds(G4double center_x, G4double center_y, G4double* bounds) const
+{
+    const G4double pixel_half_size = fDetectorGeometry.pixel_size / 2.0;
+    bounds[0] = center_x - pixel_half_size; // x_min
+    bounds[1] = center_x + pixel_half_size; // x_max
+    bounds[2] = center_y - pixel_half_size; // y_min
+    bounds[3] = center_y + pixel_half_size; // y_max
+}
+
+void Gaussian3DFitter::SetCenterPixelPosition(G4double center_x, G4double center_y)
+{
+    fCenterPixelX = center_x;
+    fCenterPixelY = center_y;
+    fConstrainToCenterPixel = true;
 } 

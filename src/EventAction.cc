@@ -206,8 +206,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
     
     // Perform fitting if we have enough data points
     if (x_coords.size() >= Constants::MIN_FIT_POINTS) { // Need at least 4 points for meaningful fit
-      // Perform fitting with all data
+      // Set center pixel constraint to ensure fitted center stays within center pixel bounds
+      fGaussianFitter->SetCenterPixelPosition(nearestPixel.x(), nearestPixel.y());
       
+      // Perform fitting with all data
       MinuitGaussianFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
         x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
       
