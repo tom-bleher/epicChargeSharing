@@ -2,6 +2,7 @@
 #include "DetectorMessenger.hh"
 #include "EventAction.hh"
 #include "RunAction.hh"
+#include "Constants.hh"
 #include "G4RunManager.hh"
 #include <fstream>
 #include <iomanip>
@@ -16,17 +17,17 @@
 
 DetectorConstruction::DetectorConstruction()
     : G4VUserDetectorConstruction(),
-      fPixelSize(0.1*mm),      // 100 microns - default value
-      fPixelSpacing(0.5*mm),   // 500 microns - default value  
-      fPixelCornerOffset(0.1*mm), // 100 microns - default value (FIXED - no auto-adjustment)
-      fdetSize(30*mm),         // 30 mm - default value (may be adjusted)
-      fdetWidth(0.05*mm),      // 50 microns thickness
-      fPixelWidth(0.001*mm),   // 1 micron thickness
+      fPixelSize(Constants::DEFAULT_PIXEL_SIZE),      // 100 microns - default value
+      fPixelSpacing(Constants::DEFAULT_PIXEL_SPACING),   // 500 microns - default value  
+      fPixelCornerOffset(Constants::DEFAULT_PIXEL_CORNER_OFFSET), // 100 microns - default value
+      fDetSize(Constants::DEFAULT_DETECTOR_SIZE),         // 30 mm - default value (may be adjusted)
+      fDetWidth(Constants::DEFAULT_DETECTOR_WIDTH),      // 50 microns thickness
+      fPixelWidth(Constants::DEFAULT_PIXEL_WIDTH),   // 1 micron thickness
       fNumBlocksPerSide(0),    // Will be calculated
       fCheckOverlaps(true),
       fEventAction(nullptr),   // Initialize EventAction pointer
       fDetectorMessenger(nullptr),
-      fNeighborhoodRadius(4)   // Default neighborhood radius for 9x9 grid
+      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS)   // Default neighborhood radius for 9x9 grid
 {
     // ————————————————————————
     // Parameters (all lengths are center–to–center except fPixelCornerOffset)
@@ -38,8 +39,8 @@ DetectorConstruction::DetectorConstruction()
     fPixelCornerOffset = 100*um;  // (purple) from inner detector edge to first pixel edge
 
     // Detector - will be calculated to fit pixel grid
-    fdetSize = 3*cm;           // Initial size - may be adjusted
-    fdetWidth = 50*um;         // Width/thickness of the detector
+    fDetSize = 3*cm;           // Initial size - may be adjusted
+    fDetWidth = 50*um;         // Width/thickness of the detector
     
     // Will be calculated in Construct() based on symmetry constraint
     fNumBlocksPerSide = 0;
@@ -61,31 +62,31 @@ void DetectorConstruction::SetGridParameters(G4double pixelSize, G4double pixelS
     // NOTE: fPixelCornerOffset is now FIXED and not changed by this method
     
     // Store the original detector size for comparison
-    G4double originalDetSize = fdetSize;
+    G4double originalDetSize = fDetSize;
     
     // Calculate the number of pixels that would fit with current parameters
-    fNumBlocksPerSide = static_cast<G4int>(std::round((fdetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
+    fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
     
     // Calculate the required detector size to accommodate the pixel grid with FIXED corner offset
     G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
     
     // Update detector size if it differs significantly (more than 1 μm tolerance)
-    if (std::abs(requiredDetSize - fdetSize) > 1*um) {
+    if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
         G4cout << "\n=== DETECTOR SIZE ADJUSTMENT ===" << G4endl;
         G4cout << "Original detector size: " << originalDetSize/mm << " mm" << G4endl;
         G4cout << "Required detector size for " << fNumBlocksPerSide << "×" << fNumBlocksPerSide 
                << " pixel grid: " << requiredDetSize/mm << " mm" << G4endl;
         G4cout << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm" << G4endl;
         
-        fdetSize = requiredDetSize;
+        fDetSize = requiredDetSize;
         
-        G4cout << "Detector size adjusted to: " << fdetSize/mm << " mm" << G4endl;
+        G4cout << "Detector size adjusted to: " << fDetSize/mm << " mm" << G4endl;
         G4cout << "=================================" << G4endl;
     }
     
     // Verify the calculation
-    G4double actualCornerOffset = (fdetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
-    if (std::abs(actualCornerOffset - fPixelCornerOffset) > 1*nm) {
+    G4double actualCornerOffset = (fDetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
+    if (std::abs(actualCornerOffset - fPixelCornerOffset) > Constants::PRECISION_TOLERANCE) {
         G4cerr << "WARNING: Corner offset calculation mismatch!" << G4endl;
         G4cerr << "Expected: " << fPixelCornerOffset/mm << " mm, Got: " << actualCornerOffset/mm << " mm" << G4endl;
     }
@@ -116,13 +117,13 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4Material *aluminumMat = nist->FindOrBuildMaterial("G4_Al"); // Pixel material
     
     // Create world volume
-    G4Box *solidWorld = new G4Box("solidWorld", 5*cm, 5*cm, 5*cm);
+    G4Box *solidWorld = new G4Box("solidWorld", Constants::WORLD_SIZE, Constants::WORLD_SIZE, Constants::WORLD_SIZE);
     G4LogicalVolume *logicWorld = new G4LogicalVolume(solidWorld, worldMat, "logicWorld");
     G4VPhysicalVolume *physWorld = new G4PVPlacement(0, G4ThreeVector(0., 0., 0.),
                                                      logicWorld, "physWorld", 0, false, 0, checkOverlaps);
 
     // Create the main silicon detector
-    G4Box* detCube = new G4Box("detCube", fdetSize/2, fdetSize/2, fdetWidth/2);
+    G4Box* detCube = new G4Box("detCube", fDetSize/2, fDetSize/2, fDetWidth/2);
     G4LogicalVolume* logicCube = new G4LogicalVolume(detCube, siliconMat, "logicCube");
     
     // Set visualization attributes for the detector (semi-transparent)
@@ -130,19 +131,19 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     logicCube->SetVisAttributes(cubeVisAtt);
     
     // Place the silicon detector at fixed position
-    G4ThreeVector detectorPosition(0., 0., -1.0*cm);
+    G4ThreeVector detectorPosition(0., 0., Constants::DETECTOR_Z_POSITION);
     
     // Store original detector size for comparison
-    G4double originalDetSize = fdetSize;
+    G4double originalDetSize = fDetSize;
     
     // Calculate number of pixels that would fit with current parameters and FIXED corner offset
-    fNumBlocksPerSide = static_cast<G4int>(std::round((fdetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
+    fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
     
     // Calculate the required detector size to accommodate the pixel grid with FIXED corner offset
     G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
     
     // Update detector size if needed and notify user
-    if (std::abs(requiredDetSize - fdetSize) > 1*um) {
+    if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
         G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===" << G4endl;
         G4cout << "Original detector size: " << originalDetSize/mm << " mm" << G4endl;
         G4cout << "Calculated pixel grid requires: " << fNumBlocksPerSide << "×" << fNumBlocksPerSide << " pixels" << G4endl;
@@ -150,36 +151,36 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         G4cout << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm" << G4endl;
         
         // Update detector size
-        fdetSize = requiredDetSize;
+        fDetSize = requiredDetSize;
         
-        G4cout << "✓ Detector size adjusted to: " << fdetSize/mm << " mm" << G4endl;
+        G4cout << "✓ Detector size adjusted to: " << fDetSize/mm << " mm" << G4endl;
         G4cout << "==========================================" << G4endl;
         
         // Recreate the detector with the correct size
         delete detCube;
-        detCube = new G4Box("detCube", fdetSize/2, fdetSize/2, fdetWidth/2);
+        detCube = new G4Box("detCube", fDetSize/2, fDetSize/2, fDetWidth/2);
         delete logicCube;
         logicCube = new G4LogicalVolume(detCube, siliconMat, "logicCube");
         logicCube->SetVisAttributes(cubeVisAtt);
+    }
+    
+    // Verify the corner offset calculation
+    G4double actualCornerOffset = (fDetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
+    if (std::abs(actualCornerOffset - fPixelCornerOffset) > Constants::PRECISION_TOLERANCE) {
+        G4cerr << "ERROR: Corner offset calculation failed!" << G4endl;
+        G4cerr << "Expected: " << fPixelCornerOffset/mm << " mm, Got: " << actualCornerOffset/mm << " mm" << G4endl;
     }
     
     // Place the silicon detector at fixed position (only once)
     new G4PVPlacement(0, detectorPosition,
                       logicCube, "physCube", logicWorld, false, 0, checkOverlaps);
     
-    // Verify the corner offset calculation
-    G4double actualCornerOffset = (fdetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
-    if (std::abs(actualCornerOffset - fPixelCornerOffset) > 1*nm) {
-        G4cerr << "ERROR: Corner offset calculation failed!" << G4endl;
-        G4cerr << "Expected: " << fPixelCornerOffset/mm << " mm, Got: " << actualCornerOffset/mm << " mm" << G4endl;
-    }
-    
     // Create aluminum pixels on the detector surface
     G4Box *pixelBlock = new G4Box("pixelBlock", fPixelSize/2, fPixelSize/2, fPixelWidth/2);
     G4LogicalVolume *logicBlock = new G4LogicalVolume(pixelBlock, aluminumMat, "logicBlock");
     
     // Add step limiting for fine tracking - force steps to be at most 10 micrometers
-    G4UserLimits* stepLimit = new G4UserLimits(10.0*micrometer);  // Max step size
+    G4UserLimits* stepLimit = new G4UserLimits(Constants::MAX_STEP_SIZE);  // Max step size
     logicCube->SetUserLimits(stepLimit);   // Apply to detector volume
     logicBlock->SetUserLimits(stepLimit);  // Apply to pixel volumes
     logicWorld->SetUserLimits(stepLimit);  // Apply to world volume
@@ -188,10 +189,10 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     
     // Place pixels on the detector surface (front face)
     G4int copyNo = 0;
-    G4double firstPixelPos = -fdetSize/2 + fPixelCornerOffset + fPixelSize/2;
+    G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
     // Calculate z position for pixels - they should be on the detector surface
-    G4double pixelZ = detectorPosition.z() + fdetWidth/2 + fPixelWidth/2;
+    G4double pixelZ = detectorPosition.z() + fDetWidth/2 + fPixelWidth/2;
     
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
         for (G4int j = 0; j < fNumBlocksPerSide; j++) {
@@ -212,13 +213,13 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     
     // Calculate and print the ratio of pixel area to detector area
     G4double totalPixelArea = fNumBlocksPerSide * fNumBlocksPerSide * fPixelSize * fPixelSize;
-    G4double detectorArea = fdetSize * fdetSize;
+    G4double detectorArea = fDetSize * fDetSize;
     G4double pixelAreaRatio = totalPixelArea / detectorArea;
     
     G4cout << "\n=== FINAL DETECTOR CONFIGURATION ===" << G4endl;
     G4cout << "Detector Statistics:" << G4endl;
-    G4cout << "  Final detector size: " << fdetSize/mm << " mm × " << fdetSize/mm << " mm" << G4endl;
-    if (std::abs(fdetSize - originalDetSize) > 1*um) {
+    G4cout << "  Final detector size: " << fDetSize/mm << " mm × " << fDetSize/mm << " mm" << G4endl;
+    if (std::abs(fDetSize - originalDetSize) > Constants::GEOMETRY_TOLERANCE) {
         G4cout << "  (Adjusted from original: " << originalDetSize/mm << " mm)" << G4endl;
     }
     G4cout << "  Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm" << G4endl;
@@ -243,11 +244,11 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
                 fPixelSize,
                 fPixelSpacing, 
                 fPixelCornerOffset,  // This is now FIXED (not adjusted)
-                fdetSize,            // This may have been adjusted
+                fDetSize,            // This may have been adjusted
                 fNumBlocksPerSide    // This is calculated based on final parameters
             );
             G4cout << "Updated RunAction with final grid parameters:" << G4endl;
-            G4cout << "  Final Detector Size: " << fdetSize/mm << " mm" << G4endl;
+            G4cout << "  Final Detector Size: " << fDetSize/mm << " mm" << G4endl;
             G4cout << "  Fixed Pixel Corner Offset: " << fPixelCornerOffset/mm << " mm" << G4endl;
             G4cout << "  Final Number of Blocks per Side: " << fNumBlocksPerSide << G4endl;
         }
@@ -267,8 +268,8 @@ G4bool DetectorConstruction::IsPositionOnPixel(const G4ThreeVector& position) co
     G4ThreeVector detectorPosition = GetDetectorPosition();
     
     // Check if the hit is in the detector volume first
-    G4double detHalfSize = fdetSize/2;
-    G4double detHalfWidth = fdetWidth/2;
+    G4double detHalfSize = fDetSize/2;
+    G4double detHalfWidth = fDetWidth/2;
     
     // Check if hit is within the detector boundaries
     if (std::abs(position.x()) > detHalfSize || 
@@ -279,7 +280,7 @@ G4bool DetectorConstruction::IsPositionOnPixel(const G4ThreeVector& position) co
     }
     
     // Calculate the first pixel position (corner)
-    G4double firstPixelPos = -fdetSize/2 + fPixelCornerOffset + fPixelSize/2;
+    G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
     // Calculate which pixel grid position is closest (i and j indices)
     G4double normX = (position.x() - firstPixelPos) / fPixelSpacing;
@@ -345,8 +346,8 @@ void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4d
         // Write detector parameters
         paramFile << "DETECTOR PARAMETERS" << std::endl;
         paramFile << "-----------------" << std::endl;
-        paramFile << "Detector Size: " << fdetSize/mm << " mm" << std::endl;
-        paramFile << "Detector Width/Thickness: " << fdetWidth/mm << " mm" << std::endl;
+        paramFile << "Detector Size: " << fDetSize/mm << " mm" << std::endl;
+        paramFile << "Detector Width/Thickness: " << fDetWidth/mm << " mm" << std::endl;
         paramFile << "Detector Area: " << detectorArea/(mm*mm) << " mm²" << std::endl << std::endl;
         
         // Write pixel parameters 
@@ -391,7 +392,7 @@ void DetectorConstruction::SaveGridParametersToFile() const
         gridFile << fPixelSize/mm << std::endl;           // Pixel size in mm
         gridFile << fPixelSpacing/mm << std::endl;        // Pixel spacing in mm  
         gridFile << fPixelCornerOffset/mm << std::endl;   // Pixel corner offset in mm
-        gridFile << fdetSize/mm << std::endl;             // Detector size in mm
+        gridFile << fDetSize/mm << std::endl;             // Detector size in mm
         gridFile << fNumBlocksPerSide << std::endl;       // Number of blocks per side
         
         gridFile.close();

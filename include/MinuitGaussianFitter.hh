@@ -1,5 +1,5 @@
-#ifndef GAUSSIAN3DFITTER_HH
-#define GAUSSIAN3DFITTER_HH
+#ifndef MINUITGAUSSIANFITTER_HH
+#define MINUITGAUSSIANFITTER_HH
 
 #include "G4Types.hh"
 #include "G4ThreeVector.hh"
@@ -7,17 +7,18 @@
 #include "Constants.hh"
 #include <vector>
 
-// ROOT includes for fitting (minimal to avoid Minuit issues)
+// ROOT includes for Minuit fitting
+#include "TMinuit.h"
 #include "TMath.h"
+#include "TF2.h"
 
 /**
- * @brief 3D Gaussian fitting class for charge distribution data
+ * @brief ROOT Minuit-based 3D Gaussian fitting class
  * 
- * This class implements 3D Gaussian fitting functionality similar to the Python 
- * ODR (Orthogonal Distance Regression) version using custom optimization.
- * It fits a 3D Gaussian function to charge distribution data from the simulation.
+ * This class implements 3D Gaussian fitting using ROOT's Minuit optimizer.
+ * It provides the same interface as Gaussian3DFitter for easy switching.
  */
-class Gaussian3DFitter {
+class MinuitGaussianFitter {
 public:
     /**
      * @brief Enumeration for fit types
@@ -35,7 +36,7 @@ public:
         G4double pixel_spacing;       // Center-to-center pixel spacing [mm]
         G4double pixel_corner_offset; // Offset from detector edge to first pixel [mm]
         G4int num_blocks_per_side;    // Number of pixels per side
-        G4double pixel_exclusion_buffer; // Buffer around pixels to exclude [mm] (default: 0.01 mm = 10 microns)
+        G4double pixel_exclusion_buffer; // Buffer around pixels to exclude [mm]
         
         DetectorGeometry() : 
             detector_size(30.0), pixel_size(0.1), pixel_spacing(0.5), 
@@ -68,7 +69,7 @@ public:
         G4double offset_err;
         
         // Fit statistics
-        G4double chi2red;             // Reduced chi-squared value (chi2red/ndf)
+        G4double chi2red;             // Chi-squared value
         G4double ndf;              // Number of degrees of freedom
         G4double Pp;             // Fit probability
         G4int n_points;            // Number of data points used in fit
@@ -92,12 +93,12 @@ public:
      * @brief Constructor
      * @param detector_geometry Optional detector geometry constraints
      */
-    Gaussian3DFitter(const DetectorGeometry& detector_geometry = DetectorGeometry());
+    MinuitGaussianFitter(const DetectorGeometry& detector_geometry = DetectorGeometry());
     
     /**
      * @brief Destructor
      */
-    ~Gaussian3DFitter();
+    ~MinuitGaussianFitter();
     
     /**
      * @brief Set detector geometry constraints
@@ -110,7 +111,7 @@ public:
     const DetectorGeometry& GetDetectorGeometry() const { return fDetectorGeometry; }
     
     /**
-     * @brief Fit 3D Gaussian to charge distribution data
+     * @brief Fit 3D Gaussian to charge distribution data using Minuit
      * 
      * @param x_coords X coordinates of data points [mm]
      * @param y_coords Y coordinates of data points [mm]
@@ -134,15 +135,15 @@ public:
      * @return Gaussian value at (x,y)
      */
     static G4double Gaussian3DFunction(G4double x, G4double y, const G4double* params);
-    
-    /**
-     * @brief ROOT function wrapper (for compatibility)
-     */
-    static G4double Gaussian3DFunctionWrapper(G4double* coords, G4double* params);
 
 private:
     /**
-     * @brief Calculate initial parameter estimates with multiple strategies
+     * @brief Static function for Minuit chi-squared calculation
+     */
+    static void MinuitFcn(G4int& npar, G4double* gin, G4double& f, G4double* par, G4int iflag);
+    
+    /**
+     * @brief Calculate initial parameter estimates
      */
     void CalculateInitialGuess(const std::vector<G4double>& x_coords,
                               const std::vector<G4double>& y_coords,
@@ -171,11 +172,6 @@ private:
     G4bool CheckConstraints(const G4double* params, G4bool verbose = false) const;
     
     /**
-     * @brief Apply parameter bounds during optimization
-     */
-    void ApplyParameterBounds(G4double* params) const;
-    
-    /**
      * @brief Calculate residual statistics
      */
     void CalculateResidualStats(const std::vector<G4double>& x_coords,
@@ -183,48 +179,21 @@ private:
                                const std::vector<G4double>& z_values,
                                const G4double* fitParams,
                                G4double& mean, G4double& std_dev);
-    
-    /**
-     * @brief Calculate chi-squared value for given parameters
-     */
-    G4double CalculateChiSquared(const std::vector<G4double>& x_coords,
-                                const std::vector<G4double>& y_coords,
-                                const std::vector<G4double>& z_values,
-                                const std::vector<G4double>& z_errors,
-                                const G4double* params);
-    
-    /**
-     * @brief Enhanced constrained chi-squared with penalty terms
-     */
-    G4double CalculateConstrainedChiSquared(const std::vector<G4double>& x_coords,
-                                           const std::vector<G4double>& y_coords,
-                                           const std::vector<G4double>& z_values,
-                                           const std::vector<G4double>& z_errors,
-                                           const G4double* params);
-    
-    /**
-     * @brief Perform robust Nelder-Mead simplex optimization with constraints
-     */
-    void RobustSimplexFit(const std::vector<G4double>& x_coords,
-                         const std::vector<G4double>& y_coords,
-                         const std::vector<G4double>& z_values,
-                         const std::vector<G4double>& z_errors,
-                         G4double* params,
-                         G4bool verbose);
-    
-    // Detector geometry constraints
+
+    // Static data for Minuit callback
+    static std::vector<G4double> fStaticXCoords;
+    static std::vector<G4double> fStaticYCoords;
+    static std::vector<G4double> fStaticZValues;
+    static std::vector<G4double> fStaticZErrors;
+    static const MinuitGaussianFitter* fStaticInstance;
+
+    // Member variables
     DetectorGeometry fDetectorGeometry;
+    TMinuit* fMinuit;
     
-    // Legacy ROOT fitting objects (kept for compatibility but not used)
-    void* fGaussianFunction;  // Changed to void* to avoid ROOT dependencies
-    void* fDataGraph;         // Changed to void* to avoid ROOT dependencies
-    
-    // Fitting parameters
+    // Fitting parameters  
     static const G4int fNParams = Constants::GAUSSIAN_N_PARAMS;  // Number of fit parameters
-    
-    // Algorithm parameters
     static const G4int fMaxFitAttempts = Constants::MAX_FIT_ATTEMPTS;     // Maximum number of fitting attempts
-    static const G4double fConstraintPenalty;  // Penalty factor for constraint violations
 };
 
-#endif // GAUSSIAN3DFITTER_HH 
+#endif 

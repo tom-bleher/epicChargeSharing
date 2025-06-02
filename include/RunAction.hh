@@ -5,6 +5,7 @@
 #include "G4Run.hh"
 #include "globals.hh"
 #include <vector>
+#include <string>
 
 // ROOT includes
 #include "TFile.h"
@@ -78,12 +79,10 @@ public:
                               G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
                               G4double amplitude_err, G4double x0_err, G4double y0_err,
                               G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
-                              G4double chi2, G4double ndf, G4double prob,
+                              G4double chi2red, G4double ndf, G4double Pp,
                               G4int n_points,
                               G4double residual_mean, G4double residual_std,
-                              G4bool constraints_satisfied,
-                              G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
-                              G4int fit_attempt_number);
+                              G4bool constraints_satisfied);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -126,8 +125,7 @@ private:
     // Variables for neighborhood (9x9) grid charge sharing data
     std::vector<G4double> fGridNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels
     std::vector<G4double> fGridNeighborhoodDistances;         // Distances from hit to neighborhood grid pixels [mm]
-    std::vector<G4double> fGridNeighborhoodChargeValues;        // Charge values for neighborhood grid pixels (electrons)
-    std::vector<G4double> fGridNeighborhoodChargeCoulombs;       // Charge values in Coulombs for neighborhood grid pixels
+    std::vector<G4double> fGridNeighborhoodCharge;       // Charge values in Coulombs for neighborhood grid pixels
     
     // Variables for detector grid parameters (stored as ROOT metadata)
     G4double fGridPixelSize;        // Pixel size [mm]
@@ -144,16 +142,16 @@ private:
     std::string fParticleName;      // Particle type name
     
     // Variables for step-by-step energy deposition information
-    std::vector<G4double> fStepEdepVec;    // Energy deposited per step [MeV]
-    std::vector<G4double> fStepZVec;       // Z position of each energy deposit [mm]
-    std::vector<G4double> fStepTimeVec;    // Time of each energy deposit [ns]
+    std::vector<G4double> fStepEnergyDeposition;    // Energy deposited per step [MeV]
+    std::vector<G4double> fStepZPositions;       // Z position of each energy deposit [mm]
+    std::vector<G4double> fStepTimes;    // Time of each energy deposit [ns]
     
     // Variables for ALL step information (including non-energy depositing steps)
-    std::vector<G4double> fAllStepEdepVec;    // Energy deposited per step (including 0) [MeV]
-    std::vector<G4double> fAllStepZVec;       // Z position of each step [mm]
-    std::vector<G4double> fAllStepTimeVec;    // Time of each step [ns]
-    std::vector<G4double> fAllStepLenVec;     // Length of each step [mm]
-    std::vector<G4int> fAllStepNumVec;        // Step number for each step
+    std::vector<G4double> fAllStepEnergyDeposition;    // Energy deposited per step (including 0) [MeV]
+    std::vector<G4double> fAllStepZPositions;       // Z position of each step [mm]
+    std::vector<G4double> fAllStepTimes;    // Time of each step [ns]
+    std::vector<G4double> fAllStepLengths;     // Length of each step [mm]
+    std::vector<G4int> fAllStepNumbers;        // Step number for each step
     
     // Variables for 3D Gaussian fit results
     G4double fFitAmplitude;         // Fitted amplitude
@@ -174,20 +172,16 @@ private:
     
     G4double fFitChi2;            // Chi-squared value
     G4double fFitNDF;             // Number of degrees of freedom
-    G4double fFitProb;            // Fit probability
+    G4double fFitChi2red;            // Reduced chi-squared (chi2red/NDF)
+    G4double fFitPp;            // Fit probability (P-value)
     G4int fFitNPoints;            // Number of points used in fit
     G4double fFitResidualMean;    // Mean of residuals
     G4double fFitResidualStd;     // Standard deviation of residuals
     
     // Enhanced robustness metrics
     G4bool fFitConstraintsSatisfied; // Whether geometric constraints were satisfied
-    G4double fFitCenterDistFromEdge; // Distance from fit center to detector edge [mm]
-    G4double fFitMinDistToPixel;  // Minimum distance from fit center to any pixel [mm]
-    G4int fFitAttemptNumber;      // Which fitting attempt succeeded (1-based)
     
     // Additional variables for convenient access to Gaussian center and distance calculation
-    G4double fGaussX;             // Gaussian X center [mm] (alias for fFitX0)
-    G4double fGaussY;             // Gaussian Y center [mm] (alias for fFitY0)  
     G4double fGaussTrueDistance;  // Distance from Gaussian center to true position [mm]
 };
 

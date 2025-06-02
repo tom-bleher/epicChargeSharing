@@ -8,7 +8,7 @@
 
 class RunAction;
 class DetectorConstruction;
-class Gaussian3DFitter;
+class MinuitGaussianFitter;
 
 class EventAction : public G4UserEventAction
 {
@@ -69,7 +69,7 @@ private:
     // Pixel mapping information
     G4int fPixelIndexI;    // Pixel index in the X direction
     G4int fPixelIndexJ;    // Pixel index in the Y direction
-    G4double fPixelDistance; // Distance from hit to pixel center
+    G4double fPixelTrueDist; // Distance from hit to pixel center
     G4bool fPixelHit;     // Flag to indicate if the hit was on a pixel
     
     // Neighborhood (9x9) grid angle information
@@ -80,8 +80,7 @@ private:
     // Neighborhood (9x9) grid charge sharing information
     std::vector<G4double> fGridNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid
     std::vector<G4double> fGridNeighborhoodDistances;       // Distance from hit to each pixel center in neighborhood grid
-    std::vector<G4double> fGridNeighborhoodChargeValues;    // Actual charge value for each pixel in neighborhood grid (electrons)
-    std::vector<G4double> fGridNeighborhoodChargeCoulombs;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
+    std::vector<G4double> fGridNeighborhoodCharge;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
     
     // Constants for charge sharing calculation
     static constexpr G4double fIonizationEnergy = 3.6; // eV - typical for silicon
@@ -96,19 +95,22 @@ private:
     G4String fParticleName;            // Particle type name
     
     // Step-by-step energy deposition information
-    std::vector<G4double> fStepEdepVec;    // Energy deposited per step
-    std::vector<G4double> fStepZVec;       // Z position of each energy deposit
-    std::vector<G4double> fStepTimeVec;    // Time of each energy deposit
-    std::vector<G4int> fStepNumVec;        // Step number for each energy deposit
+    std::vector<G4double> fStepEnergyDeposition;    // Energy deposited per step
+    std::vector<G4double> fStepZPositions;       // Z position of each energy deposit
+    std::vector<G4double> fStepTimes;    // Time of each energy deposit
+    std::vector<G4int> fStepNumbers;        // Step number for each energy deposit
     
     // ALL step information (including non-energy depositing steps)
-    std::vector<G4double> fAllStepEdepVec;    // Energy deposited per step (including 0)
-    std::vector<G4double> fAllStepZVec;       // Z position of each step
-    std::vector<G4double> fAllStepTimeVec;    // Time of each step
-    std::vector<G4int> fAllStepNumVec;        // Step number for each step
+    std::vector<G4double> fAllStepEnergyDeposition;    // Energy deposited per step (including 0)
+    std::vector<G4double> fAllStepZPositions;       // Z position of each step
+    std::vector<G4double> fAllStepTimes;    // Time of each step
+    std::vector<G4int> fAllStepNumbers;        // Step number for each step
     
     // 3D Gaussian fitter instance
-    Gaussian3DFitter* fGaussianFitter;
+    // Gaussian3DFitter* fGaussianFitter;
+
+    // ROOT Minuit-based 3D Gaussian fitter instance
+    MinuitGaussianFitter* fGaussianFitter;
 };
 
 #endif

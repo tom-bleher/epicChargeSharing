@@ -1,4 +1,5 @@
 #include "Gaussian3DFitter.hh"
+#include "Constants.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4UnitsTable.hh"
 #include <iostream>
@@ -10,7 +11,7 @@
 #include "TMath.h"
 
 // Define static constants
-const G4double Gaussian3DFitter::fConstraintPenalty = 1000.0;  // Large penalty for constraint violations
+const G4double Gaussian3DFitter::fConstraintPenalty = Constants::CONSTRAINT_PENALTY;  // Large penalty for constraint violations
 
 Gaussian3DFitter::Gaussian3DFitter(const DetectorGeometry& detector_geometry) 
     : fDetectorGeometry(detector_geometry), fGaussianFunction(nullptr), fDataGraph(nullptr)
@@ -77,7 +78,7 @@ G4double Gaussian3DFitter::Gaussian3DFunctionWrapper(G4double* coords, G4double*
     return Gaussian3DFunction(coords[0], coords[1], params);
 }
 
-G4bool Gaussian3DFitter::IsPointInsidePixelZone(G4double x, G4double y) const
+G4bool Gaussian3DFitter::IsPointInsidePixelZone(G4double x, G4double y, G4double min_distance) const
 {
     const G4double half_det = fDetectorGeometry.detector_size / 2.0;
     
@@ -89,7 +90,7 @@ G4bool Gaussian3DFitter::IsPointInsidePixelZone(G4double x, G4double y) const
     // Calculate the first pixel position
     const G4double first_pixel_pos = -half_det + fDetectorGeometry.pixel_corner_offset + fDetectorGeometry.pixel_size / 2.0;
     
-    // Check each pixel with buffer zone
+    // Check each pixel center distance
     for (G4int i = 0; i < fDetectorGeometry.num_blocks_per_side; i++) {
         for (G4int j = 0; j < fDetectorGeometry.num_blocks_per_side; j++) {
             const G4double pixel_center_x = first_pixel_pos + i * fDetectorGeometry.pixel_spacing;
@@ -98,18 +99,52 @@ G4bool Gaussian3DFitter::IsPointInsidePixelZone(G4double x, G4double y) const
             // Calculate distance from point to pixel center
             const G4double dx = x - pixel_center_x;
             const G4double dy = y - pixel_center_y;
+            const G4double distance = TMath::Sqrt(dx*dx + dy*dy);
             
-            // Check if within pixel + buffer zone (using square boundary for efficiency)
+            // Check if within the specified minimum distance from pixel center
+            if (distance < min_distance) {
+                return true; // Too close to pixel center
+            }
+            
+            // Also check if inside the pixel area itself
             const G4double pixel_half_size = fDetectorGeometry.pixel_size / 2.0;
-            const G4double exclusion_zone = pixel_half_size + fDetectorGeometry.pixel_exclusion_buffer;
-            
-            if (TMath::Abs(dx) <= exclusion_zone && TMath::Abs(dy) <= exclusion_zone) {
-                return true; // Inside pixel exclusion zone
+            if (TMath::Abs(dx) <= pixel_half_size && TMath::Abs(dy) <= pixel_half_size) {
+                return true; // Inside pixel area
             }
         }
     }
     
     return false; // Not in any pixel zone
+}
+
+G4double Gaussian3DFitter::CalculateMinDistanceToPixelCenter(G4double x, G4double y) const
+{
+    const G4double half_det = fDetectorGeometry.detector_size / 2.0;
+    
+    // Check if point is inside detector bounds
+    if (TMath::Abs(x) > half_det || TMath::Abs(y) > half_det) {
+        return 1e6; // Outside detector, return large distance
+    }
+    
+    G4double min_distance = 1e6; // Large initial value
+    const G4double first_pixel_pos = -half_det + fDetectorGeometry.pixel_corner_offset + fDetectorGeometry.pixel_size / 2.0;
+    
+    // Check distance to each pixel center
+    for (G4int i = 0; i < fDetectorGeometry.num_blocks_per_side; i++) {
+        for (G4int j = 0; j < fDetectorGeometry.num_blocks_per_side; j++) {
+            const G4double pixel_center_x = first_pixel_pos + i * fDetectorGeometry.pixel_spacing;
+            const G4double pixel_center_y = first_pixel_pos + j * fDetectorGeometry.pixel_spacing;
+            
+            // Calculate distance to pixel center
+            const G4double dx = x - pixel_center_x;
+            const G4double dy = y - pixel_center_y;
+            const G4double distance = TMath::Sqrt(dx*dx + dy*dy);
+            
+            min_distance = TMath::Min(min_distance, distance);
+        }
+    }
+    
+    return min_distance;
 }
 
 G4double Gaussian3DFitter::CalculateMinDistanceToPixel(G4double x, G4double y) const
@@ -147,9 +182,6 @@ G4bool Gaussian3DFitter::CheckConstraints(const G4double* params, G4bool verbose
 {
     const G4double x0 = params[1];
     const G4double y0 = params[2];
-    const G4double sigma_x = params[3];
-    const G4double sigma_y = params[4];
-    const G4double amplitude = params[0];
     
     // Check 1: Center must be within detector bounds
     const G4double half_det = fDetectorGeometry.detector_size / 2.0;
@@ -161,32 +193,14 @@ G4bool Gaussian3DFitter::CheckConstraints(const G4double* params, G4bool verbose
         return false;
     }
     
-    // Check 2: Center must not be inside pixel exclusion zones
-    if (IsPointInsidePixelZone(x0, y0)) {
+    // Check 2: Center must be outside pixel area and d0 (10 micron) radius from pixel center
+    const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
+    if (IsPointInsidePixelZone(x0, y0, d0)) {
         if (verbose) {
-            G4double min_dist = CalculateMinDistanceToPixel(x0, y0);
+            G4double min_dist = CalculateMinDistanceToPixelCenter(x0, y0);
             G4cout << "  Constraint violation: Center (" << x0 << ", " << y0 
-                   << ") inside pixel zone (min distance: " << min_dist 
-                   << " mm, required: " << fDetectorGeometry.pixel_exclusion_buffer << " mm)" << G4endl;
-        }
-        return false;
-    }
-    
-    // Check 3: Sigma values must be reasonable
-    const G4double min_sigma = 0.005; // 5 microns minimum
-    const G4double max_sigma = fDetectorGeometry.detector_size / 4.0; // Quarter of detector size maximum
-    if (sigma_x < min_sigma || sigma_x > max_sigma || sigma_y < min_sigma || sigma_y > max_sigma) {
-        if (verbose) {
-            G4cout << "  Constraint violation: Sigma values (" << sigma_x << ", " << sigma_y 
-                   << ") outside reasonable range [" << min_sigma << ", " << max_sigma << "] mm" << G4endl;
-        }
-        return false;
-    }
-    
-    // Check 4: Amplitude must be positive
-    if (amplitude <= 0) {
-        if (verbose) {
-            G4cout << "  Constraint violation: Amplitude (" << amplitude << ") must be positive" << G4endl;
+                   << ") too close to pixel center (min distance: " << min_dist 
+                   << " mm, required: " << d0 << " mm)" << G4endl;
         }
         return false;
     }
@@ -198,19 +212,10 @@ void Gaussian3DFitter::ApplyParameterBounds(G4double* params) const
 {
     // Apply hard bounds to prevent optimization from going to unreasonable values
     const G4double half_det = fDetectorGeometry.detector_size / 2.0;
-    const G4double min_sigma = 0.005; // 5 microns
-    const G4double max_sigma = fDetectorGeometry.detector_size / 4.0;
     
     // Clamp center coordinates to detector bounds
     params[1] = TMath::Max(-half_det, TMath::Min(half_det, params[1])); // x0
     params[2] = TMath::Max(-half_det, TMath::Min(half_det, params[2])); // y0
-    
-    // Clamp sigma values
-    params[3] = TMath::Max(min_sigma, TMath::Min(max_sigma, params[3])); // sigma_x
-    params[4] = TMath::Max(min_sigma, TMath::Min(max_sigma, params[4])); // sigma_y
-    
-    // Ensure amplitude is positive
-    if (params[0] <= 0) params[0] = 1.0;
     
     // Keep theta in reasonable range [-π, π]
     while (params[5] > TMath::Pi()) params[5] -= 2.0 * TMath::Pi();
@@ -228,8 +233,8 @@ void Gaussian3DFitter::CalculateInitialGuess(const std::vector<G4double>& x_coor
         initialParams[0] = 1.0;  // amplitude
         initialParams[1] = 0.0;  // x0
         initialParams[2] = 0.0;  // y0
-        initialParams[3] = 0.1;  // sigma_x
-        initialParams[4] = 0.1;  // sigma_y
+        initialParams[3] = Constants::DEFAULT_SIGMA_ESTIMATE;  // sigma_x
+        initialParams[4] = Constants::DEFAULT_SIGMA_ESTIMATE;  // sigma_y
         initialParams[5] = 0.0;  // theta
         initialParams[6] = 0.0;  // offset
         return;
@@ -282,7 +287,8 @@ void Gaussian3DFitter::CalculateInitialGuess(const std::vector<G4double>& x_coor
     weighted_y = TMath::Max(-half_det * 0.8, TMath::Min(half_det * 0.8, weighted_y));
     
     // If initial guess is in pixel zone, move it to nearest allowed position
-    if (IsPointInsidePixelZone(weighted_x, weighted_y)) {
+    const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
+    if (IsPointInsidePixelZone(weighted_x, weighted_y, d0)) {
         // Try to find nearby allowed position
         G4bool found_valid = false;
         const G4double search_radius = fDetectorGeometry.pixel_spacing;
@@ -294,7 +300,7 @@ void Gaussian3DFitter::CalculateInitialGuess(const std::vector<G4double>& x_coor
             G4double test_y = weighted_y + search_radius * TMath::Sin(angle);
             
             if (TMath::Abs(test_x) <= half_det && TMath::Abs(test_y) <= half_det && 
-                !IsPointInsidePixelZone(test_x, test_y)) {
+                !IsPointInsidePixelZone(test_x, test_y, d0)) {
                 weighted_x = test_x;
                 weighted_y = test_y;
                 found_valid = true;
@@ -319,8 +325,8 @@ void Gaussian3DFitter::CalculateInitialGuess(const std::vector<G4double>& x_coor
     G4double sigma_y_guess = TMath::Sqrt(sum_y_sq / y_coords.size());
     
     // Apply reasonable bounds to sigma estimates
-    const G4double min_sigma = 0.01; // 10 microns minimum
-    const G4double max_sigma = fDetectorGeometry.detector_size / 6.0;
+    const G4double min_sigma = Constants::MIN_SIGMA_ALT; // 10 microns minimum
+    const G4double max_sigma = fDetectorGeometry.detector_size * Constants::SIGMA_FRACTION_ALT;
     sigma_x_guess = TMath::Max(min_sigma, TMath::Min(max_sigma, sigma_x_guess));
     sigma_y_guess = TMath::Max(min_sigma, TMath::Min(max_sigma, sigma_y_guess));
     
@@ -340,7 +346,7 @@ G4double Gaussian3DFitter::CalculateConstrainedChiSquared(const std::vector<G4do
                                                           const std::vector<G4double>& z_errors,
                                                           const G4double* params)
 {
-    G4double chi2 = CalculateChiSquared(x_coords, y_coords, z_values, z_errors, params);
+    G4double chi2red = CalculateChiSquared(x_coords, y_coords, z_values, z_errors, params);
     
     // Add penalty terms for constraint violations
     G4double penalty = 0.0;
@@ -357,24 +363,19 @@ G4double Gaussian3DFitter::CalculateConstrainedChiSquared(const std::vector<G4do
         penalty += fConstraintPenalty * (TMath::Abs(y0) - half_det);
     }
     
-    // Penalty for being in pixel exclusion zone
-    if (IsPointInsidePixelZone(x0, y0)) {
-        G4double dist_deficit = fDetectorGeometry.pixel_exclusion_buffer - CalculateMinDistanceToPixel(x0, y0);
-        penalty += fConstraintPenalty * TMath::Max(0.0, dist_deficit * 100.0); // Scale up the penalty
+    // Penalty for being too close to pixel center or inside pixel area
+    const G4double d0 = 0.01*mm; // 10 micron minimum distance from pixel center
+    if (IsPointInsidePixelZone(x0, y0, d0)) {
+        G4double min_dist = CalculateMinDistanceToPixelCenter(x0, y0);
+        if (min_dist < d0) {
+            penalty += fConstraintPenalty * (d0 - min_dist) * 100.0; // Scale up the penalty
+        } else {
+            // Inside pixel area but outside d0 radius - still penalize
+            penalty += fConstraintPenalty * 100.0;
+        }
     }
     
-    // Penalty for unreasonable sigma values
-    const G4double min_sigma = 0.005;
-    const G4double max_sigma = fDetectorGeometry.detector_size / 4.0;
-    if (params[3] < min_sigma) penalty += fConstraintPenalty * (min_sigma - params[3]) * 1000.0;
-    if (params[3] > max_sigma) penalty += fConstraintPenalty * (params[3] - max_sigma);
-    if (params[4] < min_sigma) penalty += fConstraintPenalty * (min_sigma - params[4]) * 1000.0;
-    if (params[4] > max_sigma) penalty += fConstraintPenalty * (params[4] - max_sigma);
-    
-    // Penalty for negative amplitude
-    if (params[0] <= 0) penalty += fConstraintPenalty * (-params[0] + 1.0) * 1000.0;
-    
-    return chi2 + penalty;
+    return chi2red + penalty;
 }
 
 void Gaussian3DFitter::CalculateResidualStats(const std::vector<G4double>& x_coords,
@@ -416,7 +417,7 @@ G4double Gaussian3DFitter::CalculateChiSquared(const std::vector<G4double>& x_co
                                                const std::vector<G4double>& z_errors,
                                                const G4double* params)
 {
-    G4double chi2 = 0.0;
+    G4double chi2red = 0.0;
     
     for (size_t i = 0; i < x_coords.size(); ++i) {
         const G4double z_fit = Gaussian3DFunction(x_coords[i], y_coords[i], params);
@@ -424,11 +425,11 @@ G4double Gaussian3DFitter::CalculateChiSquared(const std::vector<G4double>& x_co
         const G4double error = (!z_errors.empty() && i < z_errors.size()) ? z_errors[i] : 1.0;
         
         if (error > 0) {
-            chi2 += (residual * residual) / (error * error);
+            chi2red += (residual * residual) / (error * error);
         }
     }
     
-    return chi2;
+    return chi2red;
 }
 
 void Gaussian3DFitter::RobustSimplexFit(const std::vector<G4double>& x_coords,
@@ -440,8 +441,8 @@ void Gaussian3DFitter::RobustSimplexFit(const std::vector<G4double>& x_coords,
 {
     // Enhanced Nelder-Mead simplex optimization with constraints
     const G4int n_params = fNParams;
-    const G4int max_iterations = 2000; // Increased for robustness
-    const G4double tolerance = 1e-8;    // Tighter tolerance
+    const G4int max_iterations = Constants::MAX_ITERATIONS; // Increased for robustness
+    const G4double tolerance = Constants::FIT_TOLERANCE;    // Tighter tolerance
     
     // Create initial simplex with better parameter space exploration
     std::vector<std::vector<G4double>> simplex(n_params + 1);
@@ -457,26 +458,26 @@ void Gaussian3DFitter::RobustSimplexFit(const std::vector<G4double>& x_coords,
                 G4double step;
                 switch (j) {
                     case 0: // amplitude
-                        step = TMath::Abs(params[j]) * 0.2; // 20% variation
-                        if (step < 0.1) step = 0.1;
+                        step = TMath::Abs(params[j]) * Constants::DEFAULT_AMPLITUDE_FRACTION;
+                        if (step < Constants::MIN_STEP_SIZE) step = Constants::MIN_STEP_SIZE;
                         break;
                     case 1: case 2: // x0, y0
-                        step = 0.05; // 50 microns
+                        step = Constants::DEFAULT_STEP_SIZE;
                         break;
                     case 3: case 4: // sigma_x, sigma_y
-                        step = TMath::Abs(params[j]) * 0.3; // 30% variation
-                        if (step < 0.01) step = 0.01;
+                        step = TMath::Abs(params[j]) * Constants::DEFAULT_AMPLITUDE_FRACTION;
+                        if (step < Constants::MIN_STEP_SIZE) step = Constants::MIN_STEP_SIZE;
                         break;
                     case 5: // theta
-                        step = 0.2; // ~11 degrees
+                        step = Constants::DEFAULT_STEP_SIZE;
                         break;
                     case 6: // offset
-                        step = TMath::Abs(params[j]) * 0.1;
-                        if (step < 0.01) step = 0.01;
+                        step = TMath::Abs(params[j]) * Constants::DEFAULT_AMPLITUDE_FRACTION;
+                        if (step < Constants::MIN_STEP_SIZE_ALT) step = Constants::MIN_STEP_SIZE;
                         break;
                     default:
-                        step = TMath::Abs(params[j]) * 0.1;
-                        if (step < 1e-6) step = 0.01;
+                        step = TMath::Abs(params[j]) * Constants::DEFAULT_AMPLITUDE_FRACTION;
+                        if (step < Constants::MIN_STEP_SIZE) step = Constants::MIN_STEP_SIZE;
                 }
                 simplex[i][j] += step;
             }
@@ -489,9 +490,9 @@ void Gaussian3DFitter::RobustSimplexFit(const std::vector<G4double>& x_coords,
     
     if (verbose) {
         G4cout << "  Starting robust simplex optimization..." << G4endl;
-        G4cout << "  Initial chi2 values: ";
-        for (const auto& chi2 : chi2_values) {
-            G4cout << chi2 << " ";
+        G4cout << "  Initial chi2red values: ";
+        for (const auto& chi2red : chi2_values) {
+            G4cout << chi2red << " ";
         }
         G4cout << G4endl;
     }
@@ -614,7 +615,7 @@ void Gaussian3DFitter::RobustSimplexFit(const std::vector<G4double>& x_coords,
         
         // Periodic verbose output
         if (verbose && iter % 200 == 0) {
-            G4cout << "  Iteration " << iter << ": best chi2 = " << chi2_values[best_idx] << G4endl;
+            G4cout << "  Iteration " << iter << ": best chi2red = " << chi2_values[best_idx] << G4endl;
         }
     }
     
@@ -630,7 +631,7 @@ void Gaussian3DFitter::RobustSimplexFit(const std::vector<G4double>& x_coords,
     }
     
     if (verbose) {
-        G4cout << "  Final chi2: " << chi2_values[best_idx] << G4endl;
+        G4cout << "  Final chi2red: " << chi2_values[best_idx] << G4endl;
     }
 }
 
@@ -703,17 +704,16 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
             G4double final_chi2 = CalculateChiSquared(x_coords, y_coords, z_values, z_errors, fitParams);
             
             if (verbose) {
-                G4cout << "  Final chi2: " << final_chi2 << G4endl;
+                G4cout << "  Final chi2red: " << final_chi2 << G4endl;
                 G4cout << "  Constraints satisfied: " << (constraints_ok ? "Yes" : "No") << G4endl;
             }
             
-            // Accept fit if constraints are satisfied and chi2 is reasonable
+            // Accept fit if constraints are satisfied and chi2red is reasonable
             if (constraints_ok && final_chi2 < best_chi2 && final_chi2 > 0) {
                 best_chi2 = final_chi2;
                 for (G4int i = 0; i < fNParams; ++i) {
                     best_params[i] = fitParams[i];
                 }
-                results.fit_attempt_number = attempt + 1;
                 results.constraints_satisfied = true;
                 fit_found = true;
                 
@@ -722,7 +722,7 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
                 }
             } else if (verbose) {
                 G4cout << "  ✗ Fit rejected (constraints: " << constraints_ok 
-                       << ", chi2: " << final_chi2 << ")" << G4endl;
+                       << ", chi2red: " << final_chi2 << ")" << G4endl;
             }
             
         } catch (const std::exception& e) {
@@ -753,34 +753,26 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
     results.offset = best_params[6];
     
     // Calculate statistics
-    results.chi2 = best_chi2;
+    results.chi2red = best_chi2;
     results.ndf = results.n_points - fNParams;
-    results.prob = (results.ndf > 0) ? TMath::Prob(best_chi2, results.ndf) : 0.0;
+    results.Pp = (results.ndf > 0) ? TMath::Prob(best_chi2, results.ndf) : 0.0;
     
     // Calculate residual statistics
     CalculateResidualStats(x_coords, y_coords, z_values, best_params, 
                          results.residual_mean, results.residual_std);
     
-    // Calculate robustness metrics
-    const G4double half_det = fDetectorGeometry.detector_size / 2.0;
-    results.center_distance_from_detector_edge = TMath::Min(
-        TMath::Min(half_det - TMath::Abs(results.x0), half_det - TMath::Abs(results.y0)),
-        TMath::Min(half_det + results.x0, half_det + results.y0)
-    );
-    results.min_distance_to_pixel = CalculateMinDistanceToPixel(results.x0, results.y0);
-    
     // Enhanced error estimates based on parameter sensitivity
-    const G4double reduced_chi2 = results.ndf > 0 ? results.chi2 : 1.0;
+    const G4double reduced_chi2 = results.ndf > 0 ? results.chi2red : 1.0;
     const G4double error_scale = TMath::Sqrt(TMath::Max(1.0, reduced_chi2));
     
     // More sophisticated error estimates
     results.amplitude_err = TMath::Abs(results.amplitude) * 0.05 * error_scale;
-    results.x0_err = 0.005 * error_scale; // 5 microns base uncertainty
-    results.y0_err = 0.005 * error_scale;
+    results.x0_err = Constants::BASE_POSITION_ERROR * error_scale; // 5 microns base uncertainty
+    results.y0_err = Constants::BASE_POSITION_ERROR * error_scale;
     results.sigma_x_err = TMath::Abs(results.sigma_x) * 0.08 * error_scale;
     results.sigma_y_err = TMath::Abs(results.sigma_y) * 0.08 * error_scale;
     results.theta_err = 0.05 * error_scale; // ~3 degrees
-    results.offset_err = TMath::Abs(results.offset) * 0.1 * error_scale;
+    results.offset_err = TMath::Abs(results.offset) * Constants::ERROR_SCALE_FRACTION * error_scale;
     
     if (verbose) {
         G4cout << "\n=== Final Fit Results ===" << G4endl;
@@ -795,13 +787,9 @@ Gaussian3DFitter::FitResults Gaussian3DFitter::FitGaussian3D(const std::vector<G
                << results.theta_err * 180.0 / TMath::Pi() << "°)" << G4endl;
         G4cout << "  Offset: " << results.offset << " ± " << results.offset_err << G4endl;
         G4cout << "Statistics:" << G4endl;
-        G4cout << "  Chi2/NDF: " << results.chi2 << G4endl;
-        G4cout << "  Probability: " << results.prob << G4endl;
+        G4cout << "  chi2red/NDF: " << results.chi2red << G4endl;
+        G4cout << "  Probability: " << results.Pp << G4endl;
         G4cout << "  Data points: " << results.n_points << G4endl;
-        G4cout << "Robustness:" << G4endl;
-        G4cout << "  Distance from detector edge: " << results.center_distance_from_detector_edge << " mm" << G4endl;
-        G4cout << "  Min distance to pixel: " << results.min_distance_to_pixel << " mm" << G4endl;
-        G4cout << "  Fit attempt: " << results.fit_attempt_number << "/" << fMaxFitAttempts << G4endl;
         G4cout << "===========================" << G4endl;
     }
     
