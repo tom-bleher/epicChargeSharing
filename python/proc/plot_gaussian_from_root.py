@@ -3,15 +3,22 @@
 Visualization of 3D Gaussian fitting results from ROOT file.
 Reads pre-computed Gaussian fit parameters from Geant4 simulation and creates plots.
 
+UPDATED FOR NEW SEPARATED DATA STRUCTURE:
+- Uses new NonPixel_ prefixed branch names for non-pixel hit data
+- Uses new classification variables: IsPixelHit, IsWithinD0, DistanceToPixelCenter
+- Updated to work with separated pixel/non-pixel data structure
+- Gaussian fitting is only available for non-pixel hits (distance > D0)
+
 FIXED TO MATCH ACTUAL C++ IMPLEMENTATION:
 - Removed all references to "outlier removal" fits (not implemented in C++)
 - Removed all references to R² (not calculated in C++, only Chi²/NDF available)
-- Removed dual fit comparison functionality 
+- Removed dual fit comparison functionality
 - Updated to work with single MinuitGaussianFitter results only
 - Fixed fit statistics to use actual ROOT branch names
 - Simplified analysis to match available data
 
 Recent updates:
+- Updated for new separated pixel/non-pixel data structure
 - Fixed to match actual C++ implementation (single fit only, no outliers, Chi²/NDF instead of R²)
 - Added dynamic units for charge and residuals based on charge_type
 - Units: 'fraction' → (fraction), 'value' → (keV), 'coulomb' → (C)
@@ -111,10 +118,18 @@ class GaussianRootPlotter:
                     'PixelY': tree['PixelY'].array(library="np"),
                     'PixelTrueDistance': tree['PixelTrueDistance'].array(library="np"),
                     
-                    # Charge data
-                    'GridNeighborhoodChargeFractions': tree['GridNeighborhoodChargeFractions'].array(library="np"),
-                    'GridNeighborhoodDistances': tree['GridNeighborhoodDistances'].array(library="np"),
-                    'GridNeighborhoodCharge': tree['GridNeighborhoodCharge'].array(library="np"),
+                    # NEW: Hit classification data
+                    'IsPixelHit': tree['IsPixelHit'].array(library="np"),
+                    'IsWithinD0': tree['IsWithinD0'].array(library="np"),
+                    'DistanceToPixelCenter': tree['DistanceToPixelCenter'].array(library="np"),
+                    
+                    # NEW: Pixel hit data (only meaningful for pixel hits)
+                    'PixelHit_PixelAlpha': tree['PixelHit_PixelAlpha'].array(library="np"),
+                    
+                    # NEW: Non-pixel hit charge data (with NonPixel_ prefix)
+                    'NonPixel_GridNeighborhoodChargeFractions': tree['NonPixel_GridNeighborhoodChargeFractions'].array(library="np"),
+                    'NonPixel_GridNeighborhoodDistances': tree['NonPixel_GridNeighborhoodDistances'].array(library="np"),
+                    'NonPixel_GridNeighborhoodCharge': tree['NonPixel_GridNeighborhoodCharge'].array(library="np"),
                     
                     # Event data
                     'EventID': tree['EventID'].array(library="np"),
@@ -189,14 +204,14 @@ class GaussianRootPlotter:
         pixel_y = data['PixelY'][event_idx]
         pixel_spacing = detector_params['pixel_spacing']
         
-        # Get charge data - exactly as in fit_gaussian.py extract_charge_data_for_fitting
+        # Get charge data - updated to use new branch names with NonPixel_ prefix
         if charge_type == 'fraction':
-            charge_data = data['GridNeighborhoodChargeFractions'][event_idx]
+            charge_data = data['NonPixel_GridNeighborhoodChargeFractions'][event_idx]
         elif charge_type == 'value':
-            charge_data = data['GridNeighborhoodCharge'][event_idx]
+            charge_data = data['NonPixel_GridNeighborhoodCharge'][event_idx]
         elif charge_type == 'coulomb':
-            if 'GridNeighborhoodCharge' in data:
-                charge_data = data['GridNeighborhoodCharge'][event_idx]
+            if 'NonPixel_GridNeighborhoodCharge' in data:
+                charge_data = data['NonPixel_GridNeighborhoodCharge'][event_idx]
             else:
                 raise ValueError("Coulomb charge data not available")
         else:
@@ -428,8 +443,19 @@ class GaussianRootPlotter:
         axs[0].plot([], [], ' ', label=f'Pixel-True Dist: {pixel_true_distance:.3f} mm')
         
         # Add title indicating fallback if used
-        title = f'Event {event_idx} - {"Python Fit (Fallback)" if fallback_used else "ROOT Fit"}'
-        # axs[0].set_title(title, fontsize=14)  # Removed title
+        fit_status = data['FitConstraintsSatisfied'][event_idx]
+        if fit_status:
+            title = f'Event {event_idx} - Successful Fit (FitConstraintsSatisfied=True)'
+            status_color = 'green'
+        else:
+            title = f'Event {event_idx} - Failed Fit (FitConstraintsSatisfied=False)'
+            status_color = 'red'
+        
+        # Add title to the figure (not individual subplots to preserve layout)
+        fig.suptitle(title, fontsize=16, fontweight='bold', color=status_color, y=0.95)
+        
+        # Add invisible line for fit status in legend
+        axs[0].plot([], [], ' ', label=f'Fit Status: {"✓ Success" if fit_status else "✗ Failed"}')
         
         axs[0].set_xlabel('X (mm)', fontsize=14)
         axs[0].set_ylabel('Y (mm)', fontsize=14)
@@ -481,14 +507,23 @@ class GaussianRootPlotter:
         if save_plot:
             import time
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            prefix = "python_fallback" if fallback_used else "gaussian_from_root"
-            filename = f'{prefix}_simple_event_{event_idx}_{timestamp}.png'
+            
+            # Create descriptive filename based on fit status
+            fit_status = data['FitConstraintsSatisfied'][event_idx]
+            if fit_status:
+                prefix = "successful_fit"
+                status_desc = "success"
+            else:
+                prefix = "failed_fit"
+                status_desc = "failed"
+            
+            filename = f'{prefix}_event_{event_idx}_{status_desc}_{timestamp}.png'
             
             if output_dir:
                 filename = os.path.join(output_dir, filename)
             
             plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
-            print(f"Simple fit plot saved to {filename}")
+            print(f"Plot saved to {filename}")
         
         # plt.show()  # Commented out for non-interactive backend
         return fig
@@ -749,15 +784,15 @@ class GaussianRootPlotter:
         true_x = generator.data['TrueX'][event_idx]
         true_y = generator.data['TrueY'][event_idx]
         
-        # Get charge data based on type - exactly like fit_gaussian.py
+        # Get charge data based on type - updated for new branch names
         if charge_type == 'fraction':
-            charge_data = generator.data['GridNeighborhoodChargeFractions'][event_idx]
+            charge_data = generator.data['NonPixel_GridNeighborhoodChargeFractions'][event_idx]
         elif charge_type == 'value':
-            charge_data = generator.data['GridNeighborhoodCharge'][event_idx]
+            charge_data = generator.data['NonPixel_GridNeighborhoodCharge'][event_idx]
         elif charge_type == 'coulomb':
-            if 'GridNeighborhoodCharge' not in generator.data:
+            if 'NonPixel_GridNeighborhoodCharge' not in generator.data:
                 raise ValueError("Coulomb charge data not available in this ROOT file")
-            charge_data = generator.data['GridNeighborhoodCharge'][event_idx]
+            charge_data = generator.data['NonPixel_GridNeighborhoodCharge'][event_idx]
         else:
             raise ValueError("charge_type must be 'fraction', 'value', or 'coulomb'")
         
@@ -876,6 +911,109 @@ class GaussianRootPlotter:
         except Exception as e:
             print(f"Error in Python fallback fitting: {e}")
             raise
+
+    def plot_pixel_hit_info(self, event_idx, data, detector_params, charge_type='fraction',
+                           save_plot=True, output_dir="", filename_prefix="pixel_hit"):
+        """
+        Create an information plot for pixel hits (no Gaussian fitting performed)
+        
+        This creates a simple plot showing the basic event information for pixel hits
+        since Gaussian fitting is not performed for these events.
+        """
+        # Get basic event information
+        true_x = data['TrueX'][event_idx]
+        true_y = data['TrueY'][event_idx]
+        pixel_x = data['PixelX'][event_idx]
+        pixel_y = data['PixelY'][event_idx]
+        distance = data['DistanceToPixelCenter'][event_idx]
+        is_within_d0 = data['IsWithinD0'][event_idx]
+        edep = data['Edep'][event_idx]
+        
+        # Create a simple information plot
+        plt.close('all')
+        
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
+        
+        # Plot pixel center and true position
+        ax.plot(pixel_x, pixel_y, 's', color='blue', markersize=15, markeredgewidth=2, 
+               markerfacecolor='lightblue', label='Pixel Center')
+        ax.plot(true_x, true_y, 'x', color='red', markersize=12, markeredgewidth=3, 
+               label='True Hit Position')
+        
+        # Draw line between them
+        ax.plot([pixel_x, true_x], [pixel_y, true_y], 'r--', linewidth=2, alpha=0.7, 
+               label=f'Distance: {distance*1000:.1f} μm')
+        
+        # Draw pixel boundary (approximate)
+        pixel_size = detector_params.get('pixel_size', 0.055)  # Default 55 μm
+        pixel_half = pixel_size / 2
+        
+        # Draw pixel square
+        pixel_corners_x = [pixel_x - pixel_half, pixel_x + pixel_half, 
+                          pixel_x + pixel_half, pixel_x - pixel_half, pixel_x - pixel_half]
+        pixel_corners_y = [pixel_y - pixel_half, pixel_y - pixel_half, 
+                          pixel_y + pixel_half, pixel_y + pixel_half, pixel_y - pixel_half]
+        ax.plot(pixel_corners_x, pixel_corners_y, 'b-', linewidth=2, alpha=0.8, label='Pixel Boundary')
+        
+        # Set axis labels and title
+        ax.set_xlabel('X Position (mm)', fontsize=14)
+        ax.set_ylabel('Y Position (mm)', fontsize=14)
+        
+        # Determine hit classification for title
+        if is_within_d0:
+            classification = f"Pixel Hit (distance ≤ D0: {distance*1000:.1f} μm ≤ 10 μm)"
+            title_color = 'blue'
+        else:
+            classification = f"Pixel Hit (on pixel, distance: {distance*1000:.1f} μm)"
+            title_color = 'green'
+        
+        title = f'Event {event_idx} - {classification}\nNo Gaussian Fitting Performed'
+        ax.set_title(title, fontsize=14, fontweight='bold', color=title_color)
+        
+        # Add information text box
+        info_text = f'''Event Information:
+Energy Deposit: {edep:.6f} MeV
+True Position: ({true_x:.6f}, {true_y:.6f}) mm
+Pixel Center: ({pixel_x:.6f}, {pixel_y:.6f}) mm
+Distance to Pixel: {distance*1000:.1f} μm
+Within D0 (10 μm): {"Yes" if is_within_d0 else "No"}
+Pixel Alpha: {data['PixelHit_PixelAlpha'][event_idx]:.3f}°'''
+
+        ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=10,
+               verticalalignment='top', bbox=dict(boxstyle='round,pad=0.5', 
+               facecolor='lightyellow', alpha=0.8))
+        
+        # Set equal aspect ratio and appropriate limits
+        ax.set_aspect('equal')
+        
+        # Calculate reasonable plot limits
+        center_x = (true_x + pixel_x) / 2
+        center_y = (true_y + pixel_y) / 2
+        range_x = max(abs(true_x - pixel_x), pixel_size * 2)
+        range_y = max(abs(true_y - pixel_y), pixel_size * 2)
+        margin = max(range_x, range_y) * 0.3
+        
+        ax.set_xlim(center_x - range_x/2 - margin, center_x + range_x/2 + margin)
+        ax.set_ylim(center_y - range_y/2 - margin, center_y + range_y/2 + margin)
+        
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='upper right')
+        
+        # Save plot if requested
+        if save_plot:
+            import time
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f'{filename_prefix}_{timestamp}.png'
+            
+            if output_dir:
+                filename = os.path.join(output_dir, filename)
+            
+            plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
+            # Note: Don't print save message here to avoid spam during batch processing
+        
+        return fig
 
 def analyze_multiple_events_from_root(root_filename, event_indices=None, charge_type='fraction', 
                                     save_plots=True, output_dir="", plot_style='simple'):
@@ -1122,6 +1260,236 @@ def compare_python_vs_cpp_fits(root_filename, event_idx, charge_type='fraction')
 #     """
 #     pass
 
+def plot_all_events_from_root(root_filename, charge_type='fraction', 
+                             save_plots=True, output_dir="all_events", plot_style='simple'):
+    """
+    Plot and save individual plots for ALL events in the ROOT file
+    
+    Parameters:
+    -----------
+    root_filename : str
+        Path to ROOT file
+    charge_type : str
+        Type of charge data: 'fraction', 'value', or 'coulomb'
+    save_plots : bool
+        Whether to save plots (should be True for this function)
+    output_dir : str
+        Output directory for plots
+    plot_style : str
+        'simple', '3d', or 'both'
+        
+    Returns:
+    --------
+    dict : Summary statistics of all events processed
+    """
+    print(f"Loading data from ROOT file: {root_filename}")
+    
+    # Create plotter and load data
+    plotter = GaussianRootPlotter()
+    data, detector_params = plotter.load_root_data(root_filename)
+    
+    total_events = len(data['EventID'])
+    print(f"Found {total_events} events in ROOT file")
+    
+    if total_events == 0:
+        print("No events found in ROOT file!")
+        return {}
+    
+    # Create output directory
+    if save_plots and output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"Created output directory: {output_dir}")
+    
+    # Analyze event types
+    is_pixel_hit = data['IsPixelHit']
+    is_within_d0 = data['IsWithinD0']
+    fit_success = data['FitConstraintsSatisfied']
+    
+    # Categorize events
+    pixel_hits = np.where(is_pixel_hit)[0]
+    non_pixel_hits = np.where(~is_pixel_hit)[0]
+    non_pixel_successful = np.where((~is_pixel_hit) & fit_success)[0]
+    non_pixel_unsuccessful = np.where((~is_pixel_hit) & (~fit_success))[0]
+    
+    print(f"\nEvent classification:")
+    print(f"  Pixel hits (on pixel or distance <= D0):     {len(pixel_hits)}")
+    print(f"  Non-pixel hits (distance > D0):              {len(non_pixel_hits)}")
+    print(f"    - Successful fits:                          {len(non_pixel_successful)}")
+    print(f"    - Unsuccessful fits:                        {len(non_pixel_unsuccessful)}")
+    
+    # Statistics tracking
+    stats = {
+        'total_events': total_events,
+        'pixel_hits': len(pixel_hits),
+        'non_pixel_hits': len(non_pixel_hits),
+        'successful_fits': len(non_pixel_successful),
+        'unsuccessful_fits': len(non_pixel_unsuccessful),
+        'plots_created': 0,
+        'plots_failed': 0,
+        'successful_fit_results': [],
+        'processing_errors': []
+    }
+    
+    # Process each event
+    print(f"\nProcessing all {total_events} events...")
+    for event_idx in range(total_events):
+        try:
+            # Progress indicator
+            if (event_idx + 1) % 10 == 0 or event_idx == total_events - 1:
+                print(f"  Processing event {event_idx + 1}/{total_events} ({(event_idx + 1)/total_events*100:.1f}%)")
+            
+            # Determine event type for filename
+            is_pixel = is_pixel_hit[event_idx]
+            has_successful_fit = fit_success[event_idx]
+            distance = data['DistanceToPixelCenter'][event_idx]
+            
+            if is_pixel:
+                event_type = "pixel_hit"
+                status = f"dist_{distance*1000:.1f}um"  # Convert mm to microns
+            else:
+                if has_successful_fit:
+                    event_type = "nonpixel_success"
+                    chi2_ndf = data['FitChi2red'][event_idx] 
+                    status = f"chi2ndf_{chi2_ndf:.3f}"
+                else:
+                    event_type = "nonpixel_failed"
+                    status = "no_fit"
+            
+            # Create subdirectory for event type
+            event_output_dir = os.path.join(output_dir, event_type) if output_dir else event_type
+            if save_plots and not os.path.exists(event_output_dir):
+                os.makedirs(event_output_dir)
+            
+            # Create descriptive filename
+            import time
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename_base = f"event_{event_idx:04d}_{event_type}_{status}"
+            
+            # Plot the event
+            if is_pixel:
+                # For pixel hits, create a basic data visualization
+                # Since no Gaussian fitting is performed, we'll show the basic event info
+                try:
+                    # Create a simple info plot for pixel hits
+                    fig = plotter.plot_pixel_hit_info(event_idx, data, detector_params, 
+                                                    charge_type, save_plot=False, 
+                                                    output_dir=event_output_dir,
+                                                    filename_prefix=filename_base)
+                    if fig is not None:
+                        stats['plots_created'] += 1
+                        
+                        # Save with custom filename
+                        if save_plots:
+                            custom_filename = os.path.join(event_output_dir, f"{filename_base}.png")
+                            fig.savefig(custom_filename, dpi=300, bbox_inches='tight', facecolor='white')
+                        
+                        plt.close(fig)  # Clean up memory
+                except Exception as e:
+                    print(f"    Warning: Could not create pixel hit plot for event {event_idx}: {e}")
+                    # For pixel hits that can't be plotted, we'll skip but not count as error
+                    pass
+            else:
+                # For non-pixel hits, use the existing plotting functions
+                if plot_style in ['simple', 'both']:
+                    try:
+                        fig = plotter.plot_simple_fit_results(event_idx, data, detector_params, 
+                                                            charge_type, save_plot=False, 
+                                                            output_dir=event_output_dir, 
+                                                            root_filename=root_filename)
+                        if fig is not None:
+                            stats['plots_created'] += 1
+                            
+                            # Save with custom filename
+                            if save_plots:
+                                custom_filename = os.path.join(event_output_dir, f"{filename_base}_simple.png")
+                                fig.savefig(custom_filename, dpi=300, bbox_inches='tight', facecolor='white')
+                            
+                            plt.close(fig)  # Clean up memory
+                    except Exception as e:
+                        print(f"    Error creating simple plot for event {event_idx}: {e}")
+                        stats['plots_failed'] += 1
+                        stats['processing_errors'].append(f"Event {event_idx}: {str(e)}")
+                
+                if plot_style in ['3d', 'both'] and has_successful_fit:
+                    try:
+                        fig = plotter.plot_3d_visualization(event_idx, data, detector_params, 
+                                                          charge_type, save_plot=False, 
+                                                          output_dir=event_output_dir)
+                        if fig is not None:
+                            # Save with custom filename
+                            if save_plots:
+                                custom_filename = os.path.join(event_output_dir, f"{filename_base}_3d.png")
+                                fig.savefig(custom_filename, dpi=300, bbox_inches='tight', facecolor='white')
+                            
+                            plt.close(fig)  # Clean up memory
+                    except Exception as e:
+                        print(f"    Error creating 3D plot for event {event_idx}: {e}")
+                        stats['processing_errors'].append(f"Event {event_idx} 3D: {str(e)}")
+            
+            # Collect fit results for successful fits
+            if has_successful_fit and not is_pixel:
+                try:
+                    true_x = data['TrueX'][event_idx]
+                    true_y = data['TrueY'][event_idx]
+                    fit_x = data['FitX0'][event_idx]
+                    fit_y = data['FitY0'][event_idx]
+                    distance_error = np.sqrt((fit_x - true_x)**2 + (fit_y - true_y)**2)
+                    
+                    stats['successful_fit_results'].append({
+                        'event_idx': event_idx,
+                        'chi2_per_ndf': data['FitChi2red'][event_idx],
+                        'distance_error': distance_error,
+                        'sigma_x': data['FitSigmaX'][event_idx],
+                        'sigma_y': data['FitSigmaY'][event_idx],
+                        'distance_to_pixel': distance
+                    })
+                except Exception as e:
+                    print(f"    Warning: Could not collect fit statistics for event {event_idx}: {e}")
+                    
+        except Exception as e:
+            print(f"    Error processing event {event_idx}: {e}")
+            stats['plots_failed'] += 1
+            stats['processing_errors'].append(f"Event {event_idx}: {str(e)}")
+            continue
+    
+    # Print final summary
+    print(f"\n{'='*70}")
+    print("ALL EVENTS PROCESSING COMPLETE")
+    print(f"{'='*70}")
+    print(f"Total events processed:        {stats['total_events']}")
+    print(f"Plots successfully created:    {stats['plots_created']}")
+    print(f"Plot creation failures:        {stats['plots_failed']}")
+    print(f"Success rate:                  {stats['plots_created']/(stats['total_events'] - stats['pixel_hits'])*100:.1f}% (non-pixel events)")
+    
+    print(f"\nEvent breakdown:")
+    print(f"  Pixel hits:                  {stats['pixel_hits']} (no Gaussian fitting)")
+    print(f"  Non-pixel successful fits:   {stats['successful_fits']}")
+    print(f"  Non-pixel unsuccessful fits: {stats['unsuccessful_fits']}")
+    
+    if stats['successful_fit_results']:
+        successful_results = stats['successful_fit_results']
+        chi2_values = [r['chi2_per_ndf'] for r in successful_results]
+        distance_errors = [r['distance_error'] for r in successful_results]
+        
+        print(f"\nSuccessful fits statistics:")
+        print(f"  Average χ²/NDF:              {np.mean(chi2_values):.6f} ± {np.std(chi2_values):.6f}")
+        print(f"  Average distance error:      {np.mean(distance_errors):.6f} ± {np.std(distance_errors):.6f} mm")
+        print(f"  Distance error range:        {np.min(distance_errors):.6f} to {np.max(distance_errors):.6f} mm")
+    
+    if stats['processing_errors']:
+        print(f"\nFirst few processing errors:")
+        for i, error in enumerate(stats['processing_errors'][:5]):
+            print(f"  {i+1}. {error}")
+        if len(stats['processing_errors']) > 5:
+            print(f"  ... and {len(stats['processing_errors']) - 5} more errors")
+    
+    print(f"\nOutput directories created:")
+    print(f"  {os.path.join(output_dir, 'pixel_hit')}     (pixel hits)")
+    print(f"  {os.path.join(output_dir, 'nonpixel_success')}  (successful non-pixel fits)")
+    print(f"  {os.path.join(output_dir, 'nonpixel_failed')}   (failed non-pixel fits)")
+    
+    return stats
+
 if __name__ == "__main__":
     # Example usage - try multiple possible paths for the ROOT file
     possible_paths = [
@@ -1156,71 +1524,226 @@ if __name__ == "__main__":
     print("="*70)
     print("This script reads pre-computed Gaussian fit results from the")
     print("C++ Geant4 simulation and creates visualization plots.")
-    print("NOTE: Single fit only - no outlier removal functionality.")
+    print("NOTE: Updated for new separated pixel/non-pixel data structure.")
+    print("Gaussian fitting is only performed for non-pixel hits (distance > D0).")
     print("="*70)
     
-    # Load data to check what's available
-    plotter = GaussianRootPlotter()
-    try:
-        data, detector_params = plotter.load_root_data(root_file)
-        
-        print(f"\nLoaded {len(data['EventID'])} events from ROOT file")
-        
-        # Find successful fits
-        fit_success = data['FitConstraintsSatisfied']
-        
-        total_events = len(data['FitConstraintsSatisfied'])
-        success_count = np.sum(fit_success)
-        
-        print(f"Fit success rates:")
-        print(f"  Successful fits:       {success_count}/{total_events} ({success_count/total_events*100:.1f}%)")
-        
-        if success_count == 0:
-            print("No successful fits found in ROOT file!")
-            print("Make sure the Gaussian fitting was enabled in the C++ simulation.")
-            exit(1)
-        
-        # Find events for demonstration
-        all_events = np.arange(len(data['EventID']))
-        
-        # Randomly select a single event for demonstration (including unsuccessful)
-        demo_event = np.random.choice(all_events)
-        print(f"\nRandomly selected event for demonstration: {demo_event}")
-        
-        # Single fit plot for the randomly selected event
-        print(f"\n1. Creating fit visualization plot for event {demo_event}...")
-        plot_single_event_from_root(root_file, demo_event, CHARGE_TYPE,
-                                   save_plots=True, output_dir=OUTPUT_DIR,
-                                   plot_style='simple')
-        
-        # Randomly select events for multiple analysis (including unsuccessful)
-        n_events = min(5, len(all_events))
-        events_to_analyze = np.random.choice(all_events, size=n_events, replace=False)
-        print(f"\nRandomly selected events for analysis: {events_to_analyze.tolist()}")
-        
-        # Multiple events analysis
-        print(f"\n2. Analyzing multiple events...")
-        summary = analyze_multiple_events_from_root(root_file, events_to_analyze, CHARGE_TYPE,
-                                                  save_plots=True, output_dir=OUTPUT_DIR)
-        
-        print(f"\n{'='*70}")
-        print("FIT ANALYSIS COMPLETE")
-        print(f"{'='*70}")
-        print(f"Generated fit visualization plots from C++ Gaussian fits")
-        print(f"Results saved to: {OUTPUT_DIR}")
-        print(f"\nFeatures available:")
-        print(f"  - Shows fitted Gaussian surface with data points")
-        print(f"  - Displays fit quality metrics (χ²/NDF)")
-        print(f"  - Shows distance from true position")
-        print(f"  - Creates residual analysis plots")
-        print(f"  - Supports 3D visualization")
-        print(f"\nUsage examples:")
-        print(f"  # Single event simple plot:")
-        print(f"  plot_single_event_from_root('{root_file}', {demo_event}, 'fraction', plot_style='simple')")
-        print(f"  # Multiple events analysis:")
-        print(f"  analyze_multiple_events_from_root('{root_file}', [{', '.join(map(str, events_to_analyze[:3]))}], 'fraction')")
+    # Ask user what type of analysis to perform
+    print("\nAvailable analysis options:")
+    print("1. Sample plots (3 good + 3 bad fits) [DEFAULT]")
+    print("2. Plot ALL events in the ROOT file")
+    print("3. Exit")
     
-    except Exception as e:
-        print(f"Error loading ROOT file: {e}")
-        print("Make sure the ROOT file contains the required fit result branches.")
-        exit(1) 
+    try:
+        choice = input("\nEnter your choice (1-3) [1]: ").strip()
+        if not choice:
+            choice = "1"
+    except (EOFError, KeyboardInterrupt):
+        print("\nExiting...")
+        exit(0)
+    
+    if choice == "3":
+        print("Exiting...")
+        exit(0)
+    elif choice == "2":
+        # Plot ALL events
+        print("\n" + "="*70)
+        print("PLOTTING ALL EVENTS IN ROOT FILE")
+        print("="*70)
+        print("This will create individual plots for EVERY event in the ROOT file.")
+        print("Depending on the number of events, this may take a while and create many files.")
+        
+        # Confirm before proceeding
+        try:
+            confirm = input("\nDo you want to proceed? (y/N): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nCancelled by user.")
+            exit(0)
+        
+        if confirm not in ['y', 'yes']:
+            print("Operation cancelled.")
+            exit(0)
+        
+        # Plot all events
+        try:
+            stats = plot_all_events_from_root(
+                root_file, 
+                charge_type=CHARGE_TYPE,
+                save_plots=True, 
+                output_dir="all_events",
+                plot_style='simple'
+            )
+            
+            print(f"\n{'='*70}")
+            print("ALL EVENTS ANALYSIS COMPLETE")
+            print(f"{'='*70}")
+            print("Check the 'all_events' directory for organized plots by event type:")
+            print("  - all_events/pixel_hit/         (pixel hits - no Gaussian fitting)")
+            print("  - all_events/nonpixel_success/  (successful non-pixel fits)")
+            print("  - all_events/nonpixel_failed/   (failed non-pixel fits)")
+            
+        except Exception as e:
+            print(f"Error during all events analysis: {e}")
+            exit(1)
+            
+    else:  # choice == "1" or default
+        # Original sample analysis (3 good + 3 bad fits)
+        # Load data to check what's available
+        plotter = GaussianRootPlotter()
+        try:
+            data, detector_params = plotter.load_root_data(root_file)
+            
+            print(f"\nLoaded {len(data['EventID'])} events from ROOT file")
+            
+            # NEW: Analyze hit classification
+            is_pixel_hit = data['IsPixelHit']
+            is_within_d0 = data['IsWithinD0']
+            fit_success = data['FitConstraintsSatisfied']
+            
+            # Find different categories of events
+            pixel_hits = np.where(is_pixel_hit)[0]
+            non_pixel_hits = np.where(~is_pixel_hit)[0]
+            
+            # For non-pixel hits, find successful and unsuccessful fits
+            non_pixel_successful = np.where((~is_pixel_hit) & fit_success)[0]
+            non_pixel_unsuccessful = np.where((~is_pixel_hit) & (~fit_success))[0]
+            
+            total_events = len(data['EventID'])
+            pixel_count = len(pixel_hits)
+            non_pixel_count = len(non_pixel_hits)
+            non_pixel_success_count = len(non_pixel_successful)
+            non_pixel_fail_count = len(non_pixel_unsuccessful)
+            
+            print(f"\nHit classification:")
+            print(f"  Pixel hits (on pixel or distance <= D0):     {pixel_count}/{total_events} ({pixel_count/total_events*100:.1f}%)")
+            print(f"  Non-pixel hits (distance > D0):              {non_pixel_count}/{total_events} ({non_pixel_count/total_events*100:.1f}%)")
+            
+            print(f"\nGaussian fit results (non-pixel hits only):")
+            print(f"  Successful fits:       {non_pixel_success_count}/{non_pixel_count} ({non_pixel_success_count/non_pixel_count*100:.1f}% of non-pixel hits)")
+            print(f"  Unsuccessful fits:     {non_pixel_fail_count}/{non_pixel_count} ({non_pixel_fail_count/non_pixel_count*100:.1f}% of non-pixel hits)")
+            
+            # Select events to plot: 3 good fits and 3 bad fits from non-pixel hits
+            events_to_plot_success = []
+            events_to_plot_fail = []
+            
+            if len(non_pixel_successful) > 0:
+                n_success = min(3, len(non_pixel_successful))
+                events_to_plot_success = np.random.choice(non_pixel_successful, size=n_success, replace=False)
+                print(f"\nSelected {n_success} successful non-pixel fits: {events_to_plot_success.tolist()}")
+            else:
+                print("\nNo successful non-pixel fits found!")
+                
+            if len(non_pixel_unsuccessful) > 0:
+                n_fail = min(3, len(non_pixel_unsuccessful))
+                events_to_plot_fail = np.random.choice(non_pixel_unsuccessful, size=n_fail, replace=False)
+                print(f"Selected {n_fail} unsuccessful non-pixel fits: {events_to_plot_fail.tolist()}")
+            else:
+                print("No unsuccessful non-pixel fits found!")
+            
+            if len(events_to_plot_success) == 0 and len(events_to_plot_fail) == 0:
+                print("No non-pixel events to plot!")
+                print("Note: Gaussian fitting is only performed for non-pixel hits (distance > D0)")
+                if pixel_count > 0:
+                    print(f"Found {pixel_count} pixel hits, but these don't have Gaussian fits")
+                exit(1)
+            
+            # Create output directory
+            if not os.path.exists(OUTPUT_DIR):
+                os.makedirs(OUTPUT_DIR)
+            
+            # Plot successful fits
+            if len(events_to_plot_success) > 0:
+                print(f"\n{'='*70}")
+                print("PLOTTING SUCCESSFUL GAUSSIAN FITS (Non-pixel hits with FitConstraintsSatisfied = True)")
+                print(f"{'='*70}")
+                
+                for i, event_idx in enumerate(events_to_plot_success):
+                    print(f"\nPlotting successful fit {i+1}/{len(events_to_plot_success)}: Event {event_idx}")
+                    
+                    # Print event classification info
+                    distance = data['DistanceToPixelCenter'][event_idx]
+                    print(f"  Event classification: Non-pixel hit (distance = {distance:.6f} mm > D0)")
+                    print(f"  IsPixelHit: {data['IsPixelHit'][event_idx]}")
+                    print(f"  IsWithinD0: {data['IsWithinD0'][event_idx]}")
+                    
+                    # Print fit summary for successful events
+                    plotter.print_fit_summary(event_idx, data)
+                    
+                    # Create plot with indication that this is a successful fit
+                    plot_single_event_from_root(root_file, event_idx, CHARGE_TYPE,
+                                               save_plots=True, output_dir=OUTPUT_DIR,
+                                               plot_style='simple')
+            
+            # Plot unsuccessful fits  
+            if len(events_to_plot_fail) > 0:
+                print(f"\n{'='*70}")
+                print("PLOTTING UNSUCCESSFUL GAUSSIAN FITS (Non-pixel hits with FitConstraintsSatisfied = False)")
+                print(f"{'='*70}")
+                
+                for i, event_idx in enumerate(events_to_plot_fail):
+                    print(f"\nPlotting unsuccessful fit {i+1}/{len(events_to_plot_fail)}: Event {event_idx}")
+                    print(f"WARNING: This event has FitConstraintsSatisfied = False")
+                    
+                    # Print event classification info
+                    distance = data['DistanceToPixelCenter'][event_idx]
+                    print(f"  Event classification: Non-pixel hit (distance = {distance:.6f} mm > D0)")
+                    print(f"  IsPixelHit: {data['IsPixelHit'][event_idx]}")
+                    print(f"  IsWithinD0: {data['IsWithinD0'][event_idx]}")
+                    
+                    # For unsuccessful fits, we'll still try to plot but with warnings
+                    try:
+                        # Create a simple plot showing the data even if fit failed
+                        plotter.plot_simple_fit_results(event_idx, data, detector_params, CHARGE_TYPE, 
+                                                       save_plot=True, output_dir=OUTPUT_DIR, 
+                                                       root_filename=root_file)
+                        
+                        # Print basic event info
+                        print(f"Event {event_idx} basic info:")
+                        print(f"  True Position: ({data['TrueX'][event_idx]:.6f}, {data['TrueY'][event_idx]:.6f}) mm")
+                        print(f"  Pixel Position: ({data['PixelX'][event_idx]:.6f}, {data['PixelY'][event_idx]:.6f}) mm")
+                        print(f"  Pixel-True Distance: {data['PixelTrueDistance'][event_idx]:.6f} mm")
+                        print(f"  Distance to Pixel Center: {data['DistanceToPixelCenter'][event_idx]:.6f} mm")
+                        print(f"  Fit Parameters (may be unreliable):")
+                        print(f"    Amplitude: {data['FitAmplitude'][event_idx]:.6f}")
+                        print(f"    Center: ({data['FitX0'][event_idx]:.6f}, {data['FitY0'][event_idx]:.6f}) mm")
+                        print(f"    Sigmas: ({data['FitSigmaX'][event_idx]:.6f}, {data['FitSigmaY'][event_idx]:.6f}) mm")
+                        print(f"    Chi²/NDF: {data['FitChi2red'][event_idx]:.6f}")
+                        
+                    except Exception as e:
+                        print(f"Error plotting unsuccessful event {event_idx}: {e}")
+                        continue
+            
+            # Summary
+            print(f"\n{'='*70}")
+            print("SAMPLE PLOTTING COMPLETE")
+            print(f"{'='*70}")
+            print(f"Generated plots for:")
+            if len(events_to_plot_success) > 0:
+                print(f"  {len(events_to_plot_success)} successful non-pixel fits: {events_to_plot_success.tolist()}")
+            if len(events_to_plot_fail) > 0:
+                print(f"  {len(events_to_plot_fail)} unsuccessful non-pixel fits: {events_to_plot_fail.tolist()}")
+            print(f"\nAll plots saved to: {OUTPUT_DIR}")
+            print(f"\nFile naming convention:")
+            print(f"  - Successful fits: 'successful_fit_event_<ID>_success_<timestamp>.png'")
+            print(f"  - Failed fits: 'failed_fit_event_<ID>_failed_<timestamp>.png'")
+            print(f"\nSuccessful fits show:")
+            print(f"  - Reliable Gaussian fit parameters from C++ ROOT analysis")
+            print(f"  - High-quality fit statistics and residuals")
+            print(f"  - Accurate distance measurements")
+            print(f"  - Green title indicating FitConstraintsSatisfied=True")
+            print(f"  - Only non-pixel hits (distance > D0) are fitted")
+            print(f"\nFailed fits show:")
+            print(f"  - Raw data visualization (may use Python fallback fitting)")
+            print(f"  - Unreliable fit parameters (marked with warnings)")
+            print(f"  - Red title indicating FitConstraintsSatisfied=False")
+            print(f"  - Indication of why the fit may have failed")
+            print(f"\nData structure notes:")
+            print(f"  - Pixel hits (distance <= D0 or on pixel): No Gaussian fitting performed")
+            print(f"  - Non-pixel hits (distance > D0): Gaussian fitting attempted")
+            print(f"  - Hit classification stored in IsPixelHit, IsWithinD0, DistanceToPixelCenter")
+            print(f"  - Charge data for non-pixel hits stored with NonPixel_ prefix")
+        
+        except Exception as e:
+            print(f"Error loading ROOT file: {e}")
+            print("Make sure the ROOT file contains the required fit result branches.")
+            exit(1)
