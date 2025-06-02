@@ -41,15 +41,18 @@ public:
     // Method to set pixel alpha angle
     void SetPixelAlpha(G4double alpha);
     
-    // Method to set pixel hit flag
-    void SetPixelHit(G4bool hit);
+    // Method to set pixel hit flag and distance to pixel center
+    void SetPixelHitInfo(G4bool hit, G4double distanceToPixelCenter);
     
-    // Method to set neighborhood (9x9) grid angle data
+    // Method to set pixel classification based on D0 threshold
+    void SetPixelClassification(G4bool isWithinD0, G4double distanceToPixelCenter);
+    
+    // Method to set neighborhood (9x9) grid angle data for non-pixel hits
     void SetNeighborhoodGridData(const std::vector<G4double>& angles, 
                         const std::vector<G4int>& pixelI, 
                         const std::vector<G4int>& pixelJ);
     
-    // Method to set neighborhood (9x9) grid charge sharing data
+    // Method to set neighborhood (9x9) grid charge sharing data for non-pixel hits
     void SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
                           const std::vector<G4double>& distances,
                           const std::vector<G4double>& chargeValues,
@@ -74,7 +77,7 @@ public:
                        const std::vector<G4double>& stepZ,
                        const std::vector<G4double>& stepTime);
     
-    // Method to set 3D Gaussian fit results
+    // Method to set 3D Gaussian fit results (only for non-pixel hits)
     void SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
                               G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
                               G4double amplitude_err, G4double x0_err, G4double y0_err,
@@ -94,7 +97,9 @@ private:
     // Thread-safety mutex for ROOT operations
     static std::mutex fRootMutex;
     
-    // Variables for data storage with fixed units
+    // =============================================
+    // COMMON VARIABLES (stored for all events)
+    // =============================================
     G4double fEdep;   // Energy deposit [MeV]
     G4double fTrueX;   // True Hit position X [mm]
     G4double fTrueY;   // True Hit position Y [mm]
@@ -114,25 +119,63 @@ private:
     G4int fPixelI;    // Pixel index in X direction
     G4int fPixelJ;    // Pixel index in Y direction
     G4double fPixelDist; // Distance from hit to pixel center [mm]
-    G4double fPixelAlpha; // Angular size of pixel from hit position [deg]
-    G4bool fPixelHit;  // Flag to indicate if hit was on a pixel
+    
+    // =============================================
+    // HIT CLASSIFICATION VARIABLES
+    // =============================================
+    G4bool fIsPixelHit;  // True if hit is on pixel OR distance <= D0
+    G4bool fIsWithinD0;  // True if distance <= D0 (10 microns)
+    G4double fDistanceToPixelCenter; // Distance to nearest pixel center [mm]
+    
+    // =============================================
+    // PIXEL HIT DATA (distance <= D0 or on pixel)
+    // =============================================
+    G4double fPixelHit_PixelAlpha; // Angular size of pixel from hit position [deg]
+    
+    // =============================================
+    // NON-PIXEL HIT DATA (distance > D0 and not on pixel)
+    // =============================================
     
     // Variables for neighborhood (9x9) grid angle data
-    std::vector<G4double> fGridNeighborhoodAngles; // Angles from hit to neighborhood grid pixels [deg]
-    std::vector<G4int> fGridNeighborhoodPixelI;     // I indices of neighborhood grid pixels
-    std::vector<G4int> fGridNeighborhoodPixelJ;     // J indices of neighborhood grid pixels
+    std::vector<G4double> fNonPixel_GridNeighborhoodAngles; // Angles from hit to neighborhood grid pixels [deg]
+    std::vector<G4int> fNonPixel_GridNeighborhoodPixelI;     // I indices of neighborhood grid pixels
+    std::vector<G4int> fNonPixel_GridNeighborhoodPixelJ;     // J indices of neighborhood grid pixels
     
     // Variables for neighborhood (9x9) grid charge sharing data
-    std::vector<G4double> fGridNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels
-    std::vector<G4double> fGridNeighborhoodDistances;         // Distances from hit to neighborhood grid pixels [mm]
-    std::vector<G4double> fGridNeighborhoodCharge;       // Charge values in Coulombs for neighborhood grid pixels
+    std::vector<G4double> fNonPixel_GridNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels
+    std::vector<G4double> fNonPixel_GridNeighborhoodDistances;         // Distances from hit to neighborhood grid pixels [mm]
+    std::vector<G4double> fNonPixel_GridNeighborhoodCharge;       // Charge values in Coulombs for neighborhood grid pixels
     
-    // Variables for detector grid parameters (stored as ROOT metadata)
-    G4double fGridPixelSize;        // Pixel size [mm]
-    G4double fGridPixelSpacing;     // Pixel spacing [mm]  
-    G4double fGridPixelCornerOffset; // Pixel corner offset [mm]
-    G4double fGridDetSize;          // Detector size [mm]
-    G4int fGridNumBlocksPerSide;    // Number of blocks per side
+    // Variables for 3D Gaussian fit results
+    G4double fNonPixel_FitAmplitude;         // Fitted amplitude
+    G4double fNonPixel_FitX0;               // Fitted X center [mm]
+    G4double fNonPixel_FitY0;               // Fitted Y center [mm]
+    G4double fNonPixel_FitSigmaX;           // Fitted sigma X [mm]
+    G4double fNonPixel_FitSigmaY;           // Fitted sigma Y [mm]
+    G4double fNonPixel_FitTheta;            // Fitted rotation angle [rad]
+    G4double fNonPixel_FitOffset;           // Fitted offset
+    
+    G4double fNonPixel_FitAmplitudeErr;     // Error in amplitude
+    G4double fNonPixel_FitX0Err;           // Error in X center [mm]
+    G4double fNonPixel_FitY0Err;           // Error in Y center [mm]
+    G4double fNonPixel_FitSigmaXErr;       // Error in sigma X [mm]
+    G4double fNonPixel_FitSigmaYErr;       // Error in sigma Y [mm]
+    G4double fNonPixel_FitThetaErr;        // Error in rotation angle [rad]
+    G4double fNonPixel_FitOffsetErr;       // Error in offset
+    
+    G4double fNonPixel_FitChi2;            // Chi-squared value
+    G4double fNonPixel_FitNDF;             // Number of degrees of freedom
+    G4double fNonPixel_FitChi2red;            // Reduced chi-squared (chi2red/NDF)
+    G4double fNonPixel_FitPp;            // Fit probability (P-value)
+    G4int fNonPixel_FitNPoints;            // Number of points used in fit
+    G4double fNonPixel_FitResidualMean;    // Mean of residuals
+    G4double fNonPixel_FitResidualStd;     // Standard deviation of residuals
+    
+    // Enhanced robustness metrics
+    G4bool fNonPixel_FitConstraintsSatisfied; // Whether geometric constraints were satisfied
+    
+    // Additional variables for convenient access to Gaussian center and distance calculation
+    G4double fNonPixel_GaussTrueDistance;  // Distance from Gaussian center to true position [mm]
     
     // Variables for particle information
     G4int fEventID;                 // Event ID
@@ -153,36 +196,12 @@ private:
     std::vector<G4double> fAllStepLengths;     // Length of each step [mm]
     std::vector<G4int> fAllStepNumbers;        // Step number for each step
     
-    // Variables for 3D Gaussian fit results
-    G4double fFitAmplitude;         // Fitted amplitude
-    G4double fFitX0;               // Fitted X center [mm]
-    G4double fFitY0;               // Fitted Y center [mm]
-    G4double fFitSigmaX;           // Fitted sigma X [mm]
-    G4double fFitSigmaY;           // Fitted sigma Y [mm]
-    G4double fFitTheta;            // Fitted rotation angle [rad]
-    G4double fFitOffset;           // Fitted offset
-    
-    G4double fFitAmplitudeErr;     // Error in amplitude
-    G4double fFitX0Err;           // Error in X center [mm]
-    G4double fFitY0Err;           // Error in Y center [mm]
-    G4double fFitSigmaXErr;       // Error in sigma X [mm]
-    G4double fFitSigmaYErr;       // Error in sigma Y [mm]
-    G4double fFitThetaErr;        // Error in rotation angle [rad]
-    G4double fFitOffsetErr;       // Error in offset
-    
-    G4double fFitChi2;            // Chi-squared value
-    G4double fFitNDF;             // Number of degrees of freedom
-    G4double fFitChi2red;            // Reduced chi-squared (chi2red/NDF)
-    G4double fFitPp;            // Fit probability (P-value)
-    G4int fFitNPoints;            // Number of points used in fit
-    G4double fFitResidualMean;    // Mean of residuals
-    G4double fFitResidualStd;     // Standard deviation of residuals
-    
-    // Enhanced robustness metrics
-    G4bool fFitConstraintsSatisfied; // Whether geometric constraints were satisfied
-    
-    // Additional variables for convenient access to Gaussian center and distance calculation
-    G4double fGaussTrueDistance;  // Distance from Gaussian center to true position [mm]
+    // Variables for detector grid parameters (stored as ROOT metadata)
+    G4double fGridPixelSize;        // Pixel size [mm]
+    G4double fGridPixelSpacing;     // Pixel spacing [mm]  
+    G4double fGridPixelCornerOffset; // Pixel corner offset [mm]
+    G4double fGridDetSize;          // Detector size [mm]
+    G4int fGridNumBlocksPerSide;    // Number of blocks per side
 };
 
 #endif
