@@ -222,8 +222,8 @@ file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh)
 
 # Define ROOT libraries needed - only if ROOT was found properly
 if(ROOT_FOUND AND NOT "${ROOT_LIBS}" STREQUAL "")
-  # Use the libraries returned by root-config if available
-  set(ROOT_LIBRARIES ${ROOT_LIBS})
+  # Use the libraries returned by root-config if available, and add Minuit
+  set(ROOT_LIBRARIES ${ROOT_LIBS} -lMinuit)
 else()
   # Fall back to common ROOT libraries including math libraries for fitting
   if(ROOT_FOUND)

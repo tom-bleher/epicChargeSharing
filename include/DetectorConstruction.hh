@@ -47,7 +47,7 @@ public:
     G4double GetPixelSize() const { return fPixelSize; }
     G4double GetPixelSpacing() const { return fPixelSpacing; }
     G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
-    G4double GetDetSize() const { return fdetSize; }
+    G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
     G4ThreeVector GetDetectorPosition() const { return G4ThreeVector(0., 0., -1.0*cm); } // Fixed position from Construct()
     
@@ -68,8 +68,8 @@ private:
     G4double fPixelCornerOffset; // Edge-most pixel distance from edge of detector
     
     // Detector parameters
-    G4double fdetSize;           // Size of the detector
-    G4double fdetWidth;          // Width/thickness of the detector
+    G4double fDetSize;           // Size of the detector
+    G4double fDetWidth;          // Width/thickness of the detector
     
     G4int fNumBlocksPerSide;     // Number of pixels per row/column
     

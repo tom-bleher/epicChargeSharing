@@ -1,7 +1,8 @@
 #include "EventAction.hh"
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
-#include "Gaussian3DFitter.hh"
+#include "MinuitGaussianFitter.hh"
+#include "Constants.hh"
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
@@ -19,7 +20,6 @@
 // where:
 //   l = side length of the pixel pad (pixel_size)
 //   d = distance from event hit to center of pixel pad
-// This replaces the previous geometric method that calculated angles to pixel corners.
 // See Page 9: https://indico.cern.ch/event/813597/contributions/3727782/attachments/1989546/3540780/TREDI_Cartiglia.pdf
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
@@ -33,7 +33,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fHasHit(false),
   fPixelIndexI(-1),
   fPixelIndexJ(-1),
-  fPixelDistance(-1.),
+  fPixelTrueDist(-1.),
   fPixelHit(false),
   fInitialParticleEnergy(0.),
   fFinalParticleEnergy(0.),
@@ -42,20 +42,27 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fGaussianFitter(nullptr)
 { 
   // Create the 3D Gaussian fitter instance with detector geometry constraints
-  Gaussian3DFitter::DetectorGeometry geometry;
+  // Gaussian3DFitter::DetectorGeometry geometry;
+
+  // Create the Minuit-based 3D Gaussian fitter instance with detector geometry constraints
+  MinuitGaussianFitter::DetectorGeometry geometry;
+
   geometry.detector_size = fDetector->GetDetSize();
   geometry.pixel_size = fDetector->GetPixelSize();
   geometry.pixel_spacing = fDetector->GetPixelSpacing();
   geometry.pixel_corner_offset = fDetector->GetPixelCornerOffset();
   geometry.num_blocks_per_side = fDetector->GetNumBlocksPerSide();
-  geometry.pixel_exclusion_buffer = 0.01; // 10 microns as requested
+  geometry.pixel_exclusion_buffer = Constants::PIXEL_EXCLUSION_BUFFER; // 10 microns as requested
   
-  fGaussianFitter = new Gaussian3DFitter(geometry);
+  //fGaussianFitter = new Gaussian3DFitter(geometry);
+  fGaussianFitter = new MinuitGaussianFitter(geometry);
+  
+  G4cout << "EventAction: Using ROOT Minuit-based Gaussian fitter" << G4endl;
 }
 
 EventAction::~EventAction()
 { 
-  // Clean up the 3D Gaussian fitter
+  // Clean up the Minuit-based 3D Gaussian fitter
   if (fGaussianFitter) {
     delete fGaussianFitter;
     fGaussianFitter = nullptr;
@@ -75,7 +82,7 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   // Reset pixel mapping variables
   fPixelIndexI = -1;
   fPixelIndexJ = -1;
-  fPixelDistance = -1.;
+  fPixelTrueDist = -1.;
   fPixelHit = false;
   
   // Reset neighborhood (9x9) grid angle data
@@ -86,8 +93,7 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   // Reset neighborhood (9x9) grid charge sharing data
   fGridNeighborhoodChargeFractions.clear();
   fGridNeighborhoodDistances.clear();
-  fGridNeighborhoodChargeValues.clear();
-  fGridNeighborhoodChargeCoulombs.clear();
+  fGridNeighborhoodCharge.clear();
   
   // Reset additional tracking variables
   fInitialParticleEnergy = 0.;
@@ -96,16 +102,16 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fParticleName = "";
   
   // Reset step energy deposition data
-  fStepEdepVec.clear();
-  fStepZVec.clear();
-  fStepTimeVec.clear();
-  fStepNumVec.clear();
+  fStepEnergyDeposition.clear();
+  fStepZPositions.clear();
+  fStepTimes.clear();
+  fStepNumbers.clear();
   
   // Reset ALL step data
-  fAllStepEdepVec.clear();
-  fAllStepZVec.clear();
-  fAllStepTimeVec.clear();
-  fAllStepNumVec.clear();
+  fAllStepEnergyDeposition.clear();
+  fAllStepZPositions.clear();
+  fAllStepTimes.clear();
+  fAllStepNumbers.clear();
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -143,7 +149,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
   fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y(), nearestPixel.z());
   
   // Pass pixel indices and distance information to RunAction
-  fRunAction->SetPixelIndices(fPixelIndexI, fPixelIndexJ, fPixelDistance);
+  fRunAction->SetPixelIndices(fPixelIndexI, fPixelIndexJ, fPixelTrueDist);
   
   // Calculate and pass pixel angular size to RunAction
   G4double pixelAlpha = CalculatePixelAlpha(fPosition, fPixelIndexI, fPixelIndexJ);
@@ -155,7 +161,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
   
   // Calculate neighborhood (9x9) grid charge sharing and pass to RunAction
   CalculateNeighborhoodChargeSharing();
-  fRunAction->SetNeighborhoodChargeData(fGridNeighborhoodChargeFractions, fGridNeighborhoodDistances, fGridNeighborhoodChargeValues, fGridNeighborhoodChargeCoulombs);
+  fRunAction->SetNeighborhoodChargeData(fGridNeighborhoodChargeFractions, fGridNeighborhoodDistances, fGridNeighborhoodCharge, fGridNeighborhoodCharge);
   
   // Pass pixel hit status to RunAction
   fRunAction->SetPixelHit(fPixelHit);
@@ -165,10 +171,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
                              fParticleMomentum, fParticleName);
   
   // Pass step energy deposition information to RunAction
-  fRunAction->SetStepEnergyDeposition(fStepEdepVec, fStepZVec, fStepTimeVec);
+  fRunAction->SetStepEnergyDeposition(fStepEnergyDeposition, fStepZPositions, fStepTimes);
   
   // Pass ALL step information to RunAction
-  fRunAction->SetAllStepInfo(fAllStepEdepVec, fAllStepZVec, fAllStepTimeVec);
+  fRunAction->SetAllStepInfo(fAllStepEnergyDeposition, fAllStepZPositions, fAllStepTimes);
   
   // Perform 3D Gaussian fitting on charge distribution data
   if (fGaussianFitter && !fGridNeighborhoodChargeFractions.empty()) {
@@ -199,10 +205,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
     
     // Perform fitting if we have enough data points
-    if (x_coords.size() >= 4) { // Need at least 4 points for meaningful fit
+    if (x_coords.size() >= Constants::MIN_FIT_POINTS) { // Need at least 4 points for meaningful fit
       // Perform fitting with all data
       
-      Gaussian3DFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
+      MinuitGaussianFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
         x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
       
       // Pass fit results to RunAction
@@ -211,34 +217,26 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.sigma_x, fitResults.sigma_y, fitResults.theta, fitResults.offset,
         fitResults.amplitude_err, fitResults.x0_err, fitResults.y0_err,
         fitResults.sigma_x_err, fitResults.sigma_y_err, fitResults.theta_err, fitResults.offset_err,
-        fitResults.chi2, fitResults.ndf, fitResults.prob,
+        fitResults.chi2red, fitResults.ndf, fitResults.Pp,
         fitResults.n_points,
         fitResults.residual_mean, fitResults.residual_std,
-        fitResults.constraints_satisfied,
-        fitResults.center_distance_from_detector_edge, fitResults.min_distance_to_pixel,
-        fitResults.fit_attempt_number);
+        fitResults.constraints_satisfied);
         
-      // Optional: Print fit results for debugging (only for first few events)
-      if (eventID < 5) {
-          G4cout << "Event " << eventID << " - Fit Results:" << G4endl;
-          G4cout << "  Center: (" << fitResults.x0 << ", " << fitResults.y0 << ") mm" << G4endl;
-          G4cout << "  Sigma: (" << fitResults.sigma_x << ", " << fitResults.sigma_y << ") mm" << G4endl;
-      }
     } else {
       // Not enough data points for fitting - set default values
       fRunAction->SetGaussianFitResults(
         0, 0, 0, 0, 0, 0, 0,  // parameters
         0, 0, 0, 0, 0, 0, 0,  // errors
-        0, 0, 0,              // chi2, ndf, prob
-        0, 0, 0, 0, 0, 0, 0); // n_points, residual stats
+        0, 0, 0,              // chi2red, ndf, Pp
+        0, 0, 0, false); // n_points, residual stats, constraints
     }
   } else {
     // No fitter or no charge data - set default values
     fRunAction->SetGaussianFitResults(
       0, 0, 0, 0, 0, 0, 0,  // parameters
       0, 0, 0, 0, 0, 0, 0,  // errors
-      0, 0, 0,              // chi2, ndf, prob
-      0, 0, 0, 0, 0, 0, 0); // n_points, residual stats
+      0, 0, 0,              // chi2red, ndf, Pp
+      0, 0, 0, false); // n_points, residual stats, constraints
   }
   
   fRunAction->FillTree();
@@ -303,7 +301,7 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
   fPixelIndexJ = j;
   
   // Calculate and store distance from hit to pixel center (2D distance in detector plane)
-  fPixelDistance = std::sqrt(std::pow(position.x() - pixelX, 2) + 
+  fPixelTrueDist = std::sqrt(std::pow(position.x() - pixelX, 2) + 
                             std::pow(position.y() - pixelY, 2));
   
   // Determine if the hit was on a pixel using the detector's method
@@ -474,8 +472,7 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   // Clear previous data
   fGridNeighborhoodChargeFractions.clear();
   fGridNeighborhoodDistances.clear();
-  fGridNeighborhoodChargeValues.clear();
-  fGridNeighborhoodChargeCoulombs.clear();
+  fGridNeighborhoodCharge.clear();
   
   // Check if no energy was deposited
   if (fEdep <= 0) {
@@ -487,8 +484,7 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         
         fGridNeighborhoodChargeFractions.push_back(0.0);
         fGridNeighborhoodDistances.push_back(-999.0);
-        fGridNeighborhoodChargeValues.push_back(0.0);
-        fGridNeighborhoodChargeCoulombs.push_back(0.0);
+        fGridNeighborhoodCharge.push_back(0.0);
       }
     }
     return;
@@ -512,15 +508,13 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         if (di == 0 && dj == 0) {
           // This is the center pixel (the one that was hit)
           fGridNeighborhoodChargeFractions.push_back(1.0);
-          fGridNeighborhoodChargeValues.push_back(totalCharge);
-          fGridNeighborhoodChargeCoulombs.push_back(totalCharge * fElementaryCharge);
+          fGridNeighborhoodCharge.push_back(totalCharge * fElementaryCharge);
           fGridNeighborhoodDistances.push_back(0.0); // Distance to center of hit pixel is effectively zero
         } else if (gridPixelI >= 0 && gridPixelI < fDetector->GetNumBlocksPerSide() && 
                    gridPixelJ >= 0 && gridPixelJ < fDetector->GetNumBlocksPerSide()) {
           // This is a valid pixel in the detector but not the hit pixel
           fGridNeighborhoodChargeFractions.push_back(0.0);
-          fGridNeighborhoodChargeValues.push_back(0.0);
-          fGridNeighborhoodChargeCoulombs.push_back(0.0);
+          fGridNeighborhoodCharge.push_back(0.0);
           
           // Calculate distance to this pixel center for completeness
           G4double pixelSize = fDetector->GetPixelSize();
@@ -538,8 +532,7 @@ void EventAction::CalculateNeighborhoodChargeSharing()
           // This pixel is outside the detector bounds
           fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
           fGridNeighborhoodDistances.push_back(-999.0);
-          fGridNeighborhoodChargeValues.push_back(0.0);
-          fGridNeighborhoodChargeCoulombs.push_back(0.0);
+          fGridNeighborhoodCharge.push_back(0.0);
         }
       }
     }
@@ -592,8 +585,7 @@ void EventAction::CalculateNeighborhoodChargeSharing()
           // Store invalid data for out-of-bounds pixels
           fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
           fGridNeighborhoodDistances.push_back(-999.0);
-          fGridNeighborhoodChargeValues.push_back(0.0);
-          fGridNeighborhoodChargeCoulombs.push_back(0.0);
+          fGridNeighborhoodCharge.push_back(0.0);
           continue;
         }
         
@@ -607,14 +599,12 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         if (di == 0 && dj == 0) {
           // This is the identified pixel (fPixelIndexI, fPixelIndexJ) - assign all charge here
           fGridNeighborhoodChargeFractions.push_back(1.0);
-          fGridNeighborhoodChargeValues.push_back(totalChargeValue);
-          fGridNeighborhoodChargeCoulombs.push_back(totalChargeValue * fElementaryCharge);
+          fGridNeighborhoodCharge.push_back(totalChargeValue * fElementaryCharge);
           fGridNeighborhoodDistances.push_back(distance);
         } else {
           // All other pixels get zero charge
           fGridNeighborhoodChargeFractions.push_back(0.0);
-          fGridNeighborhoodChargeValues.push_back(0.0);
-          fGridNeighborhoodChargeCoulombs.push_back(0.0);
+          fGridNeighborhoodCharge.push_back(0.0);
           fGridNeighborhoodDistances.push_back(distance);
         }
       }
@@ -643,8 +633,7 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         // Store invalid data for out-of-bounds pixels
         fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
         fGridNeighborhoodDistances.push_back(-999.0);
-        fGridNeighborhoodChargeValues.push_back(0.0);
-        fGridNeighborhoodChargeCoulombs.push_back(0.0);
+        fGridNeighborhoodCharge.push_back(0.0);
         continue;
       }
       
@@ -674,10 +663,10 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         weight = alpha * (1.0 / std::log(distance / d0_mm));
       } else if (distance > 0) {
         // For very small distances, use a large weight
-        weight = alpha * 1000.0; // Large weight for very close pixels
+        weight = alpha * Constants::ALPHA_WEIGHT_MULTIPLIER; // Large weight for very close pixels
       } else {
         // Distance is zero (hit exactly on pixel center), give maximum weight
-        weight = alpha * 10000.0;
+        weight = alpha * Constants::ALPHA_WEIGHT_MULTIPLIER;
       }
       
       weights.push_back(weight);
@@ -716,8 +705,7 @@ void EventAction::CalculateNeighborhoodChargeSharing()
       
       fGridNeighborhoodChargeFractions.push_back(chargeFraction);
       fGridNeighborhoodDistances.push_back(distances[validIndex]);
-      fGridNeighborhoodChargeValues.push_back(chargeValue);
-      fGridNeighborhoodChargeCoulombs.push_back(chargeValue * fElementaryCharge);
+      fGridNeighborhoodCharge.push_back(chargeValue * fElementaryCharge);
       
       validIndex++;
     }
@@ -733,16 +721,16 @@ void EventAction::AddStepEnergyDeposition(G4double edep, G4double z, G4double ti
 {
   // Only store steps that actually deposit energy
   if (edep > 0.) {
-    fStepEdepVec.push_back(edep);
-    fStepZVec.push_back(z);
-    fStepTimeVec.push_back(time / CLHEP::ns); // Convert to ns
+    fStepEnergyDeposition.push_back(edep);
+    fStepZPositions.push_back(z);
+    fStepTimes.push_back(time / CLHEP::ns); // Convert to ns
   }
 }
 
 void EventAction::AddAllStepInfo(G4double edep, G4double z, G4double time)
 {
   // Store ALL steps, including those with zero energy deposition
-  fAllStepEdepVec.push_back(edep);
-  fAllStepZVec.push_back(z);
-  fAllStepTimeVec.push_back(time / CLHEP::ns); // Convert to ns
+  fAllStepEnergyDeposition.push_back(edep);
+  fAllStepZPositions.push_back(z);
+  fAllStepTimes.push_back(time / CLHEP::ns); // Convert to ns
 }

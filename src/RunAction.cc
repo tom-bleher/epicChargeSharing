@@ -66,19 +66,14 @@ RunAction::RunAction()
   fFitSigmaYErr(0),
   fFitThetaErr(0),
   fFitOffsetErr(0),
-  fFitChi2(0),
   fFitNDF(0),
-  fFitProb(0),
+  fFitChi2red(0),
+  fFitPp(0),
   fFitNPoints(0),
   fFitResidualMean(0),
   fFitResidualStd(0),
-  fGaussX(0),
-  fGaussY(0), 
   fGaussTrueDistance(std::numeric_limits<G4double>::quiet_NaN()),
-  fFitConstraintsSatisfied(false),
-  fFitCenterDistFromEdge(0),
-  fFitMinDistToPixel(0),
-  fFitAttemptNumber(0)
+  fFitConstraintsSatisfied(false)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize step energy deposition vectors (they are automatically initialized empty)
@@ -154,7 +149,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
     // Add branches for pixel mapping information
     fTree->Branch("PixelI", &fPixelI, "PixelI/I")->SetTitle("Pixel Index X");
     fTree->Branch("PixelJ", &fPixelJ, "PixelJ/I")->SetTitle("Pixel Index Y");
-    fTree->Branch("PixelDist", &fPixelDist, "PixelDist/D")->SetTitle("Distance to Pixel Center [mm]");
+    fTree->Branch("PixelTrueDistance", &fPixelDist, "PixelTrueDistance/D")->SetTitle("Distance to Pixel Center [mm]");
     fTree->Branch("PixelAlpha", &fPixelAlpha, "PixelAlpha/D")->SetTitle("Angular Size of Pixel [deg]");
     fTree->Branch("PixelHit", &fPixelHit, "PixelHit/O")->SetTitle("Hit on Pixel (Boolean)");
     
@@ -169,8 +164,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
     // Add branches for neighborhood (9x9) grid charge sharing data
     fTree->Branch("GridNeighborhoodChargeFractions", &fGridNeighborhoodChargeFractions)->SetTitle("Charge Fractions for Neighborhood Grid Pixels");
     fTree->Branch("GridNeighborhoodDistances", &fGridNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm]");
-    fTree->Branch("GridNeighborhoodChargeValues", &fGridNeighborhoodChargeValues)->SetTitle("Charge Values for Neighborhood Grid Pixels");
-    fTree->Branch("GridNeighborhoodChargeCoulombs", &fGridNeighborhoodChargeCoulombs)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels");
+    fTree->Branch("GridNeighborhoodCharge", &fGridNeighborhoodCharge)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels");
     
     // Add branches for particle information
     fTree->Branch("EventID", &fEventID, "EventID/I")->SetTitle("Event ID");
@@ -180,14 +174,14 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("ParticleName", &fParticleName)->SetTitle("Particle Type Name");
     
     // Add branches for step-by-step energy deposition information
-    fTree->Branch("StepEnergyDeposition", &fStepEdepVec)->SetTitle("Energy Deposited Per Step [MeV]");
-    fTree->Branch("StepZPosition", &fStepZVec)->SetTitle("Z Position of Each Energy Deposit [mm]");
-    fTree->Branch("StepTime", &fStepTimeVec)->SetTitle("Time of Each Energy Deposit [ns]");
+    fTree->Branch("StepEnergyDeposition", &fStepEnergyDeposition)->SetTitle("Energy Deposited Per Step [MeV]");
+    fTree->Branch("StepZPosition", &fStepZPositions)->SetTitle("Z Position of Each Energy Deposit [mm]");
+    fTree->Branch("StepTime", &fStepTimes)->SetTitle("Time of Each Energy Deposit [ns]");
     
     // Add branches for ALL step information (including non-energy depositing steps)
-    fTree->Branch("AllStepEnergyDeposition", &fAllStepEdepVec)->SetTitle("Energy Deposited Per Step (All Steps) [MeV]");
-    fTree->Branch("AllStepZPosition", &fAllStepZVec)->SetTitle("Z Position of Each Step [mm]");
-    fTree->Branch("AllStepTime", &fAllStepTimeVec)->SetTitle("Time of Each Step [ns]");
+    fTree->Branch("AllStepEnergyDeposition", &fAllStepEnergyDeposition)->SetTitle("Energy Deposited Per Step (All Steps) [MeV]");
+    fTree->Branch("AllStepZPosition", &fAllStepZPositions)->SetTitle("Z Position of Each Step [mm]");
+    fTree->Branch("AllStepTime", &fAllStepTimes)->SetTitle("Time of Each Step [ns]");
     
     // Add branches for 3D Gaussian fit results
     fTree->Branch("FitAmplitude", &fFitAmplitude, "FitAmplitude/D")->SetTitle("Fitted Gaussian Amplitude");
@@ -208,20 +202,16 @@ void RunAction::BeginOfRunAction(const G4Run*)
     
     fTree->Branch("FitChi2", &fFitChi2, "FitChi2/D")->SetTitle("Fit Chi-squared Value");
     fTree->Branch("FitNDF", &fFitNDF, "FitNDF/D")->SetTitle("Fit Number of Degrees of Freedom");
-    fTree->Branch("FitProb", &fFitProb, "FitProb/D")->SetTitle("Fit Probability");
+    fTree->Branch("FitChi2red", &fFitChi2red, "FitChi2red/D")->SetTitle("Reduced Chi-squared (chi2red/NDF)");
+    fTree->Branch("FitPp", &fFitPp, "FitPp/D")->SetTitle("Fit Probability (P-value)");
     fTree->Branch("FitNPoints", &fFitNPoints, "FitNPoints/I")->SetTitle("Number of Points Used in Fit");
     fTree->Branch("FitResidualMean", &fFitResidualMean, "FitResidualMean/D")->SetTitle("Mean of Fit Residuals");
     fTree->Branch("FitResidualStd", &fFitResidualStd, "FitResidualStd/D")->SetTitle("Standard Deviation of Fit Residuals");
     
     // Add branches for enhanced robustness metrics
     fTree->Branch("FitConstraintsSatisfied", &fFitConstraintsSatisfied, "FitConstraintsSatisfied/O")->SetTitle("Whether Geometric Constraints were Satisfied");
-    fTree->Branch("FitCenterDistFromEdge", &fFitCenterDistFromEdge, "FitCenterDistFromEdge/D")->SetTitle("Distance from Fit Center to Detector Edge [mm]");
-    fTree->Branch("FitMinDistToPixel", &fFitMinDistToPixel, "FitMinDistToPixel/D")->SetTitle("Minimum Distance from Fit Center to Any Pixel [mm]");
-    fTree->Branch("FitAttemptNumber", &fFitAttemptNumber, "FitAttemptNumber/I")->SetTitle("Which Fitting Attempt Succeeded (1-based)");
     
     // Add convenient alias branches for Gaussian center coordinates and distance calculation
-    fTree->Branch("GaussX", &fGaussX, "GaussX/D")->SetTitle("Gaussian Center X [mm]");
-    fTree->Branch("GaussY", &fGaussY, "GaussY/D")->SetTitle("Gaussian Center Y [mm]");
     fTree->Branch("GaussTrueDistance", &fGaussTrueDistance, "GaussTrueDistance/D")->SetTitle("Distance from Gaussian Center to True Position [mm]");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
@@ -553,8 +543,7 @@ void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFra
     // Store the neighborhood (9x9) grid charge sharing data
     fGridNeighborhoodChargeFractions = chargeFractions;
     fGridNeighborhoodDistances = distances;
-    fGridNeighborhoodChargeValues = chargeValues;
-    fGridNeighborhoodChargeCoulombs = chargeCoulombs;
+    fGridNeighborhoodCharge = chargeCoulombs;
 }
 
 void RunAction::FillTree()
@@ -605,39 +594,35 @@ void RunAction::SetParticleInfo(G4int eventID, G4double initialEnergy, G4double 
     fInitialEnergy = initialEnergy;
     fFinalEnergy = finalEnergy;
     fMomentum = momentum;
-    fParticleName = particleName;
+    fParticleName = std::string(particleName);  // Convert G4String to std::string for ROOT
 }
 
 void RunAction::SetStepEnergyDeposition(const std::vector<G4double>& stepEdep,
                                        const std::vector<G4double>& stepZ,
                                        const std::vector<G4double>& stepTime)
 {
-    // Store step-by-step energy deposition information
-    fStepEdepVec = stepEdep;
-    fStepZVec = stepZ;
-    fStepTimeVec = stepTime;
+    fStepEnergyDeposition = stepEdep;
+    fStepZPositions = stepZ;
+    fStepTimes = stepTime;
 }
 
 void RunAction::SetAllStepInfo(const std::vector<G4double>& stepEdep,
                               const std::vector<G4double>& stepZ,
                               const std::vector<G4double>& stepTime)
 {
-    // Store ALL step information (including non-energy depositing steps)
-    fAllStepEdepVec = stepEdep;
-    fAllStepZVec = stepZ;
-    fAllStepTimeVec = stepTime;
+    fAllStepEnergyDeposition = stepEdep;
+    fAllStepZPositions = stepZ;
+    fAllStepTimes = stepTime;
 }
 
 void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
                                      G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
                                      G4double amplitude_err, G4double x0_err, G4double y0_err,
                                      G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
-                                     G4double chi2, G4double ndf, G4double prob,
+                                     G4double chi2red, G4double ndf, G4double Pp,
                                      G4int n_points,
                                      G4double residual_mean, G4double residual_std,
-                                     G4bool constraints_satisfied,
-                                     G4double center_distance_from_detector_edge, G4double min_distance_to_pixel,
-                                     G4int fit_attempt_number)
+                                     G4bool constraints_satisfied)
 {
     // Store 3D Gaussian fit results
     fFitAmplitude = amplitude;
@@ -656,23 +641,17 @@ void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double 
     fFitThetaErr = theta_err;
     fFitOffsetErr = offset_err;
     
-    fFitChi2 = chi2;
+    fFitChi2 = chi2red;
     fFitNDF = ndf;
-    fFitProb = prob;
+    fFitChi2red = (ndf > 0) ? chi2red / ndf : 0.0;
+    fFitPp = Pp;
     fFitNPoints = n_points;
     fFitResidualMean = residual_mean;
     fFitResidualStd = residual_std;
     
     // Store enhanced robustness metrics
     fFitConstraintsSatisfied = constraints_satisfied;
-    fFitCenterDistFromEdge = center_distance_from_detector_edge;
-    fFitMinDistToPixel = min_distance_to_pixel;
-    fFitAttemptNumber = fit_attempt_number;
-    
-    // Set alias variables for convenient access to Gaussian center coordinates
-    fGaussX = x0;  // Alias for fFitX0
-    fGaussY = y0;  // Alias for fFitY0
     
     // Calculate distance from Gaussian center to true position
-    fGaussTrueDistance = std::sqrt(std::pow(fGaussX - fTrueX, 2) + std::pow(fGaussY - fTrueY, 2));
+    fGaussTrueDistance = std::sqrt(std::pow(fFitX0 - fTrueX, 2) + std::pow(fFitY0 - fTrueY, 2));
 }
