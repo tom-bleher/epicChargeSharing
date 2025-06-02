@@ -1,7 +1,7 @@
 #include "EventAction.hh"
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
-#include "MinuitGaussianFitter.hh"
+#include "Gaussian3DFitter.hh"
 #include "Constants.hh"
 
 #include "G4Event.hh"
@@ -42,10 +42,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fGaussianFitter(nullptr)
 { 
   // Create the 3D Gaussian fitter instance with detector geometry constraints
-  // Gaussian3DFitter::DetectorGeometry geometry;
-
-  // Create the Minuit-based 3D Gaussian fitter instance with detector geometry constraints
-  MinuitGaussianFitter::DetectorGeometry geometry;
+  Gaussian3DFitter::DetectorGeometry geometry;
 
   geometry.detector_size = fDetector->GetDetSize();
   geometry.pixel_size = fDetector->GetPixelSize();
@@ -54,15 +51,14 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   geometry.num_blocks_per_side = fDetector->GetNumBlocksPerSide();
   geometry.pixel_exclusion_buffer = Constants::PIXEL_EXCLUSION_BUFFER; // 10 microns as requested
   
-  //fGaussianFitter = new Gaussian3DFitter(geometry);
-  fGaussianFitter = new MinuitGaussianFitter(geometry);
+  fGaussianFitter = new Gaussian3DFitter(geometry);
   
-  G4cout << "EventAction: Using ROOT Minuit-based Gaussian fitter" << G4endl;
+  G4cout << "EventAction: Using custom simplex-based Gaussian fitter with center pixel constraints" << G4endl;
 }
 
 EventAction::~EventAction()
 { 
-  // Clean up the Minuit-based 3D Gaussian fitter
+  // Clean up the 3D Gaussian fitter
   if (fGaussianFitter) {
     delete fGaussianFitter;
     fGaussianFitter = nullptr;
@@ -84,16 +80,17 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fPixelIndexJ = -1;
   fPixelTrueDist = -1.;
   fPixelHit = false;
+  fIsWithinD0 = false;
   
   // Reset neighborhood (9x9) grid angle data
-  fGridNeighborhoodAngles.clear();
-  fGridNeighborhoodPixelI.clear();
-  fGridNeighborhoodPixelJ.clear();
+  fNonPixel_GridNeighborhoodAngles.clear();
+  fNonPixel_GridNeighborhoodPixelI.clear();
+  fNonPixel_GridNeighborhoodPixelJ.clear();
   
   // Reset neighborhood (9x9) grid charge sharing data
-  fGridNeighborhoodChargeFractions.clear();
-  fGridNeighborhoodDistances.clear();
-  fGridNeighborhoodCharge.clear();
+  fNonPixel_GridNeighborhoodChargeFractions.clear();
+  fNonPixel_GridNeighborhoodDistances.clear();
+  fNonPixel_GridNeighborhoodCharge.clear();
   
   // Reset additional tracking variables
   fInitialParticleEnergy = 0.;
@@ -153,18 +150,41 @@ void EventAction::EndOfEventAction(const G4Event* event)
   
   // Calculate and pass pixel angular size to RunAction
   G4double pixelAlpha = CalculatePixelAlpha(fPosition, fPixelIndexI, fPixelIndexJ);
-  fRunAction->SetPixelAlpha(pixelAlpha);
   
-  // Calculate neighborhood (9x9) grid angles and pass to RunAction
-  CalculateNeighborhoodGridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
-  fRunAction->SetNeighborhoodGridData(fGridNeighborhoodAngles, fGridNeighborhoodPixelI, fGridNeighborhoodPixelJ);
+  // Implement D0 classification logic
+  const G4double D0_threshold_mm = fD0 * 1e-3; // Convert microns to mm
+  fIsWithinD0 = (fPixelTrueDist <= D0_threshold_mm);
   
-  // Calculate neighborhood (9x9) grid charge sharing and pass to RunAction
-  CalculateNeighborhoodChargeSharing();
-  fRunAction->SetNeighborhoodChargeData(fGridNeighborhoodChargeFractions, fGridNeighborhoodDistances, fGridNeighborhoodCharge, fGridNeighborhoodCharge);
+  // Set pixel hit classification: true if on pixel OR distance <= D0
+  G4bool isPixelHit = fPixelHit || fIsWithinD0;
   
-  // Pass pixel hit status to RunAction
-  fRunAction->SetPixelHit(fPixelHit);
+  // Pass classification data to RunAction
+  fRunAction->SetPixelClassification(fIsWithinD0, fPixelTrueDist);
+  fRunAction->SetPixelHitInfo(isPixelHit, fPixelTrueDist);
+  
+  // Only calculate and store pixel-specific data for pixel hits (distance <= D0 or on pixel)
+  if (isPixelHit) {
+    fRunAction->SetPixelAlpha(pixelAlpha);
+    
+    // Clear non-pixel data for pixel hits
+    fNonPixel_GridNeighborhoodAngles.clear();
+    fNonPixel_GridNeighborhoodPixelI.clear();
+    fNonPixel_GridNeighborhoodPixelJ.clear();
+    fNonPixel_GridNeighborhoodChargeFractions.clear();
+    fNonPixel_GridNeighborhoodDistances.clear();
+    fNonPixel_GridNeighborhoodCharge.clear();
+  } else {
+    // Non-pixel hit: calculate neighborhood grid data
+    CalculateNeighborhoodGridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
+    CalculateNeighborhoodChargeSharing();
+    
+    // Set pixel alpha to 0 or NaN for non-pixel hits
+    fRunAction->SetPixelAlpha(0.0);
+  }
+  
+  // Pass neighborhood grid data to RunAction (will be empty for pixel hits)
+  fRunAction->SetNeighborhoodGridData(fNonPixel_GridNeighborhoodAngles, fNonPixel_GridNeighborhoodPixelI, fNonPixel_GridNeighborhoodPixelJ);
+  fRunAction->SetNeighborhoodChargeData(fNonPixel_GridNeighborhoodChargeFractions, fNonPixel_GridNeighborhoodDistances, fNonPixel_GridNeighborhoodCharge, fNonPixel_GridNeighborhoodCharge);
   
   // Pass particle information to RunAction
   fRunAction->SetParticleInfo(eventID, fInitialParticleEnergy, fFinalParticleEnergy, 
@@ -177,7 +197,16 @@ void EventAction::EndOfEventAction(const G4Event* event)
   fRunAction->SetAllStepInfo(fAllStepEnergyDeposition, fAllStepZPositions, fAllStepTimes);
   
   // Perform 3D Gaussian fitting on charge distribution data
-  if (fGaussianFitter && !fGridNeighborhoodChargeFractions.empty()) {
+  // IMPORTANT: FitConstraintsSatisfied only tracks non-pixel hits (distance > D0 and not on pixel)
+  // For pixel hits, FitConstraintsSatisfied is always false since no fitting is performed
+  // Only fit for non-pixel hits (distance > D0 and not on pixel)
+  G4bool shouldPerformFit = !isPixelHit && !fNonPixel_GridNeighborhoodChargeFractions.empty();
+  
+  if (fGaussianFitter && shouldPerformFit) {
+    G4cout << "EventAction: Performing Gaussian fit for event " << eventID 
+           << " (non-pixel hit, distance=" << fPixelTrueDist/mm << " mm > " 
+           << D0_threshold_mm/mm << " mm)" << G4endl;
+    
     // Extract coordinates and charge values for fitting
     std::vector<G4double> x_coords, y_coords, z_values;
     
@@ -185,11 +214,11 @@ void EventAction::EndOfEventAction(const G4Event* event)
     G4double pixelSpacing = fDetector->GetPixelSpacing();
     
     // Convert grid indices to actual coordinates
-    for (size_t i = 0; i < fGridNeighborhoodChargeFractions.size(); ++i) {
-      if (fGridNeighborhoodChargeFractions[i] > 0) { // Only include pixels with charge
+    for (size_t i = 0; i < fNonPixel_GridNeighborhoodChargeFractions.size(); ++i) {
+      if (fNonPixel_GridNeighborhoodChargeFractions[i] > 0) { // Only include pixels with charge
         // Calculate position relative to the nearest pixel center
-        G4int pixelI = fGridNeighborhoodPixelI[i];
-        G4int pixelJ = fGridNeighborhoodPixelJ[i];
+        G4int pixelI = fNonPixel_GridNeighborhoodPixelI[i];
+        G4int pixelJ = fNonPixel_GridNeighborhoodPixelJ[i];
         
         // Calculate offset from center pixel (which is at index 4,4 in 9x9 grid)
         G4int centerI = fPixelIndexI;
@@ -200,7 +229,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         
         x_coords.push_back(x_pos);
         y_coords.push_back(y_pos);
-        z_values.push_back(fGridNeighborhoodChargeFractions[i]);
+        z_values.push_back(fNonPixel_GridNeighborhoodChargeFractions[i]);
       }
     }
     
@@ -210,10 +239,18 @@ void EventAction::EndOfEventAction(const G4Event* event)
       fGaussianFitter->SetCenterPixelPosition(nearestPixel.x(), nearestPixel.y());
       
       // Perform fitting with all data
-      MinuitGaussianFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
+      Gaussian3DFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
         x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
       
+      // Calculate distance from fitted center to true position (GaussTrueDistance)
+      G4double gaussTrueDistance = std::sqrt(std::pow(fitResults.x0 - fInitialPosition.x(), 2) + 
+                                           std::pow(fitResults.y0 - fInitialPosition.y(), 2));
+      
+      G4cout << "EventAction: Fit successful. Distance from fitted center to true position: " 
+             << gaussTrueDistance/mm << " mm" << G4endl;
+      
       // Pass fit results to RunAction
+      // NOTE: fitResults.constraints_satisfied is the ONLY case where FitConstraintsSatisfied = true
       fRunAction->SetGaussianFitResults(
         fitResults.amplitude, fitResults.x0, fitResults.y0,
         fitResults.sigma_x, fitResults.sigma_y, fitResults.theta, fitResults.offset,
@@ -225,20 +262,34 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.constraints_satisfied);
         
     } else {
-      // Not enough data points for fitting - set default values
+      G4cout << "EventAction: Not enough data points for fitting (" << x_coords.size() 
+             << " < " << Constants::MIN_FIT_POINTS << ")" << G4endl;
+      // Not enough data points for fitting - FitConstraintsSatisfied = false (non-pixel hit but failed fit)
       fRunAction->SetGaussianFitResults(
         0, 0, 0, 0, 0, 0, 0,  // parameters
         0, 0, 0, 0, 0, 0, 0,  // errors
         0, 0, 0,              // chi2red, ndf, Pp
-        0, 0, 0, false); // n_points, residual stats, constraints
+        0, 0, 0, false); // n_points, residual stats, FitConstraintsSatisfied = false
     }
   } else {
-    // No fitter or no charge data - set default values
+    // Skip fitting due to conditions not met
+    if (isPixelHit) {
+      G4cout << "EventAction: Skipping Gaussian fit for event " << eventID 
+             << " (pixel hit or distance <= D0: " << fPixelTrueDist/mm << " mm)" << G4endl;
+      G4cout << "EventAction: FitConstraintsSatisfied = false (no fitting performed for pixel hits)" << G4endl;
+    } else if (!fGaussianFitter) {
+      G4cout << "EventAction: No Gaussian fitter available" << G4endl;
+    } else if (fNonPixel_GridNeighborhoodChargeFractions.empty()) {
+      G4cout << "EventAction: No charge data available for fitting" << G4endl;
+    }
+    
+    // Set default values (no fitting performed) - FitConstraintsSatisfied = false
+    // This includes ALL pixel hits (distance <= D0 or on pixel)
     fRunAction->SetGaussianFitResults(
       0, 0, 0, 0, 0, 0, 0,  // parameters
       0, 0, 0, 0, 0, 0, 0,  // errors
       0, 0, 0,              // chi2red, ndf, Pp
-      0, 0, 0, false); // n_points, residual stats, constraints
+      0, 0, 0, false); // n_points, residual stats, FitConstraintsSatisfied = false
   }
   
   fRunAction->FillTree();
@@ -366,9 +417,9 @@ G4double EventAction::CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4in
 void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ)
 {
   // Clear previous data
-  fGridNeighborhoodAngles.clear();
-  fGridNeighborhoodPixelI.clear();
-  fGridNeighborhoodPixelJ.clear();
+  fNonPixel_GridNeighborhoodAngles.clear();
+  fNonPixel_GridNeighborhoodPixelI.clear();
+  fNonPixel_GridNeighborhoodPixelJ.clear();
   
   // Check if hit is inside a pixel - if so, all angles should be invalid
   G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
@@ -383,9 +434,9 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
         G4int gridPixelJ = hitPixelJ + dj;
         
         // Store pixel indices and NaN angle
-        fGridNeighborhoodPixelI.push_back(gridPixelI);
-        fGridNeighborhoodPixelJ.push_back(gridPixelJ);
-        fGridNeighborhoodAngles.push_back(std::numeric_limits<G4double>::quiet_NaN()); // Use same NaN as elsewhere
+        fNonPixel_GridNeighborhoodPixelI.push_back(gridPixelI);
+        fNonPixel_GridNeighborhoodPixelJ.push_back(gridPixelJ);
+        fNonPixel_GridNeighborhoodAngles.push_back(std::numeric_limits<G4double>::quiet_NaN()); // Use same NaN as elsewhere
       }
     }
     return; // Exit early for inside-pixel hits
@@ -413,9 +464,9 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
       if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
           gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
         // Store invalid data for out-of-bounds pixels
-        fGridNeighborhoodPixelI.push_back(gridPixelI);
-        fGridNeighborhoodPixelJ.push_back(gridPixelJ);
-        fGridNeighborhoodAngles.push_back(-999.0); // Invalid angle marker
+        fNonPixel_GridNeighborhoodPixelI.push_back(gridPixelI);
+        fNonPixel_GridNeighborhoodPixelJ.push_back(gridPixelJ);
+        fNonPixel_GridNeighborhoodAngles.push_back(-999.0); // Invalid angle marker
         continue;
       }
       
@@ -432,9 +483,9 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
       G4double alphaInDegrees = alpha * (180.0 / CLHEP::pi);
       
       // Store the results
-      fGridNeighborhoodPixelI.push_back(gridPixelI);
-      fGridNeighborhoodPixelJ.push_back(gridPixelJ);
-      fGridNeighborhoodAngles.push_back(alphaInDegrees);
+      fNonPixel_GridNeighborhoodPixelI.push_back(gridPixelI);
+      fNonPixel_GridNeighborhoodPixelJ.push_back(gridPixelJ);
+      fNonPixel_GridNeighborhoodAngles.push_back(alphaInDegrees);
     }
   }
 }
@@ -472,9 +523,9 @@ G4double EventAction::CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
 void EventAction::CalculateNeighborhoodChargeSharing()
 {
   // Clear previous data
-  fGridNeighborhoodChargeFractions.clear();
-  fGridNeighborhoodDistances.clear();
-  fGridNeighborhoodCharge.clear();
+  fNonPixel_GridNeighborhoodChargeFractions.clear();
+  fNonPixel_GridNeighborhoodDistances.clear();
+  fNonPixel_GridNeighborhoodCharge.clear();
   
   // Check if no energy was deposited
   if (fEdep <= 0) {
@@ -484,9 +535,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         G4int gridPixelI = fPixelIndexI + di;
         G4int gridPixelJ = fPixelIndexJ + dj;
         
-        fGridNeighborhoodChargeFractions.push_back(0.0);
-        fGridNeighborhoodDistances.push_back(-999.0);
-        fGridNeighborhoodCharge.push_back(0.0);
+        fNonPixel_GridNeighborhoodChargeFractions.push_back(0.0);
+        fNonPixel_GridNeighborhoodDistances.push_back(-999.0);
+        fNonPixel_GridNeighborhoodCharge.push_back(0.0);
       }
     }
     return;
@@ -509,14 +560,14 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         // Check if this is the pixel that was hit
         if (di == 0 && dj == 0) {
           // This is the center pixel (the one that was hit)
-          fGridNeighborhoodChargeFractions.push_back(1.0);
-          fGridNeighborhoodCharge.push_back(totalCharge * fElementaryCharge);
-          fGridNeighborhoodDistances.push_back(0.0); // Distance to center of hit pixel is effectively zero
+          fNonPixel_GridNeighborhoodChargeFractions.push_back(1.0);
+          fNonPixel_GridNeighborhoodCharge.push_back(totalCharge * fElementaryCharge);
+          fNonPixel_GridNeighborhoodDistances.push_back(0.0); // Distance to center of hit pixel is effectively zero
         } else if (gridPixelI >= 0 && gridPixelI < fDetector->GetNumBlocksPerSide() && 
                    gridPixelJ >= 0 && gridPixelJ < fDetector->GetNumBlocksPerSide()) {
           // This is a valid pixel in the detector but not the hit pixel
-          fGridNeighborhoodChargeFractions.push_back(0.0);
-          fGridNeighborhoodCharge.push_back(0.0);
+          fNonPixel_GridNeighborhoodChargeFractions.push_back(0.0);
+          fNonPixel_GridNeighborhoodCharge.push_back(0.0);
           
           // Calculate distance to this pixel center for completeness
           G4double pixelSize = fDetector->GetPixelSize();
@@ -529,12 +580,12 @@ void EventAction::CalculateNeighborhoodChargeSharing()
           G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
           G4double distance = std::sqrt(std::pow(fPosition.x() - pixelCenterX, 2) + 
                                        std::pow(fPosition.y() - pixelCenterY, 2));
-          fGridNeighborhoodDistances.push_back(distance);
+          fNonPixel_GridNeighborhoodDistances.push_back(distance);
         } else {
           // This pixel is outside the detector bounds
-          fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
-          fGridNeighborhoodDistances.push_back(-999.0);
-          fGridNeighborhoodCharge.push_back(0.0);
+          fNonPixel_GridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
+          fNonPixel_GridNeighborhoodDistances.push_back(-999.0);
+          fNonPixel_GridNeighborhoodCharge.push_back(0.0);
         }
       }
     }
@@ -585,9 +636,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
             gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
           // Store invalid data for out-of-bounds pixels
-          fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
-          fGridNeighborhoodDistances.push_back(-999.0);
-          fGridNeighborhoodCharge.push_back(0.0);
+          fNonPixel_GridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
+          fNonPixel_GridNeighborhoodDistances.push_back(-999.0);
+          fNonPixel_GridNeighborhoodCharge.push_back(0.0);
           continue;
         }
         
@@ -600,14 +651,14 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         // Check if this is the identified pixel (center of the neighborhood grid)
         if (di == 0 && dj == 0) {
           // This is the identified pixel (fPixelIndexI, fPixelIndexJ) - assign all charge here
-          fGridNeighborhoodChargeFractions.push_back(1.0);
-          fGridNeighborhoodCharge.push_back(totalChargeValue * fElementaryCharge);
-          fGridNeighborhoodDistances.push_back(distance);
+          fNonPixel_GridNeighborhoodChargeFractions.push_back(1.0);
+          fNonPixel_GridNeighborhoodCharge.push_back(totalChargeValue * fElementaryCharge);
+          fNonPixel_GridNeighborhoodDistances.push_back(distance);
         } else {
           // All other pixels get zero charge
-          fGridNeighborhoodChargeFractions.push_back(0.0);
-          fGridNeighborhoodCharge.push_back(0.0);
-          fGridNeighborhoodDistances.push_back(distance);
+          fNonPixel_GridNeighborhoodChargeFractions.push_back(0.0);
+          fNonPixel_GridNeighborhoodCharge.push_back(0.0);
+          fNonPixel_GridNeighborhoodDistances.push_back(distance);
         }
       }
     }
@@ -633,9 +684,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
       if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
           gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
         // Store invalid data for out-of-bounds pixels
-        fGridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
-        fGridNeighborhoodDistances.push_back(-999.0);
-        fGridNeighborhoodCharge.push_back(0.0);
+        fNonPixel_GridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
+        fNonPixel_GridNeighborhoodDistances.push_back(-999.0);
+        fNonPixel_GridNeighborhoodCharge.push_back(0.0);
         continue;
       }
       
@@ -705,9 +756,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         chargeValue = chargeFraction * totalCharge;
       }
       
-      fGridNeighborhoodChargeFractions.push_back(chargeFraction);
-      fGridNeighborhoodDistances.push_back(distances[validIndex]);
-      fGridNeighborhoodCharge.push_back(chargeValue * fElementaryCharge);
+      fNonPixel_GridNeighborhoodChargeFractions.push_back(chargeFraction);
+      fNonPixel_GridNeighborhoodDistances.push_back(distances[validIndex]);
+      fNonPixel_GridNeighborhoodCharge.push_back(chargeValue * fElementaryCharge);
       
       validIndex++;
     }

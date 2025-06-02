@@ -8,7 +8,7 @@
 
 class RunAction;
 class DetectorConstruction;
-class MinuitGaussianFitter;
+class Gaussian3DFitter;
 
 class EventAction : public G4UserEventAction
 {
@@ -69,18 +69,20 @@ private:
     // Pixel mapping information
     G4int fPixelIndexI;    // Pixel index in the X direction
     G4int fPixelIndexJ;    // Pixel index in the Y direction
-    G4double fPixelTrueDist; // Distance from hit to pixel center
+    G4double fPixelTrueDist; // Distance from hit to pixel center (only set for analysis events)
+    G4double fActualPixelDistance; // Actual distance from hit to pixel center (always calculated)
     G4bool fPixelHit;     // Flag to indicate if the hit was on a pixel
+    G4bool fIsWithinD0;   // Flag to indicate if distance <= D0 (10 microns)
     
-    // Neighborhood (9x9) grid angle information
-    std::vector<G4double> fGridNeighborhoodAngles; // Angles from hit to each pixel in neighborhood grid
-    std::vector<G4int> fGridNeighborhoodPixelI;     // I indices of pixels in neighborhood grid
-    std::vector<G4int> fGridNeighborhoodPixelJ;     // J indices of pixels in neighborhood grid
+    // Neighborhood (9x9) grid angle information (for non-pixel hits)
+    std::vector<G4double> fNonPixel_GridNeighborhoodAngles; // Angles from hit to each pixel in neighborhood grid
+    std::vector<G4int> fNonPixel_GridNeighborhoodPixelI;     // I indices of pixels in neighborhood grid
+    std::vector<G4int> fNonPixel_GridNeighborhoodPixelJ;     // J indices of pixels in neighborhood grid
     
-    // Neighborhood (9x9) grid charge sharing information
-    std::vector<G4double> fGridNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid
-    std::vector<G4double> fGridNeighborhoodDistances;       // Distance from hit to each pixel center in neighborhood grid
-    std::vector<G4double> fGridNeighborhoodCharge;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
+    // Neighborhood (9x9) grid charge sharing information (for non-pixel hits)
+    std::vector<G4double> fNonPixel_GridNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid
+    std::vector<G4double> fNonPixel_GridNeighborhoodDistances;       // Distance from hit to each pixel center in neighborhood grid
+    std::vector<G4double> fNonPixel_GridNeighborhoodCharge;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
     
     // Constants for charge sharing calculation
     static constexpr G4double fIonizationEnergy = 3.6; // eV - typical for silicon
@@ -107,10 +109,7 @@ private:
     std::vector<G4int> fAllStepNumbers;        // Step number for each step
     
     // 3D Gaussian fitter instance
-    // Gaussian3DFitter* fGaussianFitter;
-
-    // ROOT Minuit-based 3D Gaussian fitter instance
-    MinuitGaussianFitter* fGaussianFitter;
+    Gaussian3DFitter* fGaussianFitter;
 };
 
 #endif

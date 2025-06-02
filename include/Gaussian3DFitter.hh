@@ -110,6 +110,41 @@ public:
     const DetectorGeometry& GetDetectorGeometry() const { return fDetectorGeometry; }
     
     /**
+     * @brief Set the center pixel position for constraint enforcement
+     * @param center_x X coordinate of center pixel [mm]
+     * @param center_y Y coordinate of center pixel [mm]
+     */
+    void SetCenterPixelPosition(G4double center_x, G4double center_y);
+    
+    /**
+     * @brief Set neighborhood radius for constraint calculation
+     * @param radius Neighborhood radius (e.g., radius=4 for 9x9 grid)
+     */
+    void SetNeighborhoodRadius(G4int radius);
+    
+    /**
+     * @brief Enable red area constraints mode
+     * @param enable Whether to enable red area constraints
+     */
+    void SetUseRedAreaConstraints(G4bool enable);
+    
+    /**
+     * @brief Fit 3D Gaussian to charge distribution data with quadrant-based red area optimization
+     * 
+     * @param x_coords X coordinates of data points [mm]
+     * @param y_coords Y coordinates of data points [mm]
+     * @param z_values Charge values at each point
+     * @param z_errors Uncertainties in charge values (optional)
+     * @param verbose Whether to print fit progress and results
+     * @return FitResults structure containing all fit information
+     */
+    FitResults FitGaussian3DWithRedAreaConstraints(const std::vector<G4double>& x_coords,
+                                                   const std::vector<G4double>& y_coords,
+                                                   const std::vector<G4double>& z_values,
+                                                   const std::vector<G4double>& z_errors = std::vector<G4double>(),
+                                                   G4bool verbose = false);
+    
+    /**
      * @brief Fit 3D Gaussian to charge distribution data
      * 
      * @param x_coords X coordinates of data points [mm]
@@ -140,6 +175,95 @@ public:
      */
     static G4double Gaussian3DFunctionWrapper(G4double* coords, G4double* params);
 
+    /**
+     * @brief Perform robust Nelder-Mead simplex optimization with constraints
+     */
+    void RobustSimplexFit(const std::vector<G4double>& x_coords,
+                         const std::vector<G4double>& y_coords,
+                         const std::vector<G4double>& z_values,
+                         const std::vector<G4double>& z_errors,
+                         G4double* params,
+                         G4bool verbose);
+    
+    /**
+     * @brief Perform robust simplex optimization with red area constraints
+     */
+    void RobustSimplexFitWithRedAreaConstraints(const std::vector<G4double>& x_coords,
+                                               const std::vector<G4double>& y_coords,
+                                               const std::vector<G4double>& z_values,
+                                               const std::vector<G4double>& z_errors,
+                                               G4double* params,
+                                               G4bool verbose);
+    
+    /**
+     * @brief Enhanced constrained chi-squared with red area penalty terms
+     */
+    G4double CalculateConstrainedChiSquaredWithRedArea(const std::vector<G4double>& x_coords,
+                                                      const std::vector<G4double>& y_coords,
+                                                      const std::vector<G4double>& z_values,
+                                                      const std::vector<G4double>& z_errors,
+                                                      const G4double* params);
+
+    /**
+     * @brief Generate initial guess within specified quadrant of red area
+     * @param quadrant Quadrant number (0=top-right, 1=top-left, 2=bottom-left, 3=bottom-right)
+     * @param x_guess Output X coordinate guess [mm]
+     * @param y_guess Output Y coordinate guess [mm]
+     * @return True if valid guess found in quadrant
+     */
+    G4bool GenerateQuadrantGuess(G4int quadrant, G4double& x_guess, G4double& y_guess) const;
+    
+    /**
+     * @brief Generate comprehensive set of initial guesses covering the red area efficiently
+     * @param initial_guesses Vector to store initial guess coordinates (x, y pairs)
+     * @param max_points Maximum number of initial guesses to generate
+     * @return Number of valid initial guesses generated
+     */
+    G4int GenerateRedAreaSamples(std::vector<std::pair<G4double, G4double>>& initial_guesses, G4int max_points = 16) const;
+    
+    /**
+     * @brief Generate systematic grid sampling of red area
+     * @param samples Vector to store valid sample points
+     * @param grid_resolution Resolution of the grid sampling
+     * @return Number of valid samples found
+     */
+    G4int SampleRedAreaSystematically(std::vector<std::pair<G4double, G4double>>& samples, G4int grid_resolution = 20) const;
+    
+    /**
+     * @brief Generate adaptive sampling focusing on promising regions of red area
+     * @param samples Vector to store sample points
+     * @param x_coords Data X coordinates for adaptive guidance
+     * @param y_coords Data Y coordinates for adaptive guidance
+     * @param z_values Data charge values for adaptive guidance
+     * @param num_samples Number of adaptive samples to generate
+     * @return Number of valid adaptive samples found
+     */
+    G4int SampleRedAreaAdaptively(std::vector<std::pair<G4double, G4double>>& samples,
+                                  const std::vector<G4double>& x_coords,
+                                  const std::vector<G4double>& y_coords,
+                                  const std::vector<G4double>& z_values,
+                                  G4int num_samples = 8) const;
+    
+    /**
+     * @brief Analyze red area coverage and provide statistics
+     * @param verbose Whether to print detailed analysis
+     * @return Total valid area in red region [mm²]
+     */
+    G4double AnalyzeRedAreaCoverage(G4bool verbose = false) const;
+    
+    /**
+     * @brief Calculate Gaussian true distance for fit quality assessment
+     * @param x_coords X coordinates of data points [mm]
+     * @param y_coords Y coordinates of data points [mm]
+     * @param z_values Charge values at each point
+     * @param params Gaussian parameters
+     * @return True distance metric
+     */
+    G4double CalculateGaussianTrueDistance(const std::vector<G4double>& x_coords,
+                                          const std::vector<G4double>& y_coords,
+                                          const std::vector<G4double>& z_values,
+                                          const G4double* params) const;
+
 private:
     /**
      * @brief Calculate initial parameter estimates with multiple strategies
@@ -149,6 +273,15 @@ private:
                               const std::vector<G4double>& z_values,
                               G4double* initialParams,
                               G4int strategy = 0);
+    
+    /**
+     * @brief Calculate physically reasonable initial parameter estimates with enhanced sigma bounds
+     */
+    void CalculatePhysicalInitialGuess(const std::vector<G4double>& x_coords,
+                                      const std::vector<G4double>& y_coords,
+                                      const std::vector<G4double>& z_values,
+                                      G4double* initialParams,
+                                      G4int strategy = 0);
     
     /**
      * @brief Check if point is inside any pixel with buffer zone
@@ -179,11 +312,26 @@ private:
     void GetPixelBounds(G4double center_x, G4double center_y, G4double* bounds) const;
     
     /**
-     * @brief Set the center pixel position for constraint enforcement
-     * @param center_x X coordinate of center pixel [mm]
-     * @param center_y Y coordinate of center pixel [mm]
+     * @brief Calculate neighborhood boundary around center pixel
+     * @param bounds Array to store neighborhood bounds [x_min, x_max, y_min, y_max]
      */
-    void SetCenterPixelPosition(G4double center_x, G4double center_y);
+    void CalculateNeighborhoodBounds(G4double* bounds) const;
+    
+    /**
+     * @brief Check if point is in the "red area" - valid region for Gaussian center
+     * @param x X coordinate [mm]
+     * @param y Y coordinate [mm]
+     * @return True if point is in valid red area
+     */
+    G4bool IsPointInRedArea(G4double x, G4double y) const;
+    
+    /**
+     * @brief Check if point is within neighborhood boundary
+     * @param x X coordinate [mm]
+     * @param y Y coordinate [mm]
+     * @return True if point is within neighborhood bounds
+     */
+    G4bool IsPointInNeighborhood(G4double x, G4double y) const;
     
     /**
      * @brief Apply parameter bounds during optimization
@@ -217,16 +365,6 @@ private:
                                            const std::vector<G4double>& z_errors,
                                            const G4double* params);
     
-    /**
-     * @brief Perform robust Nelder-Mead simplex optimization with constraints
-     */
-    void RobustSimplexFit(const std::vector<G4double>& x_coords,
-                         const std::vector<G4double>& y_coords,
-                         const std::vector<G4double>& z_values,
-                         const std::vector<G4double>& z_errors,
-                         G4double* params,
-                         G4bool verbose);
-    
     // Detector geometry constraints
     DetectorGeometry fDetectorGeometry;
     
@@ -234,6 +372,12 @@ private:
     G4double fCenterPixelX;
     G4double fCenterPixelY;
     G4bool fConstrainToCenterPixel;
+    
+    // Neighborhood constraint parameters
+    G4int fNeighborhoodRadius;  // Radius for neighborhood calculation (e.g., 4 for 9x9 grid)
+    
+    // Red area constraint mode
+    G4bool fUseRedAreaConstraints;  // Flag to enable red area constraint mode
     
     // Legacy ROOT fitting objects (kept for compatibility but not used)
     void* fGaussianFunction;  // Changed to void* to avoid ROOT dependencies

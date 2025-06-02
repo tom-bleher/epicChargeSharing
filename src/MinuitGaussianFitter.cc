@@ -23,15 +23,51 @@ MinuitGaussianFitter::MinuitGaussianFitter(const DetectorGeometry& detector_geom
       fCenterPixelX(0.0), fCenterPixelY(0.0), fConstrainToCenterPixel(false)
 {
     // Initialize Minuit with 7 parameters
-    fMinuit = new TMinuit(fNParams);
-    fMinuit->SetFCN(MinuitFcn);
-    fMinuit->SetPrintLevel(-1); // Suppress output by default
+    try {
+        fMinuit = new TMinuit(fNParams);
+        if (fMinuit) {
+            fMinuit->SetFCN(MinuitFcn);
+            fMinuit->SetPrintLevel(-1); // Suppress output by default
+        } else {
+            G4cout << "Warning: Failed to create TMinuit object" << G4endl;
+        }
+    } catch (const std::exception& e) {
+        G4cout << "Warning: Exception while creating TMinuit: " << e.what() << G4endl;
+        fMinuit = nullptr;
+    } catch (...) {
+        G4cout << "Warning: Unknown exception while creating TMinuit" << G4endl;
+        fMinuit = nullptr;
+    }
 }
 
 MinuitGaussianFitter::~MinuitGaussianFitter()
 {
+    // Clear static instance pointer to avoid dangling references
+    if (fStaticInstance == this) {
+        fStaticInstance = nullptr;
+    }
+    
+    // Clear static data vectors to avoid memory issues
+    fStaticXCoords.clear();
+    fStaticYCoords.clear();
+    fStaticZValues.clear();
+    fStaticZErrors.clear();
+    
+    // Thread-safe cleanup of TMinuit object
     if (fMinuit) {
-        delete fMinuit;
+        try {
+            // Reset any function callback to avoid issues during destruction
+            fMinuit->SetFCN(nullptr);
+            
+            // Clear Minuit's internal state
+            fMinuit->mncler();
+            
+            // Delete the TMinuit object
+            delete fMinuit;
+        } catch (...) {
+            // Ignore any exceptions during cleanup to prevent crashes
+            // This is acceptable since we're in a destructor
+        }
         fMinuit = nullptr;
     }
 }
@@ -87,6 +123,24 @@ void MinuitGaussianFitter::MinuitFcn(G4int& npar, G4double* gin, G4double& f, G4
     // Minuit callback function to calculate chi-squared
     G4double chi2 = 0.0;
     
+    // Safety checks for static data
+    if (fStaticXCoords.empty() || fStaticYCoords.empty() || fStaticZValues.empty()) {
+        f = 1e10; // Return large chi2 for invalid data
+        return;
+    }
+    
+    if (fStaticXCoords.size() != fStaticYCoords.size() || 
+        fStaticXCoords.size() != fStaticZValues.size()) {
+        f = 1e10; // Return large chi2 for inconsistent data
+        return;
+    }
+    
+    // Safety check for parameters
+    if (!par) {
+        f = 1e10;
+        return;
+    }
+    
     for (size_t i = 0; i < fStaticXCoords.size(); ++i) {
         const G4double z_fit = Gaussian3DFunction(fStaticXCoords[i], fStaticYCoords[i], par);
         const G4double residual = fStaticZValues[i] - z_fit;
@@ -139,6 +193,11 @@ void MinuitGaussianFitter::MinuitFcn(G4int& npar, G4double* gin, G4double& f, G4
         }
         
         chi2 += penalty;
+    }
+    
+    // Ensure chi2 is finite and positive
+    if (!TMath::Finite(chi2) || chi2 < 0) {
+        chi2 = 1e10;
     }
     
     f = chi2;
@@ -447,6 +506,14 @@ MinuitGaussianFitter::FitResults MinuitGaussianFitter::FitGaussian3D(const std::
         return results;
     }
     
+    // Early safety check for TMinuit object
+    if (!fMinuit) {
+        if (verbose) {
+            G4cout << "MinuitGaussianFitter::FitGaussian3D - Error: TMinuit object is null" << G4endl;
+        }
+        return results;
+    }
+    
     if (verbose) {
         G4cout << "\n=== Minuit Gaussian3D Fitting ===" << G4endl;
         G4cout << "Data points: " << x_coords.size() << G4endl;
@@ -458,7 +525,9 @@ MinuitGaussianFitter::FitResults MinuitGaussianFitter::FitGaussian3D(const std::
     results.fit_type = ALL_DATA;
     results.n_points = x_coords.size();
     
-    // Set static data for Minuit callback
+    // Set static data for Minuit callback - ensure thread safety
+    // Note: This is not truly thread-safe, but Geant4's multithreading model
+    // ensures each worker thread has its own EventAction with its own fitter
     fStaticXCoords = x_coords;
     fStaticYCoords = y_coords;
     fStaticZValues = z_values;
@@ -477,6 +546,14 @@ MinuitGaussianFitter::FitResults MinuitGaussianFitter::FitGaussian3D(const std::
         }
         
         try {
+            // Safety check before each fitting attempt
+            if (!fMinuit) {
+                if (verbose) {
+                    G4cout << "  Error: TMinuit object became null during fitting" << G4endl;
+                }
+                break;
+            }
+            
             // Clear previous fit
             fMinuit->mncler();
             
@@ -564,6 +641,13 @@ MinuitGaussianFitter::FitResults MinuitGaussianFitter::FitGaussian3D(const std::
             }
         }
     }
+    
+    // Clear static data after fitting to prevent issues
+    fStaticXCoords.clear();
+    fStaticYCoords.clear();
+    fStaticZValues.clear();
+    fStaticZErrors.clear();
+    fStaticInstance = nullptr;
     
     if (!fit_found) {
         if (verbose) {

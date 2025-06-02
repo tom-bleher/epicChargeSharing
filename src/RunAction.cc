@@ -40,40 +40,43 @@ RunAction::RunAction()
   fPixelI(-1),
   fPixelJ(-1),
   fPixelDist(0),
-  fPixelAlpha(0),
-  fPixelHit(false),
-  fGridPixelSize(0),
-  fGridPixelSpacing(0),
-  fGridPixelCornerOffset(0),
-  fGridDetSize(0),
-  fGridNumBlocksPerSide(0),
+  fIsPixelHit(false),
+  fIsWithinD0(false),
+  fDistanceToPixelCenter(0),
+  fPixelHit_PixelAlpha(0),
+  fNonPixel_FitAmplitude(0),
+  fNonPixel_FitX0(0),
+  fNonPixel_FitY0(0),
+  fNonPixel_FitSigmaX(0),
+  fNonPixel_FitSigmaY(0),
+  fNonPixel_FitTheta(0),
+  fNonPixel_FitOffset(0),
+  fNonPixel_FitAmplitudeErr(0),
+  fNonPixel_FitX0Err(0),
+  fNonPixel_FitY0Err(0),
+  fNonPixel_FitSigmaXErr(0),
+  fNonPixel_FitSigmaYErr(0),
+  fNonPixel_FitThetaErr(0),
+  fNonPixel_FitOffsetErr(0),
+  fNonPixel_FitChi2(0),
+  fNonPixel_FitNDF(0),
+  fNonPixel_FitChi2red(0),
+  fNonPixel_FitPp(0),
+  fNonPixel_FitNPoints(0),
+  fNonPixel_FitResidualMean(0),
+  fNonPixel_FitResidualStd(0),
+  fNonPixel_FitConstraintsSatisfied(false),
+  fNonPixel_GaussTrueDistance(std::numeric_limits<G4double>::quiet_NaN()),
   fEventID(-1),
   fInitialEnergy(0),
   fFinalEnergy(0),
   fMomentum(0),
   fParticleName(""),
-  fFitAmplitude(0),
-  fFitX0(0),
-  fFitY0(0),
-  fFitSigmaX(0),
-  fFitSigmaY(0),
-  fFitTheta(0),
-  fFitOffset(0),
-  fFitAmplitudeErr(0),
-  fFitX0Err(0),
-  fFitY0Err(0),
-  fFitSigmaXErr(0),
-  fFitSigmaYErr(0),
-  fFitThetaErr(0),
-  fFitOffsetErr(0),
-  fFitNDF(0),
-  fFitChi2red(0),
-  fFitPp(0),
-  fFitNPoints(0),
-  fFitResidualMean(0),
-  fFitResidualStd(0),
-  fGaussTrueDistance(std::numeric_limits<G4double>::quiet_NaN()),
-  fFitConstraintsSatisfied(false)
+  fGridPixelSize(0),
+  fGridPixelSpacing(0),
+  fGridPixelCornerOffset(0),
+  fGridDetSize(0),
+  fGridNumBlocksPerSide(0)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize step energy deposition vectors (they are automatically initialized empty)
@@ -150,21 +153,35 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("PixelI", &fPixelI, "PixelI/I")->SetTitle("Pixel Index X");
     fTree->Branch("PixelJ", &fPixelJ, "PixelJ/I")->SetTitle("Pixel Index Y");
     fTree->Branch("PixelTrueDistance", &fPixelDist, "PixelTrueDistance/D")->SetTitle("Distance to Pixel Center [mm]");
-    fTree->Branch("PixelAlpha", &fPixelAlpha, "PixelAlpha/D")->SetTitle("Angular Size of Pixel [deg]");
-    fTree->Branch("PixelHit", &fPixelHit, "PixelHit/O")->SetTitle("Hit on Pixel (Boolean)");
+    
+    // ==============================================
+    // HIT CLASSIFICATION BRANCHES
+    // ==============================================
+    fTree->Branch("IsPixelHit", &fIsPixelHit, "IsPixelHit/O")->SetTitle("Hit on Pixel OR distance <= D0");
+    fTree->Branch("IsWithinD0", &fIsWithinD0, "IsWithinD0/O")->SetTitle("Distance <= D0 (10 microns)");
+    fTree->Branch("DistanceToPixelCenter", &fDistanceToPixelCenter, "DistanceToPixelCenter/D")->SetTitle("Distance to Nearest Pixel Center [mm]");
+    
+    // ==============================================
+    // PIXEL HIT DATA (distance <= D0 or on pixel)
+    // ==============================================
+    fTree->Branch("PixelHit_PixelAlpha", &fPixelHit_PixelAlpha, "PixelHit_PixelAlpha/D")->SetTitle("Angular Size of Pixel [deg] (for pixel hits)");
+    
+    // ==============================================
+    // NON-PIXEL HIT DATA (distance > D0 and not on pixel)
+    // ==============================================
     
     // Load vector dictionaries for ROOT to properly handle std::vector branches
     gROOT->ProcessLine("#include <vector>");
     
-    // Add branches for neighborhood (9x9) grid angle data
-    fTree->Branch("GridNeighborhoodAngles", &fGridNeighborhoodAngles)->SetTitle("Angles from Hit to Neighborhood Grid Pixels [deg]");
-    fTree->Branch("GridNeighborhoodPixelI", &fGridNeighborhoodPixelI)->SetTitle("I Indices of Neighborhood Grid Pixels");
-    fTree->Branch("GridNeighborhoodPixelJ", &fGridNeighborhoodPixelJ)->SetTitle("J Indices of Neighborhood Grid Pixels");
+    // Add branches for neighborhood (9x9) grid angle data (non-pixel hits only)
+    fTree->Branch("NonPixel_GridNeighborhoodAngles", &fNonPixel_GridNeighborhoodAngles)->SetTitle("Angles from Hit to Neighborhood Grid Pixels [deg] (non-pixel hits)");
+    fTree->Branch("NonPixel_GridNeighborhoodPixelI", &fNonPixel_GridNeighborhoodPixelI)->SetTitle("I Indices of Neighborhood Grid Pixels (non-pixel hits)");
+    fTree->Branch("NonPixel_GridNeighborhoodPixelJ", &fNonPixel_GridNeighborhoodPixelJ)->SetTitle("J Indices of Neighborhood Grid Pixels (non-pixel hits)");
     
-    // Add branches for neighborhood (9x9) grid charge sharing data
-    fTree->Branch("GridNeighborhoodChargeFractions", &fGridNeighborhoodChargeFractions)->SetTitle("Charge Fractions for Neighborhood Grid Pixels");
-    fTree->Branch("GridNeighborhoodDistances", &fGridNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm]");
-    fTree->Branch("GridNeighborhoodCharge", &fGridNeighborhoodCharge)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels");
+    // Add branches for neighborhood (9x9) grid charge sharing data (non-pixel hits only)
+    fTree->Branch("NonPixel_GridNeighborhoodChargeFractions", &fNonPixel_GridNeighborhoodChargeFractions)->SetTitle("Charge Fractions for Neighborhood Grid Pixels (non-pixel hits)");
+    fTree->Branch("NonPixel_GridNeighborhoodDistances", &fNonPixel_GridNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm] (non-pixel hits)");
+    fTree->Branch("NonPixel_GridNeighborhoodCharge", &fNonPixel_GridNeighborhoodCharge)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels (non-pixel hits)");
     
     // Add branches for particle information
     fTree->Branch("EventID", &fEventID, "EventID/I")->SetTitle("Event ID");
@@ -184,35 +201,35 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("AllStepTime", &fAllStepTimes)->SetTitle("Time of Each Step [ns]");
     
     // Add branches for 3D Gaussian fit results
-    fTree->Branch("FitAmplitude", &fFitAmplitude, "FitAmplitude/D")->SetTitle("Fitted Gaussian Amplitude");
-    fTree->Branch("FitX0", &fFitX0, "FitX0/D")->SetTitle("Fitted Gaussian Center X [mm]");
-    fTree->Branch("FitY0", &fFitY0, "FitY0/D")->SetTitle("Fitted Gaussian Center Y [mm]");
-    fTree->Branch("FitSigmaX", &fFitSigmaX, "FitSigmaX/D")->SetTitle("Fitted Gaussian Sigma X [mm]");
-    fTree->Branch("FitSigmaY", &fFitSigmaY, "FitSigmaY/D")->SetTitle("Fitted Gaussian Sigma Y [mm]");
-    fTree->Branch("FitTheta", &fFitTheta, "FitTheta/D")->SetTitle("Fitted Gaussian Rotation Angle [rad]");
-    fTree->Branch("FitOffset", &fFitOffset, "FitOffset/D")->SetTitle("Fitted Gaussian Offset");
+    fTree->Branch("FitAmplitude", &fNonPixel_FitAmplitude, "FitAmplitude/D")->SetTitle("Fitted Gaussian Amplitude");
+    fTree->Branch("FitX0", &fNonPixel_FitX0, "FitX0/D")->SetTitle("Fitted Gaussian Center X [mm]");
+    fTree->Branch("FitY0", &fNonPixel_FitY0, "FitY0/D")->SetTitle("Fitted Gaussian Center Y [mm]");
+    fTree->Branch("FitSigmaX", &fNonPixel_FitSigmaX, "FitSigmaX/D")->SetTitle("Fitted Gaussian Sigma X [mm]");
+    fTree->Branch("FitSigmaY", &fNonPixel_FitSigmaY, "FitSigmaY/D")->SetTitle("Fitted Gaussian Sigma Y [mm]");
+    fTree->Branch("FitTheta", &fNonPixel_FitTheta, "FitTheta/D")->SetTitle("Fitted Gaussian Rotation Angle [rad]");
+    fTree->Branch("FitOffset", &fNonPixel_FitOffset, "FitOffset/D")->SetTitle("Fitted Gaussian Offset");
     
-    fTree->Branch("FitAmplitudeErr", &fFitAmplitudeErr, "FitAmplitudeErr/D")->SetTitle("Error in Fitted Amplitude");
-    fTree->Branch("FitX0Err", &fFitX0Err, "FitX0Err/D")->SetTitle("Error in Fitted Center X [mm]");
-    fTree->Branch("FitY0Err", &fFitY0Err, "FitY0Err/D")->SetTitle("Error in Fitted Center Y [mm]");
-    fTree->Branch("FitSigmaXErr", &fFitSigmaXErr, "FitSigmaXErr/D")->SetTitle("Error in Fitted Sigma X [mm]");
-    fTree->Branch("FitSigmaYErr", &fFitSigmaYErr, "FitSigmaYErr/D")->SetTitle("Error in Fitted Sigma Y [mm]");
-    fTree->Branch("FitThetaErr", &fFitThetaErr, "FitThetaErr/D")->SetTitle("Error in Fitted Rotation Angle [rad]");
-    fTree->Branch("FitOffsetErr", &fFitOffsetErr, "FitOffsetErr/D")->SetTitle("Error in Fitted Offset");
+    fTree->Branch("FitAmplitudeErr", &fNonPixel_FitAmplitudeErr, "FitAmplitudeErr/D")->SetTitle("Error in Fitted Amplitude");
+    fTree->Branch("FitX0Err", &fNonPixel_FitX0Err, "FitX0Err/D")->SetTitle("Error in Fitted Center X [mm]");
+    fTree->Branch("FitY0Err", &fNonPixel_FitY0Err, "FitY0Err/D")->SetTitle("Error in Fitted Center Y [mm]");
+    fTree->Branch("FitSigmaXErr", &fNonPixel_FitSigmaXErr, "FitSigmaXErr/D")->SetTitle("Error in Fitted Sigma X [mm]");
+    fTree->Branch("FitSigmaYErr", &fNonPixel_FitSigmaYErr, "FitSigmaYErr/D")->SetTitle("Error in Fitted Sigma Y [mm]");
+    fTree->Branch("FitThetaErr", &fNonPixel_FitThetaErr, "FitThetaErr/D")->SetTitle("Error in Fitted Rotation Angle [rad]");
+    fTree->Branch("FitOffsetErr", &fNonPixel_FitOffsetErr, "FitOffsetErr/D")->SetTitle("Error in Fitted Offset");
     
-    fTree->Branch("FitChi2", &fFitChi2, "FitChi2/D")->SetTitle("Fit Chi-squared Value");
-    fTree->Branch("FitNDF", &fFitNDF, "FitNDF/D")->SetTitle("Fit Number of Degrees of Freedom");
-    fTree->Branch("FitChi2red", &fFitChi2red, "FitChi2red/D")->SetTitle("Reduced Chi-squared (chi2red/NDF)");
-    fTree->Branch("FitPp", &fFitPp, "FitPp/D")->SetTitle("Fit Probability (P-value)");
-    fTree->Branch("FitNPoints", &fFitNPoints, "FitNPoints/I")->SetTitle("Number of Points Used in Fit");
-    fTree->Branch("FitResidualMean", &fFitResidualMean, "FitResidualMean/D")->SetTitle("Mean of Fit Residuals");
-    fTree->Branch("FitResidualStd", &fFitResidualStd, "FitResidualStd/D")->SetTitle("Standard Deviation of Fit Residuals");
+    fTree->Branch("FitChi2", &fNonPixel_FitChi2, "FitChi2/D")->SetTitle("Fit Chi-squared Value");
+    fTree->Branch("FitNDF", &fNonPixel_FitNDF, "FitNDF/D")->SetTitle("Fit Number of Degrees of Freedom");
+    fTree->Branch("FitChi2red", &fNonPixel_FitChi2red, "FitChi2red/D")->SetTitle("Reduced Chi-squared (chi2red/NDF)");
+    fTree->Branch("FitPp", &fNonPixel_FitPp, "FitPp/D")->SetTitle("Fit Probability (P-value)");
+    fTree->Branch("FitNPoints", &fNonPixel_FitNPoints, "FitNPoints/I")->SetTitle("Number of Points Used in Fit");
+    fTree->Branch("FitResidualMean", &fNonPixel_FitResidualMean, "FitResidualMean/D")->SetTitle("Mean of Fit Residuals");
+    fTree->Branch("FitResidualStd", &fNonPixel_FitResidualStd, "FitResidualStd/D")->SetTitle("Standard Deviation of Fit Residuals");
     
     // Add branches for enhanced robustness metrics
-    fTree->Branch("FitConstraintsSatisfied", &fFitConstraintsSatisfied, "FitConstraintsSatisfied/O")->SetTitle("Whether Geometric Constraints were Satisfied");
+    fTree->Branch("FitConstraintsSatisfied", &fNonPixel_FitConstraintsSatisfied, "FitConstraintsSatisfied/O")->SetTitle("Whether Geometric Constraints were Satisfied (non-pixel hits only, false for pixel hits)");
     
     // Add convenient alias branches for Gaussian center coordinates and distance calculation
-    fTree->Branch("GaussTrueDistance", &fGaussTrueDistance, "GaussTrueDistance/D")->SetTitle("Distance from Gaussian Center to True Position [mm]");
+    fTree->Branch("GaussTrueDistance", &fNonPixel_GaussTrueDistance, "GaussTrueDistance/D")->SetTitle("Distance from Gaussian Center to True Position [mm]");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -516,23 +533,31 @@ void RunAction::SetPixelIndices(G4int i, G4int j, G4double distance)
 void RunAction::SetPixelAlpha(G4double alpha)
 {
     // Store the angular size of the pixel from hit position (in degrees)
-    fPixelAlpha = alpha;
+    fPixelHit_PixelAlpha = alpha;
 }
 
-void RunAction::SetPixelHit(G4bool hit)
+void RunAction::SetPixelHitInfo(G4bool hit, G4double distanceToPixelCenter)
 {
-    // Store whether the hit was on a pixel
-    fPixelHit = hit;
+    // Store pixel hit information
+    fIsPixelHit = hit;
+    fDistanceToPixelCenter = distanceToPixelCenter;
+}
+
+void RunAction::SetPixelClassification(G4bool isWithinD0, G4double distanceToPixelCenter)
+{
+    // Store pixel classification based on D0 threshold
+    fIsWithinD0 = isWithinD0;
+    fDistanceToPixelCenter = distanceToPixelCenter;
 }
 
 void RunAction::SetNeighborhoodGridData(const std::vector<G4double>& angles, 
                                const std::vector<G4int>& pixelI, 
                                const std::vector<G4int>& pixelJ)
 {
-    // Store the neighborhood (9x9) grid angle data
-    fGridNeighborhoodAngles = angles;
-    fGridNeighborhoodPixelI = pixelI;
-    fGridNeighborhoodPixelJ = pixelJ;
+    // Store the neighborhood (9x9) grid angle data for non-pixel hits
+    fNonPixel_GridNeighborhoodAngles = angles;
+    fNonPixel_GridNeighborhoodPixelI = pixelI;
+    fNonPixel_GridNeighborhoodPixelJ = pixelJ;
 }
 
 void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
@@ -540,10 +565,10 @@ void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFra
                                  const std::vector<G4double>& chargeValues,
                                  const std::vector<G4double>& chargeCoulombs)
 {
-    // Store the neighborhood (9x9) grid charge sharing data
-    fGridNeighborhoodChargeFractions = chargeFractions;
-    fGridNeighborhoodDistances = distances;
-    fGridNeighborhoodCharge = chargeCoulombs;
+    // Store the neighborhood (9x9) grid charge sharing data for non-pixel hits
+    fNonPixel_GridNeighborhoodChargeFractions = chargeFractions;
+    fNonPixel_GridNeighborhoodDistances = distances;
+    fNonPixel_GridNeighborhoodCharge = chargeCoulombs;
 }
 
 void RunAction::FillTree()
@@ -625,33 +650,38 @@ void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double 
                                      G4bool constraints_satisfied)
 {
     // Store 3D Gaussian fit results
-    fFitAmplitude = amplitude;
-    fFitX0 = x0;
-    fFitY0 = y0;
-    fFitSigmaX = sigma_x;
-    fFitSigmaY = sigma_y;
-    fFitTheta = theta;
-    fFitOffset = offset;
+    fNonPixel_FitAmplitude = amplitude;
+    fNonPixel_FitX0 = x0;
+    fNonPixel_FitY0 = y0;
+    fNonPixel_FitSigmaX = sigma_x;
+    fNonPixel_FitSigmaY = sigma_y;
+    fNonPixel_FitTheta = theta;
+    fNonPixel_FitOffset = offset;
     
-    fFitAmplitudeErr = amplitude_err;
-    fFitX0Err = x0_err;
-    fFitY0Err = y0_err;
-    fFitSigmaXErr = sigma_x_err;
-    fFitSigmaYErr = sigma_y_err;
-    fFitThetaErr = theta_err;
-    fFitOffsetErr = offset_err;
+    fNonPixel_FitAmplitudeErr = amplitude_err;
+    fNonPixel_FitX0Err = x0_err;
+    fNonPixel_FitY0Err = y0_err;
+    fNonPixel_FitSigmaXErr = sigma_x_err;
+    fNonPixel_FitSigmaYErr = sigma_y_err;
+    fNonPixel_FitThetaErr = theta_err;
+    fNonPixel_FitOffsetErr = offset_err;
     
-    fFitChi2 = chi2red;
-    fFitNDF = ndf;
-    fFitChi2red = (ndf > 0) ? chi2red / ndf : 0.0;
-    fFitPp = Pp;
-    fFitNPoints = n_points;
-    fFitResidualMean = residual_mean;
-    fFitResidualStd = residual_std;
+    fNonPixel_FitChi2 = chi2red;
+    fNonPixel_FitNDF = ndf;
+    fNonPixel_FitChi2red = (ndf > 0) ? chi2red / ndf : 0.0;
+    fNonPixel_FitPp = Pp;
+    fNonPixel_FitNPoints = n_points;
+    fNonPixel_FitResidualMean = residual_mean;
+    fNonPixel_FitResidualStd = residual_std;
     
     // Store enhanced robustness metrics
-    fFitConstraintsSatisfied = constraints_satisfied;
+    fNonPixel_FitConstraintsSatisfied = constraints_satisfied;
     
-    // Calculate distance from Gaussian center to true position
-    fGaussTrueDistance = std::sqrt(std::pow(fFitX0 - fTrueX, 2) + std::pow(fFitY0 - fTrueY, 2));
+    // Calculate distance from Gaussian center to true position ONLY if fit was successful
+    if (constraints_satisfied) {
+        fNonPixel_GaussTrueDistance = std::sqrt(std::pow(fNonPixel_FitX0 - fTrueX, 2) + std::pow(fNonPixel_FitY0 - fTrueY, 2));
+    } else {
+        // For failed fits or no fitting performed, set to NaN
+        fNonPixel_GaussTrueDistance = std::numeric_limits<G4double>::quiet_NaN();
+    }
 }
