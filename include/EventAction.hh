@@ -8,7 +8,6 @@
 
 class RunAction;
 class DetectorConstruction;
-class Gaussian3DFitter;
 
 class EventAction : public G4UserEventAction
 {
@@ -42,17 +41,12 @@ public:
     // Method to calculate charge sharing in the neighborhood (9x9) grid
     void CalculateNeighborhoodChargeSharing();
     
+    // Method to perform diagonal analysis on the neighborhood grid
+    void PerformDiagonalAnalysis(const G4ThreeVector& nearestPixel);
+    
     // Method to set neighborhood radius (default is 4 for 9x9 grid)
     void SetNeighborhoodRadius(G4int radius) { fNeighborhoodRadius = radius; }
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
-    
-    void SetFinalParticleEnergy(G4double finalEnergy);
-    
-    // Method to add step-by-step energy deposition information
-    void AddStepEnergyDeposition(G4double edep, G4double z, G4double time);
-    
-    // Method to add ALL step information (including non-energy depositing steps)
-    void AddAllStepInfo(G4double edep, G4double z, G4double time);
     
 private:
     RunAction* fRunAction;
@@ -69,10 +63,10 @@ private:
     // Pixel mapping information
     G4int fPixelIndexI;    // Pixel index in the X direction
     G4int fPixelIndexJ;    // Pixel index in the Y direction
-    G4double fPixelTrueDist; // Distance from hit to pixel center (only set for analysis events)
+    G4double fPixelTrueDeltaX; // Delta X from pixel center to hit (x_pixel - x_true) [mm]
+    G4double fPixelTrueDeltaY; // Delta Y from pixel center to hit (y_pixel - y_true) [mm]
     G4double fActualPixelDistance; // Actual distance from hit to pixel center (always calculated)
     G4bool fPixelHit;     // Flag to indicate if the hit was on a pixel
-    G4bool fIsWithinD0;   // Flag to indicate if distance <= D0 (10 microns)
     
     // Neighborhood (9x9) grid angle information (for non-pixel hits)
     std::vector<G4double> fNonPixel_GridNeighborhoodAngles; // Angles from hit to each pixel in neighborhood grid
@@ -89,27 +83,6 @@ private:
     static constexpr G4double fAmplificationFactor = 20.0; // AC-LGAD amplification factor
     static constexpr G4double fD0 = 10.0; // microns - reference distance for charge sharing
     static constexpr G4double fElementaryCharge = 1.602176634e-19; // Coulombs - elementary charge
-    
-    // Additional tracking variables for enhanced ROOT output
-    G4double fInitialParticleEnergy;   // Initial particle energy
-    G4double fFinalParticleEnergy;     // Final particle energy  
-    G4double fParticleMomentum;        // Particle momentum
-    G4String fParticleName;            // Particle type name
-    
-    // Step-by-step energy deposition information
-    std::vector<G4double> fStepEnergyDeposition;    // Energy deposited per step
-    std::vector<G4double> fStepZPositions;       // Z position of each energy deposit
-    std::vector<G4double> fStepTimes;    // Time of each energy deposit
-    std::vector<G4int> fStepNumbers;        // Step number for each energy deposit
-    
-    // ALL step information (including non-energy depositing steps)
-    std::vector<G4double> fAllStepEnergyDeposition;    // Energy deposited per step (including 0)
-    std::vector<G4double> fAllStepZPositions;       // Z position of each step
-    std::vector<G4double> fAllStepTimes;    // Time of each step
-    std::vector<G4int> fAllStepNumbers;        // Step number for each step
-    
-    // 3D Gaussian fitter instance
-    Gaussian3DFitter* fGaussianFitter;
 };
 
 #endif

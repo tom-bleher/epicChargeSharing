@@ -1,8 +1,8 @@
 #include "EventAction.hh"
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
-#include "Gaussian3DFitter.hh"
 #include "Constants.hh"
+#include "2DGaussianFit.hh"
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
@@ -33,36 +33,17 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fHasHit(false),
   fPixelIndexI(-1),
   fPixelIndexJ(-1),
-  fPixelTrueDist(-1.),
-  fPixelHit(false),
-  fInitialParticleEnergy(0.),
-  fFinalParticleEnergy(0.),
-  fParticleMomentum(0.),
-  fParticleName(""),
-  fGaussianFitter(nullptr)
+  fPixelTrueDeltaX(0),
+  fPixelTrueDeltaY(0),
+  fActualPixelDistance(-1.),
+  fPixelHit(false)
 { 
-  // Create the 3D Gaussian fitter instance with detector geometry constraints
-  Gaussian3DFitter::DetectorGeometry geometry;
-
-  geometry.detector_size = fDetector->GetDetSize();
-  geometry.pixel_size = fDetector->GetPixelSize();
-  geometry.pixel_spacing = fDetector->GetPixelSpacing();
-  geometry.pixel_corner_offset = fDetector->GetPixelCornerOffset();
-  geometry.num_blocks_per_side = fDetector->GetNumBlocksPerSide();
-  geometry.pixel_exclusion_buffer = Constants::PIXEL_EXCLUSION_BUFFER; // 10 microns as requested
-  
-  fGaussianFitter = new Gaussian3DFitter(geometry);
-  
-  G4cout << "EventAction: Using custom simplex-based Gaussian fitter with center pixel constraints" << G4endl;
+  G4cout << "EventAction: Using 2D Gaussian fitting for central row and column" << G4endl;
 }
 
 EventAction::~EventAction()
 { 
-  // Clean up the 3D Gaussian fitter
-  if (fGaussianFitter) {
-    delete fGaussianFitter;
-    fGaussianFitter = nullptr;
-  }
+  // No 3D Gaussian fitter to clean up
 }
 
 void EventAction::BeginOfEventAction(const G4Event* event)
@@ -78,9 +59,10 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   // Reset pixel mapping variables
   fPixelIndexI = -1;
   fPixelIndexJ = -1;
-  fPixelTrueDist = -1.;
+  fPixelTrueDeltaX = 0;
+  fPixelTrueDeltaY = 0;
+  fActualPixelDistance = -1.;
   fPixelHit = false;
-  fIsWithinD0 = false;
   
   // Reset neighborhood (9x9) grid angle data
   fNonPixel_GridNeighborhoodAngles.clear();
@@ -91,24 +73,6 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fNonPixel_GridNeighborhoodChargeFractions.clear();
   fNonPixel_GridNeighborhoodDistances.clear();
   fNonPixel_GridNeighborhoodCharge.clear();
-  
-  // Reset additional tracking variables
-  fInitialParticleEnergy = 0.;
-  fFinalParticleEnergy = 0.;
-  fParticleMomentum = 0.;
-  fParticleName = "";
-  
-  // Reset step energy deposition data
-  fStepEnergyDeposition.clear();
-  fStepZPositions.clear();
-  fStepTimes.clear();
-  fStepNumbers.clear();
-  
-  // Reset ALL step data
-  fAllStepEnergyDeposition.clear();
-  fAllStepZPositions.clear();
-  fAllStepTimes.clear();
-  fAllStepNumbers.clear();
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -118,49 +82,46 @@ void EventAction::EndOfEventAction(const G4Event* event)
     G4ThreeVector primaryPos = event->GetPrimaryVertex()->GetPosition();
     // Update the initial position
     fInitialPosition = primaryPos;
-    
-    // Get particle information from the primary vertex
-    if (event->GetPrimaryVertex()->GetPrimary()) {
-      G4PrimaryParticle* primary = event->GetPrimaryVertex()->GetPrimary();
-      fInitialParticleEnergy = primary->GetKineticEnergy();
-      fParticleMomentum = primary->GetMomentum().mag();
-      
-      // Get particle definition from PDG code
-      G4ParticleTable* particleTable = G4ParticleTable::GetParticleTable();
-      if (G4ParticleDefinition* particleDef = particleTable->FindParticle(primary->GetPDGcode())) {
-        fParticleName = particleDef->GetParticleName();
-      }
-    }
   }
   
-  // Set event ID
-  G4int eventID = event->GetEventID();
-  
-  // Always record event data, even if no energy was deposited
-  // Values are passed in Geant4's internal units (MeV for energy, mm for length)
-  fRunAction->SetEventData(fEdep, fPosition.x(), fPosition.y(), fPosition.z());
-  fRunAction->SetInitialPosition(fInitialPosition.x(), fInitialPosition.y(), fInitialPosition.z());
-  
-  // Calculate and store nearest pixel position (in mm)
+  // Calculate and store nearest pixel position FIRST (this calculates fActualPixelDistance)
   G4ThreeVector nearestPixel = CalculateNearestPixel(fPosition);
-  fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y(), nearestPixel.z());
-  
-  // Pass pixel indices and distance information to RunAction
-  fRunAction->SetPixelIndices(fPixelIndexI, fPixelIndexJ, fPixelTrueDist);
   
   // Calculate and pass pixel angular size to RunAction
   G4double pixelAlpha = CalculatePixelAlpha(fPosition, fPixelIndexI, fPixelIndexJ);
   
   // Implement D0 classification logic
   const G4double D0_threshold_mm = fD0 * 1e-3; // Convert microns to mm
-  fIsWithinD0 = (fPixelTrueDist <= D0_threshold_mm);
   
-  // Set pixel hit classification: true if on pixel OR distance <= D0
-  G4bool isPixelHit = fPixelHit || fIsWithinD0;
+  // Determine if hit is a pixel hit: either on pixel surface OR within D0 threshold
+  G4bool isPixelHit = fPixelHit;
+  
+  // ENERGY DEPOSITION LOGIC FIX:
+  // For pixel hits: set energy deposition to zero (per user requirement)
+  // For non-pixel hits: keep the energy that was deposited inside the detector
+  G4double finalEdep = fEdep;
+  if (isPixelHit) {
+    finalEdep = 0.0; // Set to zero for pixel hits
+    // G4cout << "EventAction: Setting energy deposition to zero for pixel hit (event " << eventID << ")" << G4endl;
+  } else {
+    // For non-pixel hits, use the energy deposited inside the detector (already tracked in fEdep)
+    // G4cout << "EventAction: Using detector energy deposition " << finalEdep/MeV 
+    //        << " MeV for non-pixel hit (event " << eventID << ")" << G4endl;
+  }
   
   // Pass classification data to RunAction
-  fRunAction->SetPixelClassification(fIsWithinD0, fPixelTrueDist);
+  fRunAction->SetPixelClassification(isPixelHit, fPixelTrueDeltaX, fPixelTrueDeltaY);
   fRunAction->SetPixelHitStatus(isPixelHit);
+  
+  // Update the event data with the corrected energy deposition
+  fRunAction->SetEventData(finalEdep, fPosition.x(), fPosition.y(), fPosition.z());
+  fRunAction->SetInitialPosition(fInitialPosition.x(), fInitialPosition.y(), fInitialPosition.z());
+  
+  // Set nearest pixel position in RunAction
+  fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y(), nearestPixel.z());
+  
+  // Pass pixel indices and distance information to RunAction
+  fRunAction->SetPixelIndices(fPixelIndexI, fPixelIndexJ, fActualPixelDistance);
   
   // Only calculate and store pixel-specific data for pixel hits (distance <= D0 or on pixel)
   if (isPixelHit) {
@@ -186,29 +147,17 @@ void EventAction::EndOfEventAction(const G4Event* event)
   fRunAction->SetNeighborhoodGridData(fNonPixel_GridNeighborhoodAngles, fNonPixel_GridNeighborhoodPixelI, fNonPixel_GridNeighborhoodPixelJ);
   fRunAction->SetNeighborhoodChargeData(fNonPixel_GridNeighborhoodChargeFractions, fNonPixel_GridNeighborhoodDistances, fNonPixel_GridNeighborhoodCharge, fNonPixel_GridNeighborhoodCharge);
   
-  // Pass particle information to RunAction
-  fRunAction->SetParticleInfo(eventID, fInitialParticleEnergy, fFinalParticleEnergy, 
-                             fParticleMomentum, fParticleName);
-  
-  // Pass step energy deposition information to RunAction
-  fRunAction->SetStepEnergyDeposition(fStepEnergyDeposition, fStepZPositions, fStepTimes);
-  
-  // Pass ALL step information to RunAction
-  fRunAction->SetAllStepInfo(fAllStepEnergyDeposition, fAllStepZPositions, fAllStepTimes);
-  
-  // Perform 3D Gaussian fitting on charge distribution data
-  // IMPORTANT: FitConstraintsSatisfied only tracks non-pixel hits (distance > D0 and not on pixel)
-  // For pixel hits, FitConstraintsSatisfied is always false since no fitting is performed
+  // Perform 2D Gaussian fitting on charge distribution data (central row and column)
   // Only fit for non-pixel hits (distance > D0 and not on pixel)
   G4bool shouldPerformFit = !isPixelHit && !fNonPixel_GridNeighborhoodChargeFractions.empty();
   
-  if (fGaussianFitter && shouldPerformFit) {
-    G4cout << "EventAction: Performing Gaussian fit for event " << eventID 
-           << " (non-pixel hit, distance=" << fPixelTrueDist/mm << " mm > " 
+  if (shouldPerformFit) {
+    G4cout << "EventAction: Performing 2D Gaussian fit" 
+           << " (Non-pixel hit, distance=" << fActualPixelDistance/mm << " mm > " 
            << D0_threshold_mm/mm << " mm)" << G4endl;
     
     // Extract coordinates and charge values for fitting
-    std::vector<G4double> x_coords, y_coords, z_values;
+    std::vector<double> x_coords, y_coords, charge_values;
     
     // Get detector parameters for coordinate calculation
     G4double pixelSpacing = fDetector->GetPixelSpacing();
@@ -220,7 +169,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         G4int pixelI = fNonPixel_GridNeighborhoodPixelI[i];
         G4int pixelJ = fNonPixel_GridNeighborhoodPixelJ[i];
         
-        // Calculate offset from center pixel (which is at index 4,4 in 9x9 grid)
+        // Calculate offset from center pixel
         G4int centerI = fPixelIndexI;
         G4int centerJ = fPixelIndexJ;
         
@@ -229,67 +178,59 @@ void EventAction::EndOfEventAction(const G4Event* event)
         
         x_coords.push_back(x_pos);
         y_coords.push_back(y_pos);
-        z_values.push_back(fNonPixel_GridNeighborhoodChargeFractions[i]);
+        // Use actual charge values (in Coulombs) instead of fractions for fitting
+        charge_values.push_back(fNonPixel_GridNeighborhoodCharge[i]);
       }
     }
     
-    // Perform fitting if we have enough data points
-    if (x_coords.size() >= Constants::MIN_FIT_POINTS) { // Need at least 4 points for meaningful fit
-      // Set center pixel constraint to ensure fitted center stays within center pixel bounds
-      fGaussianFitter->SetCenterPixelPosition(nearestPixel.x(), nearestPixel.y());
+    // Perform 2D fitting if we have enough data points
+    if (x_coords.size() >= 3) { // Need at least 3 points for 1D Gaussian fit
       
-      // Perform fitting with all data
-      Gaussian3DFitter::FitResults fitResults = fGaussianFitter->FitGaussian3D(
-        x_coords, y_coords, z_values, std::vector<G4double>(), false); // verbose=false
+      // Perform 2D Gaussian fitting using the implemented function
+      GaussianFit2DResults fitResults = Fit2DGaussian(
+        x_coords, y_coords, charge_values,
+        nearestPixel.x(), nearestPixel.y(),
+        pixelSpacing, 
+        false); // verbose=false for production
       
-      // Calculate distance from fitted center to true position (GaussTrueDistance)
-      G4double gaussTrueDistance = std::sqrt(std::pow(fitResults.x0 - fInitialPosition.x(), 2) + 
-                                           std::pow(fitResults.y0 - fInitialPosition.y(), 2));
+      if (fitResults.fit_successful) {
+        G4cout << "EventAction: 2D Gaussian fit successful. GaussX: " << fitResults.x_center/mm 
+               << " mm, GaussY: " << fitResults.y_center/mm << " mm" << G4endl;
+      }
       
-      G4cout << "EventAction: Fit successful. Distance from fitted center to true position: " 
-             << gaussTrueDistance/mm << " mm" << G4endl;
-      
-      // Pass fit results to RunAction
-      // NOTE: fitResults.constraints_satisfied is the ONLY case where FitConstraintsSatisfied = true
-      fRunAction->SetGaussianFitResults(
-        fitResults.amplitude, fitResults.x0, fitResults.y0,
-        fitResults.sigma_x, fitResults.sigma_y, fitResults.theta, fitResults.offset,
-        fitResults.amplitude_err, fitResults.x0_err, fitResults.y0_err,
-        fitResults.sigma_x_err, fitResults.sigma_y_err, fitResults.theta_err, fitResults.offset_err,
-        fitResults.chi2red, fitResults.ndf, fitResults.Pp,
-        fitResults.n_points,
-        fitResults.residual_mean, fitResults.residual_std,
-        fitResults.constraints_satisfied);
+      // Pass 2D fit results to RunAction
+      fRunAction->Set2DGaussianFitResults(
+        fitResults.x_center, fitResults.x_sigma, fitResults.x_amplitude,
+        fitResults.x_center_err, fitResults.x_sigma_err, fitResults.x_amplitude_err,
+        fitResults.x_chi2red, fitResults.x_npoints,
+        fitResults.y_center, fitResults.y_sigma, fitResults.y_amplitude,
+        fitResults.y_center_err, fitResults.y_sigma_err, fitResults.y_amplitude_err,
+        fitResults.y_chi2red, fitResults.y_npoints,
+        fitResults.fit_successful);
         
     } else {
-      G4cout << "EventAction: Not enough data points for fitting (" << x_coords.size() 
-             << " < " << Constants::MIN_FIT_POINTS << ")" << G4endl;
-      // Not enough data points for fitting - FitConstraintsSatisfied = false (non-pixel hit but failed fit)
-      fRunAction->SetGaussianFitResults(
-        0, 0, 0, 0, 0, 0, 0,  // parameters
-        0, 0, 0, 0, 0, 0, 0,  // errors
-        0, 0, 0,              // chi2red, ndf, Pp
-        0, 0, 0, false); // n_points, residual stats, FitConstraintsSatisfied = false
+      G4cout << "EventAction: Not enough data points for 2D fitting (" << x_coords.size() 
+             << " < 3)" << G4endl;
+      // Not enough data points for fitting
+      fRunAction->Set2DGaussianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
+        0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        false); // fit_successful = false
     }
   } else {
     // Skip fitting due to conditions not met
     if (isPixelHit) {
-      G4cout << "EventAction: Skipping Gaussian fit for event " << eventID 
-             << " (pixel hit or distance <= D0: " << fPixelTrueDist/mm << " mm)" << G4endl;
-      G4cout << "EventAction: FitConstraintsSatisfied = false (no fitting performed for pixel hits)" << G4endl;
-    } else if (!fGaussianFitter) {
-      G4cout << "EventAction: No Gaussian fitter available" << G4endl;
+      G4cout << "EventAction: Skipping 2D Gaussian fit" 
+             << " (pixel hit: " << fActualPixelDistance/mm << " mm)" << G4endl;
     } else if (fNonPixel_GridNeighborhoodChargeFractions.empty()) {
       G4cout << "EventAction: No charge data available for fitting" << G4endl;
     }
     
-    // Set default values (no fitting performed) - FitConstraintsSatisfied = false
-    // This includes ALL pixel hits (distance <= D0 or on pixel)
-    fRunAction->SetGaussianFitResults(
-      0, 0, 0, 0, 0, 0, 0,  // parameters
-      0, 0, 0, 0, 0, 0, 0,  // errors
-      0, 0, 0,              // chi2red, ndf, Pp
-      0, 0, 0, false); // n_points, residual stats, FitConstraintsSatisfied = false
+    // Set default values (no fitting performed)
+    fRunAction->Set2DGaussianFitResults(
+      0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
+      0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+      false); // fit_successful = false
   }
   
   fRunAction->FillTree();
@@ -354,8 +295,12 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
   fPixelIndexJ = j;
   
   // Calculate and store distance from hit to pixel center (2D distance in detector plane)
-  fPixelTrueDist = std::sqrt(std::pow(position.x() - pixelX, 2) + 
+  fActualPixelDistance = std::sqrt(std::pow(position.x() - pixelX, 2) + 
                             std::pow(position.y() - pixelY, 2));
+  
+  // Calculate and store delta values (pixel center - true position)
+  fPixelTrueDeltaX = pixelX - position.x();
+  fPixelTrueDeltaY = pixelY - position.y();
   
   // Determine if the hit was on a pixel using the detector's method
   fPixelHit = fDetector->IsPositionOnPixel(position);
@@ -763,27 +708,4 @@ void EventAction::CalculateNeighborhoodChargeSharing()
       validIndex++;
     }
   }
-}
-
-void EventAction::SetFinalParticleEnergy(G4double finalEnergy)
-{
-  fFinalParticleEnergy = finalEnergy;
-}
-
-void EventAction::AddStepEnergyDeposition(G4double edep, G4double z, G4double time)
-{
-  // Only store steps that actually deposit energy
-  if (edep > 0.) {
-    fStepEnergyDeposition.push_back(edep);
-    fStepZPositions.push_back(z);
-    fStepTimes.push_back(time / CLHEP::ns); // Convert to ns
-  }
-}
-
-void EventAction::AddAllStepInfo(G4double edep, G4double z, G4double time)
-{
-  // Store ALL steps, including those with zero energy deposition
-  fAllStepEnergyDeposition.push_back(edep);
-  fAllStepZPositions.push_back(z);
-  fAllStepTimes.push_back(time / CLHEP::ns); // Convert to ns
 }

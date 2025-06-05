@@ -254,10 +254,6 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         }
     }
 
-    // Save grid parameters to a global file for use during ROOT merging
-    // This ensures the correct final parameters are available in multithreaded mode
-    SaveGridParametersToFile();
-
     return physWorld;
 }
 
@@ -379,26 +375,6 @@ void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4d
         G4cout << "Simulation parameters saved to: " << filename << G4endl;
     } else {
         G4cerr << "ERROR: Could not open file for saving simulation parameters: " << filename << G4endl;
-    }
-}
-
-void DetectorConstruction::SaveGridParametersToFile() const
-{
-    // Save grid parameters to a simple text file that can be read during ROOT merging
-    std::ofstream gridFile("grid_parameters.txt");
-    
-    if (gridFile.is_open()) {
-        gridFile << std::fixed << std::setprecision(6);
-        gridFile << fPixelSize/mm << std::endl;           // Pixel size in mm
-        gridFile << fPixelSpacing/mm << std::endl;        // Pixel spacing in mm  
-        gridFile << fPixelCornerOffset/mm << std::endl;   // Pixel corner offset in mm
-        gridFile << fDetSize/mm << std::endl;             // Detector size in mm
-        gridFile << fNumBlocksPerSide << std::endl;       // Number of blocks per side
-        
-        gridFile.close();
-        G4cout << "Grid parameters saved to grid_parameters.txt for ROOT merging" << G4endl;
-    } else {
-        G4cerr << "ERROR: Could not save grid parameters to file" << G4endl;
     }
 }
 

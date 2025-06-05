@@ -26,48 +26,14 @@ namespace Constants {
     const G4double DEFAULT_PIXEL_WIDTH = 0.001*mm;       // 1 micron pixel thickness
     const G4double DEFAULT_PIXEL_SPACING = 0.5*mm;       // 500 microns center-to-center
     const G4double DEFAULT_PIXEL_CORNER_OFFSET = 0.1*mm; // 100 microns from detector edge
-    const G4double PIXEL_EXCLUSION_BUFFER = 0.01*mm;     // 10 microns exclusion buffer
+    const G4double PIXEL_EXCLUSION_BUFFER = 0.01*mm;     // Legacy pixel buffer (not used for d0 constraint)
     
     // Pixel positioning precision
     const G4double GEOMETRY_TOLERANCE = 1*um;            // Geometry calculation tolerance
     const G4double PRECISION_TOLERANCE = 1*nm;           // High precision calculations
     
-    // ========================
-    // FITTING CONSTANTS
-    // ========================
-    
-    // Gaussian fitting parameters
-    const G4int GAUSSIAN_N_PARAMS = 7;                   // Number of fit parameters
-    const G4int MAX_FIT_ATTEMPTS = 3;                    // Maximum fitting attempts
-    const G4double CONSTRAINT_PENALTY = 1000.0;          // Large penalty for violations
-    const G4double PENALTY_MULTIPLIER = 1000.0;          // Additional penalty scaling
-    
-    // Sigma constraints
-    const G4double MIN_SIGMA = 0.005*mm;                 // 5 microns minimum sigma
-    const G4double MIN_SIGMA_ALT = 0.01*mm;              // 10 microns alternative minimum
-    const G4double SIGMA_FRACTION_OF_DETECTOR = 0.25;    // Max sigma = detector_size/4
-    const G4double SIGMA_FRACTION_ALT = 1.0/6.0;         // Alternative: detector_size/6
-    
-    // Initial parameter estimates
-    const G4double DEFAULT_SIGMA_ESTIMATE = 0.1*mm;      // 100 microns default sigma
-    const G4double DEFAULT_AMPLITUDE_FRACTION = 0.1;     // 10% of amplitude for step size
-    
-    // Fitting algorithm parameters
-    const G4int MAX_ITERATIONS = 2000;                   // Maximum fitting iterations
-    const G4double FIT_TOLERANCE = 1e-8;                 // Fitting convergence tolerance
-    const G4int MIN_FIT_POINTS = 4;                      // Minimum points for fitting
-    const G4int NEIGHBORHOOD_RADIUS = 4;                 // 9x9 grid radius
-    
-    // Parameter step sizes and bounds
-    const G4double POSITION_STEP_SIZE = 0.01*mm;         // Position parameter step
-    const G4double SIGMA_STEP_SIZE = 0.01*mm;            // Sigma parameter step
-    const G4double ANGLE_STEP_SIZE = 0.1;                // Angle parameter step (radians)
-    const G4double DEFAULT_STEP_SIZE = 0.05*mm;          // Default step size (50 microns)
-    const G4double MIN_STEP_SIZE = 0.01*mm;              // Minimum step size
-    const G4double MIN_STEP_SIZE_ALT = 1e-6*mm;          // Alternative minimum step
-    const G4double AMPLITUDE_MIN = 0.001;                // Minimum amplitude
-    const G4double AMPLITUDE_MAX = 1e6;                  // Maximum amplitude
-    const G4double OFFSET_MAX = 1e6;                     // Maximum offset bound
+    // Grid and neighborhood configuration
+    const G4int NEIGHBORHOOD_RADIUS = 4;                 // Default neighborhood radius for 9x9 grid
     
     // ========================
     // SIMULATION CONSTANTS
@@ -86,19 +52,6 @@ namespace Constants {
     // ========================
     // UNIT CONVERSIONS
     // ========================
-    
-    // Common unit aliases for readability
-    const G4double MICRON = micrometer;
-    const G4double UM = micrometer;
-    
-    // ========================
-    // NUMERICAL CONSTANTS
-    // ========================
-    
-    // Mathematical constants (in addition to those in G4PhysicalConstants)
-    const G4double HALF = 0.5;
-    const G4double QUARTER = 0.25;
-    const G4double TWO = 2.0;
     
     // Default values for initialization
     const G4double DEFAULT_ERROR = 1.0;                  // Default error when not specified

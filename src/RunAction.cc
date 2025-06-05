@@ -39,38 +39,32 @@ RunAction::RunAction()
   fPixelZ(0),
   fPixelI(-1),
   fPixelJ(-1),
-  fPixelDist(0),
+  fPixelTrueDeltaX(0),
+  fPixelTrueDeltaY(0),
   fIsPixelHit(false),
-  fIsWithinD0(false),
   fPixelHit_PixelAlpha(0),
-  fNonPixel_FitAmplitude(0),
-  fNonPixel_FitX0(0),
-  fNonPixel_FitY0(0),
-  fNonPixel_FitSigmaX(0),
-  fNonPixel_FitSigmaY(0),
-  fNonPixel_FitTheta(0),
-  fNonPixel_FitOffset(0),
-  fNonPixel_FitAmplitudeErr(0),
-  fNonPixel_FitX0Err(0),
-  fNonPixel_FitY0Err(0),
-  fNonPixel_FitSigmaXErr(0),
-  fNonPixel_FitSigmaYErr(0),
-  fNonPixel_FitThetaErr(0),
-  fNonPixel_FitOffsetErr(0),
-  fNonPixel_FitChi2(0),
-  fNonPixel_FitNDF(0),
-  fNonPixel_FitChi2red(0),
-  fNonPixel_FitPp(0),
-  fNonPixel_FitNPoints(0),
-  fNonPixel_FitResidualMean(0),
-  fNonPixel_FitResidualStd(0),
-  fNonPixel_FitConstraintsSatisfied(false),
-  fNonPixel_GaussTrueDistance(std::numeric_limits<G4double>::quiet_NaN()),
-  fEventID(-1),
+  fNonPixel_GaussTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fNonPixel_GaussTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize 2D Gaussian fit variables
+  fNonPixel_Fit2D_XCenter(0),
+  fNonPixel_Fit2D_XSigma(0),
+  fNonPixel_Fit2D_XAmplitude(0),
+  fNonPixel_Fit2D_XCenterErr(0),
+  fNonPixel_Fit2D_XSigmaErr(0),
+  fNonPixel_Fit2D_XAmplitudeErr(0),
+  fNonPixel_Fit2D_XChi2red(0),
+  fNonPixel_Fit2D_XNPoints(0),
+  fNonPixel_Fit2D_YCenter(0),
+  fNonPixel_Fit2D_YSigma(0),
+  fNonPixel_Fit2D_YAmplitude(0),
+  fNonPixel_Fit2D_YCenterErr(0),
+  fNonPixel_Fit2D_YSigmaErr(0),
+  fNonPixel_Fit2D_YAmplitudeErr(0),
+  fNonPixel_Fit2D_YChi2red(0),
+  fNonPixel_Fit2D_YNPoints(0),
+  fNonPixel_Fit2D_Successful(false),
   fInitialEnergy(0),
-  fFinalEnergy(0),
   fMomentum(0),
-  fParticleName(""),
   fGridPixelSize(0),
   fGridPixelSpacing(0),
   fGridPixelCornerOffset(0),
@@ -151,13 +145,13 @@ void RunAction::BeginOfRunAction(const G4Run*)
     // Add branches for pixel mapping information
     fTree->Branch("PixelI", &fPixelI, "PixelI/I")->SetTitle("Pixel Index X");
     fTree->Branch("PixelJ", &fPixelJ, "PixelJ/I")->SetTitle("Pixel Index Y");
-    fTree->Branch("PixelTrueDistance", &fPixelDist, "PixelTrueDistance/D")->SetTitle("Distance to Pixel Center [mm]");
+    fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "PixelTrueDeltaX/D")->SetTitle("Delta X from Hit to Pixel Center [mm]");
+    fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "PixelTrueDeltaY/D")->SetTitle("Delta Y from Hit to Pixel Center [mm]");
     
     // ==============================================
     // HIT CLASSIFICATION BRANCHES
     // ==============================================
     fTree->Branch("IsPixelHit", &fIsPixelHit, "IsPixelHit/O")->SetTitle("Hit on Pixel OR distance <= D0");
-    fTree->Branch("IsWithinD0", &fIsWithinD0, "IsWithinD0/O")->SetTitle("Distance <= D0 (10 microns)");
     
     // ==============================================
     // PIXEL HIT DATA (distance <= D0 or on pixel)
@@ -181,53 +175,34 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("NonPixel_GridNeighborhoodDistances", &fNonPixel_GridNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm] (non-pixel hits)");
     fTree->Branch("NonPixel_GridNeighborhoodCharge", &fNonPixel_GridNeighborhoodCharge)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels (non-pixel hits)");
     
-    // Add branches for particle information
-    fTree->Branch("EventID", &fEventID, "EventID/I")->SetTitle("Event ID");
+    // Add branches for particle information (reduced set)
     fTree->Branch("InitialEnergy", &fInitialEnergy, "InitialEnergy/D")->SetTitle("Initial Particle Energy [MeV]");
-    fTree->Branch("FinalEnergy", &fFinalEnergy, "FinalEnergy/D")->SetTitle("Final Particle Energy [MeV]");
     fTree->Branch("Momentum", &fMomentum, "Momentum/D")->SetTitle("Particle Momentum [MeV/c]");
-    fTree->Branch("ParticleName", &fParticleName)->SetTitle("Particle Type Name");
     
-    // Add branches for step-by-step energy deposition information
-    fTree->Branch("StepEnergyDeposition", &fStepEnergyDeposition)->SetTitle("Energy Deposited Per Step [MeV]");
-    fTree->Branch("StepZPosition", &fStepZPositions)->SetTitle("Z Position of Each Energy Deposit [mm]");
-    fTree->Branch("StepTime", &fStepTimes)->SetTitle("Time of Each Energy Deposit [ns]");
+    // Add branches for 2D Gaussian fit results (central row and column fitting)
+    fTree->Branch("Fit2D_XCenter", &fNonPixel_Fit2D_XCenter, "Fit2D_XCenter/D")->SetTitle("Fitted X Center from Central Row [mm]");
+    fTree->Branch("Fit2D_XSigma", &fNonPixel_Fit2D_XSigma, "Fit2D_XSigma/D")->SetTitle("Fitted X Sigma from Central Row [mm]");
+    fTree->Branch("Fit2D_XAmplitude", &fNonPixel_Fit2D_XAmplitude, "Fit2D_XAmplitude/D")->SetTitle("Fitted X Amplitude from Central Row");
+    fTree->Branch("Fit2D_XCenterErr", &fNonPixel_Fit2D_XCenterErr, "Fit2D_XCenterErr/D")->SetTitle("Error in Fitted X Center [mm]");
+    fTree->Branch("Fit2D_XSigmaErr", &fNonPixel_Fit2D_XSigmaErr, "Fit2D_XSigmaErr/D")->SetTitle("Error in Fitted X Sigma [mm]");
+    fTree->Branch("Fit2D_XAmplitudeErr", &fNonPixel_Fit2D_XAmplitudeErr, "Fit2D_XAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude");
+    fTree->Branch("Fit2D_XChi2red", &fNonPixel_Fit2D_XChi2red, "Fit2D_XChi2red/D")->SetTitle("Reduced Chi-squared for X Fit");
+    fTree->Branch("Fit2D_XNPoints", &fNonPixel_Fit2D_XNPoints, "Fit2D_XNPoints/I")->SetTitle("Number of Points Used in X Fit");
     
-    // Add branches for ALL step information (including non-energy depositing steps)
-    fTree->Branch("AllStepEnergyDeposition", &fAllStepEnergyDeposition)->SetTitle("Energy Deposited Per Step (All Steps) [MeV]");
-    fTree->Branch("AllStepZPosition", &fAllStepZPositions)->SetTitle("Z Position of Each Step [mm]");
-    fTree->Branch("AllStepTime", &fAllStepTimes)->SetTitle("Time of Each Step [ns]");
+    fTree->Branch("Fit2D_YCenter", &fNonPixel_Fit2D_YCenter, "Fit2D_YCenter/D")->SetTitle("Fitted Y Center from Central Column [mm]");
+    fTree->Branch("Fit2D_YSigma", &fNonPixel_Fit2D_YSigma, "Fit2D_YSigma/D")->SetTitle("Fitted Y Sigma from Central Column [mm]");
+    fTree->Branch("Fit2D_YAmplitude", &fNonPixel_Fit2D_YAmplitude, "Fit2D_YAmplitude/D")->SetTitle("Fitted Y Amplitude from Central Column");
+    fTree->Branch("Fit2D_YCenterErr", &fNonPixel_Fit2D_YCenterErr, "Fit2D_YCenterErr/D")->SetTitle("Error in Fitted Y Center [mm]");
+    fTree->Branch("Fit2D_YSigmaErr", &fNonPixel_Fit2D_YSigmaErr, "Fit2D_YSigmaErr/D")->SetTitle("Error in Fitted Y Sigma [mm]");
+    fTree->Branch("Fit2D_YAmplitudeErr", &fNonPixel_Fit2D_YAmplitudeErr, "Fit2D_YAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude");
+    fTree->Branch("Fit2D_YChi2red", &fNonPixel_Fit2D_YChi2red, "Fit2D_YChi2red/D")->SetTitle("Reduced Chi-squared for Y Fit");
+    fTree->Branch("Fit2D_YNPoints", &fNonPixel_Fit2D_YNPoints, "Fit2D_YNPoints/I")->SetTitle("Number of Points Used in Y Fit");
     
-    // Add branches for 3D Gaussian fit results
-    fTree->Branch("FitAmplitude", &fNonPixel_FitAmplitude, "FitAmplitude/D")->SetTitle("Fitted Gaussian Amplitude");
-    fTree->Branch("FitX0", &fNonPixel_FitX0, "FitX0/D")->SetTitle("Fitted Gaussian Center X [mm]");
-    fTree->Branch("FitY0", &fNonPixel_FitY0, "FitY0/D")->SetTitle("Fitted Gaussian Center Y [mm]");
-    fTree->Branch("FitSigmaX", &fNonPixel_FitSigmaX, "FitSigmaX/D")->SetTitle("Fitted Gaussian Sigma X [mm]");
-    fTree->Branch("FitSigmaY", &fNonPixel_FitSigmaY, "FitSigmaY/D")->SetTitle("Fitted Gaussian Sigma Y [mm]");
-    fTree->Branch("FitTheta", &fNonPixel_FitTheta, "FitTheta/D")->SetTitle("Fitted Gaussian Rotation Angle [rad]");
-    fTree->Branch("FitOffset", &fNonPixel_FitOffset, "FitOffset/D")->SetTitle("Fitted Gaussian Offset");
-    
-    fTree->Branch("FitAmplitudeErr", &fNonPixel_FitAmplitudeErr, "FitAmplitudeErr/D")->SetTitle("Error in Fitted Amplitude");
-    fTree->Branch("FitX0Err", &fNonPixel_FitX0Err, "FitX0Err/D")->SetTitle("Error in Fitted Center X [mm]");
-    fTree->Branch("FitY0Err", &fNonPixel_FitY0Err, "FitY0Err/D")->SetTitle("Error in Fitted Center Y [mm]");
-    fTree->Branch("FitSigmaXErr", &fNonPixel_FitSigmaXErr, "FitSigmaXErr/D")->SetTitle("Error in Fitted Sigma X [mm]");
-    fTree->Branch("FitSigmaYErr", &fNonPixel_FitSigmaYErr, "FitSigmaYErr/D")->SetTitle("Error in Fitted Sigma Y [mm]");
-    fTree->Branch("FitThetaErr", &fNonPixel_FitThetaErr, "FitThetaErr/D")->SetTitle("Error in Fitted Rotation Angle [rad]");
-    fTree->Branch("FitOffsetErr", &fNonPixel_FitOffsetErr, "FitOffsetErr/D")->SetTitle("Error in Fitted Offset");
-    
-    fTree->Branch("FitChi2", &fNonPixel_FitChi2, "FitChi2/D")->SetTitle("Fit Chi-squared Value");
-    fTree->Branch("FitNDF", &fNonPixel_FitNDF, "FitNDF/D")->SetTitle("Fit Number of Degrees of Freedom");
-    fTree->Branch("FitChi2red", &fNonPixel_FitChi2red, "FitChi2red/D")->SetTitle("Reduced Chi-squared (chi2red/NDF)");
-    fTree->Branch("FitPp", &fNonPixel_FitPp, "FitPp/D")->SetTitle("Fit Probability (P-value)");
-    fTree->Branch("FitNPoints", &fNonPixel_FitNPoints, "FitNPoints/I")->SetTitle("Number of Points Used in Fit");
-    fTree->Branch("FitResidualMean", &fNonPixel_FitResidualMean, "FitResidualMean/D")->SetTitle("Mean of Fit Residuals");
-    fTree->Branch("FitResidualStd", &fNonPixel_FitResidualStd, "FitResidualStd/D")->SetTitle("Standard Deviation of Fit Residuals");
-    
-    // Add branches for enhanced robustness metrics
-    fTree->Branch("FitConstraintsSatisfied", &fNonPixel_FitConstraintsSatisfied, "FitConstraintsSatisfied/O")->SetTitle("Whether Geometric Constraints were Satisfied (non-pixel hits only, false for pixel hits)");
+    fTree->Branch("Fit2D_Successful", &fNonPixel_Fit2D_Successful, "Fit2D_Successful/O")->SetTitle("Whether 2D Fitting was Successful");
     
     // Add convenient alias branches for Gaussian center coordinates and distance calculation
-    fTree->Branch("GaussTrueDistance", &fNonPixel_GaussTrueDistance, "GaussTrueDistance/D")->SetTitle("Distance from Gaussian Center to True Position [mm]");
+    fTree->Branch("GaussTrueDeltaX", &fNonPixel_GaussTrueDeltaX, "GaussTrueDeltaX/D")->SetTitle("Delta X from Gaussian Center to True Position [mm]");
+    fTree->Branch("GaussTrueDeltaY", &fNonPixel_GaussTrueDeltaY, "GaussTrueDeltaY/D")->SetTitle("Delta Y from Gaussian Center to True Position [mm]");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -266,37 +241,8 @@ void RunAction::EndOfRunAction(const G4Run* run)
                        << " entries from " << nofEvents << " events" << G4endl;
                 
                 // Save detector grid parameters as metadata before writing the tree
-                // Read from grid_parameters.txt file to get the final correct values
-                std::ifstream gridFile("grid_parameters.txt");
-                if (gridFile.is_open()) {
-                    fRootFile->cd();
-                    
-                    G4double pixelSize, pixelSpacing, pixelCornerOffset, detSize;
-                    G4int numBlocksPerSide;
-                    
-                    if (gridFile >> pixelSize >> pixelSpacing >> pixelCornerOffset >> detSize >> numBlocksPerSide) {
-                        // Create TNamed objects to store grid parameters as metadata
-                        TNamed *pixelSizeMeta = new TNamed("GridPixelSize", Form("%.6f", pixelSize));
-                        TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing", Form("%.6f", pixelSpacing));  
-                        TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", pixelCornerOffset));
-                        TNamed *detSizeMeta = new TNamed("GridDetectorSize", Form("%.6f", detSize));
-                        TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", numBlocksPerSide));
-                        
-                        // Write metadata to the ROOT file
-                        pixelSizeMeta->Write();
-                        pixelSpacingMeta->Write();
-                        pixelCornerOffsetMeta->Write();
-                        detSizeMeta->Write();
-                        numBlocksMeta->Write();
-                        
-                        G4cout << "Saved detector grid metadata to ROOT file from grid_parameters.txt" << G4endl;
-                        G4cout << "  Final parameters used: " << pixelSize << ", " << pixelSpacing 
-                               << ", " << pixelCornerOffset << ", " << detSize << ", " << numBlocksPerSide << G4endl;
-                    } else {
-                        G4cerr << "Could not read grid parameters from file" << G4endl;
-                    }
-                    gridFile.close();
-                } else if (fGridPixelSize > 0) {  // Fallback to member variables
+                // Use the stored grid parameters that were set by DetectorConstruction
+                if (fGridPixelSize > 0) {  // Check if grid parameters have been set
                     fRootFile->cd();
                     
                     // Create TNamed objects to store grid parameters as metadata
@@ -313,7 +259,11 @@ void RunAction::EndOfRunAction(const G4Run* run)
                     detSizeMeta->Write();
                     numBlocksMeta->Write();
                     
-                    G4cout << "Saved detector grid metadata to ROOT file (fallback)" << G4endl;
+                    G4cout << "Saved detector grid metadata to ROOT file" << G4endl;
+                    G4cout << "  Final parameters used: " << fGridPixelSize << ", " << fGridPixelSpacing 
+                           << ", " << fGridPixelCornerOffset << ", " << fGridDetSize << ", " << fGridNumBlocksPerSide << G4endl;
+                } else {
+                    G4cerr << "Warning: Grid parameters not set, cannot save metadata to ROOT file" << G4endl;
                 }
                 
                 // Write tree to file and close file
@@ -416,34 +366,8 @@ void RunAction::EndOfRunAction(const G4Run* run)
                             mergedTree->Write();
                             
                             // Save detector grid parameters as metadata to merged file
-                            // Read from grid_parameters.txt file to get the final correct values
-                            std::ifstream gridFile("grid_parameters.txt");
-                            if (gridFile.is_open()) {
-                                G4double pixelSize, pixelSpacing, pixelCornerOffset, detSize;
-                                G4int numBlocksPerSide;
-                                
-                                if (gridFile >> pixelSize >> pixelSpacing >> pixelCornerOffset >> detSize >> numBlocksPerSide) {
-                                    TNamed *pixelSizeMeta = new TNamed("GridPixelSize", Form("%.6f", pixelSize));
-                                    TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing", Form("%.6f", pixelSpacing));  
-                                    TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", pixelCornerOffset));
-                                    TNamed *detSizeMeta = new TNamed("GridDetectorSize", Form("%.6f", detSize));
-                                    TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", numBlocksPerSide));
-                                    
-                                    // Write metadata to the merged ROOT file
-                                    pixelSizeMeta->Write();
-                                    pixelSpacingMeta->Write();
-                                    pixelCornerOffsetMeta->Write();
-                                    detSizeMeta->Write();
-                                    numBlocksMeta->Write();
-                                    
-                                    G4cout << "Saved detector grid metadata to merged ROOT file from grid_parameters.txt" << G4endl;
-                                    G4cout << "  Final parameters used: " << pixelSize << ", " << pixelSpacing 
-                                           << ", " << pixelCornerOffset << ", " << detSize << ", " << numBlocksPerSide << G4endl;
-                                } else {
-                                    G4cerr << "Could not read grid parameters from file" << G4endl;
-                                }
-                                gridFile.close();
-                            } else if (fGridPixelSize > 0) {  // Fallback to member variables
+                            // Use the stored grid parameters that were set by DetectorConstruction
+                            if (fGridPixelSize > 0) {  // Check if grid parameters have been set
                                 TNamed *pixelSizeMeta = new TNamed("GridPixelSize", Form("%.6f", fGridPixelSize));
                                 TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing", Form("%.6f", fGridPixelSpacing));  
                                 TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", fGridPixelCornerOffset));
@@ -457,7 +381,11 @@ void RunAction::EndOfRunAction(const G4Run* run)
                                 detSizeMeta->Write();
                                 numBlocksMeta->Write();
                                 
-                                G4cout << "Saved detector grid metadata to merged ROOT file (fallback)" << G4endl;
+                                G4cout << "Saved detector grid metadata to merged ROOT file" << G4endl;
+                                G4cout << "  Final parameters used: " << fGridPixelSize << ", " << fGridPixelSpacing 
+                                       << ", " << fGridPixelCornerOffset << ", " << fGridDetSize << ", " << fGridNumBlocksPerSide << G4endl;
+                            } else {
+                                G4cerr << "Warning: Grid parameters not set, cannot save metadata to merged ROOT file" << G4endl;
                             }
                             
                             mergedFile->Flush();
@@ -525,7 +453,8 @@ void RunAction::SetPixelIndices(G4int i, G4int j, G4double distance)
     // Store pixel indices and distance to center
     fPixelI = i;
     fPixelJ = j;
-    fPixelDist = distance;
+    // Note: The delta values will be set separately in SetPixelClassification
+    // This method signature is kept for compatibility but distance parameter is no longer used
 }
 
 void RunAction::SetPixelAlpha(G4double alpha)
@@ -534,11 +463,12 @@ void RunAction::SetPixelAlpha(G4double alpha)
     fPixelHit_PixelAlpha = alpha;
 }
 
-void RunAction::SetPixelClassification(G4bool isWithinD0, G4double fPixelTrueDistance)
+void RunAction::SetPixelClassification(G4bool isWithinD0, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY)
 {
-    // Store pixel classification based on D0 threshold
-    fIsWithinD0 = isWithinD0;
-    // Note: Distance is already stored in fPixelDist by SetPixelIndices()
+    // Store the classification and delta values from pixel center to true position
+    fIsPixelHit = isWithinD0;
+    fPixelTrueDeltaX = pixelTrueDeltaX;
+    fPixelTrueDeltaY = pixelTrueDeltaY;
 }
 
 void RunAction::SetPixelHitStatus(G4bool isPixelHit)
@@ -608,77 +538,51 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
     G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
 }
 
-void RunAction::SetParticleInfo(G4int eventID, G4double initialEnergy, G4double finalEnergy, 
-                               G4double momentum, const G4String& particleName)
+void RunAction::SetInitialParticleInfo(G4double initialEnergy, G4double momentum)
 {
-    // Store particle information
-    fEventID = eventID;
+    // Store essential particle information
     fInitialEnergy = initialEnergy;
-    fFinalEnergy = finalEnergy;
     fMomentum = momentum;
-    fParticleName = std::string(particleName);  // Convert G4String to std::string for ROOT
 }
 
-void RunAction::SetStepEnergyDeposition(const std::vector<G4double>& stepEdep,
-                                       const std::vector<G4double>& stepZ,
-                                       const std::vector<G4double>& stepTime)
+void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4double x_amplitude,
+                                        G4double x_center_err, G4double x_sigma_err, G4double x_amplitude_err,
+                                        G4double x_chi2red, G4int x_npoints,
+                                        G4double y_center, G4double y_sigma, G4double y_amplitude,
+                                        G4double y_center_err, G4double y_sigma_err, G4double y_amplitude_err,
+                                        G4double y_chi2red, G4int y_npoints,
+                                        G4bool fit_successful)
 {
-    fStepEnergyDeposition = stepEdep;
-    fStepZPositions = stepZ;
-    fStepTimes = stepTime;
-}
-
-void RunAction::SetAllStepInfo(const std::vector<G4double>& stepEdep,
-                              const std::vector<G4double>& stepZ,
-                              const std::vector<G4double>& stepTime)
-{
-    fAllStepEnergyDeposition = stepEdep;
-    fAllStepZPositions = stepZ;
-    fAllStepTimes = stepTime;
-}
-
-void RunAction::SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
-                                     G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
-                                     G4double amplitude_err, G4double x0_err, G4double y0_err,
-                                     G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
-                                     G4double chi2red, G4double ndf, G4double Pp,
-                                     G4int n_points,
-                                     G4double residual_mean, G4double residual_std,
-                                     G4bool constraints_satisfied)
-{
-    // Store 3D Gaussian fit results
-    fNonPixel_FitAmplitude = amplitude;
-    fNonPixel_FitX0 = x0;
-    fNonPixel_FitY0 = y0;
-    fNonPixel_FitSigmaX = sigma_x;
-    fNonPixel_FitSigmaY = sigma_y;
-    fNonPixel_FitTheta = theta;
-    fNonPixel_FitOffset = offset;
+    // Store 2D Gaussian fit results from central row (X fit)
+    fNonPixel_Fit2D_XCenter = x_center;
+    fNonPixel_Fit2D_XSigma = x_sigma;
+    fNonPixel_Fit2D_XAmplitude = x_amplitude;
+    fNonPixel_Fit2D_XCenterErr = x_center_err;
+    fNonPixel_Fit2D_XSigmaErr = x_sigma_err;
+    fNonPixel_Fit2D_XAmplitudeErr = x_amplitude_err;
+    fNonPixel_Fit2D_XChi2red = x_chi2red;
+    fNonPixel_Fit2D_XNPoints = x_npoints;
     
-    fNonPixel_FitAmplitudeErr = amplitude_err;
-    fNonPixel_FitX0Err = x0_err;
-    fNonPixel_FitY0Err = y0_err;
-    fNonPixel_FitSigmaXErr = sigma_x_err;
-    fNonPixel_FitSigmaYErr = sigma_y_err;
-    fNonPixel_FitThetaErr = theta_err;
-    fNonPixel_FitOffsetErr = offset_err;
+    // Store 2D Gaussian fit results from central column (Y fit)
+    fNonPixel_Fit2D_YCenter = y_center;
+    fNonPixel_Fit2D_YSigma = y_sigma;
+    fNonPixel_Fit2D_YAmplitude = y_amplitude;
+    fNonPixel_Fit2D_YCenterErr = y_center_err;
+    fNonPixel_Fit2D_YSigmaErr = y_sigma_err;
+    fNonPixel_Fit2D_YAmplitudeErr = y_amplitude_err;
+    fNonPixel_Fit2D_YChi2red = y_chi2red;
+    fNonPixel_Fit2D_YNPoints = y_npoints;
     
-    fNonPixel_FitChi2 = chi2red;
-    fNonPixel_FitNDF = ndf;
-    fNonPixel_FitChi2red = (ndf > 0) ? chi2red / ndf : 0.0;
-    fNonPixel_FitPp = Pp;
-    fNonPixel_FitNPoints = n_points;
-    fNonPixel_FitResidualMean = residual_mean;
-    fNonPixel_FitResidualStd = residual_std;
+    // Store overall fit success status
+    fNonPixel_Fit2D_Successful = fit_successful;
     
-    // Store enhanced robustness metrics
-    fNonPixel_FitConstraintsSatisfied = constraints_satisfied;
-    
-    // Calculate distance from Gaussian center to true position ONLY if fit was successful
-    if (constraints_satisfied) {
-        fNonPixel_GaussTrueDistance = std::sqrt(std::pow(fNonPixel_FitX0 - fTrueX, 2) + std::pow(fNonPixel_FitY0 - fTrueY, 2));
+    // Calculate delta from fitted center to true position ONLY if fit was successful
+    if (fit_successful) {
+        fNonPixel_GaussTrueDeltaX = x_center - fTrueX;
+        fNonPixel_GaussTrueDeltaY = y_center - fTrueY;
     } else {
         // For failed fits or no fitting performed, set to NaN
-        fNonPixel_GaussTrueDistance = std::numeric_limits<G4double>::quiet_NaN();
+        fNonPixel_GaussTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fNonPixel_GaussTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 }

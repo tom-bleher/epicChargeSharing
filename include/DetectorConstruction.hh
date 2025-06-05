@@ -57,9 +57,6 @@ public:
     // Method to save simulation parameters to a log file
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
     
-    // Method to save grid parameters to a file for ROOT merging
-    void SaveGridParametersToFile() const;
-    
 private:
     // Pixel parameters
     G4double fPixelSize;         // Size of each pixel
