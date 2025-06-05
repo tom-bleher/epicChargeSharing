@@ -75,6 +75,21 @@ public:
                                 G4double y_chi2red, G4int y_npoints,
                                 G4bool fit_successful);
     
+    // Method to set diagonal Gaussian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+    void SetDiagonalGaussianFitResults(G4double main_diag_x_center, G4double main_diag_x_sigma, G4double main_diag_x_amplitude,
+                                      G4double main_diag_x_center_err, G4double main_diag_x_sigma_err, G4double main_diag_x_amplitude_err,
+                                      G4double main_diag_x_chi2red, G4int main_diag_x_npoints, G4bool main_diag_x_fit_successful,
+                                      G4double main_diag_y_center, G4double main_diag_y_sigma, G4double main_diag_y_amplitude,
+                                      G4double main_diag_y_center_err, G4double main_diag_y_sigma_err, G4double main_diag_y_amplitude_err,
+                                      G4double main_diag_y_chi2red, G4int main_diag_y_npoints, G4bool main_diag_y_fit_successful,
+                                      G4double sec_diag_x_center, G4double sec_diag_x_sigma, G4double sec_diag_x_amplitude,
+                                      G4double sec_diag_x_center_err, G4double sec_diag_x_sigma_err, G4double sec_diag_x_amplitude_err,
+                                      G4double sec_diag_x_chi2red, G4int sec_diag_x_npoints, G4bool sec_diag_x_fit_successful,
+                                      G4double sec_diag_y_center, G4double sec_diag_y_sigma, G4double sec_diag_y_amplitude,
+                                      G4double sec_diag_y_center_err, G4double sec_diag_y_sigma_err, G4double sec_diag_y_amplitude_err,
+                                      G4double sec_diag_y_chi2red, G4int sec_diag_y_npoints, G4bool sec_diag_y_fit_successful,
+                                      G4bool fit_successful);
+    
     // Fill the ROOT tree with current event data
     void FillTree();
 
@@ -185,6 +200,53 @@ private:
     G4int fNonPixel_Fit2D_YNPoints;          // Number of points used in Y fit
     
     G4bool fNonPixel_Fit2D_Successful;       // Whether 2D fitting was successful
+    
+    // Variables for diagonal Gaussian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+    // Main diagonal X fit (X vs Charge for pixels on main diagonal)
+    G4double fNonPixel_FitDiag_MainXCenter;        // Fitted X center from main diagonal X fit [mm]
+    G4double fNonPixel_FitDiag_MainXSigma;         // Fitted X sigma from main diagonal X fit [mm]
+    G4double fNonPixel_FitDiag_MainXAmplitude;     // Fitted X amplitude from main diagonal X fit
+    G4double fNonPixel_FitDiag_MainXCenterErr;     // Error in fitted X center from main diagonal X fit [mm]
+    G4double fNonPixel_FitDiag_MainXSigmaErr;      // Error in fitted X sigma from main diagonal X fit [mm]
+    G4double fNonPixel_FitDiag_MainXAmplitudeErr;  // Error in fitted X amplitude from main diagonal X fit
+    G4double fNonPixel_FitDiag_MainXChi2red;       // Reduced chi-squared for main diagonal X fit
+    G4int fNonPixel_FitDiag_MainXNPoints;          // Number of points used in main diagonal X fit
+    G4bool fNonPixel_FitDiag_MainXSuccessful;      // Whether main diagonal X fitting was successful
+    
+    // Main diagonal Y fit (Y vs Charge for pixels on main diagonal)
+    G4double fNonPixel_FitDiag_MainYCenter;        // Fitted Y center from main diagonal Y fit [mm]
+    G4double fNonPixel_FitDiag_MainYSigma;         // Fitted Y sigma from main diagonal Y fit [mm]
+    G4double fNonPixel_FitDiag_MainYAmplitude;     // Fitted Y amplitude from main diagonal Y fit
+    G4double fNonPixel_FitDiag_MainYCenterErr;     // Error in fitted Y center from main diagonal Y fit [mm]
+    G4double fNonPixel_FitDiag_MainYSigmaErr;      // Error in fitted Y sigma from main diagonal Y fit [mm]
+    G4double fNonPixel_FitDiag_MainYAmplitudeErr;  // Error in fitted Y amplitude from main diagonal Y fit
+    G4double fNonPixel_FitDiag_MainYChi2red;       // Reduced chi-squared for main diagonal Y fit
+    G4int fNonPixel_FitDiag_MainYNPoints;          // Number of points used in main diagonal Y fit
+    G4bool fNonPixel_FitDiag_MainYSuccessful;      // Whether main diagonal Y fitting was successful
+    
+    // Secondary diagonal X fit (X vs Charge for pixels on secondary diagonal)
+    G4double fNonPixel_FitDiag_SecXCenter;         // Fitted X center from secondary diagonal X fit [mm]
+    G4double fNonPixel_FitDiag_SecXSigma;          // Fitted X sigma from secondary diagonal X fit [mm]
+    G4double fNonPixel_FitDiag_SecXAmplitude;      // Fitted X amplitude from secondary diagonal X fit
+    G4double fNonPixel_FitDiag_SecXCenterErr;      // Error in fitted X center from secondary diagonal X fit [mm]
+    G4double fNonPixel_FitDiag_SecXSigmaErr;       // Error in fitted X sigma from secondary diagonal X fit [mm]
+    G4double fNonPixel_FitDiag_SecXAmplitudeErr;   // Error in fitted X amplitude from secondary diagonal X fit
+    G4double fNonPixel_FitDiag_SecXChi2red;        // Reduced chi-squared for secondary diagonal X fit
+    G4int fNonPixel_FitDiag_SecXNPoints;           // Number of points used in secondary diagonal X fit
+    G4bool fNonPixel_FitDiag_SecXSuccessful;       // Whether secondary diagonal X fitting was successful
+    
+    // Secondary diagonal Y fit (Y vs Charge for pixels on secondary diagonal)
+    G4double fNonPixel_FitDiag_SecYCenter;         // Fitted Y center from secondary diagonal Y fit [mm]
+    G4double fNonPixel_FitDiag_SecYSigma;          // Fitted Y sigma from secondary diagonal Y fit [mm]
+    G4double fNonPixel_FitDiag_SecYAmplitude;      // Fitted Y amplitude from secondary diagonal Y fit
+    G4double fNonPixel_FitDiag_SecYCenterErr;      // Error in fitted Y center from secondary diagonal Y fit [mm]
+    G4double fNonPixel_FitDiag_SecYSigmaErr;       // Error in fitted Y sigma from secondary diagonal Y fit [mm]
+    G4double fNonPixel_FitDiag_SecYAmplitudeErr;   // Error in fitted Y amplitude from secondary diagonal Y fit
+    G4double fNonPixel_FitDiag_SecYChi2red;        // Reduced chi-squared for secondary diagonal Y fit
+    G4int fNonPixel_FitDiag_SecYNPoints;           // Number of points used in secondary diagonal Y fit
+    G4bool fNonPixel_FitDiag_SecYSuccessful;       // Whether secondary diagonal Y fitting was successful
+    
+    G4bool fNonPixel_FitDiag_Successful;           // Whether diagonal fitting was successful
     
     // Variables for particle information (reduced set)
     G4double fInitialEnergy;        // Initial particle energy [MeV]

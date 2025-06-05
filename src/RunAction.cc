@@ -63,6 +63,44 @@ RunAction::RunAction()
   fNonPixel_Fit2D_YChi2red(0),
   fNonPixel_Fit2D_YNPoints(0),
   fNonPixel_Fit2D_Successful(false),
+  // Initialize diagonal Gaussian fit variables (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+  fNonPixel_FitDiag_MainXCenter(0),
+  fNonPixel_FitDiag_MainXSigma(0),
+  fNonPixel_FitDiag_MainXAmplitude(0),
+  fNonPixel_FitDiag_MainXCenterErr(0),
+  fNonPixel_FitDiag_MainXSigmaErr(0),
+  fNonPixel_FitDiag_MainXAmplitudeErr(0),
+  fNonPixel_FitDiag_MainXChi2red(0),
+  fNonPixel_FitDiag_MainXNPoints(0),
+  fNonPixel_FitDiag_MainXSuccessful(false),
+  fNonPixel_FitDiag_MainYCenter(0),
+  fNonPixel_FitDiag_MainYSigma(0),
+  fNonPixel_FitDiag_MainYAmplitude(0),
+  fNonPixel_FitDiag_MainYCenterErr(0),
+  fNonPixel_FitDiag_MainYSigmaErr(0),
+  fNonPixel_FitDiag_MainYAmplitudeErr(0),
+  fNonPixel_FitDiag_MainYChi2red(0),
+  fNonPixel_FitDiag_MainYNPoints(0),
+  fNonPixel_FitDiag_MainYSuccessful(false),
+  fNonPixel_FitDiag_SecXCenter(0),
+  fNonPixel_FitDiag_SecXSigma(0),
+  fNonPixel_FitDiag_SecXAmplitude(0),
+  fNonPixel_FitDiag_SecXCenterErr(0),
+  fNonPixel_FitDiag_SecXSigmaErr(0),
+  fNonPixel_FitDiag_SecXAmplitudeErr(0),
+  fNonPixel_FitDiag_SecXChi2red(0),
+  fNonPixel_FitDiag_SecXNPoints(0),
+  fNonPixel_FitDiag_SecXSuccessful(false),
+  fNonPixel_FitDiag_SecYCenter(0),
+  fNonPixel_FitDiag_SecYSigma(0),
+  fNonPixel_FitDiag_SecYAmplitude(0),
+  fNonPixel_FitDiag_SecYCenterErr(0),
+  fNonPixel_FitDiag_SecYSigmaErr(0),
+  fNonPixel_FitDiag_SecYAmplitudeErr(0),
+  fNonPixel_FitDiag_SecYChi2red(0),
+  fNonPixel_FitDiag_SecYNPoints(0),
+  fNonPixel_FitDiag_SecYSuccessful(false),
+  fNonPixel_FitDiag_Successful(false),
   fInitialEnergy(0),
   fMomentum(0),
   fGridPixelSize(0),
@@ -199,6 +237,53 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("Fit2D_YNPoints", &fNonPixel_Fit2D_YNPoints, "Fit2D_YNPoints/I")->SetTitle("Number of Points Used in Y Fit");
     
     fTree->Branch("Fit2D_Successful", &fNonPixel_Fit2D_Successful, "Fit2D_Successful/O")->SetTitle("Whether 2D Fitting was Successful");
+    
+    // Add branches for diagonal Gaussian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+    // Main diagonal X fit (X vs Charge for pixels on main diagonal)
+    fTree->Branch("FitDiag_MainXCenter", &fNonPixel_FitDiag_MainXCenter, "FitDiag_MainXCenter/D")->SetTitle("Fitted X Center from Main Diagonal X Fit [mm]");
+    fTree->Branch("FitDiag_MainXSigma", &fNonPixel_FitDiag_MainXSigma, "FitDiag_MainXSigma/D")->SetTitle("Fitted X Sigma from Main Diagonal X Fit [mm]");
+    fTree->Branch("FitDiag_MainXAmplitude", &fNonPixel_FitDiag_MainXAmplitude, "FitDiag_MainXAmplitude/D")->SetTitle("Fitted X Amplitude from Main Diagonal X Fit");
+    fTree->Branch("FitDiag_MainXCenterErr", &fNonPixel_FitDiag_MainXCenterErr, "FitDiag_MainXCenterErr/D")->SetTitle("Error in Fitted X Center from Main Diagonal X Fit [mm]");
+    fTree->Branch("FitDiag_MainXSigmaErr", &fNonPixel_FitDiag_MainXSigmaErr, "FitDiag_MainXSigmaErr/D")->SetTitle("Error in Fitted X Sigma from Main Diagonal X Fit [mm]");
+    fTree->Branch("FitDiag_MainXAmplitudeErr", &fNonPixel_FitDiag_MainXAmplitudeErr, "FitDiag_MainXAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude from Main Diagonal X Fit");
+    fTree->Branch("FitDiag_MainXChi2red", &fNonPixel_FitDiag_MainXChi2red, "FitDiag_MainXChi2red/D")->SetTitle("Reduced Chi-squared for Main Diagonal X Fit");
+    fTree->Branch("FitDiag_MainXNPoints", &fNonPixel_FitDiag_MainXNPoints, "FitDiag_MainXNPoints/I")->SetTitle("Number of Points Used in Main Diagonal X Fit");
+    fTree->Branch("FitDiag_MainXSuccessful", &fNonPixel_FitDiag_MainXSuccessful, "FitDiag_MainXSuccessful/O")->SetTitle("Whether Main Diagonal X Fitting was Successful");
+    
+    // Main diagonal Y fit (Y vs Charge for pixels on main diagonal)
+    fTree->Branch("FitDiag_MainYCenter", &fNonPixel_FitDiag_MainYCenter, "FitDiag_MainYCenter/D")->SetTitle("Fitted Y Center from Main Diagonal Y Fit [mm]");
+    fTree->Branch("FitDiag_MainYSigma", &fNonPixel_FitDiag_MainYSigma, "FitDiag_MainYSigma/D")->SetTitle("Fitted Y Sigma from Main Diagonal Y Fit [mm]");
+    fTree->Branch("FitDiag_MainYAmplitude", &fNonPixel_FitDiag_MainYAmplitude, "FitDiag_MainYAmplitude/D")->SetTitle("Fitted Y Amplitude from Main Diagonal Y Fit");
+    fTree->Branch("FitDiag_MainYCenterErr", &fNonPixel_FitDiag_MainYCenterErr, "FitDiag_MainYCenterErr/D")->SetTitle("Error in Fitted Y Center from Main Diagonal Y Fit [mm]");
+    fTree->Branch("FitDiag_MainYSigmaErr", &fNonPixel_FitDiag_MainYSigmaErr, "FitDiag_MainYSigmaErr/D")->SetTitle("Error in Fitted Y Sigma from Main Diagonal Y Fit [mm]");
+    fTree->Branch("FitDiag_MainYAmplitudeErr", &fNonPixel_FitDiag_MainYAmplitudeErr, "FitDiag_MainYAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude from Main Diagonal Y Fit");
+    fTree->Branch("FitDiag_MainYChi2red", &fNonPixel_FitDiag_MainYChi2red, "FitDiag_MainYChi2red/D")->SetTitle("Reduced Chi-squared for Main Diagonal Y Fit");
+    fTree->Branch("FitDiag_MainYNPoints", &fNonPixel_FitDiag_MainYNPoints, "FitDiag_MainYNPoints/I")->SetTitle("Number of Points Used in Main Diagonal Y Fit");
+    fTree->Branch("FitDiag_MainYSuccessful", &fNonPixel_FitDiag_MainYSuccessful, "FitDiag_MainYSuccessful/O")->SetTitle("Whether Main Diagonal Y Fitting was Successful");
+    
+    // Secondary diagonal X fit (X vs Charge for pixels on secondary diagonal)
+    fTree->Branch("FitDiag_SecXCenter", &fNonPixel_FitDiag_SecXCenter, "FitDiag_SecXCenter/D")->SetTitle("Fitted X Center from Secondary Diagonal X Fit [mm]");
+    fTree->Branch("FitDiag_SecXSigma", &fNonPixel_FitDiag_SecXSigma, "FitDiag_SecXSigma/D")->SetTitle("Fitted X Sigma from Secondary Diagonal X Fit [mm]");
+    fTree->Branch("FitDiag_SecXAmplitude", &fNonPixel_FitDiag_SecXAmplitude, "FitDiag_SecXAmplitude/D")->SetTitle("Fitted X Amplitude from Secondary Diagonal X Fit");
+    fTree->Branch("FitDiag_SecXCenterErr", &fNonPixel_FitDiag_SecXCenterErr, "FitDiag_SecXCenterErr/D")->SetTitle("Error in Fitted X Center from Secondary Diagonal X Fit [mm]");
+    fTree->Branch("FitDiag_SecXSigmaErr", &fNonPixel_FitDiag_SecXSigmaErr, "FitDiag_SecXSigmaErr/D")->SetTitle("Error in Fitted X Sigma from Secondary Diagonal X Fit [mm]");
+    fTree->Branch("FitDiag_SecXAmplitudeErr", &fNonPixel_FitDiag_SecXAmplitudeErr, "FitDiag_SecXAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude from Secondary Diagonal X Fit");
+    fTree->Branch("FitDiag_SecXChi2red", &fNonPixel_FitDiag_SecXChi2red, "FitDiag_SecXChi2red/D")->SetTitle("Reduced Chi-squared for Secondary Diagonal X Fit");
+    fTree->Branch("FitDiag_SecXNPoints", &fNonPixel_FitDiag_SecXNPoints, "FitDiag_SecXNPoints/I")->SetTitle("Number of Points Used in Secondary Diagonal X Fit");
+    fTree->Branch("FitDiag_SecXSuccessful", &fNonPixel_FitDiag_SecXSuccessful, "FitDiag_SecXSuccessful/O")->SetTitle("Whether Secondary Diagonal X Fitting was Successful");
+    
+    // Secondary diagonal Y fit (Y vs Charge for pixels on secondary diagonal)
+    fTree->Branch("FitDiag_SecYCenter", &fNonPixel_FitDiag_SecYCenter, "FitDiag_SecYCenter/D")->SetTitle("Fitted Y Center from Secondary Diagonal Y Fit [mm]");
+    fTree->Branch("FitDiag_SecYSigma", &fNonPixel_FitDiag_SecYSigma, "FitDiag_SecYSigma/D")->SetTitle("Fitted Y Sigma from Secondary Diagonal Y Fit [mm]");
+    fTree->Branch("FitDiag_SecYAmplitude", &fNonPixel_FitDiag_SecYAmplitude, "FitDiag_SecYAmplitude/D")->SetTitle("Fitted Y Amplitude from Secondary Diagonal Y Fit");
+    fTree->Branch("FitDiag_SecYCenterErr", &fNonPixel_FitDiag_SecYCenterErr, "FitDiag_SecYCenterErr/D")->SetTitle("Error in Fitted Y Center from Secondary Diagonal Y Fit [mm]");
+    fTree->Branch("FitDiag_SecYSigmaErr", &fNonPixel_FitDiag_SecYSigmaErr, "FitDiag_SecYSigmaErr/D")->SetTitle("Error in Fitted Y Sigma from Secondary Diagonal Y Fit [mm]");
+    fTree->Branch("FitDiag_SecYAmplitudeErr", &fNonPixel_FitDiag_SecYAmplitudeErr, "FitDiag_SecYAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude from Secondary Diagonal Y Fit");
+    fTree->Branch("FitDiag_SecYChi2red", &fNonPixel_FitDiag_SecYChi2red, "FitDiag_SecYChi2red/D")->SetTitle("Reduced Chi-squared for Secondary Diagonal Y Fit");
+    fTree->Branch("FitDiag_SecYNPoints", &fNonPixel_FitDiag_SecYNPoints, "FitDiag_SecYNPoints/I")->SetTitle("Number of Points Used in Secondary Diagonal Y Fit");
+    fTree->Branch("FitDiag_SecYSuccessful", &fNonPixel_FitDiag_SecYSuccessful, "FitDiag_SecYSuccessful/O")->SetTitle("Whether Secondary Diagonal Y Fitting was Successful");
+    
+    fTree->Branch("FitDiag_Successful", &fNonPixel_FitDiag_Successful, "FitDiag_Successful/O")->SetTitle("Whether Diagonal Fitting was Successful");
     
     // Add convenient alias branches for Gaussian center coordinates and distance calculation
     fTree->Branch("GaussTrueDeltaX", &fNonPixel_GaussTrueDeltaX, "GaussTrueDeltaX/D")->SetTitle("Delta X from Gaussian Center to True Position [mm]");
@@ -585,4 +670,66 @@ void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4d
         fNonPixel_GaussTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fNonPixel_GaussTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
+}
+
+void RunAction::SetDiagonalGaussianFitResults(G4double main_diag_x_center, G4double main_diag_x_sigma, G4double main_diag_x_amplitude,
+                                             G4double main_diag_x_center_err, G4double main_diag_x_sigma_err, G4double main_diag_x_amplitude_err,
+                                             G4double main_diag_x_chi2red, G4int main_diag_x_npoints, G4bool main_diag_x_fit_successful,
+                                             G4double main_diag_y_center, G4double main_diag_y_sigma, G4double main_diag_y_amplitude,
+                                             G4double main_diag_y_center_err, G4double main_diag_y_sigma_err, G4double main_diag_y_amplitude_err,
+                                             G4double main_diag_y_chi2red, G4int main_diag_y_npoints, G4bool main_diag_y_fit_successful,
+                                             G4double sec_diag_x_center, G4double sec_diag_x_sigma, G4double sec_diag_x_amplitude,
+                                             G4double sec_diag_x_center_err, G4double sec_diag_x_sigma_err, G4double sec_diag_x_amplitude_err,
+                                             G4double sec_diag_x_chi2red, G4int sec_diag_x_npoints, G4bool sec_diag_x_fit_successful,
+                                             G4double sec_diag_y_center, G4double sec_diag_y_sigma, G4double sec_diag_y_amplitude,
+                                             G4double sec_diag_y_center_err, G4double sec_diag_y_sigma_err, G4double sec_diag_y_amplitude_err,
+                                             G4double sec_diag_y_chi2red, G4int sec_diag_y_npoints, G4bool sec_diag_y_fit_successful,
+                                             G4bool fit_successful)
+{
+    // Store main diagonal X fit results
+    fNonPixel_FitDiag_MainXCenter = main_diag_x_center;
+    fNonPixel_FitDiag_MainXSigma = main_diag_x_sigma;
+    fNonPixel_FitDiag_MainXAmplitude = main_diag_x_amplitude;
+    fNonPixel_FitDiag_MainXCenterErr = main_diag_x_center_err;
+    fNonPixel_FitDiag_MainXSigmaErr = main_diag_x_sigma_err;
+    fNonPixel_FitDiag_MainXAmplitudeErr = main_diag_x_amplitude_err;
+    fNonPixel_FitDiag_MainXChi2red = main_diag_x_chi2red;
+    fNonPixel_FitDiag_MainXNPoints = main_diag_x_npoints;
+    fNonPixel_FitDiag_MainXSuccessful = main_diag_x_fit_successful;
+    
+    // Store main diagonal Y fit results
+    fNonPixel_FitDiag_MainYCenter = main_diag_y_center;
+    fNonPixel_FitDiag_MainYSigma = main_diag_y_sigma;
+    fNonPixel_FitDiag_MainYAmplitude = main_diag_y_amplitude;
+    fNonPixel_FitDiag_MainYCenterErr = main_diag_y_center_err;
+    fNonPixel_FitDiag_MainYSigmaErr = main_diag_y_sigma_err;
+    fNonPixel_FitDiag_MainYAmplitudeErr = main_diag_y_amplitude_err;
+    fNonPixel_FitDiag_MainYChi2red = main_diag_y_chi2red;
+    fNonPixel_FitDiag_MainYNPoints = main_diag_y_npoints;
+    fNonPixel_FitDiag_MainYSuccessful = main_diag_y_fit_successful;
+    
+    // Store secondary diagonal X fit results
+    fNonPixel_FitDiag_SecXCenter = sec_diag_x_center;
+    fNonPixel_FitDiag_SecXSigma = sec_diag_x_sigma;
+    fNonPixel_FitDiag_SecXAmplitude = sec_diag_x_amplitude;
+    fNonPixel_FitDiag_SecXCenterErr = sec_diag_x_center_err;
+    fNonPixel_FitDiag_SecXSigmaErr = sec_diag_x_sigma_err;
+    fNonPixel_FitDiag_SecXAmplitudeErr = sec_diag_x_amplitude_err;
+    fNonPixel_FitDiag_SecXChi2red = sec_diag_x_chi2red;
+    fNonPixel_FitDiag_SecXNPoints = sec_diag_x_npoints;
+    fNonPixel_FitDiag_SecXSuccessful = sec_diag_x_fit_successful;
+    
+    // Store secondary diagonal Y fit results
+    fNonPixel_FitDiag_SecYCenter = sec_diag_y_center;
+    fNonPixel_FitDiag_SecYSigma = sec_diag_y_sigma;
+    fNonPixel_FitDiag_SecYAmplitude = sec_diag_y_amplitude;
+    fNonPixel_FitDiag_SecYCenterErr = sec_diag_y_center_err;
+    fNonPixel_FitDiag_SecYSigmaErr = sec_diag_y_sigma_err;
+    fNonPixel_FitDiag_SecYAmplitudeErr = sec_diag_y_amplitude_err;
+    fNonPixel_FitDiag_SecYChi2red = sec_diag_y_chi2red;
+    fNonPixel_FitDiag_SecYNPoints = sec_diag_y_npoints;
+    fNonPixel_FitDiag_SecYSuccessful = sec_diag_y_fit_successful;
+    
+    // Store overall fit success status
+    fNonPixel_FitDiag_Successful = fit_successful;
 }
