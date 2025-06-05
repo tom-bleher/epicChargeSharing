@@ -152,10 +152,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
   G4bool shouldPerformFit = !isPixelHit && !fNonPixel_GridNeighborhoodChargeFractions.empty();
   
   if (shouldPerformFit) {
-    G4cout << "EventAction: Performing 2D Gaussian fit" 
-           << " (Non-pixel hit, distance=" << fActualPixelDistance/mm << " mm > " 
-           << D0_threshold_mm/mm << " mm)" << G4endl;
-    
     // Extract coordinates and charge values for fitting
     std::vector<double> x_coords, y_coords, charge_values;
     
@@ -194,8 +190,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         false); // verbose=false for production
       
       if (fitResults.fit_successful) {
-        G4cout << "EventAction: 2D Gaussian fit successful. GaussX: " << fitResults.x_center/mm 
-               << " mm, GaussY: " << fitResults.y_center/mm << " mm" << G4endl;
+        // Removed verbose debug output for cleaner simulation logs
       }
       
       // Pass 2D fit results to RunAction
@@ -209,8 +204,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.fit_successful);
         
     } else {
-      G4cout << "EventAction: Not enough data points for 2D fitting (" << x_coords.size() 
-             << " < 3)" << G4endl;
       // Not enough data points for fitting
       fRunAction->Set2DGaussianFitResults(
         0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
@@ -220,10 +213,9 @@ void EventAction::EndOfEventAction(const G4Event* event)
   } else {
     // Skip fitting due to conditions not met
     if (isPixelHit) {
-      G4cout << "EventAction: Skipping 2D Gaussian fit" 
-             << " (pixel hit: " << fActualPixelDistance/mm << " mm)" << G4endl;
+      // Removed verbose debug output for cleaner simulation logs
     } else if (fNonPixel_GridNeighborhoodChargeFractions.empty()) {
-      G4cout << "EventAction: No charge data available for fitting" << G4endl;
+      // Removed verbose debug output for cleaner simulation logs
     }
     
     // Set default values (no fitting performed)
