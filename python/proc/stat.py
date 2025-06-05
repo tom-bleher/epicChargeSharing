@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Statistical analysis and plotting routines for epicToy simulation data.
+Statistical analysis of energy deposition and pixel hit data.
+This script provides statistical analysis and visualization capabilities
+for GEANT4 epicToy simulation data. All Gaussian fitting is performed
+using ODRPACK95 Fortran library in the C++ code.
 
 This module provides functions to create the following plots:
 1. Chi-squared distribution with statistics
@@ -15,7 +18,6 @@ matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import uproot
 import pandas as pd
-from scipy import stats
 import os
 import argparse
 
