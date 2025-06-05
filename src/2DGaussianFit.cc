@@ -6,6 +6,10 @@
 #include <map>
 #include <iostream>
 #include <mutex>
+#include <atomic>
+#include <thread>
+#include <chrono>
+#include <sstream>
 
 // ROOT includes
 #include "TGraph.h"
@@ -20,6 +24,7 @@
 
 // Thread-safe mutex for ROOT operations
 static std::mutex gRootFitMutex;
+static std::atomic<int> gGlobalFitCounter{0};
 
 GaussianFit2DResults Fit2DGaussian(
     const std::vector<double>& x_coords,
@@ -34,6 +39,13 @@ GaussianFit2DResults Fit2DGaussian(
     
     // Thread-safe ROOT operations
     std::lock_guard<std::mutex> lock(gRootFitMutex);
+    
+    // Initialize ROOT for thread safety if not already done
+    static bool root_initialized = false;
+    if (!root_initialized) {
+        gROOT->SetBatch(kTRUE);  // Run in batch mode to avoid graphics issues
+        root_initialized = true;
+    }
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
         if (verbose) {
@@ -126,8 +138,11 @@ GaussianFit2DResults Fit2DGaussian(
     bool x_fit_success = false;
     bool y_fit_success = false;
     
-    // Static counter for unique function names (thread-safe)
-    static int fit_counter = 0;
+    // Create unique identifiers for this fit session
+    auto thread_id = std::this_thread::get_id();
+    auto timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    int fit_id = gGlobalFitCounter.fetch_add(1);
     
     // Fit X direction (central row)
     if (rows_data.find(best_row_y) != rows_data.end() && rows_data[best_row_y].size() >= 3) {
@@ -151,8 +166,10 @@ GaussianFit2DResults Fit2DGaussian(
         
         TGraph* graph_x = new TGraph(x_vals.size(), &x_vals[0], &y_vals[0]);
         
-        // Create unique function name for thread safety
-        std::string func_name = "gauss_x_" + std::to_string(fit_counter++);
+        // Create unique function name for thread safety using multiple unique identifiers
+        std::ostringstream func_name_stream;
+        func_name_stream << "gauss_x_" << fit_id << "_" << timestamp << "_" << std::hash<std::thread::id>{}(thread_id);
+        std::string func_name = func_name_stream.str();
         
         // Define Gaussian + offset function: y(x) = A * exp(-(x - m)^2 / (2 * sigma^2)) + B
         TF1* gauss_x = new TF1(func_name.c_str(), "[0]*TMath::Exp(-0.5*TMath::Power((x-[1])/[2],2)) + [3]", 
@@ -175,34 +192,18 @@ GaussianFit2DResults Fit2DGaussian(
         gauss_x->SetParLimits(0, 0.1 * Q_row, Q_row);
         
         // Constraint 2: 0 ≤ B ≤ 0.2 * Q_tot
-        gauss_x->SetParLimits(3, 0, 0.2 * Q_tot);
+        gauss_x->SetParLimits(3, 0.08 * Q_row, 0.5 * Q_row);
         
         // Constraint 3: 0.2 * PixelSpacing ≤ σ ≤ 2 * PixelSpacing  
         gauss_x->SetParLimits(2, 0.2 * pixel_spacing, 2.0 * pixel_spacing);
         
-        // Constraint 4: Center within 3 blocks of central block but outside pixel area
-        // Calculate pixel boundaries for center constraint
-        double pixel_half_size = pixel_spacing * 0.5; // Assuming square pixels
-        double center_pixel_left = center_x_estimate - pixel_half_size;
-        double center_pixel_right = center_x_estimate + pixel_half_size;
-        double block_spacing = pixel_spacing; // Assuming blocks are pixel-spaced
-        
-        // Define valid ranges: within 3 blocks but outside pixel area
-        // Range 1: (center - 3*spacing) to (center - 0.5*pixel_size)
-        // Range 2: (center + 0.5*pixel_size) to (center + 3*spacing)
-        double range1_min = center_x_estimate - 3.0 * block_spacing;
-        double range1_max = center_pixel_left;
-        double range2_min = center_pixel_right;
-        double range2_max = center_x_estimate + 3.0 * block_spacing;
-        
-        // For simplicity, set broader range and let fit find optimal position
-        // We'll use the union of both valid ranges as constraints
-        double center_min = range1_min;
-        double center_max = range2_max;
+        // Constraint 4: Center within ±pixel_spacing of center estimate
+        double center_min = center_x_estimate - pixel_spacing;
+        double center_max = center_x_estimate + pixel_spacing;
         gauss_x->SetParLimits(1, center_min, center_max);
         
         if (verbose) {
-            std::cout << "X-fit constraints: A=[" << 0.1*Q_tot << "," << Q_row << "], B=[0," << 0.2*Q_tot 
+            std::cout << "X-fit constraints: A=[" << 0.1*Q_row << "," << Q_row << "], B=[" << 0.08*Q_row << "," << 0.5*Q_row 
                      << "], σ=[" << 0.2*pixel_spacing << "," << 2.0*pixel_spacing 
                      << "], m=[" << center_min << "," << center_max << "]" << std::endl;
         }
@@ -258,8 +259,10 @@ GaussianFit2DResults Fit2DGaussian(
         
         TGraph* graph_y = new TGraph(x_vals.size(), &x_vals[0], &y_vals[0]);
         
-        // Create unique function name for thread safety
-        std::string func_name_y = "gauss_y_" + std::to_string(fit_counter++);
+        // Create unique function name for thread safety using multiple unique identifiers
+        std::ostringstream func_name_y_stream;
+        func_name_y_stream << "gauss_y_" << fit_id << "_" << timestamp << "_" << std::hash<std::thread::id>{}(thread_id);
+        std::string func_name_y = func_name_y_stream.str();
         
         // Define Gaussian + offset function: y(x) = A * exp(-(x - m)^2 / (2 * sigma^2)) + B
         TF1* gauss_y = new TF1(func_name_y.c_str(), "[0]*TMath::Exp(-0.5*TMath::Power((x-[1])/[2],2)) + [3]", 
@@ -279,37 +282,21 @@ GaussianFit2DResults Fit2DGaussian(
         
         // Physical constraints on parameters
         // Constraint 1: 0.1*Q_tot ≤ A ≤ ∑Q_i for column
-        gauss_y->SetParLimits(0, 0.1 * Q_tot, Q_col);
+        gauss_y->SetParLimits(0, 0.1 * Q_col, Q_col);
         
         // Constraint 2: 0 ≤ B ≤ 0.2 * Q_tot
-        gauss_y->SetParLimits(3, 0, 0.2 * Q_tot);
+        gauss_y->SetParLimits(3, 0.08*Q_col, 0.5 * Q_col);
         
         // Constraint 3: 0.2 * PixelSpacing ≤ σ ≤ 2 * PixelSpacing  
         gauss_y->SetParLimits(2, 0.2 * pixel_spacing, 2.0 * pixel_spacing);
         
-        // Constraint 4: Center within 3 blocks of central block but outside pixel area
-        // Calculate pixel boundaries for center constraint
-        double pixel_half_size = pixel_spacing * 0.5; // Assuming square pixels
-        double center_pixel_bottom = center_y_estimate - pixel_half_size;
-        double center_pixel_top = center_y_estimate + pixel_half_size;
-        double block_spacing = pixel_spacing; // Assuming blocks are pixel-spaced
-        
-        // Define valid ranges: within 3 blocks but outside pixel area
-        // Range 1: (center - 3*spacing) to (center - 0.5*pixel_size)
-        // Range 2: (center + 0.5*pixel_size) to (center + 3*spacing)
-        double range1_min = center_y_estimate - 3.0 * block_spacing;
-        double range1_max = center_pixel_bottom;
-        double range2_min = center_pixel_top;
-        double range2_max = center_y_estimate + 3.0 * block_spacing;
-        
-        // For simplicity, set broader range and let fit find optimal position
-        // We'll use the union of both valid ranges as constraints
-        double center_min = range1_min;
-        double center_max = range2_max;
+        // Constraint 4: Center within ±pixel_spacing of center estimate
+        double center_min = center_y_estimate - pixel_spacing;
+        double center_max = center_y_estimate + pixel_spacing;
         gauss_y->SetParLimits(1, center_min, center_max);
         
         if (verbose) {
-            std::cout << "Y-fit constraints: A=[" << 0.1*Q_tot << "," << Q_col << "], B=[0," << 0.2*Q_tot 
+            std::cout << "Y-fit constraints: A=[" << 0.1*Q_col << "," << Q_col << "], B=[" << 0.08*Q_col << "," << 0.5*Q_col 
                      << "], σ=[" << 0.2*pixel_spacing << "," << 2.0*pixel_spacing 
                      << "], m=[" << center_min << "," << center_max << "]" << std::endl;
         }

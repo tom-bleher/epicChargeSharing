@@ -42,8 +42,8 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     GenerateRandomPosition();
     
     fParticleGun->SetParticleMomentumDirection(mom);
-    // Use more realistic energy for AC-LGAD testing (10-120 keV typical for MIPs)
-    fParticleGun->SetParticleEnergy(12000000*keV); // Minimum Ionizing Particle equivalent
+    // Use more realistic energy for AC-LGAD testing (typical MIP energy)
+    fParticleGun->SetParticleEnergy(1.0*MeV); // Realistic MIP energy instead of 12 GeV
     fParticleGun->SetParticleDefinition(particle);
 }
 
