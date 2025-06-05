@@ -40,12 +40,12 @@ public:
     
     // Method to set pixel alpha angle
     void SetPixelAlpha(G4double alpha);
-    
-    // Method to set pixel classification based on D0 threshold
-    void SetPixelClassification(G4bool isWithinD0, G4double fPixelTrueDistance);
-    
+
     // Method to set pixel hit status
     void SetPixelHitStatus(G4bool isPixelHit);
+    
+    // Method to set pixel classification data (hit status and delta values)
+    void SetPixelClassification(G4bool isWithinD0, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY);
     
     // Method to set neighborhood (9x9) grid angle data for non-pixel hits
     void SetNeighborhoodGridData(const std::vector<G4double>& angles, 
@@ -63,29 +63,17 @@ public:
                                    G4double pixelCornerOffset, G4double detSize, 
                                    G4int numBlocksPerSide);
     
-    // Method to set particle information
-    void SetParticleInfo(G4int eventID, G4double initialEnergy, G4double finalEnergy, 
-                        G4double momentum, const G4String& particleName);
-    
-    // Method to set step-by-step energy deposition information
-    void SetStepEnergyDeposition(const std::vector<G4double>& stepEdep,
-                                const std::vector<G4double>& stepZ,
-                                const std::vector<G4double>& stepTime);
-    
-    // Method to set ALL step information (including non-energy depositing steps)
-    void SetAllStepInfo(const std::vector<G4double>& stepEdep,
-                       const std::vector<G4double>& stepZ,
-                       const std::vector<G4double>& stepTime);
-    
-    // Method to set 3D Gaussian fit results (only for non-pixel hits)
-    void SetGaussianFitResults(G4double amplitude, G4double x0, G4double y0,
-                              G4double sigma_x, G4double sigma_y, G4double theta, G4double offset,
-                              G4double amplitude_err, G4double x0_err, G4double y0_err,
-                              G4double sigma_x_err, G4double sigma_y_err, G4double theta_err, G4double offset_err,
-                              G4double chi2red, G4double ndf, G4double Pp,
-                              G4int n_points,
-                              G4double residual_mean, G4double residual_std,
-                              G4bool constraints_satisfied);
+    // Method to set initial particle information
+    void SetInitialParticleInfo(G4double initialEnergy, G4double momentum);
+
+    // Method to set 2D Gaussian fit results (central row and column fitting)
+    void Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4double x_amplitude,
+                                G4double x_center_err, G4double x_sigma_err, G4double x_amplitude_err,
+                                G4double x_chi2red, G4int x_npoints,
+                                G4double y_center, G4double y_sigma, G4double y_amplitude,
+                                G4double y_center_err, G4double y_sigma_err, G4double y_amplitude_err,
+                                G4double y_chi2red, G4int y_npoints,
+                                G4bool fit_successful);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -118,14 +106,14 @@ private:
     // Variables for pixel mapping
     G4int fPixelI;    // Pixel index in X direction
     G4int fPixelJ;    // Pixel index in Y direction
-    G4double fPixelDist; // Distance from hit to pixel center [mm]
+    G4double fPixelTrueDeltaX; // Delta X from hit to pixel center [mm] (x_pixel - x_true)
+    G4double fPixelTrueDeltaY; // Delta Y from hit to pixel center [mm] (y_pixel - y_true)
     
     // =============================================
     // HIT CLASSIFICATION VARIABLES
     // =============================================
     G4bool fIsPixelHit;  // True if hit is on pixel OR distance <= D0
-    G4bool fIsWithinD0;  // True if distance <= D0 (10 microns)
-    
+
     // =============================================
     // PIXEL HIT DATA (distance <= D0 or on pixel)
     // =============================================
@@ -174,26 +162,33 @@ private:
     G4bool fNonPixel_FitConstraintsSatisfied; // Whether geometric constraints were satisfied
     
     // Additional variables for convenient access to Gaussian center and distance calculation
-    G4double fNonPixel_GaussTrueDistance;  // Distance from Gaussian center to true position [mm]
+    G4double fNonPixel_GaussTrueDeltaX;  // Delta X from Gaussian center to true position [mm] (x_gauss - x_true)
+    G4double fNonPixel_GaussTrueDeltaY;  // Delta Y from Gaussian center to true position [mm] (y_gauss - y_true)
     
-    // Variables for particle information
-    G4int fEventID;                 // Event ID
+    // Variables for 2D Gaussian fit results (central row and column fitting)
+    G4double fNonPixel_Fit2D_XCenter;        // Fitted X center from central row [mm]
+    G4double fNonPixel_Fit2D_XSigma;         // Fitted X sigma from central row [mm]
+    G4double fNonPixel_Fit2D_XAmplitude;     // Fitted X amplitude from central row
+    G4double fNonPixel_Fit2D_XCenterErr;     // Error in fitted X center [mm]
+    G4double fNonPixel_Fit2D_XSigmaErr;      // Error in fitted X sigma [mm]
+    G4double fNonPixel_Fit2D_XAmplitudeErr;  // Error in fitted X amplitude
+    G4double fNonPixel_Fit2D_XChi2red;       // Reduced chi-squared for X fit
+    G4int fNonPixel_Fit2D_XNPoints;          // Number of points used in X fit
+    
+    G4double fNonPixel_Fit2D_YCenter;        // Fitted Y center from central column [mm]
+    G4double fNonPixel_Fit2D_YSigma;         // Fitted Y sigma from central column [mm]
+    G4double fNonPixel_Fit2D_YAmplitude;     // Fitted Y amplitude from central column
+    G4double fNonPixel_Fit2D_YCenterErr;     // Error in fitted Y center [mm]
+    G4double fNonPixel_Fit2D_YSigmaErr;      // Error in fitted Y sigma [mm]
+    G4double fNonPixel_Fit2D_YAmplitudeErr;  // Error in fitted Y amplitude
+    G4double fNonPixel_Fit2D_YChi2red;       // Reduced chi-squared for Y fit
+    G4int fNonPixel_Fit2D_YNPoints;          // Number of points used in Y fit
+    
+    G4bool fNonPixel_Fit2D_Successful;       // Whether 2D fitting was successful
+    
+    // Variables for particle information (reduced set)
     G4double fInitialEnergy;        // Initial particle energy [MeV]
-    G4double fFinalEnergy;          // Final particle energy [MeV]
     G4double fMomentum;             // Particle momentum [MeV/c]
-    std::string fParticleName;      // Particle type name
-    
-    // Variables for step-by-step energy deposition information
-    std::vector<G4double> fStepEnergyDeposition;    // Energy deposited per step [MeV]
-    std::vector<G4double> fStepZPositions;       // Z position of each energy deposit [mm]
-    std::vector<G4double> fStepTimes;    // Time of each energy deposit [ns]
-    
-    // Variables for ALL step information (including non-energy depositing steps)
-    std::vector<G4double> fAllStepEnergyDeposition;    // Energy deposited per step (including 0) [MeV]
-    std::vector<G4double> fAllStepZPositions;       // Z position of each step [mm]
-    std::vector<G4double> fAllStepTimes;    // Time of each step [ns]
-    std::vector<G4double> fAllStepLengths;     // Length of each step [mm]
-    std::vector<G4int> fAllStepNumbers;        // Step number for each step
     
     // Variables for detector grid parameters (stored as ROOT metadata)
     G4double fGridPixelSize;        // Pixel size [mm]
