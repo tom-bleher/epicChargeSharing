@@ -196,7 +196,7 @@ def calculate_residuals(positions, charges, fit_params):
     
     return charges - fitted_values
 
-def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=True):
+def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=False):
     """
     Create separate Gaussian fit plots for X and Y directions for a single event.
     Each direction gets its own figure with residuals on left, main plot on right.
@@ -262,10 +262,10 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=T
                              capsize=3, label='Fit residuals', alpha=0.8)
             ax_x_res.axhline(0, color='red', linestyle='--', alpha=0.7)
             ax_x_res.grid(True, alpha=0.3, linestyle=':')
-            ax_x_res.set_xlabel(r'$X\mathrm{(mm)}$', fontsize=12)
-            ax_x_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Gauss}(x_{\text{px}}) \mathrm{(C)}$', fontsize=12)
-            ax_x_res.set_title('Residuals of Charge vs. Position X with Gaussian Fit', fontweight='bold')
-            ax_x_res.legend()
+            ax_x_res.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_x_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(x_{\text{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_x_res.set_title('Residuals of Pixel Charge vs. Central Coordinate (Row)')
+            ax_x_res.legend(loc='upper right')
             
             # Main plot (right panel)
             # Plot data points with error bars
@@ -277,7 +277,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=T
             y_fit = gaussian_1d(x_fit_range, x_amplitude, x_center, x_sigma)
             
             # Plot fit curve
-            fit_label = r'$y(x) = A \exp\!\Bigl(-\tfrac{(x - m)^2}{2\sigma^2}\Bigr)+ B$ fit'
+            fit_label = r'$y(x) = A \exp\left(-\frac{(x - m)^2}{2\sigma^2}\right)+ B$'
             ax_x_main.plot(x_fit_range, y_fit, 'r-', linewidth=2.5, 
                           label=fit_label, alpha=0.9)
             
@@ -286,11 +286,12 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=T
                              label=f'True X = {true_x:.3f} mm', alpha=0.8)
             
             ax_x_main.grid(True, alpha=0.3, linestyle=':')
-            ax_x_main.set_xlabel(r'$X\mathrm{(mm)}$', fontsize=12)
-            ax_x_main.set_ylabel(r'q\mathrm{(C))}', fontsize=12)
-            ax_x_main.set_title('Charge vs. Row Position X with Gaussian Fit', fontweight='bold')
-            ax_x_main.legend()
+            ax_x_main.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_x_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
+            ax_x_main.set_title('Pixel Charge vs. Central Coordinate (Row)')
+            ax_x_main.legend(loc='upper left')
             
+            '''
             # Add fit information text box
             fit_info = (f'μ = {x_center:.3f}±{x_center_err:.3f} mm\n'
                        f'σ = {x_sigma:.3f}±{x_sigma_err:.3f} mm\n' 
@@ -299,14 +300,14 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=T
                        f'N = {x_npoints}')
             ax_x_main.text(0.02, 0.98, fit_info, transform=ax_x_main.transAxes, 
                           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-            
+            '''
             # Add overall title with event information
             if show_event_info:
                 delta_x = x_center - true_x
                 fig_x.suptitle(f'Event {event_idx}: X-Direction Gaussian Fit\n'
                               f'True X: {true_x:.3f} mm, Fitted X: {x_center:.3f} mm, '
                               f'ΔX: {delta_x:.3f} mm', 
-                              fontsize=14, fontweight='bold')
+                              fontsize=14)
             
             # Save X-direction plot
             filename_x = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_X.png')
@@ -335,10 +336,10 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=T
                              capsize=3, label='Fit residuals', alpha=0.8)
             ax_y_res.axhline(0, color='red', linestyle='--', alpha=0.7)
             ax_y_res.grid(True, alpha=0.3, linestyle=':')
-            ax_y_res.set_xlabel('Position Y [mm]', fontsize=12)
-            ax_y_res.set_ylabel('Residuals (Data - Fit) [C]', fontsize=12)
-            ax_y_res.set_title('Residuals of Charge vs. Position Y with Gaussian Fit', fontweight='bold')
-            ax_y_res.legend()
+            ax_y_res.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_y_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(y_{\text{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_y_res.set_title('Residuals of Pixel Charge vs. Central Coordinate (Column)')
+            ax_y_res.legend(loc='upper right')
             
             # Main plot (right panel)
             # Plot data points with error bars
@@ -350,7 +351,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=T
             y_fit = gaussian_1d(y_fit_range, y_amplitude, y_center, y_sigma)
             
             # Plot fit curve
-            fit_label = f'A·exp(-(y-μ)²/2σ²) fit'
+            fit_label = r'$y(x) = A \exp\left(-\frac{(x - m)^2}{2\sigma^2}\right)+ B$'
             ax_y_main.plot(y_fit_range, y_fit, 'r-', linewidth=2.5, 
                           label=fit_label, alpha=0.9)
             
@@ -359,11 +360,11 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=T
                              label=f'True Y = {true_y:.3f} mm', alpha=0.8)
             
             ax_y_main.grid(True, alpha=0.3, linestyle=':')
-            ax_y_main.set_xlabel('Position Y [mm]', fontsize=12)
-            ax_y_main.set_ylabel('Charge [C]', fontsize=12)
-            ax_y_main.set_title('Charge vs. Position Y with Gaussian Fit', fontweight='bold')
-            ax_y_main.legend()
-            
+            ax_y_main.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_y_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
+            ax_y_main.set_title('Pixel Charge vs. Central Coordinate (Column)')
+            ax_y_main.legend(loc='upper left')
+            '''
             # Add fit information text box
             fit_info = (f'μ = {y_center:.3f}±{y_center_err:.3f} mm\n'
                        f'σ = {y_sigma:.3f}±{y_sigma_err:.3f} mm\n' 
@@ -372,14 +373,14 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=T
                        f'N = {y_npoints}')
             ax_y_main.text(0.02, 0.98, fit_info, transform=ax_y_main.transAxes, 
                           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-            
+            '''
             # Add overall title with event information
             if show_event_info:
                 delta_y = y_center - true_y
                 fig_y.suptitle(f'Event {event_idx}: Y-Direction Gaussian Fit\n'
                               f'True Y: {true_y:.3f} mm, Fitted Y: {y_center:.3f} mm, '
                               f'ΔY: {delta_y:.3f} mm', 
-                              fontsize=14, fontweight='bold')
+                              fontsize=14)
             
             # Save Y-direction plot
             filename_y = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_Y.png')
@@ -458,7 +459,7 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
         # X-direction residuals histogram
         if x_residuals_all:
             ax1.hist(x_residuals_all, bins=30, alpha=0.7, color='blue', edgecolor='black')
-            ax1.set_title('X-Direction Fit Residuals Distribution', fontweight='bold')
+            ax1.set_title('X-Direction Fit Residuals Distribution')
             ax1.set_xlabel('Residual [C]')
             ax1.set_ylabel('Frequency')
             ax1.grid(True, alpha=0.3)
@@ -473,7 +474,7 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
         # Y-direction residuals histogram
         if y_residuals_all:
             ax2.hist(y_residuals_all, bins=30, alpha=0.7, color='red', edgecolor='black')
-            ax2.set_title('Y-Direction Fit Residuals Distribution', fontweight='bold')
+            ax2.set_title('Y-Direction Fit Residuals Distribution')
             ax2.set_xlabel('Residual [C]')
             ax2.set_ylabel('Frequency')
             ax2.grid(True, alpha=0.3)
@@ -491,10 +492,10 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
         if y_chi2_all:
             ax3.hist(y_chi2_all, bins=20, alpha=0.7, color='red', edgecolor='black', label='Y-direction')
         
-        ax3.set_title('Reduced Chi-squared Distribution', fontweight='bold')
+        ax3.set_title('Reduced Chi-squared Distribution')
         ax3.set_xlabel('χ²/ndf')
         ax3.set_ylabel('Frequency')
-        ax3.legend()
+        ax3.legend(loc='upper right')
         ax3.grid(True, alpha=0.3)
         
         # Position accuracy plot
@@ -505,7 +506,7 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
         
         distances = np.sqrt((fit_x - true_x)**2 + (fit_y - true_y)**2)
         ax4.hist(distances, bins=20, alpha=0.7, color='green', edgecolor='black')
-        ax4.set_title('Distance: Fitted Center to True Position', fontweight='bold')
+        ax4.set_title('Distance: Fitted Center to True Position')
         ax4.set_xlabel('Distance [mm]')
         ax4.set_ylabel('Frequency')
         ax4.grid(True, alpha=0.3)
