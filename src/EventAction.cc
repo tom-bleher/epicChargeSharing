@@ -203,11 +203,57 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.y_chi2red, fitResults.y_npoints,
         fitResults.fit_successful);
         
+      // Perform diagonal fitting if 2D fitting was performed and successful
+      if (fitResults.fit_successful) {
+        // Perform diagonal Gaussian fitting using the same data
+        DiagonalFitResults diagResults = FitDiagonalGaussian(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false); // verbose=false for production
+        
+        if (diagResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass diagonal fit results to RunAction
+        fRunAction->SetDiagonalGaussianFitResults(
+          diagResults.main_diag_x_center, diagResults.main_diag_x_sigma, diagResults.main_diag_x_amplitude,
+          diagResults.main_diag_x_center_err, diagResults.main_diag_x_sigma_err, diagResults.main_diag_x_amplitude_err,
+          diagResults.main_diag_x_chi2red, diagResults.main_diag_x_npoints, diagResults.main_diag_x_fit_successful,
+          diagResults.main_diag_y_center, diagResults.main_diag_y_sigma, diagResults.main_diag_y_amplitude,
+          diagResults.main_diag_y_center_err, diagResults.main_diag_y_sigma_err, diagResults.main_diag_y_amplitude_err,
+          diagResults.main_diag_y_chi2red, diagResults.main_diag_y_npoints, diagResults.main_diag_y_fit_successful,
+          diagResults.sec_diag_x_center, diagResults.sec_diag_x_sigma, diagResults.sec_diag_x_amplitude,
+          diagResults.sec_diag_x_center_err, diagResults.sec_diag_x_sigma_err, diagResults.sec_diag_x_amplitude_err,
+          diagResults.sec_diag_x_chi2red, diagResults.sec_diag_x_npoints, diagResults.sec_diag_x_fit_successful,
+          diagResults.sec_diag_y_center, diagResults.sec_diag_y_sigma, diagResults.sec_diag_y_amplitude,
+          diagResults.sec_diag_y_center_err, diagResults.sec_diag_y_sigma_err, diagResults.sec_diag_y_amplitude_err,
+          diagResults.sec_diag_y_chi2red, diagResults.sec_diag_y_npoints, diagResults.sec_diag_y_fit_successful,
+          diagResults.fit_successful);
+      } else {
+        // Set default diagonal fit values when 2D fitting failed
+        fRunAction->SetDiagonalGaussianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          false); // fit_successful = false
+      }
+        
     } else {
       // Not enough data points for fitting
       fRunAction->Set2DGaussianFitResults(
         0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
         0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        false); // fit_successful = false
+      
+      // Set default diagonal fit values when not enough data points
+      fRunAction->SetDiagonalGaussianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
         false); // fit_successful = false
     }
   } else {
@@ -222,6 +268,14 @@ void EventAction::EndOfEventAction(const G4Event* event)
     fRunAction->Set2DGaussianFitResults(
       0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
       0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+      false); // fit_successful = false
+    
+    // Set default diagonal fit values when fitting is skipped
+    fRunAction->SetDiagonalGaussianFitResults(
+      0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
+      0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+      0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+      0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
       false); // fit_successful = false
   }
   
