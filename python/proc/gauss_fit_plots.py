@@ -5,9 +5,12 @@ Post-processing plotting routine for Gaussian fit visualization of charge sharin
 This script creates plots for:
 1. Gaussian curve estimation for central row (x-direction) with residuals
 2. Gaussian curve estimation for central column (y-direction) with residuals
+3. Gaussian curve estimation for main diagonal direction with residuals
+4. Gaussian curve estimation for secondary diagonal direction with residuals
 
 The plots show the fitted Gaussian curves overlaid on the actual charge data points 
 from the neighborhood grid, along with residual plots showing fit quality.
+Each direction gets a separate figure with corresponding file naming.
 """
 
 import uproot
@@ -76,6 +79,20 @@ def load_successful_fits(root_file):
                 'Fit2D_YCenterErr', 'Fit2D_YSigmaErr', 'Fit2D_YAmplitudeErr',
                 'Fit2D_YChi2red', 'Fit2D_YNPoints',
                 'Fit2D_Successful',  # Whether 2D fitting was successful
+                # Diagonal fit branches (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+                'FitDiag_MainXCenter', 'FitDiag_MainXSigma', 'FitDiag_MainXAmplitude',
+                'FitDiag_MainXCenterErr', 'FitDiag_MainXSigmaErr', 'FitDiag_MainXAmplitudeErr',
+                'FitDiag_MainXChi2red', 'FitDiag_MainXNPoints', 'FitDiag_MainXSuccessful',
+                'FitDiag_MainYCenter', 'FitDiag_MainYSigma', 'FitDiag_MainYAmplitude',
+                'FitDiag_MainYCenterErr', 'FitDiag_MainYSigmaErr', 'FitDiag_MainYAmplitudeErr',
+                'FitDiag_MainYChi2red', 'FitDiag_MainYNPoints', 'FitDiag_MainYSuccessful',
+                'FitDiag_SecXCenter', 'FitDiag_SecXSigma', 'FitDiag_SecXAmplitude',
+                'FitDiag_SecXCenterErr', 'FitDiag_SecXSigmaErr', 'FitDiag_SecXAmplitudeErr',
+                'FitDiag_SecXChi2red', 'FitDiag_SecXNPoints', 'FitDiag_SecXSuccessful',
+                'FitDiag_SecYCenter', 'FitDiag_SecYSigma', 'FitDiag_SecYAmplitude',
+                'FitDiag_SecYCenterErr', 'FitDiag_SecYSigmaErr', 'FitDiag_SecYAmplitudeErr',
+                'FitDiag_SecYChi2red', 'FitDiag_SecYNPoints', 'FitDiag_SecYSuccessful',
+                'FitDiag_Successful',  # Whether diagonal fitting was successful
                 'NonPixel_GridNeighborhoodPixelI', 'NonPixel_GridNeighborhoodPixelJ',  # Pixel indices
                 'NonPixel_GridNeighborhoodCharge',  # Charge values in Coulombs
                 'NonPixel_GridNeighborhoodDistances'  # Distances from hit to pixels
@@ -85,17 +102,19 @@ def load_successful_fits(root_file):
             
             print(f"Total events loaded: {len(data['TrueX'])}")
             
-            # Filter for successful non-pixel fits
+            # Filter for successful non-pixel fits (both 2D and diagonal)
             is_non_pixel = ~data['IsPixelHit'] 
             is_fit_successful = data['Fit2D_Successful']
-            valid_mask = is_non_pixel & is_fit_successful
+            is_diag_fit_successful = data['FitDiag_Successful']
+            valid_mask = is_non_pixel & is_fit_successful & is_diag_fit_successful
             
             print(f"Non-pixel events: {np.sum(is_non_pixel)}")
             print(f"Successful 2D fits: {np.sum(is_fit_successful)}")
+            print(f"Successful diagonal fits: {np.sum(is_diag_fit_successful)}")
             print(f"Valid events for plotting: {np.sum(valid_mask)}")
             
             if np.sum(valid_mask) == 0:
-                print("Warning: No successful 2D fits found for non-pixel events!")
+                print("Warning: No successful 2D and diagonal fits found for non-pixel events!")
                 return None
             
             # Extract valid data
@@ -174,6 +193,113 @@ def extract_row_column_data(event_idx, data, neighborhood_radius=4):
     
     return (np.array(row_positions), np.array(row_charges)), (np.array(col_positions), np.array(col_charges))
 
+def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
+    """
+    Extract charge data for main and secondary diagonals from neighborhood grid data.
+    This function matches the new 4-separate-fits approach: extracts X and Y coordinates
+    separately for pixels on each diagonal line.
+    
+    Args:
+        event_idx (int): Event index
+        data (dict): Filtered data dictionary
+        neighborhood_radius (int): Radius of neighborhood grid (default: 4 for 9x9)
+    
+    Returns:
+        tuple: ((main_x_pos, main_x_charges), (main_y_pos, main_y_charges), 
+                (sec_x_pos, sec_x_charges), (sec_y_pos, sec_y_charges))
+    """
+    # Get neighborhood data for this event
+    pixel_i = data['NonPixel_GridNeighborhoodPixelI'][event_idx]
+    pixel_j = data['NonPixel_GridNeighborhoodPixelJ'][event_idx]
+    charges = data['NonPixel_GridNeighborhoodCharge'][event_idx]
+    
+    # Get pixel positions (assuming they correspond to pixel centers)
+    nearest_pixel_x = data['PixelX'][event_idx]
+    nearest_pixel_y = data['PixelY'][event_idx]
+    
+    # Find the center pixel indices
+    center_i = pixel_i[len(pixel_i)//2]  # Middle element should be center
+    center_j = pixel_j[len(pixel_j)//2]
+    
+    # Grid size
+    grid_size = 2 * neighborhood_radius + 1
+    pixel_spacing = 0.5  # mm - this should match detector parameters
+    
+    # Group pixels by diagonal lines
+    # Main diagonal: pixels where (i - center_i) - (j - center_j) = constant
+    # Secondary diagonal: pixels where (i - center_i) + (j - center_j) = constant
+    
+    main_diag_pixels = {}  # key: (i-j) difference, value: list of (x_pos, y_pos, charge)
+    sec_diag_pixels = {}   # key: (i+j) sum, value: list of (x_pos, y_pos, charge)
+    
+    for idx, (i, j, charge) in enumerate(zip(pixel_i, pixel_j, charges)):
+        if charge > 0:  # Only include pixels with charge
+            # Calculate actual pixel position (relative to nearest pixel)
+            x_pos = nearest_pixel_x + (i - center_i) * pixel_spacing
+            y_pos = nearest_pixel_y + (j - center_j) * pixel_spacing
+            
+            # Group by diagonal lines
+            main_key = (i - center_i) - (j - center_j)  # Main diagonal grouping
+            sec_key = (i - center_i) + (j - center_j)   # Secondary diagonal grouping
+            
+            if main_key not in main_diag_pixels:
+                main_diag_pixels[main_key] = []
+            main_diag_pixels[main_key].append((x_pos, y_pos, charge))
+            
+            if sec_key not in sec_diag_pixels:
+                sec_diag_pixels[sec_key] = []
+            sec_diag_pixels[sec_key].append((x_pos, y_pos, charge))
+    
+    # Extract data for the main diagonal (typically the line passing through center)
+    main_x_positions = []
+    main_x_charges = []
+    main_y_positions = []
+    main_y_charges = []
+    
+    # Find the main diagonal line (key = 0, passing through center)
+    if 0 in main_diag_pixels:
+        for x_pos, y_pos, charge in main_diag_pixels[0]:
+            main_x_positions.append(x_pos)
+            main_x_charges.append(charge)
+            main_y_positions.append(y_pos)
+            main_y_charges.append(charge)
+    
+    # Extract data for the secondary diagonal (typically the line passing through center)  
+    sec_x_positions = []
+    sec_x_charges = []
+    sec_y_positions = []
+    sec_y_charges = []
+    
+    # Find the secondary diagonal line (key = 0, passing through center)
+    if 0 in sec_diag_pixels:
+        for x_pos, y_pos, charge in sec_diag_pixels[0]:
+            sec_x_positions.append(x_pos)
+            sec_x_charges.append(charge)
+            sec_y_positions.append(y_pos)
+            sec_y_charges.append(charge)
+    
+    # Sort by position for consistent plotting
+    if main_x_positions:
+        main_x_sorted = sorted(zip(main_x_positions, main_x_charges))
+        main_x_positions, main_x_charges = zip(*main_x_sorted)
+        
+    if main_y_positions:
+        main_y_sorted = sorted(zip(main_y_positions, main_y_charges))
+        main_y_positions, main_y_charges = zip(*main_y_sorted)
+    
+    if sec_x_positions:
+        sec_x_sorted = sorted(zip(sec_x_positions, sec_x_charges))
+        sec_x_positions, sec_x_charges = zip(*sec_x_sorted)
+        
+    if sec_y_positions:
+        sec_y_sorted = sorted(zip(sec_y_positions, sec_y_charges))
+        sec_y_positions, sec_y_charges = zip(*sec_y_sorted)
+    
+    return ((np.array(main_x_positions), np.array(main_x_charges)), 
+            (np.array(main_y_positions), np.array(main_y_charges)),
+            (np.array(sec_x_positions), np.array(sec_x_charges)), 
+            (np.array(sec_y_positions), np.array(sec_y_charges)))
+
 def calculate_residuals(positions, charges, fit_params):
     """
     Calculate residuals between data and fitted Gaussian.
@@ -211,10 +337,11 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         str: Success message or error
     """
     try:
-        # Extract row and column data
+        # Extract row, column, and diagonal data
         (row_pos, row_charges), (col_pos, col_charges) = extract_row_column_data(event_idx, data)
+        (main_x_pos, main_x_charges), (main_y_pos, main_y_charges), (sec_x_pos, sec_x_charges), (sec_y_pos, sec_y_charges) = extract_diagonal_data(event_idx, data)
         
-        if len(row_pos) < 3 and len(col_pos) < 3:
+        if len(row_pos) < 3 and len(col_pos) < 3 and len(main_x_pos) < 3 and len(main_y_pos) < 3 and len(sec_x_pos) < 3 and len(sec_y_pos) < 3:
             return f"Event {event_idx}: Not enough data points for plotting"
         
         # Get fit parameters for this event
@@ -233,6 +360,47 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         y_sigma_err = data['Fit2D_YSigmaErr'][event_idx]
         y_chi2red = data['Fit2D_YChi2red'][event_idx]
         y_npoints = data['Fit2D_YNPoints'][event_idx]
+        
+        # Get diagonal fit parameters (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+        # Main diagonal X fit (X vs Charge for pixels on main diagonal)
+        main_diag_x_center = data['FitDiag_MainXCenter'][event_idx]
+        main_diag_x_sigma = data['FitDiag_MainXSigma'][event_idx]
+        main_diag_x_amplitude = data['FitDiag_MainXAmplitude'][event_idx]
+        main_diag_x_center_err = data['FitDiag_MainXCenterErr'][event_idx]
+        main_diag_x_sigma_err = data['FitDiag_MainXSigmaErr'][event_idx]
+        main_diag_x_chi2red = data['FitDiag_MainXChi2red'][event_idx]
+        main_diag_x_npoints = data['FitDiag_MainXNPoints'][event_idx]
+        main_diag_x_successful = data['FitDiag_MainXSuccessful'][event_idx]
+        
+        # Main diagonal Y fit (Y vs Charge for pixels on main diagonal)
+        main_diag_y_center = data['FitDiag_MainYCenter'][event_idx]
+        main_diag_y_sigma = data['FitDiag_MainYSigma'][event_idx]
+        main_diag_y_amplitude = data['FitDiag_MainYAmplitude'][event_idx]
+        main_diag_y_center_err = data['FitDiag_MainYCenterErr'][event_idx]
+        main_diag_y_sigma_err = data['FitDiag_MainYSigmaErr'][event_idx]
+        main_diag_y_chi2red = data['FitDiag_MainYChi2red'][event_idx]
+        main_diag_y_npoints = data['FitDiag_MainYNPoints'][event_idx]
+        main_diag_y_successful = data['FitDiag_MainYSuccessful'][event_idx]
+        
+        # Secondary diagonal X fit (X vs Charge for pixels on secondary diagonal)
+        sec_diag_x_center = data['FitDiag_SecXCenter'][event_idx]
+        sec_diag_x_sigma = data['FitDiag_SecXSigma'][event_idx]
+        sec_diag_x_amplitude = data['FitDiag_SecXAmplitude'][event_idx]
+        sec_diag_x_center_err = data['FitDiag_SecXCenterErr'][event_idx]
+        sec_diag_x_sigma_err = data['FitDiag_SecXSigmaErr'][event_idx]
+        sec_diag_x_chi2red = data['FitDiag_SecXChi2red'][event_idx]
+        sec_diag_x_npoints = data['FitDiag_SecXNPoints'][event_idx]
+        sec_diag_x_successful = data['FitDiag_SecXSuccessful'][event_idx]
+        
+        # Secondary diagonal Y fit (Y vs Charge for pixels on secondary diagonal)
+        sec_diag_y_center = data['FitDiag_SecYCenter'][event_idx]
+        sec_diag_y_sigma = data['FitDiag_SecYSigma'][event_idx]
+        sec_diag_y_amplitude = data['FitDiag_SecYAmplitude'][event_idx]
+        sec_diag_y_center_err = data['FitDiag_SecYCenterErr'][event_idx]
+        sec_diag_y_sigma_err = data['FitDiag_SecYSigmaErr'][event_idx]
+        sec_diag_y_chi2red = data['FitDiag_SecYChi2red'][event_idx]
+        sec_diag_y_npoints = data['FitDiag_SecYNPoints'][event_idx]
+        sec_diag_y_successful = data['FitDiag_SecYSuccessful'][event_idx]
         
         # True hit position for comparison
         true_x = data['TrueX'][event_idx]
@@ -387,12 +555,272 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             plt.savefig(filename_y, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
         
+        # ============================================
+        # MAIN DIAGONAL X FIGURE (X vs Charge for main diagonal pixels)
+        # ============================================
+        if len(main_x_pos) >= 3 and main_diag_x_successful:
+            fig_main_x = plt.figure(figsize=(16, 6))
+            gs_main_x = GridSpec(1, 2, width_ratios=[1, 1], wspace=0.3)
+            
+            # Left panel: Residuals
+            ax_main_x_res = fig_main_x.add_subplot(gs_main_x[0, 0])
+            
+            # Right panel: Main plot
+            ax_main_x_main = fig_main_x.add_subplot(gs_main_x[0, 1])
+            
+            # Calculate fit parameters and residuals
+            main_x_fit_params = {'center': main_diag_x_center, 'sigma': main_diag_x_sigma, 'amplitude': main_diag_x_amplitude}
+            residuals_main_x = calculate_residuals(main_x_pos, main_x_charges, main_x_fit_params)
+            
+            # Residuals plot (left panel)
+            ax_main_x_res.errorbar(main_x_pos, residuals_main_x, fmt='bo', markersize=6, 
+                                  capsize=3, label='Fit residuals', alpha=0.8)
+            ax_main_x_res.axhline(0, color='red', linestyle='--', alpha=0.7)
+            ax_main_x_res.grid(True, alpha=0.3, linestyle=':')
+            ax_main_x_res.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_main_x_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(x_{\mathrm{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_main_x_res.set_title('Residuals: Main Diagonal X vs Charge')
+            ax_main_x_res.legend(loc='upper right')
+            
+            # Main plot (right panel)
+            ax_main_x_main.errorbar(main_x_pos, main_x_charges, fmt='bo', markersize=8, 
+                                   capsize=4, label='Measured data', alpha=0.8, linewidth=1.5)
+            
+            # Create smooth curve for fitted Gaussian
+            main_x_fit_range = np.linspace(main_x_pos.min() - 0.1, main_x_pos.max() + 0.1, 200)
+            main_x_y_fit = gaussian_1d(main_x_fit_range, main_diag_x_amplitude, main_diag_x_center, main_diag_x_sigma)
+            
+            # Plot fit curve
+            fit_label = r'$q(x) = A \exp\left(-\frac{(x - m)^2}{2\sigma^2}\right)+ B$'
+            ax_main_x_main.plot(main_x_fit_range, main_x_y_fit, 'r-', linewidth=2.5, 
+                               label=fit_label, alpha=0.9)
+            
+            # Mark true position
+            ax_main_x_main.axvline(true_x, color='green', linestyle='--', linewidth=2, 
+                                  label=f'True X = {true_x:.3f} mm', alpha=0.8)
+            
+            ax_main_x_main.grid(True, alpha=0.3, linestyle=':')
+            ax_main_x_main.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_main_x_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
+            ax_main_x_main.set_title('Main Diagonal: X Position vs Charge')
+            ax_main_x_main.legend(loc='upper left')
+            
+            # Add overall title with event information
+            if show_event_info:
+                delta_main_x = main_diag_x_center - true_x
+                fig_main_x.suptitle(f'Event {event_idx}: Main Diagonal X Fit\n'
+                                   f'True: {true_x:.3f} mm, Fitted: {main_diag_x_center:.3f} mm, '
+                                   f'ΔX: {delta_main_x:.3f} mm', 
+                                   fontsize=14)
+            
+            # Save main diagonal X plot
+            filename_main_x = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_MainDiagX.png')
+            plt.savefig(filename_main_x, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+            
+        # ============================================
+        # MAIN DIAGONAL Y FIGURE (Y vs Charge for main diagonal pixels)
+        # ============================================
+        if len(main_y_pos) >= 3 and main_diag_y_successful:
+            fig_main_y = plt.figure(figsize=(16, 6))
+            gs_main_y = GridSpec(1, 2, width_ratios=[1, 1], wspace=0.3)
+            
+            # Left panel: Residuals
+            ax_main_y_res = fig_main_y.add_subplot(gs_main_y[0, 0])
+            
+            # Right panel: Main plot
+            ax_main_y_main = fig_main_y.add_subplot(gs_main_y[0, 1])
+            
+            # Calculate fit parameters and residuals
+            main_y_fit_params = {'center': main_diag_y_center, 'sigma': main_diag_y_sigma, 'amplitude': main_diag_y_amplitude}
+            residuals_main_y = calculate_residuals(main_y_pos, main_y_charges, main_y_fit_params)
+            
+            # Residuals plot (left panel)
+            ax_main_y_res.errorbar(main_y_pos, residuals_main_y, fmt='bo', markersize=6, 
+                                  capsize=3, label='Fit residuals', alpha=0.8)
+            ax_main_y_res.axhline(0, color='red', linestyle='--', alpha=0.7)
+            ax_main_y_res.grid(True, alpha=0.3, linestyle=':')
+            ax_main_y_res.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_main_y_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(y_{\mathrm{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_main_y_res.set_title('Residuals: Main Diagonal Y vs Charge')
+            ax_main_y_res.legend(loc='upper right')
+            
+            # Main plot (right panel)
+            ax_main_y_main.errorbar(main_y_pos, main_y_charges, fmt='bo', markersize=8, 
+                                   capsize=4, label='Measured data', alpha=0.8, linewidth=1.5)
+            
+            # Create smooth curve for fitted Gaussian
+            main_y_fit_range = np.linspace(main_y_pos.min() - 0.1, main_y_pos.max() + 0.1, 200)
+            main_y_y_fit = gaussian_1d(main_y_fit_range, main_diag_y_amplitude, main_diag_y_center, main_diag_y_sigma)
+            
+            # Plot fit curve
+            fit_label = r'$q(y) = A \exp\left(-\frac{(y - m)^2}{2\sigma^2}\right)+ B$'
+            ax_main_y_main.plot(main_y_fit_range, main_y_y_fit, 'r-', linewidth=2.5, 
+                               label=fit_label, alpha=0.9)
+            
+            # Mark true position
+            ax_main_y_main.axvline(true_y, color='green', linestyle='--', linewidth=2, 
+                                  label=f'True Y = {true_y:.3f} mm', alpha=0.8)
+            
+            ax_main_y_main.grid(True, alpha=0.3, linestyle=':')
+            ax_main_y_main.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_main_y_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
+            ax_main_y_main.set_title('Main Diagonal: Y Position vs Charge')
+            ax_main_y_main.legend(loc='upper left')
+            
+            # Add overall title with event information
+            if show_event_info:
+                delta_main_y = main_diag_y_center - true_y
+                fig_main_y.suptitle(f'Event {event_idx}: Main Diagonal Y Fit\n'
+                                   f'True: {true_y:.3f} mm, Fitted: {main_diag_y_center:.3f} mm, '
+                                   f'ΔY: {delta_main_y:.3f} mm', 
+                                   fontsize=14)
+            
+            # Save main diagonal Y plot
+            filename_main_y = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_MainDiagY.png')
+            plt.savefig(filename_main_y, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+        
+        # ============================================
+        # SECONDARY DIAGONAL X FIGURE (X vs Charge for secondary diagonal pixels)
+        # ============================================
+        if len(sec_x_pos) >= 3 and sec_diag_x_successful:
+            fig_sec_x = plt.figure(figsize=(16, 6))
+            gs_sec_x = GridSpec(1, 2, width_ratios=[1, 1], wspace=0.3)
+            
+            # Left panel: Residuals
+            ax_sec_x_res = fig_sec_x.add_subplot(gs_sec_x[0, 0])
+            
+            # Right panel: Main plot
+            ax_sec_x_main = fig_sec_x.add_subplot(gs_sec_x[0, 1])
+            
+            # Calculate fit parameters and residuals
+            sec_x_fit_params = {'center': sec_diag_x_center, 'sigma': sec_diag_x_sigma, 'amplitude': sec_diag_x_amplitude}
+            residuals_sec_x = calculate_residuals(sec_x_pos, sec_x_charges, sec_x_fit_params)
+            
+            # Residuals plot (left panel)
+            ax_sec_x_res.errorbar(sec_x_pos, residuals_sec_x, fmt='bo', markersize=6, 
+                                 capsize=3, label='Fit residuals', alpha=0.8)
+            ax_sec_x_res.axhline(0, color='red', linestyle='--', alpha=0.7)
+            ax_sec_x_res.grid(True, alpha=0.3, linestyle=':')
+            ax_sec_x_res.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_sec_x_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(x_{\mathrm{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_sec_x_res.set_title('Residuals: Secondary Diagonal X vs Charge')
+            ax_sec_x_res.legend(loc='upper right')
+            
+            # Main plot (right panel)
+            ax_sec_x_main.errorbar(sec_x_pos, sec_x_charges, fmt='bo', markersize=8, 
+                                  capsize=4, label='Measured data', alpha=0.8, linewidth=1.5)
+            
+            # Create smooth curve for fitted Gaussian
+            sec_x_fit_range = np.linspace(sec_x_pos.min() - 0.1, sec_x_pos.max() + 0.1, 200)
+            sec_x_y_fit = gaussian_1d(sec_x_fit_range, sec_diag_x_amplitude, sec_diag_x_center, sec_diag_x_sigma)
+            
+            # Plot fit curve
+            fit_label = r'$q(x) = A \exp\left(-\frac{(x - m)^2}{2\sigma^2}\right)+ B$'
+            ax_sec_x_main.plot(sec_x_fit_range, sec_x_y_fit, 'r-', linewidth=2.5, 
+                              label=fit_label, alpha=0.9)
+            
+            # Mark true position
+            ax_sec_x_main.axvline(true_x, color='green', linestyle='--', linewidth=2, 
+                                 label=f'True X = {true_x:.3f} mm', alpha=0.8)
+            
+            ax_sec_x_main.grid(True, alpha=0.3, linestyle=':')
+            ax_sec_x_main.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_sec_x_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
+            ax_sec_x_main.set_title('Secondary Diagonal: X Position vs Charge')
+            ax_sec_x_main.legend(loc='upper left')
+            
+            # Add overall title with event information
+            if show_event_info:
+                delta_sec_x = sec_diag_x_center - true_x
+                fig_sec_x.suptitle(f'Event {event_idx}: Secondary Diagonal X Fit\n'
+                                  f'True: {true_x:.3f} mm, Fitted: {sec_diag_x_center:.3f} mm, '
+                                  f'ΔX: {delta_sec_x:.3f} mm', 
+                                  fontsize=14)
+            
+            # Save secondary diagonal X plot
+            filename_sec_x = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_SecDiagX.png')
+            plt.savefig(filename_sec_x, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+            
+        # ============================================
+        # SECONDARY DIAGONAL Y FIGURE (Y vs Charge for secondary diagonal pixels)
+        # ============================================
+        if len(sec_y_pos) >= 3 and sec_diag_y_successful:
+            fig_sec_y = plt.figure(figsize=(16, 6))
+            gs_sec_y = GridSpec(1, 2, width_ratios=[1, 1], wspace=0.3)
+            
+            # Left panel: Residuals
+            ax_sec_y_res = fig_sec_y.add_subplot(gs_sec_y[0, 0])
+            
+            # Right panel: Main plot
+            ax_sec_y_main = fig_sec_y.add_subplot(gs_sec_y[0, 1])
+            
+            # Calculate fit parameters and residuals
+            sec_y_fit_params = {'center': sec_diag_y_center, 'sigma': sec_diag_y_sigma, 'amplitude': sec_diag_y_amplitude}
+            residuals_sec_y = calculate_residuals(sec_y_pos, sec_y_charges, sec_y_fit_params)
+            
+            # Residuals plot (left panel)
+            ax_sec_y_res.errorbar(sec_y_pos, residuals_sec_y, fmt='bo', markersize=6, 
+                                 capsize=3, label='Fit residuals', alpha=0.8)
+            ax_sec_y_res.axhline(0, color='red', linestyle='--', alpha=0.7)
+            ax_sec_y_res.grid(True, alpha=0.3, linestyle=':')
+            ax_sec_y_res.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_sec_y_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(y_{\mathrm{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_sec_y_res.set_title('Residuals: Secondary Diagonal Y vs Charge')
+            ax_sec_y_res.legend(loc='upper right')
+            
+            # Main plot (right panel)
+            ax_sec_y_main.errorbar(sec_y_pos, sec_y_charges, fmt='bo', markersize=8, 
+                                  capsize=4, label='Measured data', alpha=0.8, linewidth=1.5)
+            
+            # Create smooth curve for fitted Gaussian
+            sec_y_fit_range = np.linspace(sec_y_pos.min() - 0.1, sec_y_pos.max() + 0.1, 200)
+            sec_y_y_fit = gaussian_1d(sec_y_fit_range, sec_diag_y_amplitude, sec_diag_y_center, sec_diag_y_sigma)
+            
+            # Plot fit curve
+            fit_label = r'$q(y) = A \exp\left(-\frac{(y - m)^2}{2\sigma^2}\right)+ B$'
+            ax_sec_y_main.plot(sec_y_fit_range, sec_y_y_fit, 'r-', linewidth=2.5, 
+                              label=fit_label, alpha=0.9)
+            
+            # Mark true position
+            ax_sec_y_main.axvline(true_y, color='green', linestyle='--', linewidth=2, 
+                                 label=f'True Y = {true_y:.3f} mm', alpha=0.8)
+            
+            ax_sec_y_main.grid(True, alpha=0.3, linestyle=':')
+            ax_sec_y_main.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_sec_y_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
+            ax_sec_y_main.set_title('Secondary Diagonal: Y Position vs Charge')
+            ax_sec_y_main.legend(loc='upper left')
+            
+            # Add overall title with event information
+            if show_event_info:
+                delta_sec_y = sec_diag_y_center - true_y
+                fig_sec_y.suptitle(f'Event {event_idx}: Secondary Diagonal Y Fit\n'
+                                  f'True: {true_y:.3f} mm, Fitted: {sec_diag_y_center:.3f} mm, '
+                                  f'ΔY: {delta_sec_y:.3f} mm', 
+                                  fontsize=14)
+            
+            # Save secondary diagonal Y plot
+            filename_sec_y = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_SecDiagY.png')
+            plt.savefig(filename_sec_y, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+        
         # Generate success message
         created_plots = []
         if len(row_pos) >= 3:
             created_plots.append('X-direction')
         if len(col_pos) >= 3:
             created_plots.append('Y-direction')
+        if len(main_x_pos) >= 3 and main_diag_x_successful:
+            created_plots.append('Main-diagonal-X')
+        if len(main_y_pos) >= 3 and main_diag_y_successful:
+            created_plots.append('Main-diagonal-Y')
+        if len(sec_x_pos) >= 3 and sec_diag_x_successful:
+            created_plots.append('Secondary-diagonal-X')
+        if len(sec_y_pos) >= 3 and sec_diag_y_successful:
+            created_plots.append('Secondary-diagonal-Y')
         
         return f"Event {event_idx}: {' and '.join(created_plots)} plots saved"
         
@@ -420,12 +848,17 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
         # Arrays to collect data for summary statistics
         x_residuals_all = []
         y_residuals_all = []
+        main_diag_residuals_all = []
+        sec_diag_residuals_all = []
         x_chi2_all = []
         y_chi2_all = []
+        main_diag_chi2_all = []
+        sec_diag_chi2_all = []
         
         for i in range(n_to_plot):
             try:
                 (row_pos, row_charges), (col_pos, col_charges) = extract_row_column_data(i, data)
+                (main_x_pos, main_x_charges), (main_y_pos, main_y_charges), (sec_x_pos, sec_x_charges), (sec_y_pos, sec_y_charges) = extract_diagonal_data(i, data)
                 
                 # Collect X-direction data
                 if len(row_pos) >= 3:
@@ -448,13 +881,57 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
                     y_residuals = calculate_residuals(col_pos, col_charges, y_fit_params)
                     y_residuals_all.extend(y_residuals)
                     y_chi2_all.append(data['Fit2D_YChi2red'][i])
+                
+                # Collect Main diagonal X data
+                if len(main_x_pos) >= 3 and data['FitDiag_MainXSuccessful'][i]:
+                    main_x_fit_params = {
+                        'center': data['FitDiag_MainXCenter'][i],
+                        'sigma': data['FitDiag_MainXSigma'][i],
+                        'amplitude': data['FitDiag_MainXAmplitude'][i]
+                    }
+                    main_x_residuals = calculate_residuals(main_x_pos, main_x_charges, main_x_fit_params)
+                    main_diag_residuals_all.extend(main_x_residuals)
+                    main_diag_chi2_all.append(data['FitDiag_MainXChi2red'][i])
+                
+                # Collect Main diagonal Y data
+                if len(main_y_pos) >= 3 and data['FitDiag_MainYSuccessful'][i]:
+                    main_y_fit_params = {
+                        'center': data['FitDiag_MainYCenter'][i],
+                        'sigma': data['FitDiag_MainYSigma'][i],
+                        'amplitude': data['FitDiag_MainYAmplitude'][i]
+                    }
+                    main_y_residuals = calculate_residuals(main_y_pos, main_y_charges, main_y_fit_params)
+                    main_diag_residuals_all.extend(main_y_residuals)
+                    main_diag_chi2_all.append(data['FitDiag_MainYChi2red'][i])
+                
+                # Collect Secondary diagonal X data
+                if len(sec_x_pos) >= 3 and data['FitDiag_SecXSuccessful'][i]:
+                    sec_x_fit_params = {
+                        'center': data['FitDiag_SecXCenter'][i],
+                        'sigma': data['FitDiag_SecXSigma'][i],
+                        'amplitude': data['FitDiag_SecXAmplitude'][i]
+                    }
+                    sec_x_residuals = calculate_residuals(sec_x_pos, sec_x_charges, sec_x_fit_params)
+                    sec_diag_residuals_all.extend(sec_x_residuals)
+                    sec_diag_chi2_all.append(data['FitDiag_SecXChi2red'][i])
+                
+                # Collect Secondary diagonal Y data
+                if len(sec_y_pos) >= 3 and data['FitDiag_SecYSuccessful'][i]:
+                    sec_y_fit_params = {
+                        'center': data['FitDiag_SecYCenter'][i],
+                        'sigma': data['FitDiag_SecYSigma'][i],
+                        'amplitude': data['FitDiag_SecYAmplitude'][i]
+                    }
+                    sec_y_residuals = calculate_residuals(sec_y_pos, sec_y_charges, sec_y_fit_params)
+                    sec_diag_residuals_all.extend(sec_y_residuals)
+                    sec_diag_chi2_all.append(data['FitDiag_SecYChi2red'][i])
                     
             except Exception as e:
                 print(f"Warning: Error processing event {i}: {e}")
                 continue
         
         # Create summary figure
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+        fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2, figsize=(15, 18))
         
         # X-direction residuals histogram
         if x_residuals_all:
@@ -486,36 +963,70 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
                     transform=ax2.transAxes, verticalalignment='top',
                     bbox=dict(boxstyle='round', facecolor='lightcoral', alpha=0.8))
         
+        # Main diagonal residuals histogram
+        if main_diag_residuals_all:
+            ax3.hist(main_diag_residuals_all, bins=30, alpha=0.7, color='purple', edgecolor='black')
+            ax3.set_title('Main Diagonal Fit Residuals Distribution')
+            ax3.set_xlabel('Residual [C]')
+            ax3.set_ylabel('Frequency')
+            ax3.grid(True, alpha=0.3)
+            
+            # Add statistics
+            mean_res = np.mean(main_diag_residuals_all)
+            std_res = np.std(main_diag_residuals_all)
+            ax3.text(0.05, 0.95, f'Mean: {mean_res:.2e}\nStd: {std_res:.2e}\nN: {len(main_diag_residuals_all)}',
+                    transform=ax3.transAxes, verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='plum', alpha=0.8))
+        
+        # Secondary diagonal residuals histogram
+        if sec_diag_residuals_all:
+            ax4.hist(sec_diag_residuals_all, bins=30, alpha=0.7, color='orange', edgecolor='black')
+            ax4.set_title('Secondary Diagonal Fit Residuals Distribution')
+            ax4.set_xlabel('Residual [C]')
+            ax4.set_ylabel('Frequency')
+            ax4.grid(True, alpha=0.3)
+            
+            # Add statistics
+            mean_res = np.mean(sec_diag_residuals_all)
+            std_res = np.std(sec_diag_residuals_all)
+            ax4.text(0.05, 0.95, f'Mean: {mean_res:.2e}\nStd: {std_res:.2e}\nN: {len(sec_diag_residuals_all)}',
+                    transform=ax4.transAxes, verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='moccasin', alpha=0.8))
+        
         # Chi-squared distributions
         if x_chi2_all:
-            ax3.hist(x_chi2_all, bins=20, alpha=0.7, color='blue', edgecolor='black', label='X-direction')
+            ax5.hist(x_chi2_all, bins=20, alpha=0.7, color='blue', edgecolor='black', label='X-direction')
         if y_chi2_all:
-            ax3.hist(y_chi2_all, bins=20, alpha=0.7, color='red', edgecolor='black', label='Y-direction')
+            ax5.hist(y_chi2_all, bins=20, alpha=0.7, color='red', edgecolor='black', label='Y-direction')
+        if main_diag_chi2_all:
+            ax5.hist(main_diag_chi2_all, bins=20, alpha=0.7, color='purple', edgecolor='black', label='Main diagonal')
+        if sec_diag_chi2_all:
+            ax5.hist(sec_diag_chi2_all, bins=20, alpha=0.7, color='orange', edgecolor='black', label='Sec diagonal')
         
-        ax3.set_title('Reduced Chi-squared Distribution')
-        ax3.set_xlabel('χ²/ndf')
-        ax3.set_ylabel('Frequency')
-        ax3.legend(loc='upper right')
-        ax3.grid(True, alpha=0.3)
+        ax5.set_title('Reduced Chi-squared Distribution')
+        ax5.set_xlabel('χ²/ndf')
+        ax5.set_ylabel('Frequency')
+        ax5.legend(loc='upper right')
+        ax5.grid(True, alpha=0.3)
         
-        # Position accuracy plot
+        # Position accuracy plot - 2D Gaussian fits
         true_x = data['TrueX'][:n_to_plot]
         true_y = data['TrueY'][:n_to_plot]
         fit_x = data['Fit2D_XCenter'][:n_to_plot]
         fit_y = data['Fit2D_YCenter'][:n_to_plot]
         
         distances = np.sqrt((fit_x - true_x)**2 + (fit_y - true_y)**2)
-        ax4.hist(distances, bins=20, alpha=0.7, color='green', edgecolor='black')
-        ax4.set_title('Distance: Fitted Center to True Position')
-        ax4.set_xlabel('Distance [mm]')
-        ax4.set_ylabel('Frequency')
-        ax4.grid(True, alpha=0.3)
+        ax6.hist(distances, bins=20, alpha=0.7, color='green', edgecolor='black')
+        ax6.set_title('Distance: 2D Fitted Center to True Position')
+        ax6.set_xlabel('Distance [mm]')
+        ax6.set_ylabel('Frequency')
+        ax6.grid(True, alpha=0.3)
         
         # Add statistics
         mean_dist = np.mean(distances)
         std_dist = np.std(distances)
-        ax4.text(0.05, 0.95, f'Mean: {mean_dist:.3f} mm\nStd: {std_dist:.3f} mm\nN: {len(distances)}',
-                transform=ax4.transAxes, verticalalignment='top',
+        ax6.text(0.05, 0.95, f'Mean: {mean_dist:.3f} mm\nStd: {std_dist:.3f} mm\nN: {len(distances)}',
+                transform=ax6.transAxes, verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
         
         plt.tight_layout()
