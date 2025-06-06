@@ -2,8 +2,9 @@
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
 #include "Constants.hh"
-#include "2DGaussianFit.hh"
-
+//#include "2DGaussianFit.hh"
+//#include "2DGaussianFitFree.hh"
+#include "2DGaussianFitCeres.hh"
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ParticleTable.hh"
@@ -181,9 +182,8 @@ void EventAction::EndOfEventAction(const G4Event* event)
     
     // Perform 2D fitting if we have enough data points
     if (x_coords.size() >= 3) { // Need at least 3 points for 1D Gaussian fit
-      
-      // Perform 2D Gaussian fitting using the implemented function
-      GaussianFit2DResults fitResults = Fit2DGaussian(
+      // Perform 2D Gaussian fitting using the Ceres Solver implementation
+      GaussianFit2DResultsCeres fitResults = Fit2DGaussianCeres(
         x_coords, y_coords, charge_values,
         nearestPixel.x(), nearestPixel.y(),
         pixelSpacing, 
@@ -203,10 +203,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.y_chi2red, fitResults.y_npoints,
         fitResults.fit_successful);
         
-      // Perform diagonal fitting if 2D fitting was performed and successful
-      if (fitResults.fit_successful) {
-        // Perform diagonal Gaussian fitting using the same data
-        DiagonalFitResults diagResults = FitDiagonalGaussian(
+              // Perform diagonal fitting if 2D fitting was performed and successful
+        if (fitResults.fit_successful) {
+          // Perform diagonal Gaussian fitting using the Ceres Solver implementation
+          DiagonalFitResultsCeres diagResults = FitDiagonalGaussianCeres(
           x_coords, y_coords, charge_values,
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
