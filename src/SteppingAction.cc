@@ -3,12 +3,8 @@
 #include "G4Step.hh"
 #include "G4VTouchable.hh"
 #include "G4SystemOfUnits.hh"
-#include "G4Track.hh"
-#include "G4VProcess.hh"
 #include "G4StepPoint.hh"
 #include "G4LogicalVolume.hh"
-#include "G4RunManager.hh"
-#include "G4Threading.hh"
 
 SteppingAction::SteppingAction(EventAction* eventAction)
 : G4UserSteppingAction(),
@@ -24,16 +20,11 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
   G4double edep = step->GetTotalEnergyDeposit();
   
   // Get step information for tracking
-  G4Track* track = step->GetTrack();
   G4StepPoint* prePoint = step->GetPreStepPoint();
   G4StepPoint* postPoint = step->GetPostStepPoint();
   
   // Calculate position of this step (middle of step) - CONSISTENT with AddEdep calculation
   G4ThreeVector stepPosition = 0.5 * (prePoint->GetPosition() + postPoint->GetPosition());
-  
-  // Get step information for ALL steps
-  G4double stepTime = postPoint->GetGlobalTime();
-  G4double zPosition = stepPosition.z();  // Use same position calculation
   
   // Check if energy was deposited
   if (edep > 0) {

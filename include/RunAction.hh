@@ -63,9 +63,6 @@ public:
                                    G4double pixelCornerOffset, G4double detSize, 
                                    G4int numBlocksPerSide);
     
-    // Method to set initial particle information
-    void SetInitialParticleInfo(G4double initialEnergy, G4double momentum);
-
     // Method to set 2D Gaussian fit results (central row and column fitting)
     void Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4double x_amplitude,
                                 G4double x_center_err, G4double x_sigma_err, G4double x_amplitude_err,

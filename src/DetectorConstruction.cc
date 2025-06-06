@@ -10,10 +10,10 @@
 #include <sstream>
 #include <string>
 #include <unistd.h> // For getcwd
+#include <limits.h> // For PATH_MAX
 
 // Add step limiter includes
 #include "G4UserLimits.hh"
-#include "G4StepLimiter.hh"
 
 DetectorConstruction::DetectorConstruction()
     : G4VUserDetectorConstruction(),
@@ -29,18 +29,7 @@ DetectorConstruction::DetectorConstruction()
       fDetectorMessenger(nullptr),
       fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS)   // Default neighborhood radius for 9x9 grid
 {
-    // ————————————————————————
-    // Parameters (all lengths are center–to–center except fPixelCornerOffset)
-    // ————————————————————————
-    // Pixels
-    fPixelSize = 100*um;        // "pixel" side‐length
-    fPixelWidth = 1*um;         // Width/thickness of each pixel
-    fPixelSpacing = 500*um;     // (blue) center–to–center pitch
-    fPixelCornerOffset = 100*um;  // (purple) from inner detector edge to first pixel edge
-
-    // Detector - will be calculated to fit pixel grid
-    fDetSize = 3*cm;           // Initial size - may be adjusted
-    fDetWidth = 50*um;         // Width/thickness of the detector
+    // Values for pixel grid set at constants.hh
     
     // Will be calculated in Construct() based on symmetry constraint
     fNumBlocksPerSide = 0;
@@ -257,6 +246,11 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     return physWorld;
 }
 
+G4ThreeVector DetectorConstruction::GetDetectorPosition() const
+{
+    return G4ThreeVector(0., 0., Constants::DETECTOR_Z_POSITION);
+}
+
 // Implementation of IsPositionOnPixel method
 G4bool DetectorConstruction::IsPositionOnPixel(const G4ThreeVector& position) const
 {
@@ -312,7 +306,7 @@ void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4d
     std::strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", std::localtime(&now));
     
     // Get the absolute path for logs directory
-    char cwd[1024];
+    char cwd[PATH_MAX];
     if (getcwd(cwd, sizeof(cwd)) == NULL) {
         G4cerr << "ERROR: Could not get current working directory" << G4endl;
         return;
@@ -321,7 +315,10 @@ void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4d
     // Create logs directory with absolute path
     std::string logsDir = std::string(cwd) + "/logs";
     G4cout << "Creating logs directory at: " << logsDir << G4endl;
-    system(("mkdir -p " + logsDir).c_str());
+    int result = system(("mkdir -p " + logsDir).c_str());
+    if (result != 0) {
+        G4cerr << "Warning: Could not create logs directory" << G4endl;
+    }
     
     // Create filename with timestamp in logs directory
     std::string filename = logsDir + "/simulation_params_" + std::string(timestamp) + ".log";

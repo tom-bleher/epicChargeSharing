@@ -344,6 +344,13 @@ void RunAction::EndOfRunAction(const G4Run* run)
                     detSizeMeta->Write();
                     numBlocksMeta->Write();
                     
+                    // Clean up metadata objects to prevent memory leaks
+                    delete pixelSizeMeta;
+                    delete pixelSpacingMeta;
+                    delete pixelCornerOffsetMeta;
+                    delete detSizeMeta;
+                    delete numBlocksMeta;
+                    
                     G4cout << "Saved detector grid metadata to ROOT file" << G4endl;
                     G4cout << "  Final parameters used: " << fGridPixelSize << ", " << fGridPixelSpacing 
                            << ", " << fGridPixelCornerOffset << ", " << fGridDetSize << ", " << fGridNumBlocksPerSide << G4endl;
@@ -465,6 +472,13 @@ void RunAction::EndOfRunAction(const G4Run* run)
                                 pixelCornerOffsetMeta->Write();
                                 detSizeMeta->Write();
                                 numBlocksMeta->Write();
+                                
+                                // Clean up metadata objects to prevent memory leaks
+                                delete pixelSizeMeta;
+                                delete pixelSpacingMeta;
+                                delete pixelCornerOffsetMeta;
+                                delete detSizeMeta;
+                                delete numBlocksMeta;
                                 
                                 G4cout << "Saved detector grid metadata to merged ROOT file" << G4endl;
                                 G4cout << "  Final parameters used: " << fGridPixelSize << ", " << fGridPixelSpacing 
@@ -621,13 +635,6 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
     G4cout << "  Pixel Corner Offset: " << fGridPixelCornerOffset << " mm" << G4endl;
     G4cout << "  Detector Size: " << fGridDetSize << " mm" << G4endl;
     G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
-}
-
-void RunAction::SetInitialParticleInfo(G4double initialEnergy, G4double momentum)
-{
-    // Store essential particle information
-    fInitialEnergy = initialEnergy;
-    fMomentum = momentum;
 }
 
 void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4double x_amplitude,

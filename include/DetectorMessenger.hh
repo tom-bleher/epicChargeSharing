@@ -5,7 +5,6 @@
 #include "G4UImessenger.hh"
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "G4UIcmdWithAnInteger.hh"
-#include "G4SystemOfUnits.hh"
 
 class DetectorConstruction;
 class G4UIdirectory;

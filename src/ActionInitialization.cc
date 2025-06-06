@@ -1,7 +1,6 @@
 #include "ActionInitialization.hh"
 #include "DetectorMessenger.hh"
 
-
 ActionInitialization::ActionInitialization(DetectorConstruction* detector)
 : fDetector(detector)
 {
