@@ -6,8 +6,8 @@ A GEANT4-based Monte Carlo simulation for studying charge sharing and position r
 
 ### Detector Model
 - **Geometry**: Pixelated silicon detector with aluminum readout pixels
-- **Pixel Layout**: Configurable grid with 100 μm pixel size and 500 μm spacing
-- **Active Volume**: 30×30 mm² silicon substrate (50 μm thickness)
+- **Pixel Layout**: Configurable grid with $100\mu m$ pixel size and 500 μm spacing
+- **Active Volume**: $30\times 30 \mathrm{mm}^{2}$ silicon substrate ($50\mu m$ thickness)
 
 ### Charge Sharing Physics
 
@@ -32,7 +32,7 @@ $$
 Where:
 - $\ell$: pixel size
 - $d_i$: distance from hit to pixel center
-- $d_0$: 10 μm reference distance
+- $d_0=10\mu m$: reference distance
 
 ### Position Reconstruction
 
@@ -55,6 +55,7 @@ $$y(x) = A \exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) + B$$
 - **ROOT** (v6.20+) for data output
 - **CMake** (v3.5+)
 - **C++17** compatible compiler
+- **Ceres Solver**
 
 ## Installation
 
