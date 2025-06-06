@@ -169,10 +169,3 @@ epicToy/
 ├── macros/                 # GEANT4 macro files
 └── build/                  # Build directory
 ```
-
-## References
-
-This simulation implements algorithms for LGAD charge sharing studies relevant to:
-- ePIC detector development
-- Timing detector position reconstruction
-- Pixel sensor optimization studies
