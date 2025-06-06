@@ -85,24 +85,27 @@ class RandomHitChargeGridGenerator:
         charge_distances = self.data['NonPixel_GridNeighborhoodDistances'][event_idx]
         
         # Select which data to display
+        # NOTE: The C++ code stores data with di (X direction) as outer loop and dj (Y direction) as inner loop
+        # When reshaped as (9,9), we need to transpose to get correct (Y,X) indexing for visualization
         if charge_type == 'fraction':
-            grid_data = np.array(charge_fractions).reshape(9, 9)
+            grid_data = np.array(charge_fractions).reshape(9, 9).T  # Transpose to fix coordinate system
             data_label = 'Charge Fraction'
             data_unit = ''
             value_format = '.4f'
         elif charge_type == 'coulomb':
-            grid_data = np.array(charge_coulombs).reshape(9, 9)
+            grid_data = np.array(charge_coulombs).reshape(9, 9).T  # Transpose to fix coordinate system
             data_label = 'Charge'
             data_unit = ' Coulomb'
             value_format = '.2e'
         elif charge_type == 'distance':
-            grid_data = np.array(charge_distances).reshape(9, 9)
+            grid_data = np.array(charge_distances).reshape(9, 9).T  # Transpose to fix coordinate system
             data_label = 'Distance'
             data_unit = ' mm'
             value_format = '.3f'
         else:
             raise ValueError("charge_type must be 'fraction', 'coulomb', or 'distance'")
         
+
         # Replace invalid values (-999.0) with NaN for proper display
         grid_data[grid_data == -999.0] = np.nan
         
@@ -357,7 +360,7 @@ class RandomHitChargeGridGenerator:
         
         for event_idx in valid_indices:
             grid_data = self.data[data_key][event_idx]
-            grid_array = np.array(grid_data).reshape(9, 9)
+            grid_array = np.array(grid_data).reshape(9, 9).T  # Transpose to fix coordinate system
             
             # Replace invalid values (-999.0) with NaN
             grid_array[grid_array == -999.0] = np.nan
@@ -714,7 +717,7 @@ class RandomHitChargeGridGenerator:
         
         for event_idx in near_edge_indices:
             charge_fractions = self.data['NonPixel_GridNeighborhoodChargeFractions'][event_idx]
-            charge_grid = np.array(charge_fractions).reshape(9, 9)
+            charge_grid = np.array(charge_fractions).reshape(9, 9).T  # Transpose to fix coordinate system
             
             # Count incomplete/invalid positions (should be -999.0 for out-of-bounds)
             incomplete_count = np.sum(charge_grid == -999.0)
