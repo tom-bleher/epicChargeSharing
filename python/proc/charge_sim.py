@@ -7,6 +7,8 @@ Also generates ensemble averages and handles edge cases.
 
 import uproot
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import time
@@ -56,10 +58,9 @@ class RandomHitChargeGridGenerator:
         Parameters:
         -----------
         charge_type : str
-            'fraction' for charge fractions, 'value' for absolute charge values (electrons), 
-            'coulomb' for charge in Coulombs, 'distance' for distances
+            'fraction' for charge fractions, 'coulomb' for charge in Coulombs, 'distance' for distances
         """
-        if 'GridNeighborhoodChargeFractions' not in self.data:
+        if 'NonPixel_GridNeighborhoodChargeFractions' not in self.data:
             print(f"No neighborhood charge data found for event {event_idx}")
             return None
             
@@ -70,14 +71,18 @@ class RandomHitChargeGridGenerator:
         edep = self.data['Edep'][event_idx]
         pixel_x = self.data['PixelX'][event_idx]
         pixel_y = self.data['PixelY'][event_idx]
-        pixel_dist = self.data['PixelTrueDistance'][event_idx]
-        pixel_hit = self.data['PixelHit'][event_idx]
+        
+        # Calculate pixel distance from delta values
+        pixel_delta_x = self.data['PixelTrueDeltaX'][event_idx]
+        pixel_delta_y = self.data['PixelTrueDeltaY'][event_idx]
+        pixel_dist = np.sqrt(pixel_delta_x**2 + pixel_delta_y**2)
+        
+        pixel_hit = self.data['IsPixelHit'][event_idx]
         
         # Get charge data
-        charge_fractions = self.data['GridNeighborhoodChargeFractions'][event_idx]
-        charge_values = self.data['GridNeighborhoodChargeValues'][event_idx]
-        charge_coulombs = self.data['GridNeighborhoodCharge'][event_idx] if 'GridNeighborhoodCharge' in self.data else None
-        charge_distances = self.data['GridNeighborhoodDistances'][event_idx]
+        charge_fractions = self.data['NonPixel_GridNeighborhoodChargeFractions'][event_idx]
+        charge_coulombs = self.data['NonPixel_GridNeighborhoodCharge'][event_idx]
+        charge_distances = self.data['NonPixel_GridNeighborhoodDistances'][event_idx]
         
         # Select which data to display
         if charge_type == 'fraction':
@@ -85,14 +90,7 @@ class RandomHitChargeGridGenerator:
             data_label = 'Charge Fraction'
             data_unit = ''
             value_format = '.4f'
-        elif charge_type == 'value':
-            grid_data = np.array(charge_values).reshape(9, 9)
-            data_label = 'Charge Value'
-            data_unit = ' e⁻'
-            value_format = '.0f'
         elif charge_type == 'coulomb':
-            if charge_coulombs is None:
-                raise ValueError("Coulomb charge data not available in this ROOT file")
             grid_data = np.array(charge_coulombs).reshape(9, 9)
             data_label = 'Charge'
             data_unit = ' Coulomb'
@@ -103,7 +101,7 @@ class RandomHitChargeGridGenerator:
             data_unit = ' mm'
             value_format = '.3f'
         else:
-            raise ValueError("charge_type must be 'fraction', 'value', 'coulomb', or 'distance'")
+            raise ValueError("charge_type must be 'fraction', 'coulomb', or 'distance'")
         
         # Replace invalid values (-999.0) with NaN for proper display
         grid_data[grid_data == -999.0] = np.nan
@@ -191,11 +189,6 @@ class RandomHitChargeGridGenerator:
                     # Add data value text in the block below the pixel
                     if charge_type == 'fraction':
                         display_text = f'{data_value:.3f}'
-                    elif charge_type == 'value':
-                        if data_value >= 1000:
-                            display_text = f'{data_value:.0f}'
-                        else:
-                            display_text = f'{data_value:.1f}'
                     elif charge_type == 'coulomb':
                         display_text = f'{data_value:.2e}'
                     else:  # distance
@@ -311,11 +304,6 @@ class RandomHitChargeGridGenerator:
                 print(f"  Event {event_idx}: {len(valid_data)} valid pixels, "
                       f"range {np.min(valid_data):.4f} to {np.max(valid_data):.4f}, "
                       f"total fraction: {total_fraction:.6f}, center: {grid_data[4, 4]:.4f}")
-            elif charge_type == 'value':
-                total_charge = np.sum(valid_data)
-                print(f"  Event {event_idx}: {len(valid_data)} valid pixels, "
-                      f"range {np.min(valid_data):.0f} to {np.max(valid_data):.0f} e⁻, "
-                      f"total charge: {total_charge:.0f} e⁻, center: {grid_data[4, 4]:.0f} e⁻")
             elif charge_type == 'coulomb':
                 total_charge = np.sum(valid_data)
                 print(f"  Event {event_idx}: {len(valid_data)} valid pixels, "
@@ -331,12 +319,12 @@ class RandomHitChargeGridGenerator:
     def plot_mean_neighborhood_charge_grid(self, charge_type='fraction', save_plot=True, output_dir=""):
         """Plot mean neighborhood (9x9) charge grid averaged across all non-inside-pixel events
         Only draws pixels and blocks for positions that have valid data across events"""
-        if 'GridNeighborhoodChargeFractions' not in self.data:
+        if 'NonPixel_GridNeighborhoodChargeFractions' not in self.data:
             print("No neighborhood charge data found for mean calculation")
             return None
             
         # Find all non-inside-pixel events with energy deposition
-        pixel_hit = self.data['PixelHit']
+        pixel_hit = self.data['IsPixelHit']
         edep = self.data['Edep']
         valid_mask = (~pixel_hit) & (edep > 0)
         valid_indices = np.where(valid_mask)[0]
@@ -349,25 +337,19 @@ class RandomHitChargeGridGenerator:
         
         # Select which data to average
         if charge_type == 'fraction':
-            data_key = 'GridNeighborhoodChargeFractions'
+            data_key = 'NonPixel_GridNeighborhoodChargeFractions'
             data_label = 'Mean Charge Fraction'
             data_unit = ''
-        elif charge_type == 'value':
-            data_key = 'GridNeighborhoodChargeValues'
-            data_label = 'Mean Charge Value'
-            data_unit = ' e⁻'
         elif charge_type == 'coulomb':
-            if 'GridNeighborhoodCharge' not in self.data:
-                raise ValueError("Coulomb charge data not available in this ROOT file")
-            data_key = 'GridNeighborhoodCharge'
+            data_key = 'NonPixel_GridNeighborhoodCharge'
             data_label = 'Mean Charge'
             data_unit = ' C'
         elif charge_type == 'distance':
-            data_key = 'GridNeighborhoodDistances'
+            data_key = 'NonPixel_GridNeighborhoodDistances'
             data_label = 'Mean Distance'
             data_unit = ' mm'
         else:
-            raise ValueError("charge_type must be 'fraction', 'value', 'coulomb', or 'distance'")
+            raise ValueError("charge_type must be 'fraction', 'coulomb', or 'distance'")
         
         # Collect all grids for valid events
         all_grids = []
@@ -477,11 +459,6 @@ class RandomHitChargeGridGenerator:
                     # Add mean value text in the block below the pixel
                     if charge_type == 'fraction':
                         display_text = f'{mean_value:.3f}'
-                    elif charge_type == 'value':
-                        if mean_value >= 1000:
-                            display_text = f'{mean_value:.0f}'
-                        else:
-                            display_text = f'{mean_value:.1f}'
                     elif charge_type == 'coulomb':
                         display_text = f'{mean_value:.2e}'
                     else:  # distance
@@ -579,10 +556,6 @@ class RandomHitChargeGridGenerator:
                 print(f"  Mean grid: {len(valid_mean_data)} valid positions, "
                       f"range {np.min(valid_mean_data):.4f} to {np.max(valid_mean_data):.4f}, "
                       f"center mean: {mean_grid[4, 4]:.4f}")
-            elif charge_type == 'value':
-                print(f"  Mean grid: {len(valid_mean_data)} valid positions, "
-                      f"range {np.min(valid_mean_data):.0f} to {np.max(valid_mean_data):.0f} e⁻, "
-                      f"center mean: {mean_grid[4, 4]:.0f} e⁻")
             elif charge_type == 'coulomb':
                 print(f"  Mean grid: {len(valid_mean_data)} valid positions, "
                       f"range {np.min(valid_mean_data):.2e} to {np.max(valid_mean_data):.2e} C, "
@@ -596,7 +569,7 @@ class RandomHitChargeGridGenerator:
     
     def generate_random_hits_charge_individual(self, num_events=3, charge_type='fraction', save_plots=True, output_dir="", seed=None, include_mean=True, include_edge_case=True):
         """Create individual neighborhood (9x9) charge grid visualizations for N random hits and optionally a mean plot"""
-        if 'GridNeighborhoodChargeFractions' not in self.data:
+        if 'NonPixel_GridNeighborhoodChargeFractions' not in self.data:
             print("No neighborhood charge data found")
             return None
             
@@ -694,8 +667,8 @@ class RandomHitChargeGridGenerator:
     
     def find_edge_case_event(self):
         """Find an event where the hit is near the detector edge so neighborhood (9x9) grid is incomplete"""
-        if 'GridNeighborhoodChargeFractions' not in self.data:
-            print("GridNeighborhoodChargeFractions data not available for edge case search")
+        if 'NonPixel_GridNeighborhoodChargeFractions' not in self.data:
+            print("NonPixel_GridNeighborhoodChargeFractions data not available for edge case search")
             return None
             
         # Get detector parameters
@@ -740,7 +713,7 @@ class RandomHitChargeGridGenerator:
         max_incomplete_count = 0
         
         for event_idx in near_edge_indices:
-            charge_fractions = self.data['GridNeighborhoodChargeFractions'][event_idx]
+            charge_fractions = self.data['NonPixel_GridNeighborhoodChargeFractions'][event_idx]
             charge_grid = np.array(charge_fractions).reshape(9, 9)
             
             # Count incomplete/invalid positions (should be -999.0 for out-of-bounds)
@@ -769,12 +742,15 @@ class RandomHitChargeGridGenerator:
 
     def find_inside_pixel_event(self):
         """Find an event where the hit was inside a pixel, or the closest one with energy deposition"""
-        if 'PixelHit' not in self.data or 'PixelTrueDistance' not in self.data:
-            print("PixelHit or PixelTrueDistance data not available")
+        if 'IsPixelHit' not in self.data or 'PixelTrueDeltaX' not in self.data or 'PixelTrueDeltaY' not in self.data:
+            print("IsPixelHit or PixelTrueDelta data not available")
             return None
             
-        pixel_hit = self.data['PixelHit']
-        pixel_dist = self.data['PixelTrueDistance']
+        pixel_hit = self.data['IsPixelHit']
+        # Calculate pixel distance from delta values
+        pixel_delta_x = self.data['PixelTrueDeltaX']
+        pixel_delta_y = self.data['PixelTrueDeltaY']
+        pixel_dist = np.sqrt(pixel_delta_x**2 + pixel_delta_y**2)
         edep = self.data['Edep']
         
         # First, check if there are any events where hit is inside pixel with energy deposition
@@ -813,7 +789,7 @@ def create_random_charge_plots(root_filename, num_events=1, charge_type='fractio
     num_events : int, optional
         Number of random events to visualize (default: 1)
     charge_type : str, optional
-        Type of charge data to display: 'fraction', 'value', or 'distance' (default: 'fraction')
+        Type of charge data to display: 'fraction', 'coulomb', or 'distance' (default: 'fraction')
     output_dir : str, optional
         Directory to save plots (default: current directory)
     seed : int, optional
