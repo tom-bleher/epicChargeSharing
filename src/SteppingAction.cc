@@ -16,7 +16,7 @@ SteppingAction::~SteppingAction()
 
 void SteppingAction::UserSteppingAction(const G4Step* step)
 {
-  // Collect energy deposited in this step
+  // Collect energy deposited in this step while particle travels through detector
   G4double edep = step->GetTotalEnergyDeposit();
   
   // Get step information for tracking
@@ -42,7 +42,8 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
     G4bool insideDetector = (preVolName == "logicCube" || postVolName == "logicCube");
     
     if (insideDetector) {
-      // Energy deposited inside detector - pass to EventAction
+      // Energy deposited inside detector volume - accumulate in EventAction
+      // Only energy deposited while particle travels through detector is counted
       fEventAction->AddEdep(edep, stepPosition);
     }
     // Note: Removed excessive debug output for "outside detector" cases

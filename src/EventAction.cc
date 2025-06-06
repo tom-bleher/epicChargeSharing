@@ -91,21 +91,19 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Calculate and pass pixel angular size to RunAction
   G4double pixelAlpha = CalculatePixelAlpha(fPosition, fPixelIndexI, fPixelIndexJ);
   
-  // Implement D0 classification logic
-  const G4double D0_threshold_mm = fD0 * 1e-3; // Convert microns to mm
-  
-  // Determine if hit is a pixel hit: either on pixel surface OR within D0 threshold
+  // Determine if hit is a pixel hit: only based on whether it's on pixel surface
   G4bool isPixelHit = fPixelHit;
   
-  // ENERGY DEPOSITION LOGIC FIX:
-  // For pixel hits: set energy deposition to zero (per user requirement)
-  // For non-pixel hits: keep the energy that was deposited inside the detector
+  // ENERGY DEPOSITION LOGIC:
+  // - Energy is summed only while particle travels through detector volume (handled in SteppingAction)
+  // - For pixel hits: set energy deposition to zero (per user requirement)  
+  // - For non-pixel hits: use energy deposited inside detector during particle passage
   G4double finalEdep = fEdep;
   if (isPixelHit) {
-    finalEdep = 0.0; // Set to zero for pixel hits
+    finalEdep = 0.0; // Set to zero for pixel hits (per user requirement)
     // G4cout << "EventAction: Setting energy deposition to zero for pixel hit (event " << eventID << ")" << G4endl;
   } else {
-    // For non-pixel hits, use the energy deposited inside the detector (already tracked in fEdep)
+    // For non-pixel hits, use the energy deposited inside the detector (already accumulated in fEdep from SteppingAction)
     // G4cout << "EventAction: Using detector energy deposition " << finalEdep/MeV 
     //        << " MeV for non-pixel hit (event " << eventID << ")" << G4endl;
   }
@@ -124,7 +122,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Pass pixel indices and distance information to RunAction
   fRunAction->SetPixelIndices(fPixelIndexI, fPixelIndexJ, fActualPixelDistance);
   
-  // Only calculate and store pixel-specific data for pixel hits (distance <= D0 or on pixel)
+  // Only calculate and store pixel-specific data for pixel hits (on pixel surface)
   if (isPixelHit) {
     fRunAction->SetPixelAlpha(pixelAlpha);
     
@@ -149,7 +147,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
   fRunAction->SetNeighborhoodChargeData(fNonPixel_GridNeighborhoodChargeFractions, fNonPixel_GridNeighborhoodDistances, fNonPixel_GridNeighborhoodCharge, fNonPixel_GridNeighborhoodCharge);
   
   // Perform 2D Gaussian fitting on charge distribution data (central row and column)
-  // Only fit for non-pixel hits (distance > D0 and not on pixel)
+  // Only fit for non-pixel hits (not on pixel surface)
   G4bool shouldPerformFit = !isPixelHit && !fNonPixel_GridNeighborhoodChargeFractions.empty();
   
   if (shouldPerformFit) {
@@ -284,16 +282,17 @@ void EventAction::EndOfEventAction(const G4Event* event)
 
 void EventAction::AddEdep(G4double edep, G4ThreeVector position)
 {
+  // Accumulate energy deposited while particle travels through detector volume
   // Energy weighted position calculation
   if (edep > 0) {
     if (!fHasHit) {
       fPosition = position * edep;
-      fEdep = edep;
+      fEdep = edep;  // First energy deposit in detector
       fHasHit = true;
     } else {
-      // Weight position by energy deposition
+      // Weight position by energy deposition and sum total energy
       fPosition = (fPosition * fEdep + position * edep) / (fEdep + edep);
-      fEdep += edep;
+      fEdep += edep;  // Accumulate total energy deposited in detector
     }
   }
 }
@@ -534,13 +533,12 @@ void EventAction::CalculateNeighborhoodChargeSharing()
     return;
   }
   
-  // Check if hit is inside a pixel - if so, assign all charge to that pixel
+  // Check if hit is inside a pixel - if so, assign zero charge (per user requirement)
   G4bool isInsidePixel = fDetector->IsPositionOnPixel(fPosition);
   if (isInsidePixel) {
-    // Convert energy deposit to number of electrons and apply amplification
-    G4double edepInEV = fEdep * 1e6; // Convert MeV to eV
-    G4double numElectrons = edepInEV / fIonizationEnergy;
-    G4double totalCharge = numElectrons * fAmplificationFactor;
+    // For pixel hits, energy deposition should be zero (per user requirement)
+    // Therefore, charge is also zero
+    G4double totalCharge = 0.0;
     
     // Fill all positions, giving all charge to the hit pixel and zero to others
     for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
@@ -550,9 +548,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         
         // Check if this is the pixel that was hit
         if (di == 0 && dj == 0) {
-          // This is the center pixel (the one that was hit)
-          fNonPixel_GridNeighborhoodChargeFractions.push_back(1.0);
-          fNonPixel_GridNeighborhoodCharge.push_back(totalCharge * fElementaryCharge);
+          // This is the center pixel (the one that was hit) - but charge is zero for pixel hits
+          fNonPixel_GridNeighborhoodChargeFractions.push_back(0.0);
+          fNonPixel_GridNeighborhoodCharge.push_back(0.0);
           fNonPixel_GridNeighborhoodDistances.push_back(0.0); // Distance to center of hit pixel is effectively zero
         } else if (gridPixelI >= 0 && gridPixelI < fDetector->GetNumBlocksPerSide() && 
                    gridPixelJ >= 0 && gridPixelJ < fDetector->GetNumBlocksPerSide()) {
@@ -603,60 +601,10 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   // Calculate the first pixel position (corner)
   G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
   
+  // D0 constant for charge sharing formula (10 microns converted to mm)
   G4double d0_mm = fD0 * 1e-3; // Convert microns to mm
   
-  // Check if the distance from hit to the identified pixel center (fPixelIndexI, fPixelIndexJ) is <= D0
-  G4double pixelCenterX = firstPixelPos + fPixelIndexI * pixelSpacing;
-  G4double pixelCenterY = firstPixelPos + fPixelIndexJ * pixelSpacing;
-  G4double distanceToIdentifiedPixel = std::sqrt(std::pow(fPosition.x() - pixelCenterX, 2) + 
-                                                 std::pow(fPosition.y() - pixelCenterY, 2));
-  
-  // If the distance to the identified pixel center is <= D0, assign all charge to that pixel
-  // This ensures consistency with the inside-pixel case
-  if (distanceToIdentifiedPixel <= d0_mm) {
-    // Calculate the charge without charge sharing
-    G4double totalChargeValue = totalCharge;
-    
-    // Fill all positions, giving all charge to the identified pixel (fPixelIndexI, fPixelIndexJ) and zero to others
-    for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
-      for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
-        G4int gridPixelI = fPixelIndexI + di;
-        G4int gridPixelJ = fPixelIndexJ + dj;
-        
-        // Check if this pixel is within bounds
-        if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
-            gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
-          // Store invalid data for out-of-bounds pixels
-          fNonPixel_GridNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
-          fNonPixel_GridNeighborhoodDistances.push_back(-999.0);
-          fNonPixel_GridNeighborhoodCharge.push_back(0.0);
-          continue;
-        }
-        
-        // Calculate the center position and distance for this pixel
-        G4double currentPixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
-        G4double currentPixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
-        G4double distance = std::sqrt(std::pow(fPosition.x() - currentPixelCenterX, 2) + 
-                                     std::pow(fPosition.y() - currentPixelCenterY, 2));
-        
-        // Check if this is the identified pixel (center of the neighborhood grid)
-        if (di == 0 && dj == 0) {
-          // This is the identified pixel (fPixelIndexI, fPixelIndexJ) - assign all charge here
-          fNonPixel_GridNeighborhoodChargeFractions.push_back(1.0);
-          fNonPixel_GridNeighborhoodCharge.push_back(totalChargeValue * fElementaryCharge);
-          fNonPixel_GridNeighborhoodDistances.push_back(distance);
-        } else {
-          // All other pixels get zero charge
-          fNonPixel_GridNeighborhoodChargeFractions.push_back(0.0);
-          fNonPixel_GridNeighborhoodCharge.push_back(0.0);
-          fNonPixel_GridNeighborhoodDistances.push_back(distance);
-        }
-      }
-    }
-    return; // Exit early, no need for normal charge sharing calculation
-  }
-  
-  // If distance > D0, proceed with normal charge sharing calculation
+  // Proceed with charge sharing calculation for non-pixel hits
   // First pass: collect valid pixels and calculate weights
   std::vector<G4double> weights;
   std::vector<G4double> distances;

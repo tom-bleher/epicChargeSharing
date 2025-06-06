@@ -43,8 +43,13 @@ RunAction::RunAction()
   fPixelTrueDeltaY(0),
   fIsPixelHit(false),
   fPixelHit_PixelAlpha(0),
-  fNonPixel_GaussTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_GaussTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize delta variables for Gaussian fit estimations vs true position
+  fNonPixel_GaussRowTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fNonPixel_GaussColumnTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fNonPixel_GaussDiagTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fNonPixel_GaussDiagTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fNonPixel_GaussSecDiagTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fNonPixel_GaussSecDiagTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
   // Initialize 2D Gaussian fit variables
   fNonPixel_Fit2D_XCenter(0),
   fNonPixel_Fit2D_XSigma(0),
@@ -285,9 +290,13 @@ void RunAction::BeginOfRunAction(const G4Run*)
     
     fTree->Branch("FitDiag_Successful", &fNonPixel_FitDiag_Successful, "FitDiag_Successful/O")->SetTitle("Whether Diagonal Fitting was Successful");
     
-    // Add convenient alias branches for Gaussian center coordinates and distance calculation
-    fTree->Branch("GaussTrueDeltaX", &fNonPixel_GaussTrueDeltaX, "GaussTrueDeltaX/D")->SetTitle("Delta X from Gaussian Center to True Position [mm]");
-    fTree->Branch("GaussTrueDeltaY", &fNonPixel_GaussTrueDeltaY, "GaussTrueDeltaY/D")->SetTitle("Delta Y from Gaussian Center to True Position [mm]");
+    // Add branches for delta variables from Gaussian fit estimations vs true position
+    fTree->Branch("GaussRowTrueDeltaX", &fNonPixel_GaussRowTrueDeltaX, "GaussRowTrueDeltaX/D")->SetTitle("Delta X from Row Fit Center to True Position [mm] (x_row_fit - x_true)");
+    fTree->Branch("GaussColumnTrueDeltaY", &fNonPixel_GaussColumnTrueDeltaY, "GaussColumnTrueDeltaY/D")->SetTitle("Delta Y from Column Fit Center to True Position [mm] (y_column_fit - y_true)");
+    fTree->Branch("GaussDiagTrueDeltaX", &fNonPixel_GaussDiagTrueDeltaX, "GaussDiagTrueDeltaX/D")->SetTitle("Delta X from Main Diagonal Fit Center to True Position [mm] (x_diag_fit - x_true)");
+    fTree->Branch("GaussDiagTrueDeltaY", &fNonPixel_GaussDiagTrueDeltaY, "GaussDiagTrueDeltaY/D")->SetTitle("Delta Y from Main Diagonal Fit Center to True Position [mm] (y_diag_fit - y_true)");
+    fTree->Branch("GaussSecDiagTrueDeltaX", &fNonPixel_GaussSecDiagTrueDeltaX, "GaussSecDiagTrueDeltaX/D")->SetTitle("Delta X from Secondary Diagonal Fit Center to True Position [mm] (x_secdiag_fit - x_true)");
+    fTree->Branch("GaussSecDiagTrueDeltaY", &fNonPixel_GaussSecDiagTrueDeltaY, "GaussSecDiagTrueDeltaY/D")->SetTitle("Delta Y from Secondary Diagonal Fit Center to True Position [mm] (y_secdiag_fit - y_true)");
     
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
@@ -668,14 +677,14 @@ void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4d
     // Store overall fit success status
     fNonPixel_Fit2D_Successful = fit_successful;
     
-    // Calculate delta from fitted center to true position ONLY if fit was successful
+    // Calculate delta values for row and column fits vs true position
     if (fit_successful) {
-        fNonPixel_GaussTrueDeltaX = x_center - fTrueX;
-        fNonPixel_GaussTrueDeltaY = y_center - fTrueY;
+        fNonPixel_GaussRowTrueDeltaX = x_center - fTrueX;      // x_row_fit - x_true
+        fNonPixel_GaussColumnTrueDeltaY = y_center - fTrueY;   // y_column_fit - y_true
     } else {
-        // For failed fits or no fitting performed, set to NaN
-        fNonPixel_GaussTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_GaussTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        // Set row and column delta values to NaN for failed fits
+        fNonPixel_GaussRowTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fNonPixel_GaussColumnTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 }
 
@@ -739,4 +748,39 @@ void RunAction::SetDiagonalGaussianFitResults(G4double main_diag_x_center, G4dou
     
     // Store overall fit success status
     fNonPixel_FitDiag_Successful = fit_successful;
+    
+    // Calculate delta values for diagonal fits vs true position
+    if (fit_successful) {
+        // Main diagonal delta values (using X and Y centers from main diagonal fits)
+        if (main_diag_x_fit_successful) {
+            fNonPixel_GaussDiagTrueDeltaX = main_diag_x_center - fTrueX;  // x_diag_fit - x_true
+        } else {
+            fNonPixel_GaussDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        }
+        
+        if (main_diag_y_fit_successful) {
+            fNonPixel_GaussDiagTrueDeltaY = main_diag_y_center - fTrueY;  // y_diag_fit - y_true
+        } else {
+            fNonPixel_GaussDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        }
+        
+        // Secondary diagonal delta values (using X and Y centers from secondary diagonal fits)
+        if (sec_diag_x_fit_successful) {
+            fNonPixel_GaussSecDiagTrueDeltaX = sec_diag_x_center - fTrueX;  // x_secdiag_fit - x_true
+        } else {
+            fNonPixel_GaussSecDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        }
+        
+        if (sec_diag_y_fit_successful) {
+            fNonPixel_GaussSecDiagTrueDeltaY = sec_diag_y_center - fTrueY;  // y_secdiag_fit - y_true
+        } else {
+            fNonPixel_GaussSecDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        }
+    } else {
+        // For failed overall diagonal fitting, set all delta values to NaN
+        fNonPixel_GaussDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fNonPixel_GaussDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fNonPixel_GaussSecDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fNonPixel_GaussSecDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
 }

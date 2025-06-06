@@ -173,9 +173,13 @@ private:
     // Enhanced robustness metrics
     G4bool fNonPixel_FitConstraintsSatisfied; // Whether geometric constraints were satisfied
     
-    // Additional variables for convenient access to Gaussian center and distance calculation
-    G4double fNonPixel_GaussTrueDeltaX;  // Delta X from Gaussian center to true position [mm] (x_gauss - x_true)
-    G4double fNonPixel_GaussTrueDeltaY;  // Delta Y from Gaussian center to true position [mm] (y_gauss - y_true)
+    // Delta variables for Gaussian fit estimations vs true position
+    G4double fNonPixel_GaussRowTrueDeltaX;     // Delta X from row fit center to true position [mm] (x_row_fit - x_true)
+    G4double fNonPixel_GaussColumnTrueDeltaY;  // Delta Y from column fit center to true position [mm] (y_column_fit - y_true)
+    G4double fNonPixel_GaussDiagTrueDeltaX;    // Delta X from main diagonal fit center to true position [mm] (x_diag_fit - x_true)
+    G4double fNonPixel_GaussDiagTrueDeltaY;    // Delta Y from main diagonal fit center to true position [mm] (y_diag_fit - y_true)
+    G4double fNonPixel_GaussSecDiagTrueDeltaX; // Delta X from secondary diagonal fit center to true position [mm] (x_secdiag_fit - x_true)
+    G4double fNonPixel_GaussSecDiagTrueDeltaY; // Delta Y from secondary diagonal fit center to true position [mm] (y_secdiag_fit - y_true)
     
     // Variables for 2D Gaussian fit results (central row and column fitting)
     G4double fNonPixel_Fit2D_XCenter;        // Fitted X center from central row [mm]
