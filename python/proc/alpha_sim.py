@@ -65,7 +65,9 @@ class RandomHitGridGenerator:
         grid_angles = self.data['GridNeighborhoodAngles'][event_idx]
         
         # Reshape 81-element array into 9x9 grid
-        angle_grid = np.array(grid_angles).reshape(9, 9)
+        # NOTE: The C++ code stores data with di (X direction) as outer loop and dj (Y direction) as inner loop
+        # When reshaped as (9,9), we need to transpose to get correct (Y,X) indexing for visualization
+        angle_grid = np.array(grid_angles).reshape(9, 9).T  # Transpose to fix coordinate system
         
         # Replace invalid angles (-999.0) with NaN for proper display
         angle_grid[angle_grid == -999.0] = np.nan
@@ -267,7 +269,7 @@ class RandomHitGridGenerator:
         
         for event_idx in non_inside_pixel_indices:
             grid_angles = self.data['GridNeighborhoodAngles'][event_idx]
-            angle_grid = np.array(grid_angles).reshape(9, 9)
+            angle_grid = np.array(grid_angles).reshape(9, 9).T  # Transpose to fix coordinate system
             
             # Replace invalid angles (-999.0) with NaN
             angle_grid[angle_grid == -999.0] = np.nan
@@ -570,7 +572,7 @@ class RandomHitGridGenerator:
         
         for event_idx in near_edge_indices:
             grid_angles = self.data['GridNeighborhoodAngles'][event_idx]
-            angle_grid = np.array(grid_angles).reshape(9, 9)
+            angle_grid = np.array(grid_angles).reshape(9, 9).T  # Transpose to fix coordinate system
             
             # Count incomplete/invalid positions (should be -999.0 for out-of-bounds)
             incomplete_count = np.sum(angle_grid == -999.0)
