@@ -13,26 +13,26 @@ A GEANT4-based Monte Carlo simulation for studying charge sharing and position r
 
 When a particle deposits energy in the detector, the simulation models the following process:
 
-1. **Electron Generation**: Number of electrons produced: \(N_e = E_{dep} / E_{ion}\)
-2. **Amplification**: LGAD amplification factor of 20: \(N_e' = N_e \times 20\)
-3. **Charge Distribution**: Total charge \(Q_{tot} = N_e' \times e\) is distributed across a 9×9 pixel neighborhood
+1. **Electron Generation**: Number of electrons produced: $N_e = E_{dep} / E_{ion}$
+2. **Amplification**: LGAD amplification factor of 20: $N_e' = N_e \times 20$
+3. **Charge Distribution**: Total charge $Q_{tot} = N_e' \times e$ is distributed across a 9×9 pixel neighborhood
 
 #### Charge Fraction Calculation
 
 For each pixel in the neighborhood, the charge fraction is calculated using:
 
-\[
+$$
 \alpha_i = \tan^{-1}\left[\frac{\ell/2 \times \sqrt{2}}{\ell/2 \times \sqrt{2} + d_i}\right]
-\]
+$$
 
-\[
+$$
 F_i = \frac{\alpha_i \times \ln(d_i/d_0)^{-1}}{\sum_j \alpha_j \times \ln(d_j/d_0)^{-1}}
-\]
+$$
 
 Where:
-- \(\ell\): pixel size
-- \(d_i\): distance from hit to pixel center
-- \(d_0\): 10 μm reference distance
+- $\ell$: pixel size
+- $d_i$: distance from hit to pixel center
+- $d_0$: 10 μm reference distance
 
 ### Position Reconstruction
 
@@ -46,7 +46,8 @@ The simulation implements 2D Gaussian fitting for position reconstruction:
 - **Main diagonal**: Fit along line with slope +1
 - **Secondary diagonal**: Fit along line with slope -1
 
-All fits use the form: \(y(x) = A \exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) + B\)
+All fits use the form: 
+$$y(x) = A \exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) + B$$
 
 ## Build Requirements
 
@@ -108,7 +109,7 @@ The simulation generates ROOT files with the following branches:
 | `Fit2D_XSigma/YSigma` | Double | Fitted width parameters |
 | `Fit2D_XAmplitude/YAmplitude` | Double | Fitted amplitudes |
 | `Fit2D_X*Err/Y*Err` | Double | Parameter uncertainties |
-| `Fit2D_XChi2red/YChi2red` | Double | Reduced \(\chi^2\) values |
+| `Fit2D_XChi2red/YChi2red` | Double | Reduced $$\chi^2$$ values |
 | `FitDiag_Main*/Sec*` | Double | Diagonal fit results |
 
 ### Delta Variables
@@ -122,12 +123,11 @@ The simulation generates ROOT files with the following branches:
 Events are classified into two categories:
 
 1. **Pixel Hits** (`PixelHit = true`):
-   - Direct hits on pixel active areas
-   - Hits within \(d_0\) (10 μm) of pixel center
-   - No charge sharing performed
+   - Direct hits on pixel covered areas
+   - No charge sharing performed, all charge disposed in pixel
 
 2. **Non-Pixel Hits** (`PixelHit = false`):
-   - Hits farther than \(d_0\) from pixel centers
+   - Hits farther than $$d_0$$ from pixel centers
    - Subject to charge sharing and Gaussian fitting
 
 ## Key Algorithms
@@ -147,9 +147,9 @@ Events are classified into two categories:
 
 The simulation includes several validation mechanisms:
 - Energy conservation checks
-- Charge fraction normalization (\(\sum F_i = 1\))
+- Charge fraction normalization ($\sum F_i = 1$)
 - Geometric consistency verification
-- Fit quality assessment (\(\chi^2/\text{NDF}\))
+- Fit quality assessment ($\chi^2/\text{NDF}$)
 
 ## Project Structure
 
