@@ -1,157 +1,174 @@
-# epicToy: ePIC Toy Detector Simulation
+# epicToy: LGAD Charge Sharing Simulation
 
-A Geant4-based simulation framework for testing particle interactions with silicon AC-LGAD sensors. This project provides a toy model of the ePIC detector with configurable pixel geometries and analysis tools.
+A GEANT4-based Monte Carlo simulation for studying charge sharing and position reconstruction in AC-LGAD (Alternating Current Low Gain Avalanche Detector) pixel sensors.
 
-## Project Overview
+## Physics Overview
 
-**epicToy** simulates particle interactions in a pixelated silicon detector with aluminum readout pixels. The simulation features:
+### Detector Model
+- **Geometry**: Pixelated silicon detector with aluminum readout pixels
+- **Pixel Layout**: Configurable grid with 100 μm pixel size and 500 μm spacing
+- **Active Volume**: 30×30 mm² silicon substrate (50 μm thickness)
 
-- **Realistic AC-LGAD detector geometry** with configurable pixel layouts
-- **Advanced particle tracking** with hit analysis and pixel mapping
-- **ROOT-based data output** with comprehensive metadata
-- **Interactive visualization** using Geant4's OpenGL interface
-- **Python analysis toolkit** for data processing and visualization
-- **Flexible configuration** through macro commands and messenger interfaces
+### Charge Sharing Physics
 
-## Table of Contents
+When a particle deposits energy in the detector, the simulation models the following process:
 
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Usage Modes](#usage-modes)
-- [Configuration](#configuration)
-- [Output Data](#output-data)
-- [Analysis Tools](#analysis-tools)
-- [Troubleshooting](#troubleshooting)
-- [Advanced Features](#advanced-features)
-- [Contributing](#contributing)
-- [License](#license)
+1. **Electron Generation**: Number of electrons produced: \(N_e = E_{dep} / E_{ion}\)
+2. **Amplification**: LGAD amplification factor of 20: \(N_e' = N_e \times 20\)
+3. **Charge Distribution**: Total charge \(Q_{tot} = N_e' \times e\) is distributed across a 9×9 pixel neighborhood
 
-## Prerequisites
+#### Charge Fraction Calculation
 
-### Required Dependencies
+For each pixel in the neighborhood, the charge fraction is calculated using:
 
-- **[Geant4](https://geant4.web.cern.ch/)** (11.0+) with Qt and OpenGL support
-- **[ROOT](https://root.cern/)** (6.20+) for data analysis
-- **CMake** (3.5+)
-- **C++ compiler** supporting C++17 or later
-- **Qt5/Qt6** for GUI support
+\[
+\alpha_i = \tan^{-1}\left[\frac{\ell/2 \times \sqrt{2}}{\ell/2 \times \sqrt{2} + d_i}\right]
+\]
 
-### Optional Dependencies
+\[
+F_i = \frac{\alpha_i \times \ln(d_i/d_0)^{-1}}{\sum_j \alpha_j \times \ln(d_j/d_0)^{-1}}
+\]
 
-- **Python 3.7+** with the following packages for analysis:
-  - `uproot` (ROOT file reading)
-  - `matplotlib` (visualization)
-  - `numpy` (numerical computing)
-  - `pandas` (data analysis)
+Where:
+- \(\ell\): pixel size
+- \(d_i\): distance from hit to pixel center
+- \(d_0\): 10 μm reference distance
 
-### System Setup
+### Position Reconstruction
 
-Before building, ensure Geant4 is properly sourced:
+The simulation implements 2D Gaussian fitting for position reconstruction:
 
-```bash
-source ~/Geant4/geant4-v11.3.1-install/share/Geant4/geant4make/geant4make.sh
-```
+#### Central Row/Column Fitting
+- **X-direction**: Fit Gaussian to charge distribution along central row
+- **Y-direction**: Fit Gaussian to charge distribution along central column
+
+#### Diagonal Fitting
+- **Main diagonal**: Fit along line with slope +1
+- **Secondary diagonal**: Fit along line with slope -1
+
+All fits use the form: \(y(x) = A \exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) + B\)
+
+## Build Requirements
+
+- **GEANT4** (v11.0+) with Qt and OpenGL support
+- **ROOT** (v6.20+) for data output
+- **CMake** (v3.5+)
+- **C++17** compatible compiler
 
 ## Installation
 
-### 1. Clone the Repository
-
+### Environment Setup
 ```bash
-git clone https://github.com/yourusername/epicToy.git
-cd epicToy
+source ~/Geant4/geant4-v11.3.1-install/share/Geant4/geant4make/geant4make.sh
+export QT_QPA_PLATFORM=xcb
 ```
 
-### 2. Build the Project
-
+### Build Process
 ```bash
-# Create and enter build directory
-mkdir -p build
-cd build
-
-# Configure with CMake
-cmake ..
-
-# Build the project
-make -j$(nproc)
+mkdir build && cd build
+cmake .. && make -j5
 ```
 
-## Quick Start
+## Usage
 
 ### Interactive Mode (GUI)
-
 ```bash
-cd build
 ./epicToy
 ```
 
-This launches the simulation with:
-
-- **OpenGL 3D visualization** window
-- **Geant4 command interface** for real-time control
-- **Interactive particle gun** for testing
-
 ### Batch Mode
-
 ```bash
-cd build
-./epicToy -m your_macro.mac
-# or
-./epicToy batch your_macro.mac
+./epicToy -m ../macros/run.mac
 ```
 
-## 📁 Project Structure
+## Output Data Structure
+
+The simulation generates ROOT files with the following branches:
+
+### Event Information
+| Branch | Type | Units | Description |
+|--------|------|-------|-------------|
+| `Edep` | Double | MeV | Energy deposited in detector |
+| `TrueX/Y/Z` | Double | mm | True hit position |
+| `PixelX/Y/Z` | Double | mm | Nearest pixel center |
+| `PixelI/J` | Integer | - | Pixel grid indices |
+| `PixelHit` | Boolean | - | Direct pixel hit flag |
+
+### Charge Sharing Data (Non-Pixel Hits)
+| Branch | Type | Description |
+|--------|------|-------------|
+| `GridNeighborhoodAngles` | Vector<Double> | Alpha angles for 9×9 grid |
+| `GridNeighborhoodChargeFractions` | Vector<Double> | Charge fractions per pixel |
+| `GridNeighborhoodCharge` | Vector<Double> | Actual charge values [C] |
+
+### Gaussian Fit Results
+| Branch | Type | Description |
+|--------|------|-------------|
+| `Fit2D_XCenter/YCenter` | Double | Fitted position from row/column |
+| `Fit2D_XSigma/YSigma` | Double | Fitted width parameters |
+| `Fit2D_XAmplitude/YAmplitude` | Double | Fitted amplitudes |
+| `Fit2D_X*Err/Y*Err` | Double | Parameter uncertainties |
+| `Fit2D_XChi2red/YChi2red` | Double | Reduced \(\chi^2\) values |
+| `FitDiag_Main*/Sec*` | Double | Diagonal fit results |
+
+### Delta Variables
+| Branch | Type | Description |
+|--------|------|-------------|
+| `PixelTrueDeltaX/Y` | Double | Pixel center - true position |
+| `GaussTrueDeltaX/Y` | Double | Fitted center - true position |
+
+## Hit Classification
+
+Events are classified into two categories:
+
+1. **Pixel Hits** (`PixelHit = true`):
+   - Direct hits on pixel active areas
+   - Hits within \(d_0\) (10 μm) of pixel center
+   - No charge sharing performed
+
+2. **Non-Pixel Hits** (`PixelHit = false`):
+   - Hits farther than \(d_0\) from pixel centers
+   - Subject to charge sharing and Gaussian fitting
+
+## Key Algorithms
+
+### 2D Gaussian Fitting
+- **Method**: Levenberg-Marquardt optimization
+- **Convergence**: Analytical derivatives with damping factor adjustment
+- **Error Estimation**: Curvature-based parameter uncertainties
+- **Success Criteria**: Minimum 3 data points, stable convergence
+
+### Neighborhood Construction
+- **Grid Size**: 9×9 pixels (radius = 4)
+- **Center**: Nearest pixel to true hit position
+- **Boundary**: Rectangular grid aligned with detector axes
+
+## Physics Validation
+
+The simulation includes several validation mechanisms:
+- Energy conservation checks
+- Charge fraction normalization (\(\sum F_i = 1\))
+- Geometric consistency verification
+- Fit quality assessment (\(\chi^2/\text{NDF}\))
+
+## Project Structure
 
 ```
 epicToy/
-├── 📂 src/                    # Source files
-│   ├── DetectorConstruction.cc    # Detector geometry and materials
-│   ├── EventAction.cc            # Per-event data processing
-│   ├── RunAction.cc              # Run-level ROOT output management
-│   ├── PrimaryGenerator.cc       # Particle beam configuration
-│   ├── PhysicsList.cc            # Physics processes
-│   ├── ActionInitialization.cc   # User action setup
-│   ├── DetectorMessenger.cc      # UI commands for detector
-│   └── SteppingAction.cc         # Step-by-step tracking
-├── 📂 include/                # Header files
-├── 📂 macros/                 # Geant4 macro files
-│   └── vis.mac               # Default visualization setup
-├── 📂 python/                 # Analysis toolkit
-│   ├── proc/                 # Data processing scripts
-│   │   ├── alpha_sim.py      # Alpha particle analysis
-│   │   └── vis_sim.py        # Visualization tools
-│   └── sim/                  # Simulation utilities
-│       └── alpha_demo.py     # Demo analysis script
-├── 📄 epicToy.cc              # Main application
-├── 📄 CMakeLists.txt          # Build configuration
-└── 📄 README.md               # This file
+├── src/                    # Implementation files
+│   ├── DetectorConstruction.cc  # Detector geometry
+│   ├── EventAction.cc           # Event processing & charge sharing
+│   ├── RunAction.cc             # ROOT output management
+│   ├── 2DGaussianFitCeres.cc         # Fitting algorithms
+│   └── ...
+├── include/                # Header files
+├── macros/                 # GEANT4 macro files
+└── build/                  # Build directory
 ```
 
-## Output Data
+## References
 
-### ROOT Tree Structure
-
-The simulation generates `epicToyOutput.root` with the following branches:
-
-| Branch                           | Type            | Units   | Description                  |
-| -------------------------------- | --------------- | ------- | ---------------------------- |
-| `Edep`                           | Double          | MeV     | Energy deposited in detector |
-| `TrueX`, `TrueY`, `TrueZ`           | Double          | mm      | Hit position coordinates     |
-| `InitX`, `InitY`, `InitZ`        | Double          | mm      | Initial particle position    |
-| `PixelX`, `PixelY`, `PixelZ`     | Double          | mm      | Nearest pixel center         |
-| `PixelI`, `PixelJ`               | Integer         | -       | Pixel grid indices           |
-| `PixelTrueDistance`                      | Double          | mm      | Distance to nearest pixel    |
-| `PixelAlpha`                     | Double          | degrees | Angular size of pixel        |
-| `PixelHit`                       | Boolean         | -       | Direct pixel hit flag        |
-| `Grid9x9Angles`                  | Vector<Double>  | degrees | Angles to 9×9 pixel grid     |
-| `Grid9x9PixelI`, `Grid9x9PixelJ` | Vector<Integer> | -       | 9×9 grid indices             |
-
-### Metadata
-
-Detector configuration is automatically saved as ROOT metadata:
-
-- `GridPixelSize` - Final pixel dimensions
-- `GridPixelSpacing` - Center-to-center spacing
-- `GridDetectorSize` - Total detector dimensions
-- `GridNumBlocksPerSide` - Pixel count per dimension
+This simulation implements algorithms for LGAD charge sharing studies relevant to:
+- ePIC detector development
+- Timing detector position reconstruction
+- Pixel sensor optimization studies
