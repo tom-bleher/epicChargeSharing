@@ -5,11 +5,7 @@
 #include "G4VPhysicalVolume.hh"
 #include "G4LogicalVolume.hh"
 #include "G4Box.hh"
-#include "G4Sphere.hh"
-#include "G4Tubs.hh"
-#include "G4SystemOfUnits.hh"
 #include "G4NistManager.hh"
-#include "G4RotationMatrix.hh"
 #include "G4ThreeVector.hh"
 #include "G4PVPlacement.hh"
 #include "G4VisAttributes.hh"
@@ -49,7 +45,7 @@ public:
     G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
-    G4ThreeVector GetDetectorPosition() const { return G4ThreeVector(0., 0., -1.0*cm); } // Fixed position from Construct()
+    G4ThreeVector GetDetectorPosition() const; // Fixed position from Construct()
     
     // Method to check if a position is within a pixel area
     G4bool IsPositionOnPixel(const G4ThreeVector& position) const;

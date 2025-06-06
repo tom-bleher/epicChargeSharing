@@ -2,6 +2,7 @@
 #include "DetectorConstruction.hh"
 #include "Randomize.hh"
 #include "G4Event.hh"
+#include "G4SystemOfUnits.hh"
 
 PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
 : fDetector(detector)
@@ -57,9 +58,6 @@ void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
     // Generate a new random position for each event
     GenerateRandomPosition();
     
-    // Store the particle position in the event user info for later retrieval
-    G4ThreeVector position = fParticleGun->GetParticlePosition();
-    
     // Create Vertex
     fParticleGun->GeneratePrimaryVertex(anEvent);
 
@@ -68,12 +66,6 @@ void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
         // The vertex has been created and can be accessed by EventAction
         // No additional code needed here as EventAction already reads the position
     }
-}
-
-// Implementation of the new access method
-G4ThreeVector PrimaryGenerator::GetParticlePosition() const
-{
-    return fParticleGun->GetParticlePosition();
 }
 
 // Generate random position within the detector area

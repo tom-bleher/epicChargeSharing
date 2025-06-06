@@ -21,12 +21,13 @@ namespace Constants {
     // PIXEL GEOMETRY CONSTANTS
     // ========================
     
+    // Parameters (all lengths are center–to–center except fPixelCornerOffset)
+    
     // Default pixel dimensions and spacing
-    const G4double DEFAULT_PIXEL_SIZE = 0.1*mm;          // 100 microns pixel size
-    const G4double DEFAULT_PIXEL_WIDTH = 0.001*mm;       // 1 micron pixel thickness
-    const G4double DEFAULT_PIXEL_SPACING = 0.5*mm;       // 500 microns center-to-center
-    const G4double DEFAULT_PIXEL_CORNER_OFFSET = 0.1*mm; // 100 microns from detector edge
-    const G4double PIXEL_EXCLUSION_BUFFER = 0.01*mm;     // Legacy pixel buffer (not used for d0 constraint)
+    const G4double DEFAULT_PIXEL_SIZE = 0.1*mm;          // "pixel" side‐length
+    const G4double DEFAULT_PIXEL_WIDTH = 0.001*mm;       // Width/thickness of each pixel
+    const G4double DEFAULT_PIXEL_SPACING = 0.5*mm;       // center–to–center pitch
+    const G4double DEFAULT_PIXEL_CORNER_OFFSET = 0.1*mm; // from inner detector edge to first pixel
     
     // Pixel positioning precision
     const G4double GEOMETRY_TOLERANCE = 1*um;            // Geometry calculation tolerance
@@ -44,25 +45,6 @@ namespace Constants {
     
     // Charge sharing calculations
     const G4double ALPHA_WEIGHT_MULTIPLIER = 1000.0;     // Weight for very close pixels
-    
-    // Error estimation
-    const G4double BASE_POSITION_ERROR = 0.005*mm;       // 5 microns base uncertainty
-    const G4double ERROR_SCALE_FRACTION = 0.1;           // 10% error scaling
-    
-    // ========================
-    // UNIT CONVERSIONS
-    // ========================
-    
-    // Default values for initialization
-    const G4double DEFAULT_ERROR = 1.0;                  // Default error when not specified
-    const G4int INVALID_INDEX = -1;                      // Invalid pixel index
-    const G4double INVALID_DISTANCE = -1.0;              // Invalid distance marker
-    
-    // ========================
-    // OUTPUT AND DEBUGGING
-    // ========================
-    
-    const G4int MAX_DEBUG_EVENTS = 5;                    // Maximum events to print debug info
     
 } // namespace Constants
 

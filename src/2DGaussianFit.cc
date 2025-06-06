@@ -190,7 +190,7 @@ GaussianFit2DResults Fit2DGaussian(
         gauss_x.SetParLimits(3, 0.08 * Q_row, 0.5 * Q_row);
         
         // Constraint 3: 0.2 * PixelSpacing ≤ σ ≤ 2 * PixelSpacing  
-        gauss_x.SetParLimits(2, 0.2 * pixel_spacing, 2.0 * pixel_spacing);
+        gauss_x.SetParLimits(2, 0.2 * pixel_spacing, 4.0*pixel_spacing);
         
         // Constraint 4: Center within ±pixel_spacing of center estimate
         double center_min = center_x_estimate - pixel_spacing;
@@ -279,7 +279,7 @@ GaussianFit2DResults Fit2DGaussian(
         gauss_y.SetParLimits(3, 0.08*Q_col, 0.5 * Q_col);
         
         // Constraint 3: 0.2 * PixelSpacing ≤ σ ≤ 2 * PixelSpacing  
-        gauss_y.SetParLimits(2, 0.2 * pixel_spacing, 2.0 * pixel_spacing);
+        gauss_y.SetParLimits(2, 0.2 * pixel_spacing, 4.0*pixel_spacing);
         
         // Constraint 4: Center within ±pixel_spacing of center estimate
         double center_min = center_y_estimate - pixel_spacing;
@@ -509,7 +509,7 @@ DiagonalFitResults FitDiagonalGaussian(
             // Physical constraints on parameters
             gauss_main_x.SetParLimits(0, 0.1 * Q_main_x, Q_main_x);
             gauss_main_x.SetParLimits(3, 0.08 * Q_main_x, 0.5 * Q_main_x);
-            gauss_main_x.SetParLimits(2, 0.2 * pixel_spacing, 2.0 * pixel_spacing);
+            gauss_main_x.SetParLimits(2, 0.2 * pixel_spacing, 4.0*pixel_spacing);
             
             double center_min = center_x_estimate - pixel_spacing;
             double center_max = center_x_estimate + pixel_spacing;
@@ -608,7 +608,7 @@ DiagonalFitResults FitDiagonalGaussian(
             // Physical constraints on parameters
             gauss_main_y.SetParLimits(0, 0.1 * Q_main_y, Q_main_y);
             gauss_main_y.SetParLimits(3, 0.08 * Q_main_y, 0.5 * Q_main_y);
-            gauss_main_y.SetParLimits(2, 0.2 * pixel_spacing, 2.0 * pixel_spacing);
+            gauss_main_y.SetParLimits(2, 0.2 * pixel_spacing, 4.0*pixel_spacing);
             
             double center_min = center_y_estimate - pixel_spacing;
             double center_max = center_y_estimate + pixel_spacing;
@@ -707,7 +707,7 @@ DiagonalFitResults FitDiagonalGaussian(
             // Physical constraints on parameters
             gauss_sec_x.SetParLimits(0, 0.1 * Q_sec_x, Q_sec_x);
             gauss_sec_x.SetParLimits(3, 0.08 * Q_sec_x, 0.5 * Q_sec_x);
-            gauss_sec_x.SetParLimits(2, 0.2 * pixel_spacing, 2.0 * pixel_spacing);
+            gauss_sec_x.SetParLimits(2, 0.2 * pixel_spacing, 4.0*pixel_spacing);
             
             double center_min = center_x_estimate - pixel_spacing;
             double center_max = center_x_estimate + pixel_spacing;
@@ -806,7 +806,7 @@ DiagonalFitResults FitDiagonalGaussian(
             // Physical constraints on parameters
             gauss_sec_y.SetParLimits(0, 0.1 * Q_sec_y, Q_sec_y);
             gauss_sec_y.SetParLimits(3, 0.08 * Q_sec_y, 0.5 * Q_sec_y);
-            gauss_sec_y.SetParLimits(2, 0.2 * pixel_spacing, 2.0 * pixel_spacing);
+            gauss_sec_y.SetParLimits(2, 0.2 * pixel_spacing, 4.0*pixel_spacing);
             
             double center_min = center_y_estimate - pixel_spacing;
             double center_max = center_y_estimate + pixel_spacing;
