@@ -216,6 +216,19 @@ include(${Geant4_USE_FILE})
 # Set include directories
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
+# Find Ceres Solver
+find_package(Ceres REQUIRED)
+if(Ceres_FOUND)
+    message(STATUS "Found Ceres Solver version ${Ceres_VERSION}")
+    message(STATUS "Ceres include dirs: ${CERES_INCLUDE_DIRS}")
+    message(STATUS "Ceres libraries: ${CERES_LIBRARIES}")
+else()
+    message(FATAL_ERROR "Ceres Solver not found! Please install Ceres Solver.")
+endif()
+
+# Add Ceres include directories
+include_directories(${CERES_INCLUDE_DIRS})
+
 # Find source files
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cc)
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh)
@@ -243,6 +256,7 @@ add_executable(epicToy epicToy.cc ${sources} ${headers})
 target_link_libraries(epicToy 
     ${Geant4_LIBRARIES} 
     ${ROOT_LIBRARIES} 
+    ${CERES_LIBRARIES}
     Threads::Threads
 )
 
