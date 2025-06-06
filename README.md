@@ -46,8 +46,10 @@ The simulation implements 2D Gaussian fitting for position reconstruction:
 - **Main diagonal**: Fit along line with slope +1
 - **Secondary diagonal**: Fit along line with slope -1
 
-All fits use the form: 
-$$y(x) = A \exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) + B$$
+All fits use the parameterized Gaussian function: 
+$$
+y(x) = A \exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) + B
+$$
 
 ## Build Requirements
 
