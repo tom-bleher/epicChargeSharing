@@ -7,10 +7,13 @@ This script creates plots for:
 2. Gaussian curve estimation for central column (y-direction) with residuals
 3. Gaussian curve estimation for main diagonal direction with residuals
 4. Gaussian curve estimation for secondary diagonal direction with residuals
+5. Overlay plots comparing different fitting approaches:
+   - X-coordinate: Row fit + Main diagonal X fit + Secondary diagonal X fit
+   - Y-coordinate: Column fit + Main diagonal Y fit + Secondary diagonal Y fit
 
 The plots show the fitted Gaussian curves overlaid on the actual charge data points 
 from the neighborhood grid, along with residual plots showing fit quality.
-Each direction gets a separate figure with corresponding file naming.
+Individual directions get separate figures, and overlay plots compare all approaches.
 """
 
 import uproot
@@ -453,6 +456,10 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_x_main.axvline(true_x, color='green', linestyle='--', linewidth=2, 
                              label=f'True X = {true_x:.3f} mm', alpha=0.8)
             
+            # Mark fitted center
+            ax_x_main.axvline(x_center, color='orange', linestyle=':', linewidth=2, 
+                             label=f'Fitted X = {x_center:.3f} mm', alpha=0.8)
+            
             ax_x_main.grid(True, alpha=0.3, linestyle=':')
             ax_x_main.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
             ax_x_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
@@ -527,6 +534,10 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_y_main.axvline(true_y, color='green', linestyle='--', linewidth=2, 
                              label=f'True Y = {true_y:.3f} mm', alpha=0.8)
             
+            # Mark fitted center
+            ax_y_main.axvline(y_center, color='orange', linestyle=':', linewidth=2, 
+                             label=f'Fitted Y = {y_center:.3f} mm', alpha=0.8)
+            
             ax_y_main.grid(True, alpha=0.3, linestyle=':')
             ax_y_main.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
             ax_y_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
@@ -599,6 +610,10 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_main_x_main.axvline(true_x, color='green', linestyle='--', linewidth=2, 
                                   label=f'True X = {true_x:.3f} mm', alpha=0.8)
             
+            # Mark fitted center
+            ax_main_x_main.axvline(main_diag_x_center, color='orange', linestyle=':', linewidth=2, 
+                                  label=f'Fitted X = {main_diag_x_center:.3f} mm', alpha=0.8)
+            
             ax_main_x_main.grid(True, alpha=0.3, linestyle=':')
             ax_main_x_main.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
             ax_main_x_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
@@ -661,6 +676,10 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             # Mark true position
             ax_main_y_main.axvline(true_y, color='green', linestyle='--', linewidth=2, 
                                   label=f'True Y = {true_y:.3f} mm', alpha=0.8)
+            
+            # Mark fitted center
+            ax_main_y_main.axvline(main_diag_y_center, color='orange', linestyle=':', linewidth=2, 
+                                  label=f'Fitted Y = {main_diag_y_center:.3f} mm', alpha=0.8)
             
             ax_main_y_main.grid(True, alpha=0.3, linestyle=':')
             ax_main_y_main.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
@@ -725,6 +744,10 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_sec_x_main.axvline(true_x, color='green', linestyle='--', linewidth=2, 
                                  label=f'True X = {true_x:.3f} mm', alpha=0.8)
             
+            # Mark fitted center
+            ax_sec_x_main.axvline(sec_diag_x_center, color='orange', linestyle=':', linewidth=2, 
+                                 label=f'Fitted X = {sec_diag_x_center:.3f} mm', alpha=0.8)
+            
             ax_sec_x_main.grid(True, alpha=0.3, linestyle=':')
             ax_sec_x_main.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
             ax_sec_x_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
@@ -788,6 +811,10 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_sec_y_main.axvline(true_y, color='green', linestyle='--', linewidth=2, 
                                  label=f'True Y = {true_y:.3f} mm', alpha=0.8)
             
+            # Mark fitted center
+            ax_sec_y_main.axvline(sec_diag_y_center, color='orange', linestyle=':', linewidth=2, 
+                                 label=f'Fitted Y = {sec_diag_y_center:.3f} mm', alpha=0.8)
+            
             ax_sec_y_main.grid(True, alpha=0.3, linestyle=':')
             ax_sec_y_main.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
             ax_sec_y_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
@@ -826,6 +853,255 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         
     except Exception as e:
         return f"Event {event_idx}: Error creating plot - {e}"
+
+def create_overlay_fit_plots(event_idx, data, output_dir="plots", show_event_info=False):
+    """
+    Create overlay plots comparing all fitting approaches for X and Y coordinates.
+    
+    For X-coordinate: Row fit + Main diagonal X fit + Secondary diagonal X fit
+    For Y-coordinate: Column fit + Main diagonal Y fit + Secondary diagonal Y fit
+    
+    Args:
+        event_idx (int): Event index to plot
+        data (dict): Filtered data dictionary
+        output_dir (str): Output directory for plots
+        show_event_info (bool): Whether to show event information on plot
+    
+    Returns:
+        str: Success message or error
+    """
+    try:
+        # Extract row, column, and diagonal data
+        (row_pos, row_charges), (col_pos, col_charges) = extract_row_column_data(event_idx, data)
+        (main_x_pos, main_x_charges), (main_y_pos, main_y_charges), (sec_x_pos, sec_x_charges), (sec_y_pos, sec_y_charges) = extract_diagonal_data(event_idx, data)
+        
+        # Get fit parameters for this event
+        x_center = data['Fit2D_XCenter'][event_idx]
+        x_sigma = data['Fit2D_XSigma'][event_idx]
+        x_amplitude = data['Fit2D_XAmplitude'][event_idx]
+        
+        y_center = data['Fit2D_YCenter'][event_idx]
+        y_sigma = data['Fit2D_YSigma'][event_idx]
+        y_amplitude = data['Fit2D_YAmplitude'][event_idx]
+        
+        # Get diagonal fit parameters
+        main_diag_x_center = data['FitDiag_MainXCenter'][event_idx]
+        main_diag_x_sigma = data['FitDiag_MainXSigma'][event_idx]
+        main_diag_x_amplitude = data['FitDiag_MainXAmplitude'][event_idx]
+        main_diag_x_successful = data['FitDiag_MainXSuccessful'][event_idx]
+        
+        main_diag_y_center = data['FitDiag_MainYCenter'][event_idx]
+        main_diag_y_sigma = data['FitDiag_MainYSigma'][event_idx]
+        main_diag_y_amplitude = data['FitDiag_MainYAmplitude'][event_idx]
+        main_diag_y_successful = data['FitDiag_MainYSuccessful'][event_idx]
+        
+        sec_diag_x_center = data['FitDiag_SecXCenter'][event_idx]
+        sec_diag_x_sigma = data['FitDiag_SecXSigma'][event_idx]
+        sec_diag_x_amplitude = data['FitDiag_SecXAmplitude'][event_idx]
+        sec_diag_x_successful = data['FitDiag_SecXSuccessful'][event_idx]
+        
+        sec_diag_y_center = data['FitDiag_SecYCenter'][event_idx]
+        sec_diag_y_sigma = data['FitDiag_SecYSigma'][event_idx]
+        sec_diag_y_amplitude = data['FitDiag_SecYAmplitude'][event_idx]
+        sec_diag_y_successful = data['FitDiag_SecYSuccessful'][event_idx]
+        
+        # True hit position for comparison
+        true_x = data['TrueX'][event_idx]
+        true_y = data['TrueY'][event_idx]
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # ============================================
+        # X-COORDINATE OVERLAY FIGURE
+        # ============================================
+        if len(row_pos) >= 3 or (len(main_x_pos) >= 3 and main_diag_x_successful) or (len(sec_x_pos) >= 3 and sec_diag_x_successful):
+            fig_x_overlay = plt.figure(figsize=(14, 8))
+            ax_x_overlay = fig_x_overlay.add_subplot(111)
+            
+            # Determine overall X range for plotting
+            all_x_positions = []
+            if len(row_pos) >= 3:
+                all_x_positions.extend(row_pos)
+            if len(main_x_pos) >= 3 and main_diag_x_successful:
+                all_x_positions.extend(main_x_pos)
+            if len(sec_x_pos) >= 3 and sec_diag_x_successful:
+                all_x_positions.extend(sec_x_pos)
+            
+            if all_x_positions:
+                x_min, x_max = min(all_x_positions), max(all_x_positions)
+                x_range = np.linspace(x_min - 0.2, x_max + 0.2, 300)
+                
+                # Plot Row data and fit (central row)
+                if len(row_pos) >= 3:
+                    ax_x_overlay.errorbar(row_pos, row_charges, fmt='o', markersize=8, 
+                                        capsize=4, label='Row data', alpha=0.8, linewidth=1.5, 
+                                        color='blue', markeredgecolor='darkblue')
+                    
+                    # Row fit curve
+                    row_fit = gaussian_1d(x_range, x_amplitude, x_center, x_sigma)
+                    ax_x_overlay.plot(x_range, row_fit, '-', linewidth=3, 
+                                    label=f'Row fit (μ={x_center:.3f} mm)', 
+                                    color='blue', alpha=0.9)
+                
+                # Plot Main diagonal X data and fit
+                if len(main_x_pos) >= 3 and main_diag_x_successful:
+                    ax_x_overlay.errorbar(main_x_pos, main_x_charges, fmt='s', markersize=8, 
+                                        capsize=4, label='Main diag data', alpha=0.8, linewidth=1.5,
+                                        color='red', markeredgecolor='darkred')
+                    
+                    # Main diagonal X fit curve
+                    main_diag_x_fit = gaussian_1d(x_range, main_diag_x_amplitude, main_diag_x_center, main_diag_x_sigma)
+                    ax_x_overlay.plot(x_range, main_diag_x_fit, '--', linewidth=3, 
+                                    label=f'Main diag fit (μ={main_diag_x_center:.3f} mm)', 
+                                    color='red', alpha=0.9)
+                
+                # Plot Secondary diagonal X data and fit
+                if len(sec_x_pos) >= 3 and sec_diag_x_successful:
+                    ax_x_overlay.errorbar(sec_x_pos, sec_x_charges, fmt='^', markersize=8, 
+                                        capsize=4, label='Sec diag data', alpha=0.8, linewidth=1.5,
+                                        color='purple', markeredgecolor='indigo')
+                    
+                    # Secondary diagonal X fit curve
+                    sec_diag_x_fit = gaussian_1d(x_range, sec_diag_x_amplitude, sec_diag_x_center, sec_diag_x_sigma)
+                    ax_x_overlay.plot(x_range, sec_diag_x_fit, ':', linewidth=3, 
+                                    label=f'Sec diag fit (μ={sec_diag_x_center:.3f} mm)', 
+                                    color='purple', alpha=0.9)
+                
+                # Mark fitted centers for each approach
+                if len(row_pos) >= 3:
+                    ax_x_overlay.axvline(x_center, color='blue', linestyle=':', linewidth=2, 
+                                       label=f'Row fit center = {x_center:.3f} mm', alpha=0.7)
+                
+                if len(main_x_pos) >= 3 and main_diag_x_successful:
+                    ax_x_overlay.axvline(main_diag_x_center, color='red', linestyle=':', linewidth=2, 
+                                       label=f'Main diag center = {main_diag_x_center:.3f} mm', alpha=0.7)
+                
+                if len(sec_x_pos) >= 3 and sec_diag_x_successful:
+                    ax_x_overlay.axvline(sec_diag_x_center, color='purple', linestyle=':', linewidth=2, 
+                                       label=f'Sec diag center = {sec_diag_x_center:.3f} mm', alpha=0.7)
+                
+                # Mark true position
+                ax_x_overlay.axvline(true_x, color='green', linestyle='-', linewidth=3, 
+                                   label=f'True X = {true_x:.3f} mm', alpha=0.8)
+                
+                ax_x_overlay.grid(True, alpha=0.3, linestyle=':')
+                ax_x_overlay.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=14)
+                ax_x_overlay.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=14)
+                ax_x_overlay.set_title('X-Coordinate: Comparison of Row, Main Diagonal, and Secondary Diagonal Fits', fontsize=16)
+                ax_x_overlay.legend(loc='best', fontsize=12)
+                
+                # Add overall title with event information
+                if show_event_info:
+                    fig_x_overlay.suptitle(f'Event {event_idx}: X-Coordinate Fit Comparison\n'
+                                         f'True X: {true_x:.3f} mm', 
+                                         fontsize=16)
+                
+                # Save X-coordinate overlay plot
+                filename_x_overlay = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_X_overlay.png')
+                plt.savefig(filename_x_overlay, dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close()
+        
+        # ============================================
+        # Y-COORDINATE OVERLAY FIGURE
+        # ============================================
+        if len(col_pos) >= 3 or (len(main_y_pos) >= 3 and main_diag_y_successful) or (len(sec_y_pos) >= 3 and sec_diag_y_successful):
+            fig_y_overlay = plt.figure(figsize=(14, 8))
+            ax_y_overlay = fig_y_overlay.add_subplot(111)
+            
+            # Determine overall Y range for plotting
+            all_y_positions = []
+            if len(col_pos) >= 3:
+                all_y_positions.extend(col_pos)
+            if len(main_y_pos) >= 3 and main_diag_y_successful:
+                all_y_positions.extend(main_y_pos)
+            if len(sec_y_pos) >= 3 and sec_diag_y_successful:
+                all_y_positions.extend(sec_y_pos)
+            
+            if all_y_positions:
+                y_min, y_max = min(all_y_positions), max(all_y_positions)
+                y_range = np.linspace(y_min - 0.2, y_max + 0.2, 300)
+                
+                # Plot Column data and fit (central column)
+                if len(col_pos) >= 3:
+                    ax_y_overlay.errorbar(col_pos, col_charges, fmt='o', markersize=8, 
+                                        capsize=4, label='Column data', alpha=0.8, linewidth=1.5, 
+                                        color='blue', markeredgecolor='darkblue')
+                    
+                    # Column fit curve
+                    col_fit = gaussian_1d(y_range, y_amplitude, y_center, y_sigma)
+                    ax_y_overlay.plot(y_range, col_fit, '-', linewidth=3, 
+                                    label=f'Column fit (μ={y_center:.3f} mm)', 
+                                    color='blue', alpha=0.9)
+                
+                # Plot Main diagonal Y data and fit
+                if len(main_y_pos) >= 3 and main_diag_y_successful:
+                    ax_y_overlay.errorbar(main_y_pos, main_y_charges, fmt='s', markersize=8, 
+                                        capsize=4, label='Main diag data', alpha=0.8, linewidth=1.5,
+                                        color='red', markeredgecolor='darkred')
+                    
+                    # Main diagonal Y fit curve
+                    main_diag_y_fit = gaussian_1d(y_range, main_diag_y_amplitude, main_diag_y_center, main_diag_y_sigma)
+                    ax_y_overlay.plot(y_range, main_diag_y_fit, '--', linewidth=3, 
+                                    label=f'Main diag fit (μ={main_diag_y_center:.3f} mm)', 
+                                    color='red', alpha=0.9)
+                
+                # Plot Secondary diagonal Y data and fit
+                if len(sec_y_pos) >= 3 and sec_diag_y_successful:
+                    ax_y_overlay.errorbar(sec_y_pos, sec_y_charges, fmt='^', markersize=8, 
+                                        capsize=4, label='Sec diag data', alpha=0.8, linewidth=1.5,
+                                        color='purple', markeredgecolor='indigo')
+                    
+                    # Secondary diagonal Y fit curve
+                    sec_diag_y_fit = gaussian_1d(y_range, sec_diag_y_amplitude, sec_diag_y_center, sec_diag_y_sigma)
+                    ax_y_overlay.plot(y_range, sec_diag_y_fit, ':', linewidth=3, 
+                                    label=f'Sec diag fit (μ={sec_diag_y_center:.3f} mm)', 
+                                    color='purple', alpha=0.9)
+                
+                # Mark fitted centers for each approach
+                if len(col_pos) >= 3:
+                    ax_y_overlay.axvline(y_center, color='blue', linestyle=':', linewidth=2, 
+                                       label=f'Column fit center = {y_center:.3f} mm', alpha=0.7)
+                
+                if len(main_y_pos) >= 3 and main_diag_y_successful:
+                    ax_y_overlay.axvline(main_diag_y_center, color='red', linestyle=':', linewidth=2, 
+                                       label=f'Main diag center = {main_diag_y_center:.3f} mm', alpha=0.7)
+                
+                if len(sec_y_pos) >= 3 and sec_diag_y_successful:
+                    ax_y_overlay.axvline(sec_diag_y_center, color='purple', linestyle=':', linewidth=2, 
+                                       label=f'Sec diag center = {sec_diag_y_center:.3f} mm', alpha=0.7)
+                
+                # Mark true position
+                ax_y_overlay.axvline(true_y, color='green', linestyle='-', linewidth=3, 
+                                   label=f'True Y = {true_y:.3f} mm', alpha=0.8)
+                
+                ax_y_overlay.grid(True, alpha=0.3, linestyle=':')
+                ax_y_overlay.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=14)
+                ax_y_overlay.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=14)
+                ax_y_overlay.set_title('Y-Coordinate: Comparison of Column, Main Diagonal, and Secondary Diagonal Fits', fontsize=16)
+                ax_y_overlay.legend(loc='best', fontsize=12)
+                
+                # Add overall title with event information
+                if show_event_info:
+                    fig_y_overlay.suptitle(f'Event {event_idx}: Y-Coordinate Fit Comparison\n'
+                                         f'True Y: {true_y:.3f} mm', 
+                                         fontsize=16)
+                
+                # Save Y-coordinate overlay plot
+                filename_y_overlay = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_Y_overlay.png')
+                plt.savefig(filename_y_overlay, dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close()
+        
+        # Generate success message for overlay plots
+        created_overlays = []
+        if len(row_pos) >= 3 or (len(main_x_pos) >= 3 and main_diag_x_successful) or (len(sec_x_pos) >= 3 and sec_diag_x_successful):
+            created_overlays.append('X-overlay')
+        if len(col_pos) >= 3 or (len(main_y_pos) >= 3 and main_diag_y_successful) or (len(sec_y_pos) >= 3 and sec_diag_y_successful):
+            created_overlays.append('Y-overlay')
+        
+        return f"Event {event_idx}: {' and '.join(created_overlays)} plots saved"
+        
+    except Exception as e:
+        return f"Event {event_idx}: Error creating overlay plot - {e}"
 
 def create_summary_plots(data, output_dir="plots", max_events=50):
     """
@@ -1055,6 +1331,8 @@ def main():
                        help="Number of individual events to plot")
     parser.add_argument("--summary_only", action="store_true",
                        help="Create only summary plots, skip individual events")
+    parser.add_argument("--overlay_only", action="store_true",
+                       help="Create only overlay plots, skip individual direction plots")
     parser.add_argument("--max_summary", type=int, default=100,
                        help="Maximum events to include in summary statistics")
     
@@ -1086,14 +1364,26 @@ def main():
         print(f"\nCreating individual plots for {n_events} events...")
         
         success_count = 0
+        overlay_success_count = 0
         for i in range(n_events):
-            result = create_gauss_fit_plot(i, data, args.output)
-            if "Error" not in result:
-                success_count += 1
-            if i % 5 == 0 or "Error" in result:
-                print(f"  {result}")
+            # Create individual plots for each direction (unless overlay_only is set)
+            if not args.overlay_only:
+                result = create_gauss_fit_plot(i, data, args.output)
+                if "Error" not in result:
+                    success_count += 1
+                if i % 5 == 0 or "Error" in result:
+                    print(f"  {result}")
+            
+            # Create overlay plots for comparison
+            overlay_result = create_overlay_fit_plots(i, data, args.output)
+            if "Error" not in overlay_result:
+                overlay_success_count += 1
+            if i % 5 == 0 or "Error" in overlay_result:
+                print(f"  {overlay_result}")
         
-        print(f"\nSuccessfully created {success_count}/{n_events} individual plots")
+        if not args.overlay_only:
+            print(f"\nSuccessfully created {success_count}/{n_events} individual plots")
+        print(f"Successfully created {overlay_success_count}/{n_events} overlay plots")
     
     print(f"\nAll plots saved to: {args.output}/")
     return 0
