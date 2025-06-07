@@ -41,9 +41,6 @@ public:
     // Method to calculate charge sharing in the neighborhood (9x9) grid
     void CalculateNeighborhoodChargeSharing();
     
-    // Method to perform diagonal analysis on the neighborhood grid
-    void PerformDiagonalAnalysis(const G4ThreeVector& nearestPixel);
-    
     // Method to set neighborhood radius (default is 4 for 9x9 grid)
     void SetNeighborhoodRadius(G4int radius) { fNeighborhoodRadius = radius; }
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }

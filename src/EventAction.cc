@@ -2,8 +2,6 @@
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
 #include "Constants.hh"
-//#include "2DGaussianFit.hh"
-//#include "2DGaussianFitFree.hh"
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
 #include "G4Event.hh"
