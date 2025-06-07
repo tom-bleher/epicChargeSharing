@@ -1,4 +1,5 @@
 #include "2DGaussianFitCeres.hh"
+#include "CeresLoggingInit.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <cmath>
@@ -21,19 +22,9 @@
 static std::mutex gCeresFitMutex;
 static std::atomic<int> gGlobalCeresFitCounter{0};
 
-// Initialize Google's logging library for Ceres (call once)
-static bool g_ceres_initialized = false;
-
+// Use shared Google logging initialization
 void InitializeCeres() {
-    if (!g_ceres_initialized) {
-        google::InitGoogleLogging("epicToy");
-        // Completely suppress all Ceres logging
-        FLAGS_logtostderr = false;
-        FLAGS_minloglevel = 4; // Suppress all messages including FATAL
-        FLAGS_stderrthreshold = 4;
-        FLAGS_log_dir = "/tmp";
-        g_ceres_initialized = true;
-    }
+    CeresLoggingInitializer::InitializeOnce();
 }
 
 // Enhanced cost function for Gaussian fitting with better numerical stability
