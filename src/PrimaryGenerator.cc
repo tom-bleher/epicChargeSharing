@@ -2,6 +2,7 @@
 #include "DetectorConstruction.hh"
 #include "Randomize.hh"
 #include "G4Event.hh"
+#include "G4ParticleTable.hh"
 #include "G4SystemOfUnits.hh"
 
 PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)

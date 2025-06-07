@@ -4,8 +4,6 @@
 #include "G4VUserPrimaryGeneratorAction.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4ParticleGun.hh"
-#include "G4ParticleTable.hh"
-#include "G4RandomTools.hh"
 
 class DetectorConstruction;
 
