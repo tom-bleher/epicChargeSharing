@@ -5,6 +5,7 @@
 //#include "2DGaussianFit.hh"
 //#include "2DGaussianFitFree.hh"
 #include "2DGaussianFitCeres.hh"
+#include "2DLorentzianFitCeres.hh"
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ParticleTable.hh"
@@ -238,6 +239,87 @@ void EventAction::EndOfEventAction(const G4Event* event)
           0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
           false); // fit_successful = false
       }
+      
+      // ===============================================
+      // LORENTZIAN FITTING (parallel to Gaussian)
+      // ===============================================
+      
+      // Perform 2D Lorentzian fitting if we have enough data points
+      if (x_coords.size() >= 3) { // Need at least 3 points for 1D Lorentzian fit
+        // Perform 2D Lorentzian fitting using the Ceres Solver implementation
+        LorentzianFit2DResultsCeres lorentzFitResults = Fit2DLorentzianCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false); // verbose=false for production
+        
+        if (lorentzFitResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass 2D Lorentzian fit results to RunAction
+        fRunAction->Set2DLorentzianFitResults(
+          lorentzFitResults.x_center, lorentzFitResults.x_gamma, lorentzFitResults.x_amplitude,
+          lorentzFitResults.x_center_err, lorentzFitResults.x_gamma_err, lorentzFitResults.x_amplitude_err,
+          lorentzFitResults.x_chi2red, lorentzFitResults.x_npoints,
+          lorentzFitResults.y_center, lorentzFitResults.y_gamma, lorentzFitResults.y_amplitude,
+          lorentzFitResults.y_center_err, lorentzFitResults.y_gamma_err, lorentzFitResults.y_amplitude_err,
+          lorentzFitResults.y_chi2red, lorentzFitResults.y_npoints,
+          lorentzFitResults.fit_successful);
+          
+        // Perform diagonal Lorentzian fitting if 2D fitting was performed and successful
+        if (lorentzFitResults.fit_successful) {
+          // Perform diagonal Lorentzian fitting using the Ceres Solver implementation
+          DiagonalLorentzianFitResultsCeres lorentzDiagResults = FitDiagonalLorentzianCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false); // verbose=false for production
+        
+        if (lorentzDiagResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass diagonal Lorentzian fit results to RunAction
+        fRunAction->SetDiagonalLorentzianFitResults(
+          lorentzDiagResults.main_diag_x_center, lorentzDiagResults.main_diag_x_gamma, lorentzDiagResults.main_diag_x_amplitude,
+          lorentzDiagResults.main_diag_x_center_err, lorentzDiagResults.main_diag_x_gamma_err, lorentzDiagResults.main_diag_x_amplitude_err,
+          lorentzDiagResults.main_diag_x_chi2red, lorentzDiagResults.main_diag_x_npoints, lorentzDiagResults.main_diag_x_fit_successful,
+          lorentzDiagResults.main_diag_y_center, lorentzDiagResults.main_diag_y_gamma, lorentzDiagResults.main_diag_y_amplitude,
+          lorentzDiagResults.main_diag_y_center_err, lorentzDiagResults.main_diag_y_gamma_err, lorentzDiagResults.main_diag_y_amplitude_err,
+          lorentzDiagResults.main_diag_y_chi2red, lorentzDiagResults.main_diag_y_npoints, lorentzDiagResults.main_diag_y_fit_successful,
+          lorentzDiagResults.sec_diag_x_center, lorentzDiagResults.sec_diag_x_gamma, lorentzDiagResults.sec_diag_x_amplitude,
+          lorentzDiagResults.sec_diag_x_center_err, lorentzDiagResults.sec_diag_x_gamma_err, lorentzDiagResults.sec_diag_x_amplitude_err,
+          lorentzDiagResults.sec_diag_x_chi2red, lorentzDiagResults.sec_diag_x_npoints, lorentzDiagResults.sec_diag_x_fit_successful,
+          lorentzDiagResults.sec_diag_y_center, lorentzDiagResults.sec_diag_y_gamma, lorentzDiagResults.sec_diag_y_amplitude,
+          lorentzDiagResults.sec_diag_y_center_err, lorentzDiagResults.sec_diag_y_gamma_err, lorentzDiagResults.sec_diag_y_amplitude_err,
+          lorentzDiagResults.sec_diag_y_chi2red, lorentzDiagResults.sec_diag_y_npoints, lorentzDiagResults.sec_diag_y_fit_successful,
+          lorentzDiagResults.fit_successful);
+      } else {
+        // Set default diagonal Lorentzian fit values when 2D fitting failed
+        fRunAction->SetDiagonalLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          false); // fit_successful = false
+      }
+        
+    } else {
+      // Not enough data points for Lorentzian fitting
+      fRunAction->Set2DLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
+        0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        false); // fit_successful = false
+      
+      // Set default diagonal Lorentzian fit values when not enough data points
+      fRunAction->SetDiagonalLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        false); // fit_successful = false
+    }
         
     } else {
       // Not enough data points for fitting
@@ -248,6 +330,20 @@ void EventAction::EndOfEventAction(const G4Event* event)
       
       // Set default diagonal fit values when not enough data points
       fRunAction->SetDiagonalGaussianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        false); // fit_successful = false
+      
+      // Not enough data points for Lorentzian fitting
+      fRunAction->Set2DLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
+        0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        false); // fit_successful = false
+      
+      // Set default diagonal Lorentzian fit values when not enough data points
+      fRunAction->SetDiagonalLorentzianFitResults(
         0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
         0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
         0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
@@ -270,6 +366,20 @@ void EventAction::EndOfEventAction(const G4Event* event)
     
     // Set default diagonal fit values when fitting is skipped
     fRunAction->SetDiagonalGaussianFitResults(
+      0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
+      0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+      0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+      0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+      false); // fit_successful = false
+    
+    // Set default Lorentzian values (no fitting performed)
+    fRunAction->Set2DLorentzianFitResults(
+      0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
+      0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+      false); // fit_successful = false
+    
+    // Set default diagonal Lorentzian fit values when fitting is skipped
+    fRunAction->SetDiagonalLorentzianFitResults(
       0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
       0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
       0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
