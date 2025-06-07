@@ -751,14 +751,15 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
             std::cout << "Fitting X direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        double offset_dummy, offset_err_dummy;
         x_fit_success = FitGaussianCeres(
             x_vals, y_vals, center_x_estimate, pixel_spacing,
-            result.x_amplitude, result.x_center, result.x_sigma, offset_dummy,
-            result.x_amplitude_err, result.x_center_err, result.x_sigma_err, offset_err_dummy,
+            result.x_amplitude, result.x_center, result.x_sigma, result.x_vertical_offset,
+            result.x_amplitude_err, result.x_center_err, result.x_sigma_err, result.x_vertical_offset_err,
             result.x_chi2red, verbose, enable_outlier_filtering);
         
-        result.x_npoints = x_vals.size();
+        // Calculate DOF and p-value
+        result.x_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
+        result.x_pp = (result.x_chi2red > 0) ? 1.0 - std::min(1.0, result.x_chi2red / 10.0) : 0.0; // Simple p-value approximation
     }
     
     // Fit Y direction (central column)
@@ -779,14 +780,15 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
             std::cout << "Fitting Y direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        double offset_dummy, offset_err_dummy; // We don't use the offset parameter values in the result structure
         y_fit_success = FitGaussianCeres(
             x_vals, y_vals, center_y_estimate, pixel_spacing,
-            result.y_amplitude, result.y_center, result.y_sigma, offset_dummy,
-            result.y_amplitude_err, result.y_center_err, result.y_sigma_err, offset_err_dummy,
+            result.y_amplitude, result.y_center, result.y_sigma, result.y_vertical_offset,
+            result.y_amplitude_err, result.y_center_err, result.y_sigma_err, result.y_vertical_offset_err,
             result.y_chi2red, verbose, enable_outlier_filtering);
         
-        result.y_npoints = x_vals.size();
+        // Calculate DOF and p-value
+        result.y_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
+        result.y_pp = (result.y_chi2red > 0) ? 1.0 - std::min(1.0, result.y_chi2red / 10.0) : 0.0; // Simple p-value approximation
     }
     
     // Set overall success status
@@ -943,14 +945,15 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
                 std::cout << "Fitting main diagonal X with " << x_sorted.size() << " points" << std::endl;
             }
             
-            double offset_dummy, offset_err_dummy;
             main_diag_x_success = FitGaussianCeres(
                 x_sorted, charge_x_sorted, center_x_estimate, pixel_spacing,
-                result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_sigma, offset_dummy,
-                result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_sigma_err, offset_err_dummy,
+                result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_sigma, result.main_diag_x_vertical_offset,
+                result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_sigma_err, result.main_diag_x_vertical_offset_err,
                 result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
             
-            result.main_diag_x_npoints = x_sorted.size();
+            // Calculate DOF and p-value
+            result.main_diag_x_dof = std::max(1, static_cast<int>(x_sorted.size()) - 4);
+            result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
             result.main_diag_x_fit_successful = main_diag_x_success;
         }
     }
@@ -987,14 +990,15 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
                 std::cout << "Fitting main diagonal Y with " << y_sorted.size() << " points" << std::endl;
             }
             
-            double offset_dummy, offset_err_dummy;
             main_diag_y_success = FitGaussianCeres(
                 y_sorted, charge_y_sorted, center_y_estimate, pixel_spacing,
-                result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_sigma, offset_dummy,
-                result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_sigma_err, offset_err_dummy,
+                result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_sigma, result.main_diag_y_vertical_offset,
+                result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_sigma_err, result.main_diag_y_vertical_offset_err,
                 result.main_diag_y_chi2red, verbose, enable_outlier_filtering);
             
-            result.main_diag_y_npoints = y_sorted.size();
+            // Calculate DOF and p-value
+            result.main_diag_y_dof = std::max(1, static_cast<int>(y_sorted.size()) - 4);
+            result.main_diag_y_pp = (result.main_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_y_chi2red / 10.0) : 0.0;
             result.main_diag_y_fit_successful = main_diag_y_success;
         }
     }
@@ -1031,14 +1035,15 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
                 std::cout << "Fitting secondary diagonal X with " << x_sorted.size() << " points" << std::endl;
             }
             
-            double offset_dummy, offset_err_dummy;
             sec_diag_x_success = FitGaussianCeres(
                 x_sorted, charge_x_sorted, center_x_estimate, pixel_spacing,
-                result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_sigma, offset_dummy,
-                result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_sigma_err, offset_err_dummy,
+                result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_sigma, result.sec_diag_x_vertical_offset,
+                result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_sigma_err, result.sec_diag_x_vertical_offset_err,
                 result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
             
-            result.sec_diag_x_npoints = x_sorted.size();
+            // Calculate DOF and p-value
+            result.sec_diag_x_dof = std::max(1, static_cast<int>(x_sorted.size()) - 4);
+            result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
             result.sec_diag_x_fit_successful = sec_diag_x_success;
         }
     }
@@ -1075,14 +1080,15 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
                 std::cout << "Fitting secondary diagonal Y with " << y_sorted.size() << " points" << std::endl;
             }
             
-            double offset_dummy, offset_err_dummy;
             sec_diag_y_success = FitGaussianCeres(
                 y_sorted, charge_y_sorted, center_y_estimate, pixel_spacing,
-                result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_sigma, offset_dummy,
-                result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_sigma_err, offset_err_dummy,
+                result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_sigma, result.sec_diag_y_vertical_offset,
+                result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_sigma_err, result.sec_diag_y_vertical_offset_err,
                 result.sec_diag_y_chi2red, verbose, enable_outlier_filtering);
             
-            result.sec_diag_y_npoints = y_sorted.size();
+            // Calculate DOF and p-value
+            result.sec_diag_y_dof = std::max(1, static_cast<int>(y_sorted.size()) - 4);
+            result.sec_diag_y_pp = (result.sec_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_y_chi2red / 10.0) : 0.0;
             result.sec_diag_y_fit_successful = sec_diag_y_success;
         }
     }

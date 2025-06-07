@@ -383,11 +383,11 @@ bool FitLorentzianCeres(
     double& fit_amplitude,
     double& fit_center,
     double& fit_gamma,
-    double& fit_baseline,
+    double& fit_vertical_offset,
     double& fit_amplitude_err,
     double& fit_center_err,
     double& fit_gamma_err,
-    double& fit_baseline_err,
+    double& fit_vertical_offset_err,
     double& chi2_reduced,
     bool verbose,
     bool enable_outlier_filtering) {
@@ -535,7 +535,7 @@ bool FitLorentzianCeres(
                 fit_amplitude = parameters[0];
                 fit_center = parameters[1];
                 fit_gamma = std::abs(parameters[2]);
-                fit_baseline = parameters[3];
+                fit_vertical_offset = parameters[3];
                 
                 // Calculate uncertainties
                 bool cov_success = false;
@@ -564,10 +564,10 @@ bool FitLorentzianCeres(
                             fit_amplitude_err = std::sqrt(std::abs(covariance_matrix[0]));
                             fit_center_err = std::sqrt(std::abs(covariance_matrix[5]));
                             fit_gamma_err = std::sqrt(std::abs(covariance_matrix[10]));
-                            fit_baseline_err = std::sqrt(std::abs(covariance_matrix[15]));
+                            fit_vertical_offset_err = std::sqrt(std::abs(covariance_matrix[15]));
                             
                             if (!std::isnan(fit_amplitude_err) && !std::isnan(fit_center_err) &&
-                                !std::isnan(fit_gamma_err) && !std::isnan(fit_baseline_err) &&
+                                !std::isnan(fit_gamma_err) && !std::isnan(fit_vertical_offset_err) &&
                                 fit_amplitude_err < 10.0 * fit_amplitude &&
                                 fit_center_err < 5.0 * pixel_spacing) {
                                 cov_success = true;
@@ -583,7 +583,7 @@ bool FitLorentzianCeres(
                     fit_amplitude_err = std::max(0.02 * fit_amplitude, 0.1 * data_stats.mad);
                     fit_center_err = std::max(0.02 * pixel_spacing, fit_gamma / 10.0);
                     fit_gamma_err = std::max(0.05 * fit_gamma, 0.01 * pixel_spacing);
-                    fit_baseline_err = std::max(0.1 * std::abs(fit_baseline), 0.05 * data_stats.mad);
+                    fit_vertical_offset_err = std::max(0.1 * std::abs(fit_vertical_offset), 0.05 * data_stats.mad);
                 }
                 
                 // Calculate reduced chi-squared
@@ -597,7 +597,7 @@ bool FitLorentzianCeres(
                              << ": A=" << fit_amplitude << "±" << fit_amplitude_err
                              << ", m=" << fit_center << "±" << fit_center_err
                              << ", gamma=" << fit_gamma << "±" << fit_gamma_err
-                             << ", B=" << fit_baseline << "±" << fit_baseline_err
+                             << ", B=" << fit_vertical_offset << "±" << fit_vertical_offset_err
                              << ", chi2red=" << chi2_reduced << std::endl;
                 }
                 
@@ -734,14 +734,15 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
             std::cout << "Fitting Lorentzian X direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        double baseline_dummy, baseline_err_dummy;
         x_fit_success = FitLorentzianCeres(
             x_vals, y_vals, center_x_estimate, pixel_spacing,
-            result.x_amplitude, result.x_center, result.x_gamma, baseline_dummy,
-            result.x_amplitude_err, result.x_center_err, result.x_gamma_err, baseline_err_dummy,
+            result.x_amplitude, result.x_center, result.x_gamma, result.x_vertical_offset,
+            result.x_amplitude_err, result.x_center_err, result.x_gamma_err, result.x_vertical_offset_err,
             result.x_chi2red, verbose, enable_outlier_filtering);
         
-        result.x_npoints = x_vals.size();
+        // Calculate DOF and p-value
+        result.x_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
+        result.x_pp = (result.x_chi2red > 0) ? 1.0 - std::min(1.0, result.x_chi2red / 10.0) : 0.0;
     }
     
     // Fit Y direction (central column)
@@ -762,14 +763,15 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
             std::cout << "Fitting Lorentzian Y direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        double baseline_dummy, baseline_err_dummy;
         y_fit_success = FitLorentzianCeres(
             x_vals, y_vals, center_y_estimate, pixel_spacing,
-            result.y_amplitude, result.y_center, result.y_gamma, baseline_dummy,
-            result.y_amplitude_err, result.y_center_err, result.y_gamma_err, baseline_err_dummy,
+            result.y_amplitude, result.y_center, result.y_gamma, result.y_vertical_offset,
+            result.y_amplitude_err, result.y_center_err, result.y_gamma_err, result.y_vertical_offset_err,
             result.y_chi2red, verbose, enable_outlier_filtering);
         
-        result.y_npoints = x_vals.size();
+        // Calculate DOF and p-value
+        result.y_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
+        result.y_pp = (result.y_chi2red > 0) ? 1.0 - std::min(1.0, result.y_chi2red / 10.0) : 0.0;
     }
     
     // Set overall success status
@@ -926,14 +928,15 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
                 std::cout << "Fitting main diagonal Lorentzian X with " << x_sorted.size() << " points" << std::endl;
             }
             
-            double baseline_dummy, baseline_err_dummy;
             main_diag_x_success = FitLorentzianCeres(
                 x_sorted, charge_x_sorted, center_x_estimate, pixel_spacing,
-                result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_gamma, baseline_dummy,
-                result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err, baseline_err_dummy,
+                result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_gamma, result.main_diag_x_vertical_offset,
+                result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err, result.main_diag_x_vertical_offset_err,
                 result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
             
-            result.main_diag_x_npoints = x_sorted.size();
+            // Calculate DOF and p-value
+            result.main_diag_x_dof = std::max(1, static_cast<int>(x_sorted.size()) - 4);
+            result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
             result.main_diag_x_fit_successful = main_diag_x_success;
         }
     }
@@ -970,14 +973,15 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
                 std::cout << "Fitting main diagonal Lorentzian Y with " << y_sorted.size() << " points" << std::endl;
             }
             
-            double baseline_dummy, baseline_err_dummy;
             main_diag_y_success = FitLorentzianCeres(
                 y_sorted, charge_y_sorted, center_y_estimate, pixel_spacing,
-                result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_gamma, baseline_dummy,
-                result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_gamma_err, baseline_err_dummy,
+                result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_gamma, result.main_diag_y_vertical_offset,
+                result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_gamma_err, result.main_diag_y_vertical_offset_err,
                 result.main_diag_y_chi2red, verbose, enable_outlier_filtering);
             
-            result.main_diag_y_npoints = y_sorted.size();
+            // Calculate DOF and p-value
+            result.main_diag_y_dof = std::max(1, static_cast<int>(y_sorted.size()) - 4);
+            result.main_diag_y_pp = (result.main_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_y_chi2red / 10.0) : 0.0;
             result.main_diag_y_fit_successful = main_diag_y_success;
         }
     }
@@ -1014,14 +1018,15 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
                 std::cout << "Fitting secondary diagonal Lorentzian X with " << x_sorted.size() << " points" << std::endl;
             }
             
-            double baseline_dummy, baseline_err_dummy;
             sec_diag_x_success = FitLorentzianCeres(
                 x_sorted, charge_x_sorted, center_x_estimate, pixel_spacing,
-                result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_gamma, baseline_dummy,
-                result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err, baseline_err_dummy,
+                result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_gamma, result.sec_diag_x_vertical_offset,
+                result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err, result.sec_diag_x_vertical_offset_err,
                 result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
             
-            result.sec_diag_x_npoints = x_sorted.size();
+            // Calculate DOF and p-value
+            result.sec_diag_x_dof = std::max(1, static_cast<int>(x_sorted.size()) - 4);
+            result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
             result.sec_diag_x_fit_successful = sec_diag_x_success;
         }
     }
@@ -1058,14 +1063,15 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
                 std::cout << "Fitting secondary diagonal Lorentzian Y with " << y_sorted.size() << " points" << std::endl;
             }
             
-            double baseline_dummy, baseline_err_dummy;
             sec_diag_y_success = FitLorentzianCeres(
                 y_sorted, charge_y_sorted, center_y_estimate, pixel_spacing,
-                result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_gamma, baseline_dummy,
-                result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_gamma_err, baseline_err_dummy,
+                result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_gamma, result.sec_diag_y_vertical_offset,
+                result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_gamma_err, result.sec_diag_y_vertical_offset_err,
                 result.sec_diag_y_chi2red, verbose, enable_outlier_filtering);
             
-            result.sec_diag_y_npoints = y_sorted.size();
+            // Calculate DOF and p-value
+            result.sec_diag_y_dof = std::max(1, static_cast<int>(y_sorted.size()) - 4);
+            result.sec_diag_y_pp = (result.sec_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_y_chi2red / 10.0) : 0.0;
             result.sec_diag_y_fit_successful = sec_diag_y_success;
         }
     }
