@@ -1,4 +1,5 @@
 #include "2DLorentzianFitCeres.hh"
+#include "CeresLoggingInit.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <cmath>
@@ -21,19 +22,9 @@
 static std::mutex gCeresLorentzianFitMutex;
 static std::atomic<int> gGlobalCeresLorentzianFitCounter{0};
 
-// Initialize Google's logging library for Ceres (call once)
-static bool g_ceres_lorentzian_initialized = false;
-
+// Use shared Google logging initialization
 void InitializeCeresLorentzian() {
-    if (!g_ceres_lorentzian_initialized) {
-        google::InitGoogleLogging("epicToyLorentzian");
-        // Completely suppress all Ceres logging
-        FLAGS_logtostderr = false;
-        FLAGS_minloglevel = 4; // Suppress all messages including FATAL
-        FLAGS_stderrthreshold = 4;
-        FLAGS_log_dir = "/tmp";
-        g_ceres_lorentzian_initialized = true;
-    }
+    CeresLoggingInitializer::InitializeOnce();
 }
 
 // Enhanced cost function for Lorentzian fitting with numerical stability
