@@ -818,7 +818,7 @@ def create_random_charge_plots(root_filename, num_events=1, charge_type='fractio
 if __name__ == "__main__":
     # Configuration parameters
     NUM_EVENTS = 3  # Change this to control number of random events to visualize
-    CHARGE_TYPES = ['fraction', 'coulomb']  # Generate both fraction and coulomb plots
+    CHARGE_TYPES = ['coulomb']  # Generate only charge plots (removed fractions)
     OUTPUT_DIR = "neighborhood_charge_plots"  # Directory to save plots (empty string for current directory)
     RANDOM_SEED = 2  # For reproducible results
     INCLUDE_MEAN = True  # Whether to include mean plot of all valid events
@@ -863,12 +863,12 @@ if __name__ == "__main__":
         print("\n" + "="*60)
         print("CHARGE SHARING VISUALIZATION COMPLETE")
         print("="*60)
-        print(f"Generated plots for {len(CHARGE_TYPES)} charge types: {', '.join(CHARGE_TYPES)}")
-        print(f"Each type includes {NUM_EVENTS} individual neighborhood (9x9) charge plots")
+        print(f"Generated charge plots (no fractions): {', '.join(CHARGE_TYPES)}")
+        print(f"Includes {NUM_EVENTS} individual neighborhood (9x9) charge plots")
         if INCLUDE_MEAN:
-            print(f"Each type includes 1 mean neighborhood (9x9) charge plot averaged across all valid events")
+            print(f"Includes 1 mean neighborhood (9x9) charge plot averaged across all valid events")
         if INCLUDE_EDGE_CASE:
-            print("Each type includes 1 edge case neighborhood (9x9) charge plot where grid extends beyond detector")
+            print("Includes 1 edge case neighborhood (9x9) charge plot where grid extends beyond detector")
         print("Each event is displayed as a separate plot focused on its neighborhood (9x9) grid area.")
         print(f"All plots saved to directory: {OUTPUT_DIR}")
         
