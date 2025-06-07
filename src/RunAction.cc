@@ -27,7 +27,7 @@ RunAction::RunAction()
 : G4UserRunAction(),
   fRootFile(nullptr),
   fTree(nullptr),
-  fEdep(0),
+  // Initialize HITS variables
   fTrueX(0),
   fTrueY(0),
   fTrueZ(0),
@@ -36,151 +36,159 @@ RunAction::RunAction()
   fInitZ(0),
   fPixelX(0),
   fPixelY(0),
-  fPixelZ(0),
-  fPixelI(-1),
-  fPixelJ(-1),
+  fEdep(0),
   fPixelTrueDeltaX(0),
   fPixelTrueDeltaY(0),
+  // Initialize delta variables
+  fGaussRowDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussColumnDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussMainDiagDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussMainDiagDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussSecondDiagDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussSecondDiagDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzRowDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzColumnDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzMainDiagDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzMainDiagDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzSecondDiagDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzSecondDiagDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize Gaussian fit variables
+  fGaussFitRowAmplitude(0),
+  fGaussFitRowAmplitudeErr(0),
+  fGaussFitRowStdev(0),
+  fGaussFitRowStdevErr(0),
+  fGaussFitRowVerticalOffset(0),
+  fGaussFitRowVerticalOffsetErr(0),
+  fGaussFitRowCenter(0),
+  fGaussFitRowCenterErr(0),
+  fGaussFitRowChi2red(0),
+  fGaussFitRowPp(0),
+  fGaussFitRowDOF(0),
+  fGaussFitColumnAmplitude(0),
+  fGaussFitColumnAmplitudeErr(0),
+  fGaussFitColumnStdev(0),
+  fGaussFitColumnStdevErr(0),
+  fGaussFitColumnVerticalOffset(0),
+  fGaussFitColumnVerticalOffsetErr(0),
+  fGaussFitColumnCenter(0),
+  fGaussFitColumnCenterErr(0),
+  fGaussFitColumnChi2red(0),
+  fGaussFitColumnPp(0),
+  fGaussFitColumnDOF(0),
+  fGaussFitMainDiagXAmplitude(0),
+  fGaussFitMainDiagXAmplitudeErr(0),
+  fGaussFitMainDiagXStdev(0),
+  fGaussFitMainDiagXStdevErr(0),
+  fGaussFitMainDiagXVerticalOffset(0),
+  fGaussFitMainDiagXVerticalOffsetErr(0),
+  fGaussFitMainDiagXCenter(0),
+  fGaussFitMainDiagXCenterErr(0),
+  fGaussFitMainDiagXChi2red(0),
+  fGaussFitMainDiagXPp(0),
+  fGaussFitMainDiagXDOF(0),
+  fGaussFitMainDiagYAmplitude(0),
+  fGaussFitMainDiagYAmplitudeErr(0),
+  fGaussFitMainDiagYStdev(0),
+  fGaussFitMainDiagYStdevErr(0),
+  fGaussFitMainDiagYVerticalOffset(0),
+  fGaussFitMainDiagYVerticalOffsetErr(0),
+  fGaussFitMainDiagYCenter(0),
+  fGaussFitMainDiagYCenterErr(0),
+  fGaussFitMainDiagYChi2red(0),
+  fGaussFitMainDiagYPp(0),
+  fGaussFitMainDiagYDOF(0),
+  fGaussFitSecondDiagXAmplitude(0),
+  fGaussFitSecondDiagXAmplitudeErr(0),
+  fGaussFitSecondDiagXStdev(0),
+  fGaussFitSecondDiagXStdevErr(0),
+  fGaussFitSecondDiagXVerticalOffset(0),
+  fGaussFitSecondDiagXVerticalOffsetErr(0),
+  fGaussFitSecondDiagXCenter(0),
+  fGaussFitSecondDiagXCenterErr(0),
+  fGaussFitSecondDiagXChi2red(0),
+  fGaussFitSecondDiagXPp(0),
+  fGaussFitSecondDiagXDOF(0),
+  fGaussFitSecondDiagYAmplitude(0),
+  fGaussFitSecondDiagYAmplitudeErr(0),
+  fGaussFitSecondDiagYStdev(0),
+  fGaussFitSecondDiagYStdevErr(0),
+  fGaussFitSecondDiagYVerticalOffset(0),
+  fGaussFitSecondDiagYVerticalOffsetErr(0),
+  fGaussFitSecondDiagYCenter(0),
+  fGaussFitSecondDiagYCenterErr(0),
+  fGaussFitSecondDiagYChi2red(0),
+  fGaussFitSecondDiagYPp(0),
+  fGaussFitSecondDiagYDOF(0),
+  // Initialize Lorentzian fit variables
+  fLorentzFitRowAmplitude(0),
+  fLorentzFitRowAmplitudeErr(0),
+  fLorentzFitRowGamma(0),
+  fLorentzFitRowGammaErr(0),
+  fLorentzFitRowVerticalOffset(0),
+  fLorentzFitRowVerticalOffsetErr(0),
+  fLorentzFitRowCenter(0),
+  fLorentzFitRowCenterErr(0),
+  fLorentzFitRowChi2red(0),
+  fLorentzFitRowPp(0),
+  fLorentzFitRowDOF(0),
+  fLorentzFitColumnAmplitude(0),
+  fLorentzFitColumnAmplitudeErr(0),
+  fLorentzFitColumnGamma(0),
+  fLorentzFitColumnGammaErr(0),
+  fLorentzFitColumnVerticalOffset(0),
+  fLorentzFitColumnVerticalOffsetErr(0),
+  fLorentzFitColumnCenter(0),
+  fLorentzFitColumnCenterErr(0),
+  fLorentzFitColumnChi2red(0),
+  fLorentzFitColumnPp(0),
+  fLorentzFitColumnDOF(0),
+  fLorentzFitMainDiagXAmplitude(0),
+  fLorentzFitMainDiagXAmplitudeErr(0),
+  fLorentzFitMainDiagXGamma(0),
+  fLorentzFitMainDiagXGammaErr(0),
+  fLorentzFitMainDiagXVerticalOffset(0),
+  fLorentzFitMainDiagXVerticalOffsetErr(0),
+  fLorentzFitMainDiagXCenter(0),
+  fLorentzFitMainDiagXCenterErr(0),
+  fLorentzFitMainDiagXChi2red(0),
+  fLorentzFitMainDiagXPp(0),
+  fLorentzFitMainDiagXDOF(0),
+  fLorentzFitMainDiagYAmplitude(0),
+  fLorentzFitMainDiagYAmplitudeErr(0),
+  fLorentzFitMainDiagYGamma(0),
+  fLorentzFitMainDiagYGammaErr(0),
+  fLorentzFitMainDiagYVerticalOffset(0),
+  fLorentzFitMainDiagYVerticalOffsetErr(0),
+  fLorentzFitMainDiagYCenter(0),
+  fLorentzFitMainDiagYCenterErr(0),
+  fLorentzFitMainDiagYChi2red(0),
+  fLorentzFitMainDiagYPp(0),
+  fLorentzFitMainDiagYDOF(0),
+  fLorentzFitSecondDiagXAmplitude(0),
+  fLorentzFitSecondDiagXAmplitudeErr(0),
+  fLorentzFitSecondDiagXGamma(0),
+  fLorentzFitSecondDiagXGammaErr(0),
+  fLorentzFitSecondDiagXVerticalOffset(0),
+  fLorentzFitSecondDiagXVerticalOffsetErr(0),
+  fLorentzFitSecondDiagXCenter(0),
+  fLorentzFitSecondDiagXCenterErr(0),
+  fLorentzFitSecondDiagXChi2red(0),
+  fLorentzFitSecondDiagXPp(0),
+  fLorentzFitSecondDiagXDOF(0),
+  fLorentzFitSecondDiagYAmplitude(0),
+  fLorentzFitSecondDiagYAmplitudeErr(0),
+  fLorentzFitSecondDiagYGamma(0),
+  fLorentzFitSecondDiagYGammaErr(0),
+  fLorentzFitSecondDiagYVerticalOffset(0),
+  fLorentzFitSecondDiagYVerticalOffsetErr(0),
+  fLorentzFitSecondDiagYCenter(0),
+  fLorentzFitSecondDiagYCenterErr(0),
+  fLorentzFitSecondDiagYChi2red(0),
+  fLorentzFitSecondDiagYPp(0),
+  fLorentzFitSecondDiagYDOF(0),
+  // Legacy variables
+  fPixelZ(0),
   fIsPixelHit(false),
-  fPixelHit_PixelAlpha(0),
-  // Initialize delta variables for Gaussian fit estimations vs true position
-  fNonPixel_GaussRowTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_GaussColumnTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_GaussDiagTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_GaussDiagTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_GaussSecDiagTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_GaussSecDiagTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize 2D Gaussian fit variables
-  fNonPixel_Fit2D_XCenter(0),
-  fNonPixel_Fit2D_XSigma(0),
-  fNonPixel_Fit2D_XFWHM(0),
-  fNonPixel_Fit2D_XAmplitude(0),
-  fNonPixel_Fit2D_XCenterErr(0),
-  fNonPixel_Fit2D_XSigmaErr(0),
-  fNonPixel_Fit2D_XFWHMErr(0),
-  fNonPixel_Fit2D_XAmplitudeErr(0),
-  fNonPixel_Fit2D_XChi2red(0),
-  fNonPixel_Fit2D_XNPoints(0),
-  fNonPixel_Fit2D_YCenter(0),
-  fNonPixel_Fit2D_YSigma(0),
-  fNonPixel_Fit2D_YFWHM(0),
-  fNonPixel_Fit2D_YAmplitude(0),
-  fNonPixel_Fit2D_YCenterErr(0),
-  fNonPixel_Fit2D_YSigmaErr(0),
-  fNonPixel_Fit2D_YFWHMErr(0),
-  fNonPixel_Fit2D_YAmplitudeErr(0),
-  fNonPixel_Fit2D_YChi2red(0),
-  fNonPixel_Fit2D_YNPoints(0),
-  fNonPixel_Fit2D_Successful(false),
-  // Initialize diagonal Gaussian fit variables (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-  fNonPixel_FitDiag_MainXCenter(0),
-  fNonPixel_FitDiag_MainXSigma(0),
-  fNonPixel_FitDiag_MainXFWHM(0),
-  fNonPixel_FitDiag_MainXAmplitude(0),
-  fNonPixel_FitDiag_MainXCenterErr(0),
-  fNonPixel_FitDiag_MainXSigmaErr(0),
-  fNonPixel_FitDiag_MainXFWHMErr(0),
-  fNonPixel_FitDiag_MainXAmplitudeErr(0),
-  fNonPixel_FitDiag_MainXChi2red(0),
-  fNonPixel_FitDiag_MainXNPoints(0),
-  fNonPixel_FitDiag_MainXSuccessful(false),
-  fNonPixel_FitDiag_MainYCenter(0),
-  fNonPixel_FitDiag_MainYSigma(0),
-  fNonPixel_FitDiag_MainYFWHM(0),
-  fNonPixel_FitDiag_MainYAmplitude(0),
-  fNonPixel_FitDiag_MainYCenterErr(0),
-  fNonPixel_FitDiag_MainYSigmaErr(0),
-  fNonPixel_FitDiag_MainYFWHMErr(0),
-  fNonPixel_FitDiag_MainYAmplitudeErr(0),
-  fNonPixel_FitDiag_MainYChi2red(0),
-  fNonPixel_FitDiag_MainYNPoints(0),
-  fNonPixel_FitDiag_MainYSuccessful(false),
-  fNonPixel_FitDiag_SecXCenter(0),
-  fNonPixel_FitDiag_SecXSigma(0),
-  fNonPixel_FitDiag_SecXFWHM(0),
-  fNonPixel_FitDiag_SecXAmplitude(0),
-  fNonPixel_FitDiag_SecXCenterErr(0),
-  fNonPixel_FitDiag_SecXSigmaErr(0),
-  fNonPixel_FitDiag_SecXFWHMErr(0),
-  fNonPixel_FitDiag_SecXAmplitudeErr(0),
-  fNonPixel_FitDiag_SecXChi2red(0),
-  fNonPixel_FitDiag_SecXNPoints(0),
-  fNonPixel_FitDiag_SecXSuccessful(false),
-  fNonPixel_FitDiag_SecYCenter(0),
-  fNonPixel_FitDiag_SecYSigma(0),
-  fNonPixel_FitDiag_SecYFWHM(0),
-  fNonPixel_FitDiag_SecYAmplitude(0),
-  fNonPixel_FitDiag_SecYCenterErr(0),
-  fNonPixel_FitDiag_SecYSigmaErr(0),
-  fNonPixel_FitDiag_SecYFWHMErr(0),
-  fNonPixel_FitDiag_SecYAmplitudeErr(0),
-  fNonPixel_FitDiag_SecYChi2red(0),
-  fNonPixel_FitDiag_SecYNPoints(0),
-  fNonPixel_FitDiag_SecYSuccessful(false),
-  fNonPixel_FitDiag_Successful(false),
-  // Initialize delta variables for Lorentzian fit estimations vs true position
-  fNonPixel_LorentzRowTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_LorentzColumnTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_LorentzDiagTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_LorentzDiagTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_LorentzSecDiagTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fNonPixel_LorentzSecDiagTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize 2D Lorentzian fit variables
-  fNonPixel_Fit2D_Lorentz_XCenter(0),
-  fNonPixel_Fit2D_Lorentz_XGamma(0),
-  fNonPixel_Fit2D_Lorentz_XAmplitude(0),
-  fNonPixel_Fit2D_Lorentz_XCenterErr(0),
-  fNonPixel_Fit2D_Lorentz_XGammaErr(0),
-  fNonPixel_Fit2D_Lorentz_XAmplitudeErr(0),
-  fNonPixel_Fit2D_Lorentz_XChi2red(0),
-  fNonPixel_Fit2D_Lorentz_XNPoints(0),
-  fNonPixel_Fit2D_Lorentz_YCenter(0),
-  fNonPixel_Fit2D_Lorentz_YGamma(0),
-  fNonPixel_Fit2D_Lorentz_YAmplitude(0),
-  fNonPixel_Fit2D_Lorentz_YCenterErr(0),
-  fNonPixel_Fit2D_Lorentz_YGammaErr(0),
-  fNonPixel_Fit2D_Lorentz_YAmplitudeErr(0),
-  fNonPixel_Fit2D_Lorentz_YChi2red(0),
-  fNonPixel_Fit2D_Lorentz_YNPoints(0),
-  fNonPixel_Fit2D_Lorentz_Successful(false),
-  // Initialize diagonal Lorentzian fit variables (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-  fNonPixel_FitDiag_Lorentz_MainXCenter(0),
-  fNonPixel_FitDiag_Lorentz_MainXGamma(0),
-  fNonPixel_FitDiag_Lorentz_MainXAmplitude(0),
-  fNonPixel_FitDiag_Lorentz_MainXCenterErr(0),
-  fNonPixel_FitDiag_Lorentz_MainXGammaErr(0),
-  fNonPixel_FitDiag_Lorentz_MainXAmplitudeErr(0),
-  fNonPixel_FitDiag_Lorentz_MainXChi2red(0),
-  fNonPixel_FitDiag_Lorentz_MainXNPoints(0),
-  fNonPixel_FitDiag_Lorentz_MainXSuccessful(false),
-  fNonPixel_FitDiag_Lorentz_MainYCenter(0),
-  fNonPixel_FitDiag_Lorentz_MainYGamma(0),
-  fNonPixel_FitDiag_Lorentz_MainYAmplitude(0),
-  fNonPixel_FitDiag_Lorentz_MainYCenterErr(0),
-  fNonPixel_FitDiag_Lorentz_MainYGammaErr(0),
-  fNonPixel_FitDiag_Lorentz_MainYAmplitudeErr(0),
-  fNonPixel_FitDiag_Lorentz_MainYChi2red(0),
-  fNonPixel_FitDiag_Lorentz_MainYNPoints(0),
-  fNonPixel_FitDiag_Lorentz_MainYSuccessful(false),
-  fNonPixel_FitDiag_Lorentz_SecXCenter(0),
-  fNonPixel_FitDiag_Lorentz_SecXGamma(0),
-  fNonPixel_FitDiag_Lorentz_SecXAmplitude(0),
-  fNonPixel_FitDiag_Lorentz_SecXCenterErr(0),
-  fNonPixel_FitDiag_Lorentz_SecXGammaErr(0),
-  fNonPixel_FitDiag_Lorentz_SecXAmplitudeErr(0),
-  fNonPixel_FitDiag_Lorentz_SecXChi2red(0),
-  fNonPixel_FitDiag_Lorentz_SecXNPoints(0),
-  fNonPixel_FitDiag_Lorentz_SecXSuccessful(false),
-  fNonPixel_FitDiag_Lorentz_SecYCenter(0),
-  fNonPixel_FitDiag_Lorentz_SecYGamma(0),
-  fNonPixel_FitDiag_Lorentz_SecYAmplitude(0),
-  fNonPixel_FitDiag_Lorentz_SecYCenterErr(0),
-  fNonPixel_FitDiag_Lorentz_SecYGammaErr(0),
-  fNonPixel_FitDiag_Lorentz_SecYAmplitudeErr(0),
-  fNonPixel_FitDiag_Lorentz_SecYChi2red(0),
-  fNonPixel_FitDiag_Lorentz_SecYNPoints(0),
-  fNonPixel_FitDiag_Lorentz_SecYSuccessful(false),
-  fNonPixel_FitDiag_Lorentz_Successful(false),
   fInitialEnergy(0),
   fMomentum(0),
   fGridPixelSize(0),
@@ -243,224 +251,210 @@ void RunAction::BeginOfRunAction(const G4Run*)
       return;
     }
     
-    // Create branches for the tree with explicit units in the titles
-    // Note: Values are stored in Geant4's internal units (MeV for energy, mm for length)
-    fTree->Branch("Edep", &fEdep, "Edep/D")->SetTitle("Energy Deposit [MeV]");
-    fTree->Branch("TrueX", &fTrueX, "TrueX/D")->SetTitle("True Position X [mm]");
-    fTree->Branch("TrueY", &fTrueY, "TrueY/D")->SetTitle("True Position Y [mm]");
-    fTree->Branch("TrueZ", &fTrueZ, "TrueZ/D")->SetTitle("True Position Z [mm]");
+    // Create branches following the new hierarchical structure
+    // =============================================
+    // HITS BRANCHES
+    // =============================================
+    fTree->Branch("Hits/TrueX", &fTrueX, "TrueX/D")->SetTitle("True Position X [mm]");
+    fTree->Branch("Hits/TrueY", &fTrueY, "TrueY/D")->SetTitle("True Position Y [mm]");
+    fTree->Branch("Hits/TrueZ", &fTrueZ, "TrueZ/D")->SetTitle("True Position Z [mm]");
+    fTree->Branch("Hits/InitX", &fInitX, "InitX/D")->SetTitle("Initial X [mm]");
+    fTree->Branch("Hits/InitY", &fInitY, "InitY/D")->SetTitle("Initial Y [mm]");
+    fTree->Branch("Hits/InitZ", &fInitZ, "InitZ/D")->SetTitle("Initial Z [mm]");
+    fTree->Branch("Hits/PixelX", &fPixelX, "PixelX/D")->SetTitle("Nearest Pixel X [mm]");
+    fTree->Branch("Hits/PixelY", &fPixelY, "PixelY/D")->SetTitle("Nearest Pixel Y [mm]");
+    fTree->Branch("Hits/PixelZ", &fPixelZ, "PixelZ/D")->SetTitle("Nearest to hit pixel center Z [mm]");
+    fTree->Branch("Hits/Edep", &fEdep, "Edep/D")->SetTitle("Energy Deposit [MeV]");
+    fTree->Branch("Hits/InitialEnergy", &fInitialEnergy, "InitialEnergy/D")->SetTitle("Initial Particle Energy [MeV]");
+    fTree->Branch("Hits/Momentum", &fMomentum, "Momentum/D")->SetTitle("Particle Momentum [MeV/c]");
+    fTree->Branch("Hits/IsPixelHit", &fIsPixelHit, "IsPixelHit/O")->SetTitle("True if hit is on pixel OR distance <= D0");
+    fTree->Branch("Hits/PixelTrueDeltaX", &fPixelTrueDeltaX, "PixelTrueDeltaX/D")->SetTitle("Delta X from Pixel Center to True Position [mm] (x_pixel - x_true)");
+    fTree->Branch("Hits/PixelTrueDeltaY", &fPixelTrueDeltaY, "PixelTrueDeltaY/D")->SetTitle("Delta Y from Pixel Center to True Position [mm] (y_pixel - y_true)");
+    fTree->Branch("Hits/GaussRowDeltaX", &fGaussRowDeltaX, "GaussRowDeltaX/D")->SetTitle("Delta X from Gaussian Row Fit to True Position [mm]");
+    fTree->Branch("Hits/GaussColumnDeltaY", &fGaussColumnDeltaY, "GaussColumnDeltaY/D")->SetTitle("Delta Y from Gaussian Column Fit to True Position [mm]");
+    fTree->Branch("Hits/GaussMainDiagDeltaX", &fGaussMainDiagDeltaX, "GaussMainDiagDeltaX/D")->SetTitle("Delta X from Gaussian Main Diagonal Fit to True Position [mm]");
+    fTree->Branch("Hits/GaussMainDiagDeltaY", &fGaussMainDiagDeltaY, "GaussMainDiagDeltaY/D")->SetTitle("Delta Y from Gaussian Main Diagonal Fit to True Position [mm]");
+    fTree->Branch("Hits/GaussSecondDiagDeltaX", &fGaussSecondDiagDeltaX, "GaussSecondDiagDeltaX/D")->SetTitle("Delta X from Gaussian Second Diagonal Fit to True Position [mm]");
+    fTree->Branch("Hits/GaussSecondDiagDeltaY", &fGaussSecondDiagDeltaY, "GaussSecondDiagDeltaY/D")->SetTitle("Delta Y from Gaussian Second Diagonal Fit to True Position [mm]");
+    fTree->Branch("Hits/LorentzRowDeltaX", &fLorentzRowDeltaX, "LorentzRowDeltaX/D")->SetTitle("Delta X from Lorentzian Row Fit to True Position [mm]");
+    fTree->Branch("Hits/LorentzColumnDeltaY", &fLorentzColumnDeltaY, "LorentzColumnDeltaY/D")->SetTitle("Delta Y from Lorentzian Column Fit to True Position [mm]");
+    fTree->Branch("Hits/LorentzMainDiagDeltaX", &fLorentzMainDiagDeltaX, "LorentzMainDiagDeltaX/D")->SetTitle("Delta X from Lorentzian Main Diagonal Fit to True Position [mm]");
+    fTree->Branch("Hits/LorentzMainDiagDeltaY", &fLorentzMainDiagDeltaY, "LorentzMainDiagDeltaY/D")->SetTitle("Delta Y from Lorentzian Main Diagonal Fit to True Position [mm]");
+    fTree->Branch("Hits/LorentzSecondDiagDeltaX", &fLorentzSecondDiagDeltaX, "LorentzSecondDiagDeltaX/D")->SetTitle("Delta X from Lorentzian Second Diagonal Fit to True Position [mm]");
+    fTree->Branch("Hits/LorentzSecondDiagDeltaY", &fLorentzSecondDiagDeltaY, "LorentzSecondDiagDeltaY/D")->SetTitle("Delta Y from Lorentzian Second Diagonal Fit to True Position [mm]");
+
+    // GRIDNEIGHBORHOOD BRANCHES
+    // Grid neighborhood data for 9x9 neighborhood around hits
+    fTree->Branch("GridNeighborhood/GridNeighborhoodAngles", &fNonPixel_GridNeighborhoodAngles)->SetTitle("Angles from Hit to Neighborhood Grid Pixels [deg]");
+    fTree->Branch("GridNeighborhood/GridNeighborhoodChargeFractions", &fNonPixel_GridNeighborhoodChargeFractions)->SetTitle("Charge Fractions for Neighborhood Grid Pixels");
+    fTree->Branch("GridNeighborhood/GridNeighborhoodDistances", &fNonPixel_GridNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm]");
+    fTree->Branch("GridNeighborhood/GridNeighborhoodCharges", &fNonPixel_GridNeighborhoodCharge)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels");
     
-    // Add branches for initial particle position with explicit units
-    fTree->Branch("InitX", &fInitX, "InitX/D")->SetTitle("Initial X [mm]");
-    fTree->Branch("InitY", &fInitY, "InitY/D")->SetTitle("Initial Y [mm]");
-    fTree->Branch("InitZ", &fInitZ, "InitZ/D")->SetTitle("Initial Z [mm]");
+    // =============================================
+    // GAUSSIAN FITS BRANCHES
+    // =============================================
+    // GaussFitRow/GaussFitRowX
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowAmplitude", &fGaussFitRowAmplitude, "GaussFitRowAmplitude/D")->SetTitle("Gaussian Row Fit Amplitude");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowAmplitudeErr", &fGaussFitRowAmplitudeErr, "GaussFitRowAmplitudeErr/D")->SetTitle("Gaussian Row Fit Amplitude Error");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowStdev", &fGaussFitRowStdev, "GaussFitRowStdev/D")->SetTitle("Gaussian Row Fit Standard Deviation");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowStdevErr", &fGaussFitRowStdevErr, "GaussFitRowStdevErr/D")->SetTitle("Gaussian Row Fit Standard Deviation Error");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowVerticalOffset", &fGaussFitRowVerticalOffset, "GaussFitRowVerticalOffset/D")->SetTitle("Gaussian Row Fit Vertical Offset");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowVerticalOffsetErr", &fGaussFitRowVerticalOffsetErr, "GaussFitRowVerticalOffsetErr/D")->SetTitle("Gaussian Row Fit Vertical Offset Error");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowCenter", &fGaussFitRowCenter, "GaussFitRowCenter/D")->SetTitle("Gaussian Row Fit Center [mm]");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowCenterErr", &fGaussFitRowCenterErr, "GaussFitRowCenterErr/D")->SetTitle("Gaussian Row Fit Center Error [mm]");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowChi2red", &fGaussFitRowChi2red, "GaussFitRowChi2red/D")->SetTitle("Gaussian Row Fit Reduced Chi-squared");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowPp", &fGaussFitRowPp, "GaussFitRowPp/D")->SetTitle("Gaussian Row Fit P-value");
+    fTree->Branch("GaussFits/GaussFitRow/GaussFitRowX/GaussFitRowDOF", &fGaussFitRowDOF, "GaussFitRowDOF/I")->SetTitle("Gaussian Row Fit Degrees of Freedom");
     
-    // Add branches for nearest pixel center position with explicit units
-    fTree->Branch("PixelX", &fPixelX, "PixelX/D")->SetTitle("Nearest Pixel X [mm]");
-    fTree->Branch("PixelY", &fPixelY, "PixelY/D")->SetTitle("Nearest Pixel Y [mm]");
-    fTree->Branch("PixelZ", &fPixelZ, "PixelZ/D")->SetTitle("Nearest Pixel Z [mm]");
+    // GaussFitColumn/GaussFitColumnY
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnAmplitude", &fGaussFitColumnAmplitude, "GaussFitColumnAmplitude/D")->SetTitle("Gaussian Column Fit Amplitude");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnAmplitudeErr", &fGaussFitColumnAmplitudeErr, "GaussFitColumnAmplitudeErr/D")->SetTitle("Gaussian Column Fit Amplitude Error");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnStdev", &fGaussFitColumnStdev, "GaussFitColumnStdev/D")->SetTitle("Gaussian Column Fit Standard Deviation");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnStdevErr", &fGaussFitColumnStdevErr, "GaussFitColumnStdevErr/D")->SetTitle("Gaussian Column Fit Standard Deviation Error");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnVerticalOffset", &fGaussFitColumnVerticalOffset, "GaussFitColumnVerticalOffset/D")->SetTitle("Gaussian Column Fit Vertical Offset");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnVerticalOffsetErr", &fGaussFitColumnVerticalOffsetErr, "GaussFitColumnVerticalOffsetErr/D")->SetTitle("Gaussian Column Fit Vertical Offset Error");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnCenter", &fGaussFitColumnCenter, "GaussFitColumnCenter/D")->SetTitle("Gaussian Column Fit Center [mm]");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnCenterErr", &fGaussFitColumnCenterErr, "GaussFitColumnCenterErr/D")->SetTitle("Gaussian Column Fit Center Error [mm]");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnChi2red", &fGaussFitColumnChi2red, "GaussFitColumnChi2red/D")->SetTitle("Gaussian Column Fit Reduced Chi-squared");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnPp", &fGaussFitColumnPp, "GaussFitColumnPp/D")->SetTitle("Gaussian Column Fit P-value");
+    fTree->Branch("GaussFits/GaussFitColumn/GaussFitColumnY/GaussFitColumnDOF", &fGaussFitColumnDOF, "GaussFitColumnDOF/I")->SetTitle("Gaussian Column Fit Degrees of Freedom");
     
-    // Add branches for pixel mapping information
-    fTree->Branch("PixelI", &fPixelI, "PixelI/I")->SetTitle("Pixel Index X");
-    fTree->Branch("PixelJ", &fPixelJ, "PixelJ/I")->SetTitle("Pixel Index Y");
-    fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "PixelTrueDeltaX/D")->SetTitle("Delta X from Pixel Center to True Position [mm] (x_pixel - x_true)");
-    fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "PixelTrueDeltaY/D")->SetTitle("Delta Y from Pixel Center to True Position [mm] (y_pixel - y_true)");
+    // GaussFitMainDiag/GaussFitMainDiagX
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagAmplitude", &fGaussFitMainDiagXAmplitude, "GaussFitMainDiagAmplitude/D")->SetTitle("Gaussian Main Diagonal X Fit Amplitude");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagAmplitudeErr", &fGaussFitMainDiagXAmplitudeErr, "GaussFitMainDiagAmplitudeErr/D")->SetTitle("Gaussian Main Diagonal X Fit Amplitude Error");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagStdev", &fGaussFitMainDiagXStdev, "GaussFitMainDiagStdev/D")->SetTitle("Gaussian Main Diagonal X Fit Standard Deviation");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagStdevErr", &fGaussFitMainDiagXStdevErr, "GaussFitMainDiagStdevErr/D")->SetTitle("Gaussian Main Diagonal X Fit Standard Deviation Error");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagVerticalOffset", &fGaussFitMainDiagXVerticalOffset, "GaussFitMainDiagVerticalOffset/D")->SetTitle("Gaussian Main Diagonal X Fit Vertical Offset");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagVerticalOffsetErr", &fGaussFitMainDiagXVerticalOffsetErr, "GaussFitMainDiagVerticalOffsetErr/D")->SetTitle("Gaussian Main Diagonal X Fit Vertical Offset Error");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagCenter", &fGaussFitMainDiagXCenter, "GaussFitMainDiagCenter/D")->SetTitle("Gaussian Main Diagonal X Fit Center [mm]");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagCenterErr", &fGaussFitMainDiagXCenterErr, "GaussFitMainDiagCenterErr/D")->SetTitle("Gaussian Main Diagonal X Fit Center Error [mm]");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagChi2red", &fGaussFitMainDiagXChi2red, "GaussFitMainDiagChi2red/D")->SetTitle("Gaussian Main Diagonal X Fit Reduced Chi-squared");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagPp", &fGaussFitMainDiagXPp, "GaussFitMainDiagPp/D")->SetTitle("Gaussian Main Diagonal X Fit P-value");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagX/GaussFitMainDiagDOF", &fGaussFitMainDiagXDOF, "GaussFitMainDiagDOF/I")->SetTitle("Gaussian Main Diagonal X Fit Degrees of Freedom");
     
-    // ==============================================
-    // HIT CLASSIFICATION BRANCHES
-    // ==============================================
-    fTree->Branch("IsPixelHit", &fIsPixelHit, "IsPixelHit/O")->SetTitle("Hit on Pixel OR distance <= D0");
+    // GaussFitMainDiag/GaussFitMainDiagY
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagAmplitude", &fGaussFitMainDiagYAmplitude, "GaussFitMainDiagAmplitude/D")->SetTitle("Gaussian Main Diagonal Y Fit Amplitude");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagAmplitudeErr", &fGaussFitMainDiagYAmplitudeErr, "GaussFitMainDiagAmplitudeErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Amplitude Error");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagStdev", &fGaussFitMainDiagYStdev, "GaussFitMainDiagStdev/D")->SetTitle("Gaussian Main Diagonal Y Fit Standard Deviation");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagStdevErr", &fGaussFitMainDiagYStdevErr, "GaussFitMainDiagStdevErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Standard Deviation Error");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagVerticalOffset", &fGaussFitMainDiagYVerticalOffset, "GaussFitMainDiagVerticalOffset/D")->SetTitle("Gaussian Main Diagonal Y Fit Vertical Offset");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagVerticalOffsetErr", &fGaussFitMainDiagYVerticalOffsetErr, "GaussFitMainDiagVerticalOffsetErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Vertical Offset Error");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagCenter", &fGaussFitMainDiagYCenter, "GaussFitMainDiagCenter/D")->SetTitle("Gaussian Main Diagonal Y Fit Center [mm]");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagCenterErr", &fGaussFitMainDiagYCenterErr, "GaussFitMainDiagCenterErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Center Error [mm]");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagChi2red", &fGaussFitMainDiagYChi2red, "GaussFitMainDiagChi2red/D")->SetTitle("Gaussian Main Diagonal Y Fit Reduced Chi-squared");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagPp", &fGaussFitMainDiagYPp, "GaussFitMainDiagPp/D")->SetTitle("Gaussian Main Diagonal Y Fit P-value");
+    fTree->Branch("GaussFits/GaussFitMainDiag/GaussFitMainDiagY/GaussFitMainDiagDOF", &fGaussFitMainDiagYDOF, "GaussFitMainDiagDOF/I")->SetTitle("Gaussian Main Diagonal Y Fit Degrees of Freedom");
     
-    // ==============================================
-    // PIXEL HIT DATA (distance <= D0 or on pixel)
-    // ==============================================
-    fTree->Branch("PixelHit_PixelAlpha", &fPixelHit_PixelAlpha, "PixelHit_PixelAlpha/D")->SetTitle("Angular Size of Pixel [deg] (for pixel hits)");
+    // GaussFitSecondDiag/GaussFitSecondDiagX
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagAmplitude", &fGaussFitSecondDiagXAmplitude, "GaussFitSecondDiagAmplitude/D")->SetTitle("Gaussian Second Diagonal X Fit Amplitude");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagAmplitudeErr", &fGaussFitSecondDiagXAmplitudeErr, "GaussFitSecondDiagAmplitudeErr/D")->SetTitle("Gaussian Second Diagonal X Fit Amplitude Error");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagStdev", &fGaussFitSecondDiagXStdev, "GaussFitSecondDiagStdev/D")->SetTitle("Gaussian Second Diagonal X Fit Standard Deviation");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagStdevErr", &fGaussFitSecondDiagXStdevErr, "GaussFitSecondDiagStdevErr/D")->SetTitle("Gaussian Second Diagonal X Fit Standard Deviation Error");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagVerticalOffset", &fGaussFitSecondDiagXVerticalOffset, "GaussFitSecondDiagVerticalOffset/D")->SetTitle("Gaussian Second Diagonal X Fit Vertical Offset");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagVerticalOffsetErr", &fGaussFitSecondDiagXVerticalOffsetErr, "GaussFitSecondDiagVerticalOffsetErr/D")->SetTitle("Gaussian Second Diagonal X Fit Vertical Offset Error");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagCenter", &fGaussFitSecondDiagXCenter, "GaussFitSecondDiagCenter/D")->SetTitle("Gaussian Second Diagonal X Fit Center [mm]");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagCenterErr", &fGaussFitSecondDiagXCenterErr, "GaussFitSecondDiagCenterErr/D")->SetTitle("Gaussian Second Diagonal X Fit Center Error [mm]");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagChi2red", &fGaussFitSecondDiagXChi2red, "GaussFitSecondDiagChi2red/D")->SetTitle("Gaussian Second Diagonal X Fit Reduced Chi-squared");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagPp", &fGaussFitSecondDiagXPp, "GaussFitSecondDiagPp/D")->SetTitle("Gaussian Second Diagonal X Fit P-value");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagX/GaussFitSecondDiagDOF", &fGaussFitSecondDiagXDOF, "GaussFitSecondDiagDOF/I")->SetTitle("Gaussian Second Diagonal X Fit Degrees of Freedom");
     
-    // ==============================================
-    // NON-PIXEL HIT DATA (distance > D0 and not on pixel)
-    // ==============================================
+    // GaussFitSecondDiag/GaussFitSecondDiagY
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagAmplitude", &fGaussFitSecondDiagYAmplitude, "GaussFitSecondDiagAmplitude/D")->SetTitle("Gaussian Second Diagonal Y Fit Amplitude");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagAmplitudeErr", &fGaussFitSecondDiagYAmplitudeErr, "GaussFitSecondDiagAmplitudeErr/D")->SetTitle("Gaussian Second Diagonal Y Fit Amplitude Error");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagStdev", &fGaussFitSecondDiagYStdev, "GaussFitSecondDiagStdev/D")->SetTitle("Gaussian Second Diagonal Y Fit Standard Deviation");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagStdevErr", &fGaussFitSecondDiagYStdevErr, "GaussFitSecondDiagStdevErr/D")->SetTitle("Gaussian Second Diagonal Y Fit Standard Deviation Error");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagVerticalOffset", &fGaussFitSecondDiagYVerticalOffset, "GaussFitSecondDiagVerticalOffset/D")->SetTitle("Gaussian Second Diagonal Y Fit Vertical Offset");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagVerticalOffsetErr", &fGaussFitSecondDiagYVerticalOffsetErr, "GaussFitSecondDiagVerticalOffsetErr/D")->SetTitle("Gaussian Second Diagonal Y Fit Vertical Offset Error");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagCenter", &fGaussFitSecondDiagYCenter, "GaussFitSecondDiagCenter/D")->SetTitle("Gaussian Second Diagonal Y Fit Center [mm]");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagCenterErr", &fGaussFitSecondDiagYCenterErr, "GaussFitSecondDiagCenterErr/D")->SetTitle("Gaussian Second Diagonal Y Fit Center Error [mm]");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagChi2red", &fGaussFitSecondDiagYChi2red, "GaussFitSecondDiagChi2red/D")->SetTitle("Gaussian Second Diagonal Y Fit Reduced Chi-squared");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagPp", &fGaussFitSecondDiagYPp, "GaussFitSecondDiagPp/D")->SetTitle("Gaussian Second Diagonal Y Fit P-value");
+    fTree->Branch("GaussFits/GaussFitSecondDiag/GaussFitSecondDiagY/GaussFitSecondDiagDOF", &fGaussFitSecondDiagYDOF, "GaussFitSecondDiagDOF/I")->SetTitle("Gaussian Second Diagonal Y Fit Degrees of Freedom");
     
+    // =============================================
+    // LORENTZIAN FITS BRANCHES
+    // =============================================
+    // LorentzFitRow/LorentzFitRowX
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowAmplitude", &fLorentzFitRowAmplitude, "LorentzFitRowAmplitude/D")->SetTitle("Lorentzian Row Fit Amplitude");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowAmplitudeErr", &fLorentzFitRowAmplitudeErr, "LorentzFitRowAmplitudeErr/D")->SetTitle("Lorentzian Row Fit Amplitude Error");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowGamma", &fLorentzFitRowGamma, "LorentzFitRowGamma/D")->SetTitle("Lorentzian Row Fit Gamma Parameter");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowGammaErr", &fLorentzFitRowGammaErr, "LorentzFitRowGammaErr/D")->SetTitle("Lorentzian Row Fit Gamma Parameter Error");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowVerticalOffset", &fLorentzFitRowVerticalOffset, "LorentzFitRowVerticalOffset/D")->SetTitle("Lorentzian Row Fit Vertical Offset");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowVerticalOffsetErr", &fLorentzFitRowVerticalOffsetErr, "LorentzFitRowVerticalOffsetErr/D")->SetTitle("Lorentzian Row Fit Vertical Offset Error");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowCenter", &fLorentzFitRowCenter, "LorentzFitRowCenter/D")->SetTitle("Lorentzian Row Fit Center [mm]");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowCenterErr", &fLorentzFitRowCenterErr, "LorentzFitRowCenterErr/D")->SetTitle("Lorentzian Row Fit Center Error [mm]");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowChi2red", &fLorentzFitRowChi2red, "LorentzFitRowChi2red/D")->SetTitle("Lorentzian Row Fit Reduced Chi-squared");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowPp", &fLorentzFitRowPp, "LorentzFitRowPp/D")->SetTitle("Lorentzian Row Fit P-value");
+    fTree->Branch("LorentzFits/LorentzFitRow/LorentzFitRowX/LorentzFitRowDOF", &fLorentzFitRowDOF, "LorentzFitRowDOF/I")->SetTitle("Lorentzian Row Fit Degrees of Freedom");
+
+    // LorentzFitColumn/LorentzFitColumnY
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnAmplitude", &fLorentzFitColumnAmplitude, "LorentzFitColumnAmplitude/D")->SetTitle("Lorentzian Column Fit Amplitude");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnAmplitudeErr", &fLorentzFitColumnAmplitudeErr, "LorentzFitColumnAmplitudeErr/D")->SetTitle("Lorentzian Column Fit Amplitude Error");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnGamma", &fLorentzFitColumnGamma, "LorentzFitColumnGamma/D")->SetTitle("Lorentzian Column Fit Gamma Parameter");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnGammaErr", &fLorentzFitColumnGammaErr, "LorentzFitColumnGammaErr/D")->SetTitle("Lorentzian Column Fit Gamma Parameter Error");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnVerticalOffset", &fLorentzFitColumnVerticalOffset, "LorentzFitColumnVerticalOffset/D")->SetTitle("Lorentzian Column Fit Vertical Offset");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnVerticalOffsetErr", &fLorentzFitColumnVerticalOffsetErr, "LorentzFitColumnVerticalOffsetErr/D")->SetTitle("Lorentzian Column Fit Vertical Offset Error");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnCenter", &fLorentzFitColumnCenter, "LorentzFitColumnCenter/D")->SetTitle("Lorentzian Column Fit Center [mm]");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnCenterErr", &fLorentzFitColumnCenterErr, "LorentzFitColumnCenterErr/D")->SetTitle("Lorentzian Column Fit Center Error [mm]");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnChi2red", &fLorentzFitColumnChi2red, "LorentzFitColumnChi2red/D")->SetTitle("Lorentzian Column Fit Reduced Chi-squared");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnPp", &fLorentzFitColumnPp, "LorentzFitColumnPp/D")->SetTitle("Lorentzian Column Fit P-value");
+    fTree->Branch("LorentzFits/LorentzFitColumn/LorentzFitColumnY/LorentzFitColumnDOF", &fLorentzFitColumnDOF, "LorentzFitColumnDOF/I")->SetTitle("Lorentzian Column Fit Degrees of Freedom");
+
+    // LorentzFitMainDiag/LorentzFitMainDiagX
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagAmplitude", &fLorentzFitMainDiagXAmplitude, "LorentzFitMainDiagAmplitude/D")->SetTitle("Lorentzian Main Diagonal X Fit Amplitude");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagAmplitudeErr", &fLorentzFitMainDiagXAmplitudeErr, "LorentzFitMainDiagAmplitudeErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Amplitude Error");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagGamma", &fLorentzFitMainDiagXGamma, "LorentzFitMainDiagGamma/D")->SetTitle("Lorentzian Main Diagonal X Fit Gamma Parameter");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagGammaErr", &fLorentzFitMainDiagXGammaErr, "LorentzFitMainDiagGammaErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Gamma Parameter Error");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagVerticalOffset", &fLorentzFitMainDiagXVerticalOffset, "LorentzFitMainDiagVerticalOffset/D")->SetTitle("Lorentzian Main Diagonal X Fit Vertical Offset");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagVerticalOffsetErr", &fLorentzFitMainDiagXVerticalOffsetErr, "LorentzFitMainDiagVerticalOffsetErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Vertical Offset Error");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagCenter", &fLorentzFitMainDiagXCenter, "LorentzFitMainDiagCenter/D")->SetTitle("Lorentzian Main Diagonal X Fit Center [mm]");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagCenterErr", &fLorentzFitMainDiagXCenterErr, "LorentzFitMainDiagCenterErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Center Error [mm]");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagChi2red", &fLorentzFitMainDiagXChi2red, "LorentzFitMainDiagChi2red/D")->SetTitle("Lorentzian Main Diagonal X Fit Reduced Chi-squared");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagPp", &fLorentzFitMainDiagXPp, "LorentzFitMainDiagPp/D")->SetTitle("Lorentzian Main Diagonal X Fit P-value");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagX/LorentzFitMainDiagDOF", &fLorentzFitMainDiagXDOF, "LorentzFitMainDiagDOF/I")->SetTitle("Lorentzian Main Diagonal X Fit Degrees of Freedom");
+
+    // LorentzFitMainDiag/LorentzFitMainDiagY
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagAmplitude", &fLorentzFitMainDiagYAmplitude, "LorentzFitMainDiagAmplitude/D")->SetTitle("Lorentzian Main Diagonal Y Fit Amplitude");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagAmplitudeErr", &fLorentzFitMainDiagYAmplitudeErr, "LorentzFitMainDiagAmplitudeErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Amplitude Error");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagGamma", &fLorentzFitMainDiagYGamma, "LorentzFitMainDiagGamma/D")->SetTitle("Lorentzian Main Diagonal Y Fit Gamma Parameter");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagGammaErr", &fLorentzFitMainDiagYGammaErr, "LorentzFitMainDiagGammaErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Gamma Parameter Error");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagVerticalOffset", &fLorentzFitMainDiagYVerticalOffset, "LorentzFitMainDiagVerticalOffset/D")->SetTitle("Lorentzian Main Diagonal Y Fit Vertical Offset");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagVerticalOffsetErr", &fLorentzFitMainDiagYVerticalOffsetErr, "LorentzFitMainDiagVerticalOffsetErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Vertical Offset Error");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagCenter", &fLorentzFitMainDiagYCenter, "LorentzFitMainDiagCenter/D")->SetTitle("Lorentzian Main Diagonal Y Fit Center [mm]");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagCenterErr", &fLorentzFitMainDiagYCenterErr, "LorentzFitMainDiagCenterErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Center Error [mm]");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagChi2red", &fLorentzFitMainDiagYChi2red, "LorentzFitMainDiagChi2red/D")->SetTitle("Lorentzian Main Diagonal Y Fit Reduced Chi-squared");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagPp", &fLorentzFitMainDiagYPp, "LorentzFitMainDiagPp/D")->SetTitle("Lorentzian Main Diagonal Y Fit P-value");
+    fTree->Branch("LorentzFits/LorentzFitMainDiag/LorentzFitMainDiagY/LorentzFitMainDiagDOF", &fLorentzFitMainDiagYDOF, "LorentzFitMainDiagDOF/I")->SetTitle("Lorentzian Main Diagonal Y Fit Degrees of Freedom");
+
+    // LorentzFitSecondDiag/LorentzFitSecondDiagX
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagAmplitude", &fLorentzFitSecondDiagXAmplitude, "LorentzFitSecondDiagAmplitude/D")->SetTitle("Lorentzian Second Diagonal X Fit Amplitude");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagAmplitudeErr", &fLorentzFitSecondDiagXAmplitudeErr, "LorentzFitSecondDiagAmplitudeErr/D")->SetTitle("Lorentzian Second Diagonal X Fit Amplitude Error");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagGamma", &fLorentzFitSecondDiagXGamma, "LorentzFitSecondDiagGamma/D")->SetTitle("Lorentzian Second Diagonal X Fit Gamma Parameter");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagGammaErr", &fLorentzFitSecondDiagXGammaErr, "LorentzFitSecondDiagGammaErr/D")->SetTitle("Lorentzian Second Diagonal X Fit Gamma Parameter Error");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagVerticalOffset", &fLorentzFitSecondDiagXVerticalOffset, "LorentzFitSecondDiagVerticalOffset/D")->SetTitle("Lorentzian Second Diagonal X Fit Vertical Offset");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagVerticalOffsetErr", &fLorentzFitSecondDiagXVerticalOffsetErr, "LorentzFitSecondDiagVerticalOffsetErr/D")->SetTitle("Lorentzian Second Diagonal X Fit Vertical Offset Error");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagCenter", &fLorentzFitSecondDiagXCenter, "LorentzFitSecondDiagCenter/D")->SetTitle("Lorentzian Second Diagonal X Fit Center [mm]");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagCenterErr", &fLorentzFitSecondDiagXCenterErr, "LorentzFitSecondDiagCenterErr/D")->SetTitle("Lorentzian Second Diagonal X Fit Center Error [mm]");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagChi2red", &fLorentzFitSecondDiagXChi2red, "LorentzFitSecondDiagChi2red/D")->SetTitle("Lorentzian Second Diagonal X Fit Reduced Chi-squared");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagPp", &fLorentzFitSecondDiagXPp, "LorentzFitSecondDiagPp/D")->SetTitle("Lorentzian Second Diagonal X Fit P-value");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagX/LorentzFitSecondDiagDOF", &fLorentzFitSecondDiagXDOF, "LorentzFitSecondDiagDOF/I")->SetTitle("Lorentzian Second Diagonal X Fit Degrees of Freedom");
+
+    // LorentzFitSecondDiag/LorentzFitSecondDiagY
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagAmplitude", &fLorentzFitSecondDiagYAmplitude, "LorentzFitSecondDiagAmplitude/D")->SetTitle("Lorentzian Second Diagonal Y Fit Amplitude");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagAmplitudeErr", &fLorentzFitSecondDiagYAmplitudeErr, "LorentzFitSecondDiagAmplitudeErr/D")->SetTitle("Lorentzian Second Diagonal Y Fit Amplitude Error");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagGamma", &fLorentzFitSecondDiagYGamma, "LorentzFitSecondDiagGamma/D")->SetTitle("Lorentzian Second Diagonal Y Fit Gamma Parameter");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagGammaErr", &fLorentzFitSecondDiagYGammaErr, "LorentzFitSecondDiagGammaErr/D")->SetTitle("Lorentzian Second Diagonal Y Fit Gamma Parameter Error");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagVerticalOffset", &fLorentzFitSecondDiagYVerticalOffset, "LorentzFitSecondDiagVerticalOffset/D")->SetTitle("Lorentzian Second Diagonal Y Fit Vertical Offset");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagVerticalOffsetErr", &fLorentzFitSecondDiagYVerticalOffsetErr, "LorentzFitSecondDiagVerticalOffsetErr/D")->SetTitle("Lorentzian Second Diagonal Y Fit Vertical Offset Error");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagCenter", &fLorentzFitSecondDiagYCenter, "LorentzFitSecondDiagCenter/D")->SetTitle("Lorentzian Second Diagonal Y Fit Center [mm]");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagCenterErr", &fLorentzFitSecondDiagYCenterErr, "LorentzFitSecondDiagCenterErr/D")->SetTitle("Lorentzian Second Diagonal Y Fit Center Error [mm]");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagChi2red", &fLorentzFitSecondDiagYChi2red, "LorentzFitSecondDiagChi2red/D")->SetTitle("Lorentzian Second Diagonal Y Fit Reduced Chi-squared");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagPp", &fLorentzFitSecondDiagYPp, "LorentzFitSecondDiagPp/D")->SetTitle("Lorentzian Second Diagonal Y Fit P-value");
+    fTree->Branch("LorentzFits/LorentzFitSecondDiag/LorentzFitSecondDiagY/LorentzFitSecondDiagDOF", &fLorentzFitSecondDiagYDOF, "LorentzFitSecondDiagDOF/I")->SetTitle("Lorentzian Second Diagonal Y Fit Degrees of Freedom");
+
     // Load vector dictionaries for ROOT to properly handle std::vector branches
     gROOT->ProcessLine("#include <vector>");
-    
-    // Add branches for neighborhood (9x9) grid angle data (non-pixel hits only)
-    fTree->Branch("NonPixel_GridNeighborhoodAngles", &fNonPixel_GridNeighborhoodAngles)->SetTitle("Angles from Hit to Neighborhood Grid Pixels [deg] (non-pixel hits)");
-    fTree->Branch("NonPixel_GridNeighborhoodPixelI", &fNonPixel_GridNeighborhoodPixelI)->SetTitle("I Indices of Neighborhood Grid Pixels (non-pixel hits)");
-    fTree->Branch("NonPixel_GridNeighborhoodPixelJ", &fNonPixel_GridNeighborhoodPixelJ)->SetTitle("J Indices of Neighborhood Grid Pixels (non-pixel hits)");
-    
-    // Add branches for neighborhood (9x9) grid charge sharing data (non-pixel hits only)
-    fTree->Branch("NonPixel_GridNeighborhoodChargeFractions", &fNonPixel_GridNeighborhoodChargeFractions)->SetTitle("Charge Fractions for Neighborhood Grid Pixels (non-pixel hits)");
-    fTree->Branch("NonPixel_GridNeighborhoodDistances", &fNonPixel_GridNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm] (non-pixel hits)");
-    fTree->Branch("NonPixel_GridNeighborhoodCharge", &fNonPixel_GridNeighborhoodCharge)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels (non-pixel hits)");
-    
-    // Add branches for particle information (reduced set)
-    fTree->Branch("InitialEnergy", &fInitialEnergy, "InitialEnergy/D")->SetTitle("Initial Particle Energy [MeV]");
-    fTree->Branch("Momentum", &fMomentum, "Momentum/D")->SetTitle("Particle Momentum [MeV/c]");
-    
-    // Add branches for 2D Gaussian fit results (central row and column fitting)
-    fTree->Branch("Fit2D_XCenter", &fNonPixel_Fit2D_XCenter, "Fit2D_XCenter/D")->SetTitle("Fitted X Center from Central Row [mm]");
-    fTree->Branch("Fit2D_XSigma", &fNonPixel_Fit2D_XSigma, "Fit2D_XSigma/D")->SetTitle("Fitted X Sigma from Central Row [mm]");
-    fTree->Branch("Fit2D_XFWHM", &fNonPixel_Fit2D_XFWHM, "Fit2D_XFWHM/D")->SetTitle("Fitted X FWHM from Central Row [mm]");
-    fTree->Branch("Fit2D_XAmplitude", &fNonPixel_Fit2D_XAmplitude, "Fit2D_XAmplitude/D")->SetTitle("Fitted X Amplitude from Central Row");
-    fTree->Branch("Fit2D_XCenterErr", &fNonPixel_Fit2D_XCenterErr, "Fit2D_XCenterErr/D")->SetTitle("Error in Fitted X Center [mm]");
-    fTree->Branch("Fit2D_XSigmaErr", &fNonPixel_Fit2D_XSigmaErr, "Fit2D_XSigmaErr/D")->SetTitle("Error in Fitted X Sigma [mm]");
-    fTree->Branch("Fit2D_XFWHMErr", &fNonPixel_Fit2D_XFWHMErr, "Fit2D_XFWHMErr/D")->SetTitle("Error in Fitted X FWHM [mm]");
-    fTree->Branch("Fit2D_XAmplitudeErr", &fNonPixel_Fit2D_XAmplitudeErr, "Fit2D_XAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude");
-    fTree->Branch("Fit2D_XChi2red", &fNonPixel_Fit2D_XChi2red, "Fit2D_XChi2red/D")->SetTitle("Reduced Chi-squared for X Fit");
-    fTree->Branch("Fit2D_XNPoints", &fNonPixel_Fit2D_XNPoints, "Fit2D_XNPoints/I")->SetTitle("Number of Points Used in X Fit");
-    
-    fTree->Branch("Fit2D_YCenter", &fNonPixel_Fit2D_YCenter, "Fit2D_YCenter/D")->SetTitle("Fitted Y Center from Central Column [mm]");
-    fTree->Branch("Fit2D_YSigma", &fNonPixel_Fit2D_YSigma, "Fit2D_YSigma/D")->SetTitle("Fitted Y Sigma from Central Column [mm]");
-    fTree->Branch("Fit2D_YFWHM", &fNonPixel_Fit2D_YFWHM, "Fit2D_YFWHM/D")->SetTitle("Fitted Y FWHM from Central Column [mm]");
-    fTree->Branch("Fit2D_YAmplitude", &fNonPixel_Fit2D_YAmplitude, "Fit2D_YAmplitude/D")->SetTitle("Fitted Y Amplitude from Central Column");
-    fTree->Branch("Fit2D_YCenterErr", &fNonPixel_Fit2D_YCenterErr, "Fit2D_YCenterErr/D")->SetTitle("Error in Fitted Y Center [mm]");
-    fTree->Branch("Fit2D_YSigmaErr", &fNonPixel_Fit2D_YSigmaErr, "Fit2D_YSigmaErr/D")->SetTitle("Error in Fitted Y Sigma [mm]");
-    fTree->Branch("Fit2D_YFWHMErr", &fNonPixel_Fit2D_YFWHMErr, "Fit2D_YFWHMErr/D")->SetTitle("Error in Fitted Y FWHM [mm]");
-    fTree->Branch("Fit2D_YAmplitudeErr", &fNonPixel_Fit2D_YAmplitudeErr, "Fit2D_YAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude");
-    fTree->Branch("Fit2D_YChi2red", &fNonPixel_Fit2D_YChi2red, "Fit2D_YChi2red/D")->SetTitle("Reduced Chi-squared for Y Fit");
-    fTree->Branch("Fit2D_YNPoints", &fNonPixel_Fit2D_YNPoints, "Fit2D_YNPoints/I")->SetTitle("Number of Points Used in Y Fit");
-    
-    fTree->Branch("Fit2D_Successful", &fNonPixel_Fit2D_Successful, "Fit2D_Successful/O")->SetTitle("Whether 2D Fitting was Successful");
-    
-    // Add branches for diagonal Gaussian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-    // Main diagonal X fit (X vs Charge for pixels on main diagonal)
-    fTree->Branch("FitDiag_MainXCenter", &fNonPixel_FitDiag_MainXCenter, "FitDiag_MainXCenter/D")->SetTitle("Fitted X Center from Main Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_MainXSigma", &fNonPixel_FitDiag_MainXSigma, "FitDiag_MainXSigma/D")->SetTitle("Fitted X Sigma from Main Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_MainXFWHM", &fNonPixel_FitDiag_MainXFWHM, "FitDiag_MainXFWHM/D")->SetTitle("Fitted X FWHM from Main Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_MainXAmplitude", &fNonPixel_FitDiag_MainXAmplitude, "FitDiag_MainXAmplitude/D")->SetTitle("Fitted X Amplitude from Main Diagonal X Fit");
-    fTree->Branch("FitDiag_MainXCenterErr", &fNonPixel_FitDiag_MainXCenterErr, "FitDiag_MainXCenterErr/D")->SetTitle("Error in Fitted X Center from Main Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_MainXSigmaErr", &fNonPixel_FitDiag_MainXSigmaErr, "FitDiag_MainXSigmaErr/D")->SetTitle("Error in Fitted X Sigma from Main Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_MainXFWHMErr", &fNonPixel_FitDiag_MainXFWHMErr, "FitDiag_MainXFWHMErr/D")->SetTitle("Error in Fitted X FWHM [mm]");
-    fTree->Branch("FitDiag_MainXAmplitudeErr", &fNonPixel_FitDiag_MainXAmplitudeErr, "FitDiag_MainXAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude");
-    fTree->Branch("FitDiag_MainXChi2red", &fNonPixel_FitDiag_MainXChi2red, "FitDiag_MainXChi2red/D")->SetTitle("Reduced Chi-squared for Main Diagonal X Fit");
-    fTree->Branch("FitDiag_MainXNPoints", &fNonPixel_FitDiag_MainXNPoints, "FitDiag_MainXNPoints/I")->SetTitle("Number of Points Used in Main Diagonal X Fit");
-    fTree->Branch("FitDiag_MainXSuccessful", &fNonPixel_FitDiag_MainXSuccessful, "FitDiag_MainXSuccessful/O")->SetTitle("Whether Main Diagonal X Fitting was Successful");
-    
-    // Main diagonal Y fit (Y vs Charge for pixels on main diagonal)
-    fTree->Branch("FitDiag_MainYCenter", &fNonPixel_FitDiag_MainYCenter, "FitDiag_MainYCenter/D")->SetTitle("Fitted Y Center from Main Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_MainYSigma", &fNonPixel_FitDiag_MainYSigma, "FitDiag_MainYSigma/D")->SetTitle("Fitted Y Sigma from Main Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_MainYFWHM", &fNonPixel_FitDiag_MainYFWHM, "FitDiag_MainYFWHM/D")->SetTitle("Fitted Y FWHM from Main Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_MainYAmplitude", &fNonPixel_FitDiag_MainYAmplitude, "FitDiag_MainYAmplitude/D")->SetTitle("Fitted Y Amplitude from Main Diagonal Y Fit");
-    fTree->Branch("FitDiag_MainYCenterErr", &fNonPixel_FitDiag_MainYCenterErr, "FitDiag_MainYCenterErr/D")->SetTitle("Error in Fitted Y Center from Main Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_MainYSigmaErr", &fNonPixel_FitDiag_MainYSigmaErr, "FitDiag_MainYSigmaErr/D")->SetTitle("Error in Fitted Y Sigma from Main Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_MainYFWHMErr", &fNonPixel_FitDiag_MainYFWHMErr, "FitDiag_MainYFWHMErr/D")->SetTitle("Error in Fitted Y FWHM [mm]");
-    fTree->Branch("FitDiag_MainYAmplitudeErr", &fNonPixel_FitDiag_MainYAmplitudeErr, "FitDiag_MainYAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude");
-    fTree->Branch("FitDiag_MainYChi2red", &fNonPixel_FitDiag_MainYChi2red, "FitDiag_MainYChi2red/D")->SetTitle("Reduced Chi-squared for Main Diagonal Y Fit");
-    fTree->Branch("FitDiag_MainYNPoints", &fNonPixel_FitDiag_MainYNPoints, "FitDiag_MainYNPoints/I")->SetTitle("Number of Points Used in Main Diagonal Y Fit");
-    fTree->Branch("FitDiag_MainYSuccessful", &fNonPixel_FitDiag_MainYSuccessful, "FitDiag_MainYSuccessful/O")->SetTitle("Whether Main Diagonal Y Fitting was Successful");
-    
-    // Secondary diagonal X fit (X vs Charge for pixels on secondary diagonal)
-    fTree->Branch("FitDiag_SecXCenter", &fNonPixel_FitDiag_SecXCenter, "FitDiag_SecXCenter/D")->SetTitle("Fitted X Center from Secondary Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_SecXSigma", &fNonPixel_FitDiag_SecXSigma, "FitDiag_SecXSigma/D")->SetTitle("Fitted X Sigma from Secondary Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_SecXFWHM", &fNonPixel_FitDiag_SecXFWHM, "FitDiag_SecXFWHM/D")->SetTitle("Fitted X FWHM from Secondary Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_SecXAmplitude", &fNonPixel_FitDiag_SecXAmplitude, "FitDiag_SecXAmplitude/D")->SetTitle("Fitted X Amplitude from Secondary Diagonal X Fit");
-    fTree->Branch("FitDiag_SecXCenterErr", &fNonPixel_FitDiag_SecXCenterErr, "FitDiag_SecXCenterErr/D")->SetTitle("Error in Fitted X Center from Secondary Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_SecXSigmaErr", &fNonPixel_FitDiag_SecXSigmaErr, "FitDiag_SecXSigmaErr/D")->SetTitle("Error in Fitted X Sigma from Secondary Diagonal X Fit [mm]");
-    fTree->Branch("FitDiag_SecXFWHMErr", &fNonPixel_FitDiag_SecXFWHMErr, "FitDiag_SecXFWHMErr/D")->SetTitle("Error in Fitted X FWHM [mm]");
-    fTree->Branch("FitDiag_SecXAmplitudeErr", &fNonPixel_FitDiag_SecXAmplitudeErr, "FitDiag_SecXAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude");
-    fTree->Branch("FitDiag_SecXChi2red", &fNonPixel_FitDiag_SecXChi2red, "FitDiag_SecXChi2red/D")->SetTitle("Reduced Chi-squared for Secondary Diagonal X Fit");
-    fTree->Branch("FitDiag_SecXNPoints", &fNonPixel_FitDiag_SecXNPoints, "FitDiag_SecXNPoints/I")->SetTitle("Number of Points Used in Secondary Diagonal X Fit");
-    fTree->Branch("FitDiag_SecXSuccessful", &fNonPixel_FitDiag_SecXSuccessful, "FitDiag_SecXSuccessful/O")->SetTitle("Whether Secondary Diagonal X Fitting was Successful");
-    
-    // Secondary diagonal Y fit (Y vs Charge for pixels on secondary diagonal)
-    fTree->Branch("FitDiag_SecYCenter", &fNonPixel_FitDiag_SecYCenter, "FitDiag_SecYCenter/D")->SetTitle("Fitted Y Center from Secondary Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_SecYSigma", &fNonPixel_FitDiag_SecYSigma, "FitDiag_SecYSigma/D")->SetTitle("Fitted Y Sigma from Secondary Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_SecYFWHM", &fNonPixel_FitDiag_SecYFWHM, "FitDiag_SecYFWHM/D")->SetTitle("Fitted Y FWHM from Secondary Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_SecYAmplitude", &fNonPixel_FitDiag_SecYAmplitude, "FitDiag_SecYAmplitude/D")->SetTitle("Fitted Y Amplitude from Secondary Diagonal Y Fit");
-    fTree->Branch("FitDiag_SecYCenterErr", &fNonPixel_FitDiag_SecYCenterErr, "FitDiag_SecYCenterErr/D")->SetTitle("Error in Fitted Y Center from Secondary Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_SecYSigmaErr", &fNonPixel_FitDiag_SecYSigmaErr, "FitDiag_SecYSigmaErr/D")->SetTitle("Error in Fitted Y Sigma from Secondary Diagonal Y Fit [mm]");
-    fTree->Branch("FitDiag_SecYFWHMErr", &fNonPixel_FitDiag_SecYFWHMErr, "FitDiag_SecYFWHMErr/D")->SetTitle("Error in Fitted Y FWHM [mm]");
-    fTree->Branch("FitDiag_SecYAmplitudeErr", &fNonPixel_FitDiag_SecYAmplitudeErr, "FitDiag_SecYAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude");
-    fTree->Branch("FitDiag_SecYChi2red", &fNonPixel_FitDiag_SecYChi2red, "FitDiag_SecYChi2red/D")->SetTitle("Reduced Chi-squared for Secondary Diagonal Y Fit");
-    fTree->Branch("FitDiag_SecYNPoints", &fNonPixel_FitDiag_SecYNPoints, "FitDiag_SecYNPoints/I")->SetTitle("Number of Points Used in Secondary Diagonal Y Fit");
-    fTree->Branch("FitDiag_SecYSuccessful", &fNonPixel_FitDiag_SecYSuccessful, "FitDiag_SecYSuccessful/O")->SetTitle("Whether Secondary Diagonal Y Fitting was Successful");
-    
-    fTree->Branch("FitDiag_Successful", &fNonPixel_FitDiag_Successful, "FitDiag_Successful/O")->SetTitle("Whether Diagonal Fitting was Successful");
-    
-    // Add branches for delta variables from Gaussian fit estimations vs true position
-    fTree->Branch("GaussRowTrueDeltaX", &fNonPixel_GaussRowTrueDeltaX, "GaussRowTrueDeltaX/D")->SetTitle("Delta X from Row Fit Center to True Position [mm] (x_row_fit - x_true)");
-    fTree->Branch("GaussColumnTrueDeltaY", &fNonPixel_GaussColumnTrueDeltaY, "GaussColumnTrueDeltaY/D")->SetTitle("Delta Y from Column Fit Center to True Position [mm] (y_column_fit - y_true)");
-    fTree->Branch("GaussDiagTrueDeltaX", &fNonPixel_GaussDiagTrueDeltaX, "GaussDiagTrueDeltaX/D")->SetTitle("Delta X from Main Diagonal Fit Center to True Position [mm] (x_diag_fit - x_true)");
-    fTree->Branch("GaussDiagTrueDeltaY", &fNonPixel_GaussDiagTrueDeltaY, "GaussDiagTrueDeltaY/D")->SetTitle("Delta Y from Main Diagonal Fit Center to True Position [mm] (y_diag_fit - y_true)");
-    fTree->Branch("GaussSecDiagTrueDeltaX", &fNonPixel_GaussSecDiagTrueDeltaX, "GaussSecDiagTrueDeltaX/D")->SetTitle("Delta X from Secondary Diagonal Fit Center to True Position [mm] (x_secdiag_fit - x_true)");
-    fTree->Branch("GaussSecDiagTrueDeltaY", &fNonPixel_GaussSecDiagTrueDeltaY, "GaussSecDiagTrueDeltaY/D")->SetTitle("Delta Y from Secondary Diagonal Fit Center to True Position [mm] (y_secdiag_fit - y_true)");
-    
-    // Add branches for 2D Lorentzian fit results (central row and column fitting)
-    fTree->Branch("Fit2D_Lorentz_XCenter", &fNonPixel_Fit2D_Lorentz_XCenter, "Fit2D_Lorentz_XCenter/D")->SetTitle("Fitted X Center from Central Row [mm] (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_XGamma", &fNonPixel_Fit2D_Lorentz_XGamma, "Fit2D_Lorentz_XGamma/D")->SetTitle("Fitted X Gamma (HWHM) from Central Row [mm] (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_XAmplitude", &fNonPixel_Fit2D_Lorentz_XAmplitude, "Fit2D_Lorentz_XAmplitude/D")->SetTitle("Fitted X Amplitude from Central Row (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_XCenterErr", &fNonPixel_Fit2D_Lorentz_XCenterErr, "Fit2D_Lorentz_XCenterErr/D")->SetTitle("Error in Fitted X Center [mm] (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_XGammaErr", &fNonPixel_Fit2D_Lorentz_XGammaErr, "Fit2D_Lorentz_XGammaErr/D")->SetTitle("Error in Fitted X Gamma [mm] (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_XAmplitudeErr", &fNonPixel_Fit2D_Lorentz_XAmplitudeErr, "Fit2D_Lorentz_XAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_XChi2red", &fNonPixel_Fit2D_Lorentz_XChi2red, "Fit2D_Lorentz_XChi2red/D")->SetTitle("Reduced Chi-squared for X Fit (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_XNPoints", &fNonPixel_Fit2D_Lorentz_XNPoints, "Fit2D_Lorentz_XNPoints/I")->SetTitle("Number of Points Used in X Fit (Lorentzian)");
-    
-    fTree->Branch("Fit2D_Lorentz_YCenter", &fNonPixel_Fit2D_Lorentz_YCenter, "Fit2D_Lorentz_YCenter/D")->SetTitle("Fitted Y Center from Central Column [mm] (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_YGamma", &fNonPixel_Fit2D_Lorentz_YGamma, "Fit2D_Lorentz_YGamma/D")->SetTitle("Fitted Y Gamma (HWHM) from Central Column [mm] (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_YAmplitude", &fNonPixel_Fit2D_Lorentz_YAmplitude, "Fit2D_Lorentz_YAmplitude/D")->SetTitle("Fitted Y Amplitude from Central Column (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_YCenterErr", &fNonPixel_Fit2D_Lorentz_YCenterErr, "Fit2D_Lorentz_YCenterErr/D")->SetTitle("Error in Fitted Y Center [mm] (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_YGammaErr", &fNonPixel_Fit2D_Lorentz_YGammaErr, "Fit2D_Lorentz_YGammaErr/D")->SetTitle("Error in Fitted Y Gamma [mm] (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_YAmplitudeErr", &fNonPixel_Fit2D_Lorentz_YAmplitudeErr, "Fit2D_Lorentz_YAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_YChi2red", &fNonPixel_Fit2D_Lorentz_YChi2red, "Fit2D_Lorentz_YChi2red/D")->SetTitle("Reduced Chi-squared for Y Fit (Lorentzian)");
-    fTree->Branch("Fit2D_Lorentz_YNPoints", &fNonPixel_Fit2D_Lorentz_YNPoints, "Fit2D_Lorentz_YNPoints/I")->SetTitle("Number of Points Used in Y Fit (Lorentzian)");
-    
-    fTree->Branch("Fit2D_Lorentz_Successful", &fNonPixel_Fit2D_Lorentz_Successful, "Fit2D_Lorentz_Successful/O")->SetTitle("Whether 2D Lorentzian Fitting was Successful");
-    
-    // Add branches for diagonal Lorentzian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-    // Main diagonal X fit (X vs Charge for pixels on main diagonal)
-    fTree->Branch("FitDiag_Lorentz_MainXCenter", &fNonPixel_FitDiag_Lorentz_MainXCenter, "FitDiag_Lorentz_MainXCenter/D")->SetTitle("Fitted X Center from Main Diagonal X Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainXGamma", &fNonPixel_FitDiag_Lorentz_MainXGamma, "FitDiag_Lorentz_MainXGamma/D")->SetTitle("Fitted X Gamma from Main Diagonal X Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainXAmplitude", &fNonPixel_FitDiag_Lorentz_MainXAmplitude, "FitDiag_Lorentz_MainXAmplitude/D")->SetTitle("Fitted X Amplitude from Main Diagonal X Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainXCenterErr", &fNonPixel_FitDiag_Lorentz_MainXCenterErr, "FitDiag_Lorentz_MainXCenterErr/D")->SetTitle("Error in Fitted X Center from Main Diagonal X Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainXGammaErr", &fNonPixel_FitDiag_Lorentz_MainXGammaErr, "FitDiag_Lorentz_MainXGammaErr/D")->SetTitle("Error in Fitted X Gamma from Main Diagonal X Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainXAmplitudeErr", &fNonPixel_FitDiag_Lorentz_MainXAmplitudeErr, "FitDiag_Lorentz_MainXAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude from Main Diagonal X Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainXChi2red", &fNonPixel_FitDiag_Lorentz_MainXChi2red, "FitDiag_Lorentz_MainXChi2red/D")->SetTitle("Reduced Chi-squared for Main Diagonal X Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainXNPoints", &fNonPixel_FitDiag_Lorentz_MainXNPoints, "FitDiag_Lorentz_MainXNPoints/I")->SetTitle("Number of Points Used in Main Diagonal X Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainXSuccessful", &fNonPixel_FitDiag_Lorentz_MainXSuccessful, "FitDiag_Lorentz_MainXSuccessful/O")->SetTitle("Whether Main Diagonal X Lorentzian Fitting was Successful");
-    
-    // Main diagonal Y fit (Y vs Charge for pixels on main diagonal)
-    fTree->Branch("FitDiag_Lorentz_MainYCenter", &fNonPixel_FitDiag_Lorentz_MainYCenter, "FitDiag_Lorentz_MainYCenter/D")->SetTitle("Fitted Y Center from Main Diagonal Y Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainYGamma", &fNonPixel_FitDiag_Lorentz_MainYGamma, "FitDiag_Lorentz_MainYGamma/D")->SetTitle("Fitted Y Gamma from Main Diagonal Y Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainYAmplitude", &fNonPixel_FitDiag_Lorentz_MainYAmplitude, "FitDiag_Lorentz_MainYAmplitude/D")->SetTitle("Fitted Y Amplitude from Main Diagonal Y Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainYCenterErr", &fNonPixel_FitDiag_Lorentz_MainYCenterErr, "FitDiag_Lorentz_MainYCenterErr/D")->SetTitle("Error in Fitted Y Center from Main Diagonal Y Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainYGammaErr", &fNonPixel_FitDiag_Lorentz_MainYGammaErr, "FitDiag_Lorentz_MainYGammaErr/D")->SetTitle("Error in Fitted Y Gamma from Main Diagonal Y Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainYAmplitudeErr", &fNonPixel_FitDiag_Lorentz_MainYAmplitudeErr, "FitDiag_Lorentz_MainYAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude from Main Diagonal Y Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainYChi2red", &fNonPixel_FitDiag_Lorentz_MainYChi2red, "FitDiag_Lorentz_MainYChi2red/D")->SetTitle("Reduced Chi-squared for Main Diagonal Y Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainYNPoints", &fNonPixel_FitDiag_Lorentz_MainYNPoints, "FitDiag_Lorentz_MainYNPoints/I")->SetTitle("Number of Points Used in Main Diagonal Y Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_MainYSuccessful", &fNonPixel_FitDiag_Lorentz_MainYSuccessful, "FitDiag_Lorentz_MainYSuccessful/O")->SetTitle("Whether Main Diagonal Y Lorentzian Fitting was Successful");
-    
-    // Secondary diagonal X fit (X vs Charge for pixels on secondary diagonal)
-    fTree->Branch("FitDiag_Lorentz_SecXCenter", &fNonPixel_FitDiag_Lorentz_SecXCenter, "FitDiag_Lorentz_SecXCenter/D")->SetTitle("Fitted X Center from Secondary Diagonal X Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecXGamma", &fNonPixel_FitDiag_Lorentz_SecXGamma, "FitDiag_Lorentz_SecXGamma/D")->SetTitle("Fitted X Gamma from Secondary Diagonal X Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecXAmplitude", &fNonPixel_FitDiag_Lorentz_SecXAmplitude, "FitDiag_Lorentz_SecXAmplitude/D")->SetTitle("Fitted X Amplitude from Secondary Diagonal X Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecXCenterErr", &fNonPixel_FitDiag_Lorentz_SecXCenterErr, "FitDiag_Lorentz_SecXCenterErr/D")->SetTitle("Error in Fitted X Center from Secondary Diagonal X Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecXGammaErr", &fNonPixel_FitDiag_Lorentz_SecXGammaErr, "FitDiag_Lorentz_SecXGammaErr/D")->SetTitle("Error in Fitted X Gamma from Secondary Diagonal X Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecXAmplitudeErr", &fNonPixel_FitDiag_Lorentz_SecXAmplitudeErr, "FitDiag_Lorentz_SecXAmplitudeErr/D")->SetTitle("Error in Fitted X Amplitude from Secondary Diagonal X Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecXChi2red", &fNonPixel_FitDiag_Lorentz_SecXChi2red, "FitDiag_Lorentz_SecXChi2red/D")->SetTitle("Reduced Chi-squared for Secondary Diagonal X Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecXNPoints", &fNonPixel_FitDiag_Lorentz_SecXNPoints, "FitDiag_Lorentz_SecXNPoints/I")->SetTitle("Number of Points Used in Secondary Diagonal X Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecXSuccessful", &fNonPixel_FitDiag_Lorentz_SecXSuccessful, "FitDiag_Lorentz_SecXSuccessful/O")->SetTitle("Whether Secondary Diagonal X Lorentzian Fitting was Successful");
-    
-    // Secondary diagonal Y fit (Y vs Charge for pixels on secondary diagonal)
-    fTree->Branch("FitDiag_Lorentz_SecYCenter", &fNonPixel_FitDiag_Lorentz_SecYCenter, "FitDiag_Lorentz_SecYCenter/D")->SetTitle("Fitted Y Center from Secondary Diagonal Y Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecYGamma", &fNonPixel_FitDiag_Lorentz_SecYGamma, "FitDiag_Lorentz_SecYGamma/D")->SetTitle("Fitted Y Gamma from Secondary Diagonal Y Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecYAmplitude", &fNonPixel_FitDiag_Lorentz_SecYAmplitude, "FitDiag_Lorentz_SecYAmplitude/D")->SetTitle("Fitted Y Amplitude from Secondary Diagonal Y Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecYCenterErr", &fNonPixel_FitDiag_Lorentz_SecYCenterErr, "FitDiag_Lorentz_SecYCenterErr/D")->SetTitle("Error in Fitted Y Center from Secondary Diagonal Y Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecYGammaErr", &fNonPixel_FitDiag_Lorentz_SecYGammaErr, "FitDiag_Lorentz_SecYGammaErr/D")->SetTitle("Error in Fitted Y Gamma from Secondary Diagonal Y Fit [mm] (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecYAmplitudeErr", &fNonPixel_FitDiag_Lorentz_SecYAmplitudeErr, "FitDiag_Lorentz_SecYAmplitudeErr/D")->SetTitle("Error in Fitted Y Amplitude from Secondary Diagonal Y Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecYChi2red", &fNonPixel_FitDiag_Lorentz_SecYChi2red, "FitDiag_Lorentz_SecYChi2red/D")->SetTitle("Reduced Chi-squared for Secondary Diagonal Y Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecYNPoints", &fNonPixel_FitDiag_Lorentz_SecYNPoints, "FitDiag_Lorentz_SecYNPoints/I")->SetTitle("Number of Points Used in Secondary Diagonal Y Fit (Lorentzian)");
-    fTree->Branch("FitDiag_Lorentz_SecYSuccessful", &fNonPixel_FitDiag_Lorentz_SecYSuccessful, "FitDiag_Lorentz_SecYSuccessful/O")->SetTitle("Whether Secondary Diagonal Y Lorentzian Fitting was Successful");
-    
-    fTree->Branch("FitDiag_Lorentz_Successful", &fNonPixel_FitDiag_Lorentz_Successful, "FitDiag_Lorentz_Successful/O")->SetTitle("Whether Diagonal Lorentzian Fitting was Successful");
-    
-    // Add branches for delta variables from Lorentzian fit estimations vs true position
-    fTree->Branch("LorentzRowTrueDeltaX", &fNonPixel_LorentzRowTrueDeltaX, "LorentzRowTrueDeltaX/D")->SetTitle("Delta X from Row Fit Center to True Position [mm] (x_row_fit - x_true) (Lorentzian)");
-    fTree->Branch("LorentzColumnTrueDeltaY", &fNonPixel_LorentzColumnTrueDeltaY, "LorentzColumnTrueDeltaY/D")->SetTitle("Delta Y from Column Fit Center to True Position [mm] (y_column_fit - y_true) (Lorentzian)");
-    fTree->Branch("LorentzDiagTrueDeltaX", &fNonPixel_LorentzDiagTrueDeltaX, "LorentzDiagTrueDeltaX/D")->SetTitle("Delta X from Main Diagonal Fit Center to True Position [mm] (x_diag_fit - x_true) (Lorentzian)");
-    fTree->Branch("LorentzDiagTrueDeltaY", &fNonPixel_LorentzDiagTrueDeltaY, "LorentzDiagTrueDeltaY/D")->SetTitle("Delta Y from Main Diagonal Fit Center to True Position [mm] (y_diag_fit - y_true) (Lorentzian)");
-    fTree->Branch("LorentzSecDiagTrueDeltaX", &fNonPixel_LorentzSecDiagTrueDeltaX, "LorentzSecDiagTrueDeltaX/D")->SetTitle("Delta X from Secondary Diagonal Fit Center to True Position [mm] (x_secdiag_fit - x_true) (Lorentzian)");
-    fTree->Branch("LorentzSecDiagTrueDeltaY", &fNonPixel_LorentzSecDiagTrueDeltaY, "LorentzSecDiagTrueDeltaY/D")->SetTitle("Delta Y from Secondary Diagonal Fit Center to True Position [mm] (y_secdiag_fit - y_true) (Lorentzian)");
-    
+
     G4cout << "Created ROOT file and tree successfully: " << fileName << G4endl;
   }
   catch (std::exception& e) {
@@ -719,20 +713,7 @@ void RunAction::SetNearestPixelPosition(G4double x, G4double y, G4double z)
     fPixelZ = z;
 }
 
-void RunAction::SetPixelIndices(G4int i, G4int j, G4double distance)
-{
-    // Store pixel indices and distance to center
-    fPixelI = i;
-    fPixelJ = j;
-    // Note: The delta values will be set separately in SetPixelClassification
-    // This method signature is kept for compatibility but distance parameter is no longer used
-}
 
-void RunAction::SetPixelAlpha(G4double alpha)
-{
-    // Store the angular size of the pixel from hit position (in degrees)
-    fPixelHit_PixelAlpha = alpha;
-}
 
 void RunAction::SetPixelClassification(G4bool isWithinD0, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY)
 {
@@ -748,14 +729,10 @@ void RunAction::SetPixelHitStatus(G4bool isPixelHit)
     fIsPixelHit = isPixelHit;
 }
 
-void RunAction::SetNeighborhoodGridData(const std::vector<G4double>& angles, 
-                               const std::vector<G4int>& pixelI, 
-                               const std::vector<G4int>& pixelJ)
+void RunAction::SetNeighborhoodGridData(const std::vector<G4double>& angles)
 {
     // Store the neighborhood (9x9) grid angle data for non-pixel hits
     fNonPixel_GridNeighborhoodAngles = angles;
-    fNonPixel_GridNeighborhoodPixelI = pixelI;
-    fNonPixel_GridNeighborhoodPixelJ = pixelJ;
 }
 
 void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
@@ -811,313 +788,329 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
 
 void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4double x_amplitude,
                                         G4double x_center_err, G4double x_sigma_err, G4double x_amplitude_err,
-                                        G4double x_chi2red, G4int x_npoints,
+                                        G4double x_vertical_offset, G4double x_vertical_offset_err,
+                                        G4double x_chi2red, G4double x_pp, G4int x_dof,
                                         G4double y_center, G4double y_sigma, G4double y_amplitude,
                                         G4double y_center_err, G4double y_sigma_err, G4double y_amplitude_err,
-                                        G4double y_chi2red, G4int y_npoints,
+                                        G4double y_vertical_offset, G4double y_vertical_offset_err,
+                                        G4double y_chi2red, G4double y_pp, G4int y_dof,
                                         G4bool fit_successful)
 {
     // Store 2D Gaussian fit results from central row (X fit)
-    fNonPixel_Fit2D_XCenter = x_center;
-    fNonPixel_Fit2D_XSigma = x_sigma;
-    fNonPixel_Fit2D_XFWHM = x_sigma * 2.35482; // FWHM = 2.35482 * sigma
-    fNonPixel_Fit2D_XAmplitude = x_amplitude;
-    fNonPixel_Fit2D_XCenterErr = x_center_err;
-    fNonPixel_Fit2D_XSigmaErr = x_sigma_err;
-    fNonPixel_Fit2D_XFWHMErr = x_sigma_err * 2.35482; // FWHM error = 2.35482 * sigma error
-    fNonPixel_Fit2D_XAmplitudeErr = x_amplitude_err;
-    fNonPixel_Fit2D_XChi2red = x_chi2red;
-    fNonPixel_Fit2D_XNPoints = x_npoints;
+    fGaussFitRowCenter = x_center;
+    fGaussFitRowStdev = x_sigma;
+    fGaussFitRowAmplitude = x_amplitude;
+    fGaussFitRowCenterErr = x_center_err;
+    fGaussFitRowStdevErr = x_sigma_err;
+    fGaussFitRowAmplitudeErr = x_amplitude_err;
+    fGaussFitRowVerticalOffset = x_vertical_offset;
+    fGaussFitRowVerticalOffsetErr = x_vertical_offset_err;
+    fGaussFitRowChi2red = x_chi2red;
+    fGaussFitRowPp = x_pp;
+    fGaussFitRowDOF = x_dof;
     
     // Store 2D Gaussian fit results from central column (Y fit)
-    fNonPixel_Fit2D_YCenter = y_center;
-    fNonPixel_Fit2D_YSigma = y_sigma;
-    fNonPixel_Fit2D_YFWHM = y_sigma * 2.35482; // FWHM = 2.35482 * sigma
-    fNonPixel_Fit2D_YAmplitude = y_amplitude;
-    fNonPixel_Fit2D_YCenterErr = y_center_err;
-    fNonPixel_Fit2D_YSigmaErr = y_sigma_err;
-    fNonPixel_Fit2D_YFWHMErr = y_sigma_err * 2.35482; // FWHM error = 2.35482 * sigma error
-    fNonPixel_Fit2D_YAmplitudeErr = y_amplitude_err;
-    fNonPixel_Fit2D_YChi2red = y_chi2red;
-    fNonPixel_Fit2D_YNPoints = y_npoints;
-    
-    // Store overall fit success status
-    fNonPixel_Fit2D_Successful = fit_successful;
+    fGaussFitColumnCenter = y_center;
+    fGaussFitColumnStdev = y_sigma;
+    fGaussFitColumnAmplitude = y_amplitude;
+    fGaussFitColumnCenterErr = y_center_err;
+    fGaussFitColumnStdevErr = y_sigma_err;
+    fGaussFitColumnAmplitudeErr = y_amplitude_err;
+    fGaussFitColumnVerticalOffset = y_vertical_offset;
+    fGaussFitColumnVerticalOffsetErr = y_vertical_offset_err;
+    fGaussFitColumnChi2red = y_chi2red;
+    fGaussFitColumnPp = y_pp;
+    fGaussFitColumnDOF = y_dof;
     
     // Calculate delta values for row and column fits vs true position
     // Use individual fit validity checks similar to diagonal fits for consistency
     if (fit_successful) {
-        // Check X fit validity (row fit) - use npoints as success indicator
-        if (x_npoints > 0) {
-            fNonPixel_GaussRowTrueDeltaX = x_center - fTrueX;      // x_row_fit - x_true
+        // Check X fit validity (row fit) - use dof as success indicator
+        if (x_dof > 0) {
+            fGaussRowDeltaX = x_center - fTrueX;      // x_row_fit - x_true
         } else {
-            fNonPixel_GaussRowTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+            fGaussRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
-        // Check Y fit validity (column fit) - use npoints as success indicator  
-        if (y_npoints > 0) {
-            fNonPixel_GaussColumnTrueDeltaY = y_center - fTrueY;   // y_column_fit - y_true
+        // Check Y fit validity (column fit) - use dof as success indicator  
+        if (y_dof > 0) {
+            fGaussColumnDeltaY = y_center - fTrueY;   // y_column_fit - y_true
         } else {
-            fNonPixel_GaussColumnTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+            fGaussColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
     } else {
         // Set row and column delta values to NaN for failed overall fits
-        fNonPixel_GaussRowTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_GaussColumnTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 }
 
 void RunAction::SetDiagonalGaussianFitResults(G4double main_diag_x_center, G4double main_diag_x_sigma, G4double main_diag_x_amplitude,
                                              G4double main_diag_x_center_err, G4double main_diag_x_sigma_err, G4double main_diag_x_amplitude_err,
-                                             G4double main_diag_x_chi2red, G4int main_diag_x_npoints, G4bool main_diag_x_fit_successful,
+                                             G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
+                                             G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
                                              G4double main_diag_y_center, G4double main_diag_y_sigma, G4double main_diag_y_amplitude,
                                              G4double main_diag_y_center_err, G4double main_diag_y_sigma_err, G4double main_diag_y_amplitude_err,
-                                             G4double main_diag_y_chi2red, G4int main_diag_y_npoints, G4bool main_diag_y_fit_successful,
+                                             G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
+                                             G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
                                              G4double sec_diag_x_center, G4double sec_diag_x_sigma, G4double sec_diag_x_amplitude,
                                              G4double sec_diag_x_center_err, G4double sec_diag_x_sigma_err, G4double sec_diag_x_amplitude_err,
-                                             G4double sec_diag_x_chi2red, G4int sec_diag_x_npoints, G4bool sec_diag_x_fit_successful,
+                                             G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
+                                             G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
                                              G4double sec_diag_y_center, G4double sec_diag_y_sigma, G4double sec_diag_y_amplitude,
                                              G4double sec_diag_y_center_err, G4double sec_diag_y_sigma_err, G4double sec_diag_y_amplitude_err,
-                                             G4double sec_diag_y_chi2red, G4int sec_diag_y_npoints, G4bool sec_diag_y_fit_successful,
+                                             G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
+                                             G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
                                              G4bool fit_successful)
 {
     // Store main diagonal X fit results
-    fNonPixel_FitDiag_MainXCenter = main_diag_x_center;
-    fNonPixel_FitDiag_MainXSigma = main_diag_x_sigma;
-    fNonPixel_FitDiag_MainXFWHM = main_diag_x_sigma * 2.35482; // FWHM = 2.35482 * sigma
-    fNonPixel_FitDiag_MainXAmplitude = main_diag_x_amplitude;
-    fNonPixel_FitDiag_MainXCenterErr = main_diag_x_center_err;
-    fNonPixel_FitDiag_MainXSigmaErr = main_diag_x_sigma_err;
-    fNonPixel_FitDiag_MainXFWHMErr = main_diag_x_sigma_err * 2.35482; // FWHM error = 2.35482 * sigma error
-    fNonPixel_FitDiag_MainXAmplitudeErr = main_diag_x_amplitude_err;
-    fNonPixel_FitDiag_MainXChi2red = main_diag_x_chi2red;
-    fNonPixel_FitDiag_MainXNPoints = main_diag_x_npoints;
-    fNonPixel_FitDiag_MainXSuccessful = main_diag_x_fit_successful;
+    fGaussFitMainDiagXCenter = main_diag_x_center;
+    fGaussFitMainDiagXStdev = main_diag_x_sigma;
+    fGaussFitMainDiagXAmplitude = main_diag_x_amplitude;
+    fGaussFitMainDiagXCenterErr = main_diag_x_center_err;
+    fGaussFitMainDiagXStdevErr = main_diag_x_sigma_err;
+    fGaussFitMainDiagXAmplitudeErr = main_diag_x_amplitude_err;
+    fGaussFitMainDiagXVerticalOffset = main_diag_x_vertical_offset;
+    fGaussFitMainDiagXVerticalOffsetErr = main_diag_x_vertical_offset_err;
+    fGaussFitMainDiagXChi2red = main_diag_x_chi2red;
+    fGaussFitMainDiagXPp = main_diag_x_pp;
+    fGaussFitMainDiagXDOF = main_diag_x_dof;
     
     // Store main diagonal Y fit results
-    fNonPixel_FitDiag_MainYCenter = main_diag_y_center;
-    fNonPixel_FitDiag_MainYSigma = main_diag_y_sigma;
-    fNonPixel_FitDiag_MainYFWHM = main_diag_y_sigma * 2.35482; // FWHM = 2.35482 * sigma
-    fNonPixel_FitDiag_MainYAmplitude = main_diag_y_amplitude;
-    fNonPixel_FitDiag_MainYCenterErr = main_diag_y_center_err;
-    fNonPixel_FitDiag_MainYSigmaErr = main_diag_y_sigma_err;
-    fNonPixel_FitDiag_MainYFWHMErr = main_diag_y_sigma_err * 2.35482; // FWHM error = 2.35482 * sigma error
-    fNonPixel_FitDiag_MainYAmplitudeErr = main_diag_y_amplitude_err;
-    fNonPixel_FitDiag_MainYChi2red = main_diag_y_chi2red;
-    fNonPixel_FitDiag_MainYNPoints = main_diag_y_npoints;
-    fNonPixel_FitDiag_MainYSuccessful = main_diag_y_fit_successful;
+    fGaussFitMainDiagYCenter = main_diag_y_center;
+    fGaussFitMainDiagYStdev = main_diag_y_sigma;
+    fGaussFitMainDiagYAmplitude = main_diag_y_amplitude;
+    fGaussFitMainDiagYCenterErr = main_diag_y_center_err;
+    fGaussFitMainDiagYStdevErr = main_diag_y_sigma_err;
+    fGaussFitMainDiagYAmplitudeErr = main_diag_y_amplitude_err;
+    fGaussFitMainDiagYVerticalOffset = main_diag_y_vertical_offset;
+    fGaussFitMainDiagYVerticalOffsetErr = main_diag_y_vertical_offset_err;
+    fGaussFitMainDiagYChi2red = main_diag_y_chi2red;
+    fGaussFitMainDiagYPp = main_diag_y_pp;
+    fGaussFitMainDiagYDOF = main_diag_y_dof;
     
     // Store secondary diagonal X fit results
-    fNonPixel_FitDiag_SecXCenter = sec_diag_x_center;
-    fNonPixel_FitDiag_SecXSigma = sec_diag_x_sigma;
-    fNonPixel_FitDiag_SecXFWHM = sec_diag_x_sigma * 2.35482; // FWHM = 2.35482 * sigma
-    fNonPixel_FitDiag_SecXAmplitude = sec_diag_x_amplitude;
-    fNonPixel_FitDiag_SecXCenterErr = sec_diag_x_center_err;
-    fNonPixel_FitDiag_SecXSigmaErr = sec_diag_x_sigma_err;
-    fNonPixel_FitDiag_SecXFWHMErr = sec_diag_x_sigma_err * 2.35482; // FWHM error = 2.35482 * sigma error
-    fNonPixel_FitDiag_SecXAmplitudeErr = sec_diag_x_amplitude_err;
-    fNonPixel_FitDiag_SecXChi2red = sec_diag_x_chi2red;
-    fNonPixel_FitDiag_SecXNPoints = sec_diag_x_npoints;
-    fNonPixel_FitDiag_SecXSuccessful = sec_diag_x_fit_successful;
+    fGaussFitSecondDiagXCenter = sec_diag_x_center;
+    fGaussFitSecondDiagXStdev = sec_diag_x_sigma;
+    fGaussFitSecondDiagXAmplitude = sec_diag_x_amplitude;
+    fGaussFitSecondDiagXCenterErr = sec_diag_x_center_err;
+    fGaussFitSecondDiagXStdevErr = sec_diag_x_sigma_err;
+    fGaussFitSecondDiagXAmplitudeErr = sec_diag_x_amplitude_err;
+    fGaussFitSecondDiagXVerticalOffset = sec_diag_x_vertical_offset;
+    fGaussFitSecondDiagXVerticalOffsetErr = sec_diag_x_vertical_offset_err;
+    fGaussFitSecondDiagXChi2red = sec_diag_x_chi2red;
+    fGaussFitSecondDiagXPp = sec_diag_x_pp;
+    fGaussFitSecondDiagXDOF = sec_diag_x_dof;
     
     // Store secondary diagonal Y fit results
-    fNonPixel_FitDiag_SecYCenter = sec_diag_y_center;
-    fNonPixel_FitDiag_SecYSigma = sec_diag_y_sigma;
-    fNonPixel_FitDiag_SecYFWHM = sec_diag_y_sigma * 2.35482; // FWHM = 2.35482 * sigma
-    fNonPixel_FitDiag_SecYAmplitude = sec_diag_y_amplitude;
-    fNonPixel_FitDiag_SecYCenterErr = sec_diag_y_center_err;
-    fNonPixel_FitDiag_SecYSigmaErr = sec_diag_y_sigma_err;
-    fNonPixel_FitDiag_SecYFWHMErr = sec_diag_y_sigma_err * 2.35482; // FWHM error = 2.35482 * sigma error
-    fNonPixel_FitDiag_SecYAmplitudeErr = sec_diag_y_amplitude_err;
-    fNonPixel_FitDiag_SecYChi2red = sec_diag_y_chi2red;
-    fNonPixel_FitDiag_SecYNPoints = sec_diag_y_npoints;
-    fNonPixel_FitDiag_SecYSuccessful = sec_diag_y_fit_successful;
-    
-    // Store overall fit success status
-    fNonPixel_FitDiag_Successful = fit_successful;
+    fGaussFitSecondDiagYCenter = sec_diag_y_center;
+    fGaussFitSecondDiagYStdev = sec_diag_y_sigma;
+    fGaussFitSecondDiagYAmplitude = sec_diag_y_amplitude;
+    fGaussFitSecondDiagYCenterErr = sec_diag_y_center_err;
+    fGaussFitSecondDiagYStdevErr = sec_diag_y_sigma_err;
+    fGaussFitSecondDiagYAmplitudeErr = sec_diag_y_amplitude_err;
+    fGaussFitSecondDiagYVerticalOffset = sec_diag_y_vertical_offset;
+    fGaussFitSecondDiagYVerticalOffsetErr = sec_diag_y_vertical_offset_err;
+    fGaussFitSecondDiagYChi2red = sec_diag_y_chi2red;
+    fGaussFitSecondDiagYPp = sec_diag_y_pp;
+    fGaussFitSecondDiagYDOF = sec_diag_y_dof;
     
     // Calculate delta values for diagonal fits vs true position
     if (fit_successful) {
         // Main diagonal delta values (using X and Y centers from main diagonal fits)
         if (main_diag_x_fit_successful) {
-            fNonPixel_GaussDiagTrueDeltaX = main_diag_x_center - fTrueX;  // x_diag_fit - x_true
+            fGaussMainDiagDeltaX = main_diag_x_center - fTrueX;  // x_diag_fit - x_true
         } else {
-            fNonPixel_GaussDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+            fGaussMainDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         if (main_diag_y_fit_successful) {
-            fNonPixel_GaussDiagTrueDeltaY = main_diag_y_center - fTrueY;  // y_diag_fit - y_true
+            fGaussMainDiagDeltaY = main_diag_y_center - fTrueY;  // y_diag_fit - y_true
         } else {
-            fNonPixel_GaussDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+            fGaussMainDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         // Secondary diagonal delta values (using X and Y centers from secondary diagonal fits)
         if (sec_diag_x_fit_successful) {
-            fNonPixel_GaussSecDiagTrueDeltaX = sec_diag_x_center - fTrueX;  // x_secdiag_fit - x_true
+            fGaussSecondDiagDeltaX = sec_diag_x_center - fTrueX;  // x_secdiag_fit - x_true
         } else {
-            fNonPixel_GaussSecDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+            fGaussSecondDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         if (sec_diag_y_fit_successful) {
-            fNonPixel_GaussSecDiagTrueDeltaY = sec_diag_y_center - fTrueY;  // y_secdiag_fit - y_true
+            fGaussSecondDiagDeltaY = sec_diag_y_center - fTrueY;  // y_secdiag_fit - y_true
         } else {
-            fNonPixel_GaussSecDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+            fGaussSecondDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
     } else {
         // For failed overall diagonal fitting, set all delta values to NaN
-        fNonPixel_GaussDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_GaussDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_GaussSecDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_GaussSecDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussMainDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussMainDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussSecondDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussSecondDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 }
 
 void RunAction::Set2DLorentzianFitResults(G4double x_center, G4double x_gamma, G4double x_amplitude,
                                           G4double x_center_err, G4double x_gamma_err, G4double x_amplitude_err,
-                                          G4double x_chi2red, G4int x_npoints,
+                                          G4double x_vertical_offset, G4double x_vertical_offset_err,
+                                          G4double x_chi2red, G4double x_pp, G4int x_dof,
                                           G4double y_center, G4double y_gamma, G4double y_amplitude,
                                           G4double y_center_err, G4double y_gamma_err, G4double y_amplitude_err,
-                                          G4double y_chi2red, G4int y_npoints,
+                                          G4double y_vertical_offset, G4double y_vertical_offset_err,
+                                          G4double y_chi2red, G4double y_pp, G4int y_dof,
                                           G4bool fit_successful)
 {
     // Store 2D Lorentzian fit results from central row (X fit)
-    fNonPixel_Fit2D_Lorentz_XCenter = x_center;
-    fNonPixel_Fit2D_Lorentz_XGamma = x_gamma;
-    fNonPixel_Fit2D_Lorentz_XAmplitude = x_amplitude;
-    fNonPixel_Fit2D_Lorentz_XCenterErr = x_center_err;
-    fNonPixel_Fit2D_Lorentz_XGammaErr = x_gamma_err;
-    fNonPixel_Fit2D_Lorentz_XAmplitudeErr = x_amplitude_err;
-    fNonPixel_Fit2D_Lorentz_XChi2red = x_chi2red;
-    fNonPixel_Fit2D_Lorentz_XNPoints = x_npoints;
+    fLorentzFitRowCenter = x_center;
+    fLorentzFitRowGamma = x_gamma;
+    fLorentzFitRowAmplitude = x_amplitude;
+    fLorentzFitRowCenterErr = x_center_err;
+    fLorentzFitRowGammaErr = x_gamma_err;
+    fLorentzFitRowAmplitudeErr = x_amplitude_err;
+    fLorentzFitRowVerticalOffset = x_vertical_offset;
+    fLorentzFitRowVerticalOffsetErr = x_vertical_offset_err;
+    fLorentzFitRowChi2red = x_chi2red;
+    fLorentzFitRowPp = x_pp;
+    fLorentzFitRowDOF = x_dof;
     
     // Store 2D Lorentzian fit results from central column (Y fit)
-    fNonPixel_Fit2D_Lorentz_YCenter = y_center;
-    fNonPixel_Fit2D_Lorentz_YGamma = y_gamma;
-    fNonPixel_Fit2D_Lorentz_YAmplitude = y_amplitude;
-    fNonPixel_Fit2D_Lorentz_YCenterErr = y_center_err;
-    fNonPixel_Fit2D_Lorentz_YGammaErr = y_gamma_err;
-    fNonPixel_Fit2D_Lorentz_YAmplitudeErr = y_amplitude_err;
-    fNonPixel_Fit2D_Lorentz_YChi2red = y_chi2red;
-    fNonPixel_Fit2D_Lorentz_YNPoints = y_npoints;
-    
-    // Store overall fit success status
-    fNonPixel_Fit2D_Lorentz_Successful = fit_successful;
+    fLorentzFitColumnCenter = y_center;
+    fLorentzFitColumnGamma = y_gamma;
+    fLorentzFitColumnAmplitude = y_amplitude;
+    fLorentzFitColumnCenterErr = y_center_err;
+    fLorentzFitColumnGammaErr = y_gamma_err;
+    fLorentzFitColumnAmplitudeErr = y_amplitude_err;
+    fLorentzFitColumnVerticalOffset = y_vertical_offset;
+    fLorentzFitColumnVerticalOffsetErr = y_vertical_offset_err;
+    fLorentzFitColumnChi2red = y_chi2red;
+    fLorentzFitColumnPp = y_pp;
+    fLorentzFitColumnDOF = y_dof;
     
     // Calculate delta values for row and column fits vs true position
     if (fit_successful) {
-        // Check X fit validity (row fit) - use npoints as success indicator
-        if (x_npoints > 0) {
-            fNonPixel_LorentzRowTrueDeltaX = x_center - fTrueX;      // x_row_fit - x_true
+        // Check X fit validity (row fit) - use dof as success indicator
+        if (x_dof > 0) {
+            fLorentzRowDeltaX = x_center - fTrueX;      // x_row_fit - x_true
         } else {
-            fNonPixel_LorentzRowTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+            fLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
-        // Check Y fit validity (column fit) - use npoints as success indicator  
-        if (y_npoints > 0) {
-            fNonPixel_LorentzColumnTrueDeltaY = y_center - fTrueY;   // y_column_fit - y_true
+        // Check Y fit validity (column fit) - use dof as success indicator  
+        if (y_dof > 0) {
+            fLorentzColumnDeltaY = y_center - fTrueY;   // y_column_fit - y_true
         } else {
-            fNonPixel_LorentzColumnTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+            fLorentzColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
     } else {
         // Set row and column delta values to NaN for failed overall fits
-        fNonPixel_LorentzRowTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_LorentzColumnTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 }
 
 void RunAction::SetDiagonalLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_amplitude,
                                                G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_amplitude_err,
-                                               G4double main_diag_x_chi2red, G4int main_diag_x_npoints, G4bool main_diag_x_fit_successful,
+                                               G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
+                                               G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
                                                G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_amplitude,
                                                G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_amplitude_err,
-                                               G4double main_diag_y_chi2red, G4int main_diag_y_npoints, G4bool main_diag_y_fit_successful,
+                                               G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
+                                               G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
                                                G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_amplitude,
                                                G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_amplitude_err,
-                                               G4double sec_diag_x_chi2red, G4int sec_diag_x_npoints, G4bool sec_diag_x_fit_successful,
+                                               G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
+                                               G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
                                                G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_amplitude,
                                                G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_amplitude_err,
-                                               G4double sec_diag_y_chi2red, G4int sec_diag_y_npoints, G4bool sec_diag_y_fit_successful,
+                                               G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
+                                               G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
                                                G4bool fit_successful)
 {
     // Store main diagonal X fit results
-    fNonPixel_FitDiag_Lorentz_MainXCenter = main_diag_x_center;
-    fNonPixel_FitDiag_Lorentz_MainXGamma = main_diag_x_gamma;
-    fNonPixel_FitDiag_Lorentz_MainXAmplitude = main_diag_x_amplitude;
-    fNonPixel_FitDiag_Lorentz_MainXCenterErr = main_diag_x_center_err;
-    fNonPixel_FitDiag_Lorentz_MainXGammaErr = main_diag_x_gamma_err;
-    fNonPixel_FitDiag_Lorentz_MainXAmplitudeErr = main_diag_x_amplitude_err;
-    fNonPixel_FitDiag_Lorentz_MainXChi2red = main_diag_x_chi2red;
-    fNonPixel_FitDiag_Lorentz_MainXNPoints = main_diag_x_npoints;
-    fNonPixel_FitDiag_Lorentz_MainXSuccessful = main_diag_x_fit_successful;
+    fLorentzFitMainDiagXCenter = main_diag_x_center;
+    fLorentzFitMainDiagXGamma = main_diag_x_gamma;
+    fLorentzFitMainDiagXAmplitude = main_diag_x_amplitude;
+    fLorentzFitMainDiagXCenterErr = main_diag_x_center_err;
+    fLorentzFitMainDiagXGammaErr = main_diag_x_gamma_err;
+    fLorentzFitMainDiagXAmplitudeErr = main_diag_x_amplitude_err;
+    fLorentzFitMainDiagXVerticalOffset = main_diag_x_vertical_offset;
+    fLorentzFitMainDiagXVerticalOffsetErr = main_diag_x_vertical_offset_err;
+    fLorentzFitMainDiagXChi2red = main_diag_x_chi2red;
+    fLorentzFitMainDiagXPp = main_diag_x_pp;
+    fLorentzFitMainDiagXDOF = main_diag_x_dof;
     
     // Store main diagonal Y fit results
-    fNonPixel_FitDiag_Lorentz_MainYCenter = main_diag_y_center;
-    fNonPixel_FitDiag_Lorentz_MainYGamma = main_diag_y_gamma;
-    fNonPixel_FitDiag_Lorentz_MainYAmplitude = main_diag_y_amplitude;
-    fNonPixel_FitDiag_Lorentz_MainYCenterErr = main_diag_y_center_err;
-    fNonPixel_FitDiag_Lorentz_MainYGammaErr = main_diag_y_gamma_err;
-    fNonPixel_FitDiag_Lorentz_MainYAmplitudeErr = main_diag_y_amplitude_err;
-    fNonPixel_FitDiag_Lorentz_MainYChi2red = main_diag_y_chi2red;
-    fNonPixel_FitDiag_Lorentz_MainYNPoints = main_diag_y_npoints;
-    fNonPixel_FitDiag_Lorentz_MainYSuccessful = main_diag_y_fit_successful;
+    fLorentzFitMainDiagYCenter = main_diag_y_center;
+    fLorentzFitMainDiagYGamma = main_diag_y_gamma;
+    fLorentzFitMainDiagYAmplitude = main_diag_y_amplitude;
+    fLorentzFitMainDiagYCenterErr = main_diag_y_center_err;
+    fLorentzFitMainDiagYGammaErr = main_diag_y_gamma_err;
+    fLorentzFitMainDiagYAmplitudeErr = main_diag_y_amplitude_err;
+    fLorentzFitMainDiagYVerticalOffset = main_diag_y_vertical_offset;
+    fLorentzFitMainDiagYVerticalOffsetErr = main_diag_y_vertical_offset_err;
+    fLorentzFitMainDiagYChi2red = main_diag_y_chi2red;
+    fLorentzFitMainDiagYPp = main_diag_y_pp;
+    fLorentzFitMainDiagYDOF = main_diag_y_dof;
     
     // Store secondary diagonal X fit results
-    fNonPixel_FitDiag_Lorentz_SecXCenter = sec_diag_x_center;
-    fNonPixel_FitDiag_Lorentz_SecXGamma = sec_diag_x_gamma;
-    fNonPixel_FitDiag_Lorentz_SecXAmplitude = sec_diag_x_amplitude;
-    fNonPixel_FitDiag_Lorentz_SecXCenterErr = sec_diag_x_center_err;
-    fNonPixel_FitDiag_Lorentz_SecXGammaErr = sec_diag_x_gamma_err;
-    fNonPixel_FitDiag_Lorentz_SecXAmplitudeErr = sec_diag_x_amplitude_err;
-    fNonPixel_FitDiag_Lorentz_SecXChi2red = sec_diag_x_chi2red;
-    fNonPixel_FitDiag_Lorentz_SecXNPoints = sec_diag_x_npoints;
-    fNonPixel_FitDiag_Lorentz_SecXSuccessful = sec_diag_x_fit_successful;
+    fLorentzFitSecondDiagXCenter = sec_diag_x_center;
+    fLorentzFitSecondDiagXGamma = sec_diag_x_gamma;
+    fLorentzFitSecondDiagXAmplitude = sec_diag_x_amplitude;
+    fLorentzFitSecondDiagXCenterErr = sec_diag_x_center_err;
+    fLorentzFitSecondDiagXGammaErr = sec_diag_x_gamma_err;
+    fLorentzFitSecondDiagXAmplitudeErr = sec_diag_x_amplitude_err;
+    fLorentzFitSecondDiagXVerticalOffset = sec_diag_x_vertical_offset;
+    fLorentzFitSecondDiagXVerticalOffsetErr = sec_diag_x_vertical_offset_err;
+    fLorentzFitSecondDiagXChi2red = sec_diag_x_chi2red;
+    fLorentzFitSecondDiagXPp = sec_diag_x_pp;
+    fLorentzFitSecondDiagXDOF = sec_diag_x_dof;
     
     // Store secondary diagonal Y fit results
-    fNonPixel_FitDiag_Lorentz_SecYCenter = sec_diag_y_center;
-    fNonPixel_FitDiag_Lorentz_SecYGamma = sec_diag_y_gamma;
-    fNonPixel_FitDiag_Lorentz_SecYAmplitude = sec_diag_y_amplitude;
-    fNonPixel_FitDiag_Lorentz_SecYCenterErr = sec_diag_y_center_err;
-    fNonPixel_FitDiag_Lorentz_SecYGammaErr = sec_diag_y_gamma_err;
-    fNonPixel_FitDiag_Lorentz_SecYAmplitudeErr = sec_diag_y_amplitude_err;
-    fNonPixel_FitDiag_Lorentz_SecYChi2red = sec_diag_y_chi2red;
-    fNonPixel_FitDiag_Lorentz_SecYNPoints = sec_diag_y_npoints;
-    fNonPixel_FitDiag_Lorentz_SecYSuccessful = sec_diag_y_fit_successful;
-    
-    // Store overall fit success status
-    fNonPixel_FitDiag_Lorentz_Successful = fit_successful;
+    fLorentzFitSecondDiagYCenter = sec_diag_y_center;
+    fLorentzFitSecondDiagYGamma = sec_diag_y_gamma;
+    fLorentzFitSecondDiagYAmplitude = sec_diag_y_amplitude;
+    fLorentzFitSecondDiagYCenterErr = sec_diag_y_center_err;
+    fLorentzFitSecondDiagYGammaErr = sec_diag_y_gamma_err;
+    fLorentzFitSecondDiagYAmplitudeErr = sec_diag_y_amplitude_err;
+    fLorentzFitSecondDiagYVerticalOffset = sec_diag_y_vertical_offset;
+    fLorentzFitSecondDiagYVerticalOffsetErr = sec_diag_y_vertical_offset_err;
+    fLorentzFitSecondDiagYChi2red = sec_diag_y_chi2red;
+    fLorentzFitSecondDiagYPp = sec_diag_y_pp;
+    fLorentzFitSecondDiagYDOF = sec_diag_y_dof;
     
     // Calculate delta values for diagonal fits vs true position
     if (fit_successful) {
         // Main diagonal delta values (using X and Y centers from main diagonal fits)
         if (main_diag_x_fit_successful) {
-            fNonPixel_LorentzDiagTrueDeltaX = main_diag_x_center - fTrueX;  // x_diag_fit - x_true
+            fLorentzMainDiagDeltaX = main_diag_x_center - fTrueX;  // x_diag_fit - x_true
         } else {
-            fNonPixel_LorentzDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+            fLorentzMainDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         if (main_diag_y_fit_successful) {
-            fNonPixel_LorentzDiagTrueDeltaY = main_diag_y_center - fTrueY;  // y_diag_fit - y_true
+            fLorentzMainDiagDeltaY = main_diag_y_center - fTrueY;  // y_diag_fit - y_true
         } else {
-            fNonPixel_LorentzDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+            fLorentzMainDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         // Secondary diagonal delta values (using X and Y centers from secondary diagonal fits)
         if (sec_diag_x_fit_successful) {
-            fNonPixel_LorentzSecDiagTrueDeltaX = sec_diag_x_center - fTrueX;  // x_secdiag_fit - x_true
+            fLorentzSecondDiagDeltaX = sec_diag_x_center - fTrueX;  // x_secdiag_fit - x_true
         } else {
-            fNonPixel_LorentzSecDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+            fLorentzSecondDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         if (sec_diag_y_fit_successful) {
-            fNonPixel_LorentzSecDiagTrueDeltaY = sec_diag_y_center - fTrueY;  // y_secdiag_fit - y_true
+            fLorentzSecondDiagDeltaY = sec_diag_y_center - fTrueY;  // y_secdiag_fit - y_true
         } else {
-            fNonPixel_LorentzSecDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+            fLorentzSecondDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
     } else {
         // For failed overall diagonal fitting, set all delta values to NaN
-        fNonPixel_LorentzDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_LorentzDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_LorentzSecDiagTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fNonPixel_LorentzSecDiagTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzMainDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzMainDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzSecondDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzSecondDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 }

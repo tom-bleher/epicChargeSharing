@@ -35,11 +35,7 @@ public:
     // Method to set nearest pixel position [mm]
     void SetNearestPixelPosition(G4double x, G4double y, G4double z);
     
-    // Method to set pixel indices and distance
-    void SetPixelIndices(G4int i, G4int j, G4double distance);
-    
-    // Method to set pixel alpha angle
-    void SetPixelAlpha(G4double alpha);
+
 
     // Method to set pixel hit status
     void SetPixelHitStatus(G4bool isPixelHit);
@@ -48,9 +44,7 @@ public:
     void SetPixelClassification(G4bool isWithinD0, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY);
     
     // Method to set neighborhood (9x9) grid angle data for non-pixel hits
-    void SetNeighborhoodGridData(const std::vector<G4double>& angles, 
-                        const std::vector<G4int>& pixelI, 
-                        const std::vector<G4int>& pixelJ);
+    void SetNeighborhoodGridData(const std::vector<G4double>& angles);
     
     // Method to set neighborhood (9x9) grid charge sharing data for non-pixel hits
     void SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
@@ -66,49 +60,61 @@ public:
     // Method to set 2D Gaussian fit results (central row and column fitting)
     void Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4double x_amplitude,
                                 G4double x_center_err, G4double x_sigma_err, G4double x_amplitude_err,
-                                G4double x_chi2red, G4int x_npoints,
+                                G4double x_vertical_offset, G4double x_vertical_offset_err,
+                                G4double x_chi2red, G4double x_pp, G4int x_dof,
                                 G4double y_center, G4double y_sigma, G4double y_amplitude,
                                 G4double y_center_err, G4double y_sigma_err, G4double y_amplitude_err,
-                                G4double y_chi2red, G4int y_npoints,
+                                G4double y_vertical_offset, G4double y_vertical_offset_err,
+                                G4double y_chi2red, G4double y_pp, G4int y_dof,
                                 G4bool fit_successful);
     
     // Method to set diagonal Gaussian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
     void SetDiagonalGaussianFitResults(G4double main_diag_x_center, G4double main_diag_x_sigma, G4double main_diag_x_amplitude,
                                       G4double main_diag_x_center_err, G4double main_diag_x_sigma_err, G4double main_diag_x_amplitude_err,
-                                      G4double main_diag_x_chi2red, G4int main_diag_x_npoints, G4bool main_diag_x_fit_successful,
+                                      G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
+                                      G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
                                       G4double main_diag_y_center, G4double main_diag_y_sigma, G4double main_diag_y_amplitude,
                                       G4double main_diag_y_center_err, G4double main_diag_y_sigma_err, G4double main_diag_y_amplitude_err,
-                                      G4double main_diag_y_chi2red, G4int main_diag_y_npoints, G4bool main_diag_y_fit_successful,
+                                      G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
+                                      G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
                                       G4double sec_diag_x_center, G4double sec_diag_x_sigma, G4double sec_diag_x_amplitude,
                                       G4double sec_diag_x_center_err, G4double sec_diag_x_sigma_err, G4double sec_diag_x_amplitude_err,
-                                      G4double sec_diag_x_chi2red, G4int sec_diag_x_npoints, G4bool sec_diag_x_fit_successful,
+                                      G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
+                                      G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
                                       G4double sec_diag_y_center, G4double sec_diag_y_sigma, G4double sec_diag_y_amplitude,
                                       G4double sec_diag_y_center_err, G4double sec_diag_y_sigma_err, G4double sec_diag_y_amplitude_err,
-                                      G4double sec_diag_y_chi2red, G4int sec_diag_y_npoints, G4bool sec_diag_y_fit_successful,
+                                      G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
+                                      G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
                                       G4bool fit_successful);
     
     // Method to set 2D Lorentzian fit results (central row and column fitting)
     void Set2DLorentzianFitResults(G4double x_center, G4double x_gamma, G4double x_amplitude,
                                   G4double x_center_err, G4double x_gamma_err, G4double x_amplitude_err,
-                                  G4double x_chi2red, G4int x_npoints,
+                                  G4double x_vertical_offset, G4double x_vertical_offset_err,
+                                  G4double x_chi2red, G4double x_pp, G4int x_dof,
                                   G4double y_center, G4double y_gamma, G4double y_amplitude,
                                   G4double y_center_err, G4double y_gamma_err, G4double y_amplitude_err,
-                                  G4double y_chi2red, G4int y_npoints,
+                                  G4double y_vertical_offset, G4double y_vertical_offset_err,
+                                  G4double y_chi2red, G4double y_pp, G4int y_dof,
                                   G4bool fit_successful);
     
     // Method to set diagonal Lorentzian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
     void SetDiagonalLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_amplitude,
                                         G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_amplitude_err,
-                                        G4double main_diag_x_chi2red, G4int main_diag_x_npoints, G4bool main_diag_x_fit_successful,
+                                        G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
+                                        G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
                                         G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_amplitude,
                                         G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_amplitude_err,
-                                        G4double main_diag_y_chi2red, G4int main_diag_y_npoints, G4bool main_diag_y_fit_successful,
+                                        G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
+                                        G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
                                         G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_amplitude,
                                         G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_amplitude_err,
-                                        G4double sec_diag_x_chi2red, G4int sec_diag_x_npoints, G4bool sec_diag_x_fit_successful,
+                                        G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
+                                        G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
                                         G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_amplitude,
                                         G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_amplitude_err,
-                                        G4double sec_diag_y_chi2red, G4int sec_diag_y_npoints, G4bool sec_diag_y_fit_successful,
+                                        G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
+                                        G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
                                         G4bool fit_successful);
     
     // Fill the ROOT tree with current event data
@@ -122,245 +128,208 @@ private:
     static std::mutex fRootMutex;
     
     // =============================================
-    // COMMON VARIABLES (stored for all events)
+    // HITS DATA VARIABLES
     // =============================================
-    G4double fEdep;   // Energy deposit [MeV]
     G4double fTrueX;   // True Hit position X [mm]
     G4double fTrueY;   // True Hit position Y [mm]
     G4double fTrueZ;   // True Hit position Z [mm]
-    
-    // Variables for initial particle gun position
     G4double fInitX;  // Initial X [mm]
     G4double fInitY;  // Initial Y [mm]
     G4double fInitZ;  // Initial Z [mm]
-    
-    // Variables for nearest pixel center position
     G4double fPixelX; // Nearest to hit pixel center X [mm]
     G4double fPixelY; // Nearest to hit pixel center Y [mm]
-    G4double fPixelZ; // Nearest to hit pixel center Z [mm]
-    
-    // Variables for pixel mapping
-    G4int fPixelI;    // Pixel index in X direction
-    G4int fPixelJ;    // Pixel index in Y direction
+    G4double fEdep;   // Energy deposit [MeV]
     G4double fPixelTrueDeltaX; // Delta X from pixel center to true position [mm] (x_pixel - x_true)
     G4double fPixelTrueDeltaY; // Delta Y from pixel center to true position [mm] (y_pixel - y_true)
     
-    // =============================================
-    // HIT CLASSIFICATION VARIABLES
-    // =============================================
-    G4bool fIsPixelHit;  // True if hit is on pixel OR distance <= D0
+    // Delta variables for estimations vs true position
+    G4double fGaussRowDeltaX;
+    G4double fGaussColumnDeltaY;
+    G4double fGaussMainDiagDeltaX;
+    G4double fGaussMainDiagDeltaY;
+    G4double fGaussSecondDiagDeltaX;
+    G4double fGaussSecondDiagDeltaY;
+    G4double fLorentzRowDeltaX;
+    G4double fLorentzColumnDeltaY;
+    G4double fLorentzMainDiagDeltaX;
+    G4double fLorentzMainDiagDeltaY;
+    G4double fLorentzSecondDiagDeltaX;
+    G4double fLorentzSecondDiagDeltaY;
 
     // =============================================
-    // PIXEL HIT DATA (distance <= D0 or on pixel)
+    // GAUSSIAN FITS VARIABLES
     // =============================================
-    G4double fPixelHit_PixelAlpha; // Angular size of pixel from hit position [deg]
     
+    // GaussFitRow/GaussFitRowX
+    G4double fGaussFitRowAmplitude;
+    G4double fGaussFitRowAmplitudeErr;
+    G4double fGaussFitRowStdev;
+    G4double fGaussFitRowStdevErr;
+    G4double fGaussFitRowVerticalOffset;
+    G4double fGaussFitRowVerticalOffsetErr;
+    G4double fGaussFitRowCenter;
+    G4double fGaussFitRowCenterErr;
+    G4double fGaussFitRowChi2red;
+    G4double fGaussFitRowPp;
+    G4int fGaussFitRowDOF;
+    
+    // GaussFitColumn/GaussFitColumnY
+    G4double fGaussFitColumnAmplitude;
+    G4double fGaussFitColumnAmplitudeErr;
+    G4double fGaussFitColumnStdev;
+    G4double fGaussFitColumnStdevErr;
+    G4double fGaussFitColumnVerticalOffset;
+    G4double fGaussFitColumnVerticalOffsetErr;
+    G4double fGaussFitColumnCenter;
+    G4double fGaussFitColumnCenterErr;
+    G4double fGaussFitColumnChi2red;
+    G4double fGaussFitColumnPp;
+    G4int fGaussFitColumnDOF;
+    
+    // GaussFitMainDiag/GaussFitMainDiagX
+    G4double fGaussFitMainDiagXAmplitude;
+    G4double fGaussFitMainDiagXAmplitudeErr;
+    G4double fGaussFitMainDiagXStdev;
+    G4double fGaussFitMainDiagXStdevErr;
+    G4double fGaussFitMainDiagXVerticalOffset;
+    G4double fGaussFitMainDiagXVerticalOffsetErr;
+    G4double fGaussFitMainDiagXCenter;
+    G4double fGaussFitMainDiagXCenterErr;
+    G4double fGaussFitMainDiagXChi2red;
+    G4double fGaussFitMainDiagXPp;
+    G4int fGaussFitMainDiagXDOF;
+    
+    // GaussFitMainDiag/GaussFitMainDiagY
+    G4double fGaussFitMainDiagYAmplitude;
+    G4double fGaussFitMainDiagYAmplitudeErr;
+    G4double fGaussFitMainDiagYStdev;
+    G4double fGaussFitMainDiagYStdevErr;
+    G4double fGaussFitMainDiagYVerticalOffset;
+    G4double fGaussFitMainDiagYVerticalOffsetErr;
+    G4double fGaussFitMainDiagYCenter;
+    G4double fGaussFitMainDiagYCenterErr;
+    G4double fGaussFitMainDiagYChi2red;
+    G4double fGaussFitMainDiagYPp;
+    G4int fGaussFitMainDiagYDOF;
+    
+    // GaussFitSecondDiag/GaussFitSecondDiagX
+    G4double fGaussFitSecondDiagXAmplitude;
+    G4double fGaussFitSecondDiagXAmplitudeErr;
+    G4double fGaussFitSecondDiagXStdev;
+    G4double fGaussFitSecondDiagXStdevErr;
+    G4double fGaussFitSecondDiagXVerticalOffset;
+    G4double fGaussFitSecondDiagXVerticalOffsetErr;
+    G4double fGaussFitSecondDiagXCenter;
+    G4double fGaussFitSecondDiagXCenterErr;
+    G4double fGaussFitSecondDiagXChi2red;
+    G4double fGaussFitSecondDiagXPp;
+    G4int fGaussFitSecondDiagXDOF;
+    
+    // GaussFitSecondDiag/GaussFitSecondDiagY
+    G4double fGaussFitSecondDiagYAmplitude;
+    G4double fGaussFitSecondDiagYAmplitudeErr;
+    G4double fGaussFitSecondDiagYStdev;
+    G4double fGaussFitSecondDiagYStdevErr;
+    G4double fGaussFitSecondDiagYVerticalOffset;
+    G4double fGaussFitSecondDiagYVerticalOffsetErr;
+    G4double fGaussFitSecondDiagYCenter;
+    G4double fGaussFitSecondDiagYCenterErr;
+    G4double fGaussFitSecondDiagYChi2red;
+    G4double fGaussFitSecondDiagYPp;
+    G4int fGaussFitSecondDiagYDOF;
+
     // =============================================
+    // LORENTZIAN FITS VARIABLES
+    // =============================================
+    
+    // LorentzFitRow/LorentzFitRowX
+    G4double fLorentzFitRowAmplitude;
+    G4double fLorentzFitRowAmplitudeErr;
+    G4double fLorentzFitRowGamma;
+    G4double fLorentzFitRowGammaErr;
+    G4double fLorentzFitRowVerticalOffset;
+    G4double fLorentzFitRowVerticalOffsetErr;
+    G4double fLorentzFitRowCenter;
+    G4double fLorentzFitRowCenterErr;
+    G4double fLorentzFitRowChi2red;
+    G4double fLorentzFitRowPp;
+    G4int fLorentzFitRowDOF;
+    
+    // LorentzFitColumn/LorentzFitColumnY
+    G4double fLorentzFitColumnAmplitude;
+    G4double fLorentzFitColumnAmplitudeErr;
+    G4double fLorentzFitColumnGamma;
+    G4double fLorentzFitColumnGammaErr;
+    G4double fLorentzFitColumnVerticalOffset;
+    G4double fLorentzFitColumnVerticalOffsetErr;
+    G4double fLorentzFitColumnCenter;
+    G4double fLorentzFitColumnCenterErr;
+    G4double fLorentzFitColumnChi2red;
+    G4double fLorentzFitColumnPp;
+    G4int fLorentzFitColumnDOF;
+    
+    // LorentzFitMainDiag/LorentzFitMainDiagX
+    G4double fLorentzFitMainDiagXAmplitude;
+    G4double fLorentzFitMainDiagXAmplitudeErr;
+    G4double fLorentzFitMainDiagXGamma;
+    G4double fLorentzFitMainDiagXGammaErr;
+    G4double fLorentzFitMainDiagXVerticalOffset;
+    G4double fLorentzFitMainDiagXVerticalOffsetErr;
+    G4double fLorentzFitMainDiagXCenter;
+    G4double fLorentzFitMainDiagXCenterErr;
+    G4double fLorentzFitMainDiagXChi2red;
+    G4double fLorentzFitMainDiagXPp;
+    G4int fLorentzFitMainDiagXDOF;
+    
+    // LorentzFitMainDiag/LorentzFitMainDiagY
+    G4double fLorentzFitMainDiagYAmplitude;
+    G4double fLorentzFitMainDiagYAmplitudeErr;
+    G4double fLorentzFitMainDiagYGamma;
+    G4double fLorentzFitMainDiagYGammaErr;
+    G4double fLorentzFitMainDiagYVerticalOffset;
+    G4double fLorentzFitMainDiagYVerticalOffsetErr;
+    G4double fLorentzFitMainDiagYCenter;
+    G4double fLorentzFitMainDiagYCenterErr;
+    G4double fLorentzFitMainDiagYChi2red;
+    G4double fLorentzFitMainDiagYPp;
+    G4int fLorentzFitMainDiagYDOF;
+    
+    // LorentzFitSecondDiag/LorentzFitSecondDiagX
+    G4double fLorentzFitSecondDiagXAmplitude;
+    G4double fLorentzFitSecondDiagXAmplitudeErr;
+    G4double fLorentzFitSecondDiagXGamma;
+    G4double fLorentzFitSecondDiagXGammaErr;
+    G4double fLorentzFitSecondDiagXVerticalOffset;
+    G4double fLorentzFitSecondDiagXVerticalOffsetErr;
+    G4double fLorentzFitSecondDiagXCenter;
+    G4double fLorentzFitSecondDiagXCenterErr;
+    G4double fLorentzFitSecondDiagXChi2red;
+    G4double fLorentzFitSecondDiagXPp;
+    G4int fLorentzFitSecondDiagXDOF;
+    
+    // LorentzFitSecondDiag/LorentzFitSecondDiagY
+    G4double fLorentzFitSecondDiagYAmplitude;
+    G4double fLorentzFitSecondDiagYAmplitudeErr;
+    G4double fLorentzFitSecondDiagYGamma;
+    G4double fLorentzFitSecondDiagYGammaErr;
+    G4double fLorentzFitSecondDiagYVerticalOffset;
+    G4double fLorentzFitSecondDiagYVerticalOffsetErr;
+    G4double fLorentzFitSecondDiagYCenter;
+    G4double fLorentzFitSecondDiagYCenterErr;
+    G4double fLorentzFitSecondDiagYChi2red;
+    G4double fLorentzFitSecondDiagYPp;
+    G4int fLorentzFitSecondDiagYDOF;
+
+    // Legacy variables that may still be used
+    G4double fPixelZ; // Nearest to hit pixel center Z [mm]
+    G4bool fIsPixelHit;  // True if hit is on pixel OR distance <= D0
+    
     // NON-PIXEL HIT DATA (distance > D0 and not on pixel)
-    // =============================================
-    
-    // Variables for neighborhood (9x9) grid angle data
     std::vector<G4double> fNonPixel_GridNeighborhoodAngles; // Angles from hit to neighborhood grid pixels [deg]
-    std::vector<G4int> fNonPixel_GridNeighborhoodPixelI;     // I indices of neighborhood grid pixels
-    std::vector<G4int> fNonPixel_GridNeighborhoodPixelJ;     // J indices of neighborhood grid pixels
-    
-    // Variables for neighborhood (9x9) grid charge sharing data
     std::vector<G4double> fNonPixel_GridNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels
     std::vector<G4double> fNonPixel_GridNeighborhoodDistances;         // Distances from hit to neighborhood grid pixels [mm]
     std::vector<G4double> fNonPixel_GridNeighborhoodCharge;       // Charge values in Coulombs for neighborhood grid pixels
-    
-    // Variables for 3D Gaussian fit results
-    G4double fNonPixel_FitAmplitude;         // Fitted amplitude
-    G4double fNonPixel_FitX0;               // Fitted X center [mm]
-    G4double fNonPixel_FitY0;               // Fitted Y center [mm]
-    G4double fNonPixel_FitSigmaX;           // Fitted sigma X [mm]
-    G4double fNonPixel_FitSigmaY;           // Fitted sigma Y [mm]
-    G4double fNonPixel_FitTheta;            // Fitted rotation angle [rad]
-    G4double fNonPixel_FitOffset;           // Fitted offset
-    
-    G4double fNonPixel_FitAmplitudeErr;     // Error in amplitude
-    G4double fNonPixel_FitX0Err;           // Error in X center [mm]
-    G4double fNonPixel_FitY0Err;           // Error in Y center [mm]
-    G4double fNonPixel_FitSigmaXErr;       // Error in sigma X [mm]
-    G4double fNonPixel_FitSigmaYErr;       // Error in sigma Y [mm]
-    G4double fNonPixel_FitThetaErr;        // Error in rotation angle [rad]
-    G4double fNonPixel_FitOffsetErr;       // Error in offset
-    
-    G4double fNonPixel_FitChi2;            // Chi-squared value
-    G4double fNonPixel_FitNDF;             // Number of degrees of freedom
-    G4double fNonPixel_FitChi2red;            // Reduced chi-squared (chi2red/NDF)
-    G4double fNonPixel_FitPp;            // Fit probability (P-value)
-    G4int fNonPixel_FitNPoints;            // Number of points used in fit
-    G4double fNonPixel_FitResidualMean;    // Mean of residuals
-    G4double fNonPixel_FitResidualStd;     // Standard deviation of residuals
-    
-    // Enhanced robustness metrics
-    G4bool fNonPixel_FitConstraintsSatisfied; // Whether geometric constraints were satisfied
-    
-    // Delta variables for Gaussian fit estimations vs true position
-    G4double fNonPixel_GaussRowTrueDeltaX;     // Delta X from row fit center to true position [mm] (x_row_fit - x_true)
-    G4double fNonPixel_GaussColumnTrueDeltaY;  // Delta Y from column fit center to true position [mm] (y_column_fit - y_true)
-    G4double fNonPixel_GaussDiagTrueDeltaX;    // Delta X from main diagonal fit center to true position [mm] (x_diag_fit - x_true)
-    G4double fNonPixel_GaussDiagTrueDeltaY;    // Delta Y from main diagonal fit center to true position [mm] (y_diag_fit - y_true)
-    G4double fNonPixel_GaussSecDiagTrueDeltaX; // Delta X from secondary diagonal fit center to true position [mm] (x_secdiag_fit - x_true)
-    G4double fNonPixel_GaussSecDiagTrueDeltaY; // Delta Y from secondary diagonal fit center to true position [mm] (y_secdiag_fit - y_true)
-    
-    // Variables for 2D Gaussian fit results (central row and column fitting)
-    G4double fNonPixel_Fit2D_XCenter;        // Fitted X center from central row [mm]
-    G4double fNonPixel_Fit2D_XSigma;         // Fitted X sigma from central row [mm]
-    G4double fNonPixel_Fit2D_XFWHM;          // Fitted X FWHM from central row [mm] (2*sqrt(2*ln(2))*sigma)
-    G4double fNonPixel_Fit2D_XAmplitude;     // Fitted X amplitude from central row
-    G4double fNonPixel_Fit2D_XCenterErr;     // Error in fitted X center [mm]
-    G4double fNonPixel_Fit2D_XSigmaErr;      // Error in fitted X sigma [mm]
-    G4double fNonPixel_Fit2D_XFWHMErr;       // Error in fitted X FWHM [mm]
-    G4double fNonPixel_Fit2D_XAmplitudeErr;  // Error in fitted X amplitude
-    G4double fNonPixel_Fit2D_XChi2red;       // Reduced chi-squared for X fit
-    G4int fNonPixel_Fit2D_XNPoints;          // Number of points used in X fit
-    
-    G4double fNonPixel_Fit2D_YCenter;        // Fitted Y center from central column [mm]
-    G4double fNonPixel_Fit2D_YSigma;         // Fitted Y sigma from central column [mm]
-    G4double fNonPixel_Fit2D_YFWHM;          // Fitted Y FWHM from central column [mm] (2*sqrt(2*ln(2))*sigma)
-    G4double fNonPixel_Fit2D_YAmplitude;     // Fitted Y amplitude from central column
-    G4double fNonPixel_Fit2D_YCenterErr;     // Error in fitted Y center [mm]
-    G4double fNonPixel_Fit2D_YSigmaErr;      // Error in fitted Y sigma [mm]
-    G4double fNonPixel_Fit2D_YFWHMErr;       // Error in fitted Y FWHM [mm]
-    G4double fNonPixel_Fit2D_YAmplitudeErr;  // Error in fitted Y amplitude
-    G4double fNonPixel_Fit2D_YChi2red;       // Reduced chi-squared for Y fit
-    G4int fNonPixel_Fit2D_YNPoints;          // Number of points used in Y fit
-    
-    G4bool fNonPixel_Fit2D_Successful;       // Whether 2D fitting was successful
-    
-    // Variables for diagonal Gaussian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-    // Main diagonal X fit (X vs Charge for pixels on main diagonal)
-    G4double fNonPixel_FitDiag_MainXCenter;        // Fitted X center from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_MainXSigma;         // Fitted X sigma from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_MainXFWHM;          // Fitted X FWHM from main diagonal X fit [mm] (2*sqrt(2*ln(2))*sigma)
-    G4double fNonPixel_FitDiag_MainXAmplitude;     // Fitted X amplitude from main diagonal X fit
-    G4double fNonPixel_FitDiag_MainXCenterErr;     // Error in fitted X center from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_MainXSigmaErr;      // Error in fitted X sigma from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_MainXFWHMErr;       // Error in fitted X FWHM from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_MainXAmplitudeErr;  // Error in fitted X amplitude from main diagonal X fit
-    G4double fNonPixel_FitDiag_MainXChi2red;       // Reduced chi-squared for main diagonal X fit
-    G4int fNonPixel_FitDiag_MainXNPoints;          // Number of points used in main diagonal X fit
-    G4bool fNonPixel_FitDiag_MainXSuccessful;      // Whether main diagonal X fitting was successful
-    
-    // Main diagonal Y fit (Y vs Charge for pixels on main diagonal)
-    G4double fNonPixel_FitDiag_MainYCenter;        // Fitted Y center from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_MainYSigma;         // Fitted Y sigma from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_MainYFWHM;          // Fitted Y FWHM from main diagonal Y fit [mm] (2*sqrt(2*ln(2))*sigma)
-    G4double fNonPixel_FitDiag_MainYAmplitude;     // Fitted Y amplitude from main diagonal Y fit
-    G4double fNonPixel_FitDiag_MainYCenterErr;     // Error in fitted Y center from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_MainYSigmaErr;      // Error in fitted Y sigma from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_MainYFWHMErr;       // Error in fitted Y FWHM from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_MainYAmplitudeErr;  // Error in fitted Y amplitude from main diagonal Y fit
-    G4double fNonPixel_FitDiag_MainYChi2red;       // Reduced chi-squared for main diagonal Y fit
-    G4int fNonPixel_FitDiag_MainYNPoints;          // Number of points used in main diagonal Y fit
-    G4bool fNonPixel_FitDiag_MainYSuccessful;      // Whether main diagonal Y fitting was successful
-    
-    // Secondary diagonal X fit (X vs Charge for pixels on secondary diagonal)
-    G4double fNonPixel_FitDiag_SecXCenter;         // Fitted X center from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_SecXSigma;          // Fitted X sigma from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_SecXFWHM;           // Fitted X FWHM from secondary diagonal X fit [mm] (2*sqrt(2*ln(2))*sigma)
-    G4double fNonPixel_FitDiag_SecXAmplitude;      // Fitted X amplitude from secondary diagonal X fit
-    G4double fNonPixel_FitDiag_SecXCenterErr;      // Error in fitted X center from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_SecXSigmaErr;       // Error in fitted X sigma from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_SecXFWHMErr;        // Error in fitted X FWHM from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_SecXAmplitudeErr;   // Error in fitted X amplitude from secondary diagonal X fit
-    G4double fNonPixel_FitDiag_SecXChi2red;        // Reduced chi-squared for secondary diagonal X fit
-    G4int fNonPixel_FitDiag_SecXNPoints;           // Number of points used in secondary diagonal X fit
-    G4bool fNonPixel_FitDiag_SecXSuccessful;       // Whether secondary diagonal X fitting was successful
-    
-    // Secondary diagonal Y fit (Y vs Charge for pixels on secondary diagonal)
-    G4double fNonPixel_FitDiag_SecYCenter;         // Fitted Y center from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_SecYSigma;          // Fitted Y sigma from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_SecYFWHM;           // Fitted Y FWHM from secondary diagonal Y fit [mm] (2*sqrt(2*ln(2))*sigma)
-    G4double fNonPixel_FitDiag_SecYAmplitude;      // Fitted Y amplitude from secondary diagonal Y fit
-    G4double fNonPixel_FitDiag_SecYCenterErr;      // Error in fitted Y center from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_SecYSigmaErr;       // Error in fitted Y sigma from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_SecYFWHMErr;        // Error in fitted Y FWHM from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_SecYAmplitudeErr;   // Error in fitted Y amplitude from secondary diagonal Y fit
-    G4double fNonPixel_FitDiag_SecYChi2red;        // Reduced chi-squared for secondary diagonal Y fit
-    G4int fNonPixel_FitDiag_SecYNPoints;           // Number of points used in secondary diagonal Y fit
-    G4bool fNonPixel_FitDiag_SecYSuccessful;       // Whether secondary diagonal Y fitting was successful
-    
-    G4bool fNonPixel_FitDiag_Successful;           // Whether diagonal fitting was successful
-    
-    // Variables for 2D Lorentzian fit results (central row and column fitting)
-    G4double fNonPixel_Fit2D_Lorentz_XCenter;        // Fitted X center from central row [mm]
-    G4double fNonPixel_Fit2D_Lorentz_XGamma;         // Fitted X gamma (HWHM) from central row [mm]
-    G4double fNonPixel_Fit2D_Lorentz_XAmplitude;     // Fitted X amplitude from central row
-    G4double fNonPixel_Fit2D_Lorentz_XCenterErr;     // Error in fitted X center [mm]
-    G4double fNonPixel_Fit2D_Lorentz_XGammaErr;      // Error in fitted X gamma [mm]
-    G4double fNonPixel_Fit2D_Lorentz_XAmplitudeErr;  // Error in fitted X amplitude
-    G4double fNonPixel_Fit2D_Lorentz_XChi2red;       // Reduced chi-squared for X fit
-    G4int fNonPixel_Fit2D_Lorentz_XNPoints;          // Number of points used in X fit
-    
-    G4double fNonPixel_Fit2D_Lorentz_YCenter;        // Fitted Y center from central column [mm]
-    G4double fNonPixel_Fit2D_Lorentz_YGamma;         // Fitted Y gamma (HWHM) from central column [mm]
-    G4double fNonPixel_Fit2D_Lorentz_YAmplitude;     // Fitted Y amplitude from central column
-    G4double fNonPixel_Fit2D_Lorentz_YCenterErr;     // Error in fitted Y center [mm]
-    G4double fNonPixel_Fit2D_Lorentz_YGammaErr;      // Error in fitted Y gamma [mm]
-    G4double fNonPixel_Fit2D_Lorentz_YAmplitudeErr;  // Error in fitted Y amplitude
-    G4double fNonPixel_Fit2D_Lorentz_YChi2red;       // Reduced chi-squared for Y fit
-    G4int fNonPixel_Fit2D_Lorentz_YNPoints;          // Number of points used in Y fit
-    
-    G4bool fNonPixel_Fit2D_Lorentz_Successful;       // Whether 2D Lorentzian fitting was successful
-    
-    // Variables for diagonal Lorentzian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-    // Main diagonal X fit (X vs Charge for pixels on main diagonal)
-    G4double fNonPixel_FitDiag_Lorentz_MainXCenter;        // Fitted X center from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_MainXGamma;         // Fitted X gamma from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_MainXAmplitude;     // Fitted X amplitude from main diagonal X fit
-    G4double fNonPixel_FitDiag_Lorentz_MainXCenterErr;     // Error in fitted X center from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_MainXGammaErr;      // Error in fitted X gamma from main diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_MainXAmplitudeErr;  // Error in fitted X amplitude from main diagonal X fit
-    G4double fNonPixel_FitDiag_Lorentz_MainXChi2red;       // Reduced chi-squared for main diagonal X fit
-    G4int fNonPixel_FitDiag_Lorentz_MainXNPoints;          // Number of points used in main diagonal X fit
-    G4bool fNonPixel_FitDiag_Lorentz_MainXSuccessful;      // Whether main diagonal X Lorentzian fitting was successful
-    
-    // Main diagonal Y fit (Y vs Charge for pixels on main diagonal)
-    G4double fNonPixel_FitDiag_Lorentz_MainYCenter;        // Fitted Y center from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_MainYGamma;         // Fitted Y gamma from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_MainYAmplitude;     // Fitted Y amplitude from main diagonal Y fit
-    G4double fNonPixel_FitDiag_Lorentz_MainYCenterErr;     // Error in fitted Y center from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_MainYGammaErr;      // Error in fitted Y gamma from main diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_MainYAmplitudeErr;  // Error in fitted Y amplitude from main diagonal Y fit
-    G4double fNonPixel_FitDiag_Lorentz_MainYChi2red;       // Reduced chi-squared for main diagonal Y fit
-    G4int fNonPixel_FitDiag_Lorentz_MainYNPoints;          // Number of points used in main diagonal Y fit
-    G4bool fNonPixel_FitDiag_Lorentz_MainYSuccessful;      // Whether main diagonal Y Lorentzian fitting was successful
-    
-    // Secondary diagonal X fit (X vs Charge for pixels on secondary diagonal)
-    G4double fNonPixel_FitDiag_Lorentz_SecXCenter;         // Fitted X center from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_SecXGamma;          // Fitted X gamma from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_SecXAmplitude;      // Fitted X amplitude from secondary diagonal X fit
-    G4double fNonPixel_FitDiag_Lorentz_SecXCenterErr;      // Error in fitted X center from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_SecXGammaErr;       // Error in fitted X gamma from secondary diagonal X fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_SecXAmplitudeErr;   // Error in fitted X amplitude from secondary diagonal X fit
-    G4double fNonPixel_FitDiag_Lorentz_SecXChi2red;        // Reduced chi-squared for secondary diagonal X fit
-    G4int fNonPixel_FitDiag_Lorentz_SecXNPoints;           // Number of points used in secondary diagonal X fit
-    G4bool fNonPixel_FitDiag_Lorentz_SecXSuccessful;       // Whether secondary diagonal X Lorentzian fitting was successful
-    
-    // Secondary diagonal Y fit (Y vs Charge for pixels on secondary diagonal)
-    G4double fNonPixel_FitDiag_Lorentz_SecYCenter;         // Fitted Y center from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_SecYGamma;          // Fitted Y gamma from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_SecYAmplitude;      // Fitted Y amplitude from secondary diagonal Y fit
-    G4double fNonPixel_FitDiag_Lorentz_SecYCenterErr;      // Error in fitted Y center from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_SecYGammaErr;       // Error in fitted Y gamma from secondary diagonal Y fit [mm]
-    G4double fNonPixel_FitDiag_Lorentz_SecYAmplitudeErr;   // Error in fitted Y amplitude from secondary diagonal Y fit
-    G4double fNonPixel_FitDiag_Lorentz_SecYChi2red;        // Reduced chi-squared for secondary diagonal Y fit
-    G4int fNonPixel_FitDiag_Lorentz_SecYNPoints;           // Number of points used in secondary diagonal Y fit
-    G4bool fNonPixel_FitDiag_Lorentz_SecYSuccessful;       // Whether secondary diagonal Y Lorentzian fitting was successful
-    
-    G4bool fNonPixel_FitDiag_Lorentz_Successful;           // Whether diagonal Lorentzian fitting was successful
-    
-    // Delta variables for Lorentzian fit estimations vs true position
-    G4double fNonPixel_LorentzRowTrueDeltaX;     // Delta X from row fit center to true position [mm] (x_row_fit - x_true)
-    G4double fNonPixel_LorentzColumnTrueDeltaY;  // Delta Y from column fit center to true position [mm] (y_column_fit - y_true)
-    G4double fNonPixel_LorentzDiagTrueDeltaX;    // Delta X from main diagonal fit center to true position [mm] (x_diag_fit - x_true)
-    G4double fNonPixel_LorentzDiagTrueDeltaY;    // Delta Y from main diagonal fit center to true position [mm] (y_diag_fit - y_true)
-    G4double fNonPixel_LorentzSecDiagTrueDeltaX; // Delta X from secondary diagonal fit center to true position [mm] (x_secdiag_fit - x_true)
-    G4double fNonPixel_LorentzSecDiagTrueDeltaY; // Delta Y from secondary diagonal fit center to true position [mm] (y_secdiag_fit - y_true)
-    
+
     // Variables for particle information (reduced set)
     G4double fInitialEnergy;        // Initial particle energy [MeV]
     G4double fMomentum;             // Particle momentum [MeV/c]

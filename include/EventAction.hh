@@ -70,8 +70,6 @@ private:
     
     // Neighborhood (9x9) grid angle information (for non-pixel hits)
     std::vector<G4double> fNonPixel_GridNeighborhoodAngles; // Angles from hit to each pixel in neighborhood grid
-    std::vector<G4int> fNonPixel_GridNeighborhoodPixelI;     // I indices of pixels in neighborhood grid
-    std::vector<G4int> fNonPixel_GridNeighborhoodPixelJ;     // J indices of pixels in neighborhood grid
     
     // Neighborhood (9x9) grid charge sharing information (for non-pixel hits)
     std::vector<G4double> fNonPixel_GridNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid

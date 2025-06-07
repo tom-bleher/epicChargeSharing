@@ -68,8 +68,6 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   
   // Reset neighborhood (9x9) grid angle data
   fNonPixel_GridNeighborhoodAngles.clear();
-  fNonPixel_GridNeighborhoodPixelI.clear();
-  fNonPixel_GridNeighborhoodPixelJ.clear();
   
   // Reset neighborhood (9x9) grid charge sharing data
   fNonPixel_GridNeighborhoodChargeFractions.clear();
@@ -120,17 +118,11 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Set nearest pixel position in RunAction
   fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y(), nearestPixel.z());
   
-  // Pass pixel indices and distance information to RunAction
-  fRunAction->SetPixelIndices(fPixelIndexI, fPixelIndexJ, fActualPixelDistance);
-  
   // Only calculate and store pixel-specific data for pixel hits (on pixel surface)
   if (isPixelHit) {
-    fRunAction->SetPixelAlpha(pixelAlpha);
     
     // Clear non-pixel data for pixel hits
     fNonPixel_GridNeighborhoodAngles.clear();
-    fNonPixel_GridNeighborhoodPixelI.clear();
-    fNonPixel_GridNeighborhoodPixelJ.clear();
     fNonPixel_GridNeighborhoodChargeFractions.clear();
     fNonPixel_GridNeighborhoodDistances.clear();
     fNonPixel_GridNeighborhoodCharge.clear();
@@ -138,13 +130,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
     // Non-pixel hit: calculate neighborhood grid data
     CalculateNeighborhoodGridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
     CalculateNeighborhoodChargeSharing();
-    
-    // Set pixel alpha to 0 or NaN for non-pixel hits
-    fRunAction->SetPixelAlpha(0.0);
   }
   
   // Pass neighborhood grid data to RunAction (will be empty for pixel hits)
-  fRunAction->SetNeighborhoodGridData(fNonPixel_GridNeighborhoodAngles, fNonPixel_GridNeighborhoodPixelI, fNonPixel_GridNeighborhoodPixelJ);
+  fRunAction->SetNeighborhoodGridData(fNonPixel_GridNeighborhoodAngles);
   fRunAction->SetNeighborhoodChargeData(fNonPixel_GridNeighborhoodChargeFractions, fNonPixel_GridNeighborhoodDistances, fNonPixel_GridNeighborhoodCharge, fNonPixel_GridNeighborhoodCharge);
   
   // Perform 2D Gaussian fitting on charge distribution data (central row and column)
@@ -159,18 +148,22 @@ void EventAction::EndOfEventAction(const G4Event* event)
     G4double pixelSpacing = fDetector->GetPixelSpacing();
     
     // Convert grid indices to actual coordinates
+    // The neighborhood grid is a systematic 9x9 grid around the center pixel
+    G4int gridSize = 2 * fNeighborhoodRadius + 1; // Should be 9 for radius 4
     for (size_t i = 0; i < fNonPixel_GridNeighborhoodChargeFractions.size(); ++i) {
       if (fNonPixel_GridNeighborhoodChargeFractions[i] > 0) { // Only include pixels with charge
-        // Calculate position relative to the nearest pixel center
-        G4int pixelI = fNonPixel_GridNeighborhoodPixelI[i];
-        G4int pixelJ = fNonPixel_GridNeighborhoodPixelJ[i];
+        // Calculate grid position from array index
+        // The grid is stored in row-major order: i = row * gridSize + col
+        G4int row = i / gridSize;
+        G4int col = i % gridSize;
         
-        // Calculate offset from center pixel
-        G4int centerI = fPixelIndexI;
-        G4int centerJ = fPixelIndexJ;
+        // Convert grid position to pixel offset from center
+        G4int offsetI = col - fNeighborhoodRadius; // -4 to +4 for 9x9 grid
+        G4int offsetJ = row - fNeighborhoodRadius; // -4 to +4 for 9x9 grid
         
-        G4double x_pos = nearestPixel.x() + (pixelI - centerI) * pixelSpacing;
-        G4double y_pos = nearestPixel.y() + (pixelJ - centerJ) * pixelSpacing;
+        // Calculate actual position
+        G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
+        G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
         
         x_coords.push_back(x_pos);
         y_coords.push_back(y_pos);
@@ -196,10 +189,12 @@ void EventAction::EndOfEventAction(const G4Event* event)
       fRunAction->Set2DGaussianFitResults(
         fitResults.x_center, fitResults.x_sigma, fitResults.x_amplitude,
         fitResults.x_center_err, fitResults.x_sigma_err, fitResults.x_amplitude_err,
-        fitResults.x_chi2red, fitResults.x_npoints,
+        fitResults.x_vertical_offset, fitResults.x_vertical_offset_err,
+        fitResults.x_chi2red, fitResults.x_pp, fitResults.x_dof,
         fitResults.y_center, fitResults.y_sigma, fitResults.y_amplitude,
         fitResults.y_center_err, fitResults.y_sigma_err, fitResults.y_amplitude_err,
-        fitResults.y_chi2red, fitResults.y_npoints,
+        fitResults.y_vertical_offset, fitResults.y_vertical_offset_err,
+        fitResults.y_chi2red, fitResults.y_pp, fitResults.y_dof,
         fitResults.fit_successful);
         
               // Perform diagonal fitting if 2D fitting was performed and successful
@@ -219,24 +214,28 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fRunAction->SetDiagonalGaussianFitResults(
           diagResults.main_diag_x_center, diagResults.main_diag_x_sigma, diagResults.main_diag_x_amplitude,
           diagResults.main_diag_x_center_err, diagResults.main_diag_x_sigma_err, diagResults.main_diag_x_amplitude_err,
-          diagResults.main_diag_x_chi2red, diagResults.main_diag_x_npoints, diagResults.main_diag_x_fit_successful,
+          diagResults.main_diag_x_vertical_offset, diagResults.main_diag_x_vertical_offset_err,
+          diagResults.main_diag_x_chi2red, diagResults.main_diag_x_pp, diagResults.main_diag_x_dof, diagResults.main_diag_x_fit_successful,
           diagResults.main_diag_y_center, diagResults.main_diag_y_sigma, diagResults.main_diag_y_amplitude,
           diagResults.main_diag_y_center_err, diagResults.main_diag_y_sigma_err, diagResults.main_diag_y_amplitude_err,
-          diagResults.main_diag_y_chi2red, diagResults.main_diag_y_npoints, diagResults.main_diag_y_fit_successful,
+          diagResults.main_diag_y_vertical_offset, diagResults.main_diag_y_vertical_offset_err,
+          diagResults.main_diag_y_chi2red, diagResults.main_diag_y_pp, diagResults.main_diag_y_dof, diagResults.main_diag_y_fit_successful,
           diagResults.sec_diag_x_center, diagResults.sec_diag_x_sigma, diagResults.sec_diag_x_amplitude,
           diagResults.sec_diag_x_center_err, diagResults.sec_diag_x_sigma_err, diagResults.sec_diag_x_amplitude_err,
-          diagResults.sec_diag_x_chi2red, diagResults.sec_diag_x_npoints, diagResults.sec_diag_x_fit_successful,
+          diagResults.sec_diag_x_vertical_offset, diagResults.sec_diag_x_vertical_offset_err,
+          diagResults.sec_diag_x_chi2red, diagResults.sec_diag_x_pp, diagResults.sec_diag_x_dof, diagResults.sec_diag_x_fit_successful,
           diagResults.sec_diag_y_center, diagResults.sec_diag_y_sigma, diagResults.sec_diag_y_amplitude,
           diagResults.sec_diag_y_center_err, diagResults.sec_diag_y_sigma_err, diagResults.sec_diag_y_amplitude_err,
-          diagResults.sec_diag_y_chi2red, diagResults.sec_diag_y_npoints, diagResults.sec_diag_y_fit_successful,
+          diagResults.sec_diag_y_vertical_offset, diagResults.sec_diag_y_vertical_offset_err,
+          diagResults.sec_diag_y_chi2red, diagResults.sec_diag_y_pp, diagResults.sec_diag_y_dof, diagResults.sec_diag_y_fit_successful,
           diagResults.fit_successful);
       } else {
         // Set default diagonal fit values when 2D fitting failed
         fRunAction->SetDiagonalGaussianFitResults(
-          0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
           false); // fit_successful = false
       }
       
@@ -261,10 +260,12 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fRunAction->Set2DLorentzianFitResults(
           lorentzFitResults.x_center, lorentzFitResults.x_gamma, lorentzFitResults.x_amplitude,
           lorentzFitResults.x_center_err, lorentzFitResults.x_gamma_err, lorentzFitResults.x_amplitude_err,
-          lorentzFitResults.x_chi2red, lorentzFitResults.x_npoints,
+          lorentzFitResults.x_vertical_offset, lorentzFitResults.x_vertical_offset_err,
+          lorentzFitResults.x_chi2red, lorentzFitResults.x_pp, lorentzFitResults.x_dof,
           lorentzFitResults.y_center, lorentzFitResults.y_gamma, lorentzFitResults.y_amplitude,
           lorentzFitResults.y_center_err, lorentzFitResults.y_gamma_err, lorentzFitResults.y_amplitude_err,
-          lorentzFitResults.y_chi2red, lorentzFitResults.y_npoints,
+          lorentzFitResults.y_vertical_offset, lorentzFitResults.y_vertical_offset_err,
+          lorentzFitResults.y_chi2red, lorentzFitResults.y_pp, lorentzFitResults.y_dof,
           lorentzFitResults.fit_successful);
           
         // Perform diagonal Lorentzian fitting if 2D fitting was performed and successful
@@ -284,70 +285,74 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fRunAction->SetDiagonalLorentzianFitResults(
           lorentzDiagResults.main_diag_x_center, lorentzDiagResults.main_diag_x_gamma, lorentzDiagResults.main_diag_x_amplitude,
           lorentzDiagResults.main_diag_x_center_err, lorentzDiagResults.main_diag_x_gamma_err, lorentzDiagResults.main_diag_x_amplitude_err,
-          lorentzDiagResults.main_diag_x_chi2red, lorentzDiagResults.main_diag_x_npoints, lorentzDiagResults.main_diag_x_fit_successful,
+          lorentzDiagResults.main_diag_x_vertical_offset, lorentzDiagResults.main_diag_x_vertical_offset_err,
+          lorentzDiagResults.main_diag_x_chi2red, lorentzDiagResults.main_diag_x_pp, lorentzDiagResults.main_diag_x_dof, lorentzDiagResults.main_diag_x_fit_successful,
           lorentzDiagResults.main_diag_y_center, lorentzDiagResults.main_diag_y_gamma, lorentzDiagResults.main_diag_y_amplitude,
           lorentzDiagResults.main_diag_y_center_err, lorentzDiagResults.main_diag_y_gamma_err, lorentzDiagResults.main_diag_y_amplitude_err,
-          lorentzDiagResults.main_diag_y_chi2red, lorentzDiagResults.main_diag_y_npoints, lorentzDiagResults.main_diag_y_fit_successful,
+          lorentzDiagResults.main_diag_y_vertical_offset, lorentzDiagResults.main_diag_y_vertical_offset_err,
+          lorentzDiagResults.main_diag_y_chi2red, lorentzDiagResults.main_diag_y_pp, lorentzDiagResults.main_diag_y_dof, lorentzDiagResults.main_diag_y_fit_successful,
           lorentzDiagResults.sec_diag_x_center, lorentzDiagResults.sec_diag_x_gamma, lorentzDiagResults.sec_diag_x_amplitude,
           lorentzDiagResults.sec_diag_x_center_err, lorentzDiagResults.sec_diag_x_gamma_err, lorentzDiagResults.sec_diag_x_amplitude_err,
-          lorentzDiagResults.sec_diag_x_chi2red, lorentzDiagResults.sec_diag_x_npoints, lorentzDiagResults.sec_diag_x_fit_successful,
+          lorentzDiagResults.sec_diag_x_vertical_offset, lorentzDiagResults.sec_diag_x_vertical_offset_err,
+          lorentzDiagResults.sec_diag_x_chi2red, lorentzDiagResults.sec_diag_x_pp, lorentzDiagResults.sec_diag_x_dof, lorentzDiagResults.sec_diag_x_fit_successful,
           lorentzDiagResults.sec_diag_y_center, lorentzDiagResults.sec_diag_y_gamma, lorentzDiagResults.sec_diag_y_amplitude,
           lorentzDiagResults.sec_diag_y_center_err, lorentzDiagResults.sec_diag_y_gamma_err, lorentzDiagResults.sec_diag_y_amplitude_err,
-          lorentzDiagResults.sec_diag_y_chi2red, lorentzDiagResults.sec_diag_y_npoints, lorentzDiagResults.sec_diag_y_fit_successful,
+          lorentzDiagResults.sec_diag_y_vertical_offset, lorentzDiagResults.sec_diag_y_vertical_offset_err,
+          lorentzDiagResults.sec_diag_y_chi2red, lorentzDiagResults.sec_diag_y_pp, lorentzDiagResults.sec_diag_y_dof, lorentzDiagResults.sec_diag_y_fit_successful,
           lorentzDiagResults.fit_successful);
       } else {
         // Set default diagonal Lorentzian fit values when 2D fitting failed
         fRunAction->SetDiagonalLorentzianFitResults(
-          0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
           false); // fit_successful = false
       }
         
     } else {
       // Not enough data points for Lorentzian fitting
       fRunAction->Set2DLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
-        0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
         false); // fit_successful = false
       
       // Set default diagonal Lorentzian fit values when not enough data points
       fRunAction->SetDiagonalLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
         false); // fit_successful = false
     }
         
     } else {
       // Not enough data points for fitting
       fRunAction->Set2DGaussianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
-        0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
         false); // fit_successful = false
       
       // Set default diagonal fit values when not enough data points
       fRunAction->SetDiagonalGaussianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
         false); // fit_successful = false
       
       // Not enough data points for Lorentzian fitting
       fRunAction->Set2DLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
-        0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
         false); // fit_successful = false
       
       // Set default diagonal Lorentzian fit values when not enough data points
       fRunAction->SetDiagonalLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
         false); // fit_successful = false
     }
   } else {
@@ -360,30 +365,30 @@ void EventAction::EndOfEventAction(const G4Event* event)
     
     // Set default values (no fitting performed)
     fRunAction->Set2DGaussianFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
-      0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
       false); // fit_successful = false
     
     // Set default diagonal fit values when fitting is skipped
     fRunAction->SetDiagonalGaussianFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-      0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
       false); // fit_successful = false
     
     // Set default Lorentzian values (no fitting performed)
     fRunAction->Set2DLorentzianFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
-      0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
       false); // fit_successful = false
     
     // Set default diagonal Lorentzian fit values when fitting is skipped
     fRunAction->SetDiagonalLorentzianFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-      0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
       false); // fit_successful = false
   }
   
@@ -518,8 +523,6 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
 {
   // Clear previous data
   fNonPixel_GridNeighborhoodAngles.clear();
-  fNonPixel_GridNeighborhoodPixelI.clear();
-  fNonPixel_GridNeighborhoodPixelJ.clear();
   
   // Check if hit is inside a pixel - if so, all angles should be invalid
   G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
@@ -533,9 +536,7 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
         G4int gridPixelI = hitPixelI + di;
         G4int gridPixelJ = hitPixelJ + dj;
         
-        // Store pixel indices and NaN angle
-        fNonPixel_GridNeighborhoodPixelI.push_back(gridPixelI);
-        fNonPixel_GridNeighborhoodPixelJ.push_back(gridPixelJ);
+        // Store NaN angle
         fNonPixel_GridNeighborhoodAngles.push_back(std::numeric_limits<G4double>::quiet_NaN()); // Use same NaN as elsewhere
       }
     }
@@ -564,8 +565,6 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
       if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
           gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
         // Store invalid data for out-of-bounds pixels
-        fNonPixel_GridNeighborhoodPixelI.push_back(gridPixelI);
-        fNonPixel_GridNeighborhoodPixelJ.push_back(gridPixelJ);
         fNonPixel_GridNeighborhoodAngles.push_back(-999.0); // Invalid angle marker
         continue;
       }
@@ -583,8 +582,6 @@ void EventAction::CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPositi
       G4double alphaInDegrees = alpha * (180.0 / CLHEP::pi);
       
       // Store the results
-      fNonPixel_GridNeighborhoodPixelI.push_back(gridPixelI);
-      fNonPixel_GridNeighborhoodPixelJ.push_back(gridPixelJ);
       fNonPixel_GridNeighborhoodAngles.push_back(alphaInDegrees);
     }
   }
