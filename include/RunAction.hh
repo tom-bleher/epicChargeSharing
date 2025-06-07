@@ -118,8 +118,8 @@ private:
     // Variables for pixel mapping
     G4int fPixelI;    // Pixel index in X direction
     G4int fPixelJ;    // Pixel index in Y direction
-    G4double fPixelTrueDeltaX; // Delta X from hit to pixel center [mm] (x_pixel - x_true)
-    G4double fPixelTrueDeltaY; // Delta Y from hit to pixel center [mm] (y_pixel - y_true)
+    G4double fPixelTrueDeltaX; // Delta X from pixel center to true position [mm] (x_pixel - x_true)
+    G4double fPixelTrueDeltaY; // Delta Y from pixel center to true position [mm] (y_pixel - y_true)
     
     // =============================================
     // HIT CLASSIFICATION VARIABLES
