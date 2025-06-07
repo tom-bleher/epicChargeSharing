@@ -188,8 +188,8 @@ void RunAction::BeginOfRunAction(const G4Run*)
     // Add branches for pixel mapping information
     fTree->Branch("PixelI", &fPixelI, "PixelI/I")->SetTitle("Pixel Index X");
     fTree->Branch("PixelJ", &fPixelJ, "PixelJ/I")->SetTitle("Pixel Index Y");
-    fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "PixelTrueDeltaX/D")->SetTitle("Delta X from Hit to Pixel Center [mm]");
-    fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "PixelTrueDeltaY/D")->SetTitle("Delta Y from Hit to Pixel Center [mm]");
+    fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "PixelTrueDeltaX/D")->SetTitle("Delta X from Pixel Center to True Position [mm] (x_pixel - x_true)");
+    fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "PixelTrueDeltaY/D")->SetTitle("Delta Y from Pixel Center to True Position [mm] (y_pixel - y_true)");
     
     // ==============================================
     // HIT CLASSIFICATION BRANCHES
@@ -678,11 +678,23 @@ void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4d
     fNonPixel_Fit2D_Successful = fit_successful;
     
     // Calculate delta values for row and column fits vs true position
+    // Use individual fit validity checks similar to diagonal fits for consistency
     if (fit_successful) {
-        fNonPixel_GaussRowTrueDeltaX = x_center - fTrueX;      // x_row_fit - x_true
-        fNonPixel_GaussColumnTrueDeltaY = y_center - fTrueY;   // y_column_fit - y_true
+        // Check X fit validity (row fit) - use npoints as success indicator
+        if (x_npoints > 0) {
+            fNonPixel_GaussRowTrueDeltaX = x_center - fTrueX;      // x_row_fit - x_true
+        } else {
+            fNonPixel_GaussRowTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        }
+        
+        // Check Y fit validity (column fit) - use npoints as success indicator  
+        if (y_npoints > 0) {
+            fNonPixel_GaussColumnTrueDeltaY = y_center - fTrueY;   // y_column_fit - y_true
+        } else {
+            fNonPixel_GaussColumnTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        }
     } else {
-        // Set row and column delta values to NaN for failed fits
+        // Set row and column delta values to NaN for failed overall fits
         fNonPixel_GaussRowTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fNonPixel_GaussColumnTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
