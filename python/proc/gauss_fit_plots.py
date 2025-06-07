@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-Post-processing plotting routine for Gaussian fit visualization of charge sharing in LGAD detectors.
+Post-processing plotting routine for Gaussian and Lorentzian fit visualization of charge sharing in LGAD detectors.
 
 This script creates plots for:
-1. Gaussian curve estimation for central row (x-direction) with residuals
-2. Gaussian curve estimation for central column (y-direction) with residuals
+1. Gaussian and Lorentzian curve estimation for central row (x-direction) with residuals
+2. Gaussian and Lorentzian curve estimation for central column (y-direction) with residuals
 3. Gaussian curve estimation for main diagonal direction with residuals
 4. Gaussian curve estimation for secondary diagonal direction with residuals
-5. Overlay plots comparing different fitting approaches:
-   - X-coordinate: Row fit + Main diagonal X fit + Secondary diagonal X fit
-   - Y-coordinate: Column fit + Main diagonal Y fit + Secondary diagonal Y fit
+5. Comparison plots showing ALL fitting approaches overlaid:
+   - X-direction: Row (Gaussian + Lorentzian) + Main Diagonal (Gaussian) + Secondary Diagonal (Gaussian)
+   - Y-direction: Column (Gaussian + Lorentzian) + Main Diagonal (Gaussian) + Secondary Diagonal (Gaussian)
 
-The plots show the fitted Gaussian curves overlaid on the actual charge data points 
-from the neighborhood grid, along with residual plots showing fit quality.
-Individual directions get separate figures, and overlay plots compare all approaches.
+The plots show both fitted Gaussian and Lorentzian curves overlaid on the actual charge data points 
+from the neighborhood grid, along with residual plots showing fit quality for both function types.
+Individual directions get separate figures in their respective subdirectories, and comparison plots show all fitting approaches overlaid for comprehensive analysis.
 """
 
 import uproot
@@ -54,6 +54,22 @@ def gaussian_1d(x, amplitude, center, sigma, offset=0):
     """
     return amplitude * np.exp(-0.5 * ((x - center) / sigma)**2) + offset
 
+def lorentzian_1d(x, amplitude, center, gamma, offset=0):
+    """
+    1D Lorentzian function for plotting fitted curves.
+    
+    Args:
+        x: Independent variable
+        amplitude: Lorentzian amplitude
+        center: Lorentzian center
+        gamma: Lorentzian gamma (half-width at half-maximum, HWHM)
+        offset: Baseline offset
+    
+    Returns:
+        Lorentzian function values
+    """
+    return amplitude / (1 + ((x - center) / gamma)**2) + offset
+
 def load_successful_fits(root_file):
     """
     Load data from ROOT file, filtering for successful 2D Gaussian fits.
@@ -75,14 +91,23 @@ def load_successful_fits(root_file):
                 'TrueX', 'TrueY',  # True hit positions
                 'PixelX', 'PixelY',  # Nearest pixel positions
                 'IsPixelHit',  # Pixel hit classification
+                # Gaussian fit branches
                 'Fit2D_XCenter', 'Fit2D_XSigma', 'Fit2D_XAmplitude',
                 'Fit2D_XCenterErr', 'Fit2D_XSigmaErr', 'Fit2D_XAmplitudeErr',
                 'Fit2D_XChi2red', 'Fit2D_XNPoints',
                 'Fit2D_YCenter', 'Fit2D_YSigma', 'Fit2D_YAmplitude',
                 'Fit2D_YCenterErr', 'Fit2D_YSigmaErr', 'Fit2D_YAmplitudeErr',
                 'Fit2D_YChi2red', 'Fit2D_YNPoints',
-                'Fit2D_Successful',  # Whether 2D fitting was successful
-                # Diagonal fit branches (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+                'Fit2D_Successful',  # Whether 2D Gaussian fitting was successful
+                # Lorentzian fit branches
+                'Fit2D_Lorentz_XCenter', 'Fit2D_Lorentz_XGamma', 'Fit2D_Lorentz_XAmplitude',
+                'Fit2D_Lorentz_XCenterErr', 'Fit2D_Lorentz_XGammaErr', 'Fit2D_Lorentz_XAmplitudeErr',
+                'Fit2D_Lorentz_XChi2red', 'Fit2D_Lorentz_XNPoints',
+                'Fit2D_Lorentz_YCenter', 'Fit2D_Lorentz_YGamma', 'Fit2D_Lorentz_YAmplitude',
+                'Fit2D_Lorentz_YCenterErr', 'Fit2D_Lorentz_YGammaErr', 'Fit2D_Lorentz_YAmplitudeErr',
+                'Fit2D_Lorentz_YChi2red', 'Fit2D_Lorentz_YNPoints',
+                'Fit2D_Lorentz_Successful',  # Whether 2D Lorentzian fitting was successful
+                # Diagonal Gaussian fit branches (4 separate fits: Main X, Main Y, Sec X, Sec Y)
                 'FitDiag_MainXCenter', 'FitDiag_MainXSigma', 'FitDiag_MainXAmplitude',
                 'FitDiag_MainXCenterErr', 'FitDiag_MainXSigmaErr', 'FitDiag_MainXAmplitudeErr',
                 'FitDiag_MainXChi2red', 'FitDiag_MainXNPoints', 'FitDiag_MainXSuccessful',
@@ -95,7 +120,21 @@ def load_successful_fits(root_file):
                 'FitDiag_SecYCenter', 'FitDiag_SecYSigma', 'FitDiag_SecYAmplitude',
                 'FitDiag_SecYCenterErr', 'FitDiag_SecYSigmaErr', 'FitDiag_SecYAmplitudeErr',
                 'FitDiag_SecYChi2red', 'FitDiag_SecYNPoints', 'FitDiag_SecYSuccessful',
-                'FitDiag_Successful',  # Whether diagonal fitting was successful
+                'FitDiag_Successful',  # Whether diagonal Gaussian fitting was successful
+                # Diagonal Lorentzian fit branches (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+                'FitDiag_Lorentz_MainXCenter', 'FitDiag_Lorentz_MainXGamma', 'FitDiag_Lorentz_MainXAmplitude',
+                'FitDiag_Lorentz_MainXCenterErr', 'FitDiag_Lorentz_MainXGammaErr', 'FitDiag_Lorentz_MainXAmplitudeErr',
+                'FitDiag_Lorentz_MainXChi2red', 'FitDiag_Lorentz_MainXNPoints', 'FitDiag_Lorentz_MainXSuccessful',
+                'FitDiag_Lorentz_MainYCenter', 'FitDiag_Lorentz_MainYGamma', 'FitDiag_Lorentz_MainYAmplitude',
+                'FitDiag_Lorentz_MainYCenterErr', 'FitDiag_Lorentz_MainYGammaErr', 'FitDiag_Lorentz_MainYAmplitudeErr',
+                'FitDiag_Lorentz_MainYChi2red', 'FitDiag_Lorentz_MainYNPoints', 'FitDiag_Lorentz_MainYSuccessful',
+                'FitDiag_Lorentz_SecXCenter', 'FitDiag_Lorentz_SecXGamma', 'FitDiag_Lorentz_SecXAmplitude',
+                'FitDiag_Lorentz_SecXCenterErr', 'FitDiag_Lorentz_SecXGammaErr', 'FitDiag_Lorentz_SecXAmplitudeErr',
+                'FitDiag_Lorentz_SecXChi2red', 'FitDiag_Lorentz_SecXNPoints', 'FitDiag_Lorentz_SecXSuccessful',
+                'FitDiag_Lorentz_SecYCenter', 'FitDiag_Lorentz_SecYGamma', 'FitDiag_Lorentz_SecYAmplitude',
+                'FitDiag_Lorentz_SecYCenterErr', 'FitDiag_Lorentz_SecYGammaErr', 'FitDiag_Lorentz_SecYAmplitudeErr',
+                'FitDiag_Lorentz_SecYChi2red', 'FitDiag_Lorentz_SecYNPoints', 'FitDiag_Lorentz_SecYSuccessful',
+                'FitDiag_Lorentz_Successful',  # Whether diagonal Lorentzian fitting was successful
                 'NonPixel_GridNeighborhoodPixelI', 'NonPixel_GridNeighborhoodPixelJ',  # Pixel indices
                 'NonPixel_GridNeighborhoodCharge',  # Charge values in Coulombs
                 'NonPixel_GridNeighborhoodDistances'  # Distances from hit to pixels
@@ -105,19 +144,23 @@ def load_successful_fits(root_file):
             
             print(f"Total events loaded: {len(data['TrueX'])}")
             
-            # Filter for successful non-pixel fits (both 2D and diagonal)
+            # Filter for successful non-pixel fits (both 2D Gaussian/Lorentzian and diagonal Gaussian/Lorentzian)
             is_non_pixel = ~data['IsPixelHit'] 
-            is_fit_successful = data['Fit2D_Successful']
-            is_diag_fit_successful = data['FitDiag_Successful']
-            valid_mask = is_non_pixel & is_fit_successful & is_diag_fit_successful
+            is_gauss_fit_successful = data['Fit2D_Successful']
+            is_lorentz_fit_successful = data['Fit2D_Lorentz_Successful']
+            is_diag_gauss_fit_successful = data['FitDiag_Successful']
+            is_diag_lorentz_fit_successful = data['FitDiag_Lorentz_Successful']
+            valid_mask = is_non_pixel & is_gauss_fit_successful & is_lorentz_fit_successful & is_diag_gauss_fit_successful & is_diag_lorentz_fit_successful
             
             print(f"Non-pixel events: {np.sum(is_non_pixel)}")
-            print(f"Successful 2D fits: {np.sum(is_fit_successful)}")
-            print(f"Successful diagonal fits: {np.sum(is_diag_fit_successful)}")
+            print(f"Successful 2D Gaussian fits: {np.sum(is_gauss_fit_successful)}")
+            print(f"Successful 2D Lorentzian fits: {np.sum(is_lorentz_fit_successful)}")
+            print(f"Successful diagonal Gaussian fits: {np.sum(is_diag_gauss_fit_successful)}")
+            print(f"Successful diagonal Lorentzian fits: {np.sum(is_diag_lorentz_fit_successful)}")
             print(f"Valid events for plotting: {np.sum(valid_mask)}")
             
             if np.sum(valid_mask) == 0:
-                print("Warning: No successful 2D and diagonal fits found for non-pixel events!")
+                print("Warning: No successful 2D and diagonal Gaussian/Lorentzian fits found for non-pixel events!")
                 return None
             
             # Extract valid data
@@ -303,14 +346,15 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
             (np.array(sec_x_positions), np.array(sec_x_charges)), 
             (np.array(sec_y_positions), np.array(sec_y_charges)))
 
-def calculate_residuals(positions, charges, fit_params):
+def calculate_residuals(positions, charges, fit_params, fit_type='gaussian'):
     """
-    Calculate residuals between data and fitted Gaussian.
+    Calculate residuals between data and fitted function.
     
     Args:
         positions (array): Position values
         charges (array): Charge values (data)
-        fit_params (dict): Fitted parameters with keys 'center', 'sigma', 'amplitude'
+        fit_params (dict): Fitted parameters with keys 'center', 'sigma'/'gamma', 'amplitude'
+        fit_type (str): 'gaussian' or 'lorentzian'
     
     Returns:
         array: Residuals (data - fit)
@@ -318,17 +362,26 @@ def calculate_residuals(positions, charges, fit_params):
     if len(positions) == 0:
         return np.array([])
     
-    fitted_values = gaussian_1d(positions, 
-                               fit_params['amplitude'], 
-                               fit_params['center'], 
-                               fit_params['sigma'])
+    if fit_type == 'gaussian':
+        fitted_values = gaussian_1d(positions, 
+                                   fit_params['amplitude'], 
+                                   fit_params['center'], 
+                                   fit_params['sigma'])
+    elif fit_type == 'lorentzian':
+        fitted_values = lorentzian_1d(positions, 
+                                     fit_params['amplitude'], 
+                                     fit_params['center'], 
+                                     fit_params['gamma'])
+    else:
+        raise ValueError("fit_type must be 'gaussian' or 'lorentzian'")
     
     return charges - fitted_values
 
 def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=False):
     """
-    Create separate Gaussian fit plots for X and Y directions for a single event.
+    Create separate Gaussian and Lorentzian fit plots for X and Y directions for a single event.
     Each direction gets its own figure with residuals on left, main plot on right.
+    Saves Gaussian and Lorentzian plots to separate subdirectories.
     
     Args:
         event_idx (int): Event index to plot
@@ -347,7 +400,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         if len(row_pos) < 3 and len(col_pos) < 3 and len(main_x_pos) < 3 and len(main_y_pos) < 3 and len(sec_x_pos) < 3 and len(sec_y_pos) < 3:
             return f"Event {event_idx}: Not enough data points for plotting"
         
-        # Get fit parameters for this event
+        # Get Gaussian fit parameters for this event
         x_center = data['Fit2D_XCenter'][event_idx]
         x_sigma = data['Fit2D_XSigma'][event_idx]
         x_amplitude = data['Fit2D_XAmplitude'][event_idx]
@@ -363,6 +416,23 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         y_sigma_err = data['Fit2D_YSigmaErr'][event_idx]
         y_chi2red = data['Fit2D_YChi2red'][event_idx]
         y_npoints = data['Fit2D_YNPoints'][event_idx]
+        
+        # Get Lorentzian fit parameters for this event
+        x_lorentz_center = data['Fit2D_Lorentz_XCenter'][event_idx]
+        x_lorentz_gamma = data['Fit2D_Lorentz_XGamma'][event_idx]
+        x_lorentz_amplitude = data['Fit2D_Lorentz_XAmplitude'][event_idx]
+        x_lorentz_center_err = data['Fit2D_Lorentz_XCenterErr'][event_idx]
+        x_lorentz_gamma_err = data['Fit2D_Lorentz_XGammaErr'][event_idx]
+        x_lorentz_chi2red = data['Fit2D_Lorentz_XChi2red'][event_idx]
+        x_lorentz_npoints = data['Fit2D_Lorentz_XNPoints'][event_idx]
+        
+        y_lorentz_center = data['Fit2D_Lorentz_YCenter'][event_idx]
+        y_lorentz_gamma = data['Fit2D_Lorentz_YGamma'][event_idx]
+        y_lorentz_amplitude = data['Fit2D_Lorentz_YAmplitude'][event_idx]
+        y_lorentz_center_err = data['Fit2D_Lorentz_YCenterErr'][event_idx]
+        y_lorentz_gamma_err = data['Fit2D_Lorentz_YGammaErr'][event_idx]
+        y_lorentz_chi2red = data['Fit2D_Lorentz_YChi2red'][event_idx]
+        y_lorentz_npoints = data['Fit2D_Lorentz_YNPoints'][event_idx]
         
         # Get diagonal fit parameters (4 separate fits: Main X, Main Y, Sec X, Sec Y)
         # Main diagonal X fit (X vs Charge for pixels on main diagonal)
@@ -409,10 +479,17 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         true_x = data['TrueX'][event_idx]
         true_y = data['TrueY'][event_idx]
         
-        os.makedirs(output_dir, exist_ok=True)
+        # Create subdirectories for different fit types
+        gaussian_dir = os.path.join(output_dir, "gaussian")
+        lorentzian_dir = os.path.join(output_dir, "lorentzian")
+        comparison_dir = os.path.join(output_dir, "comparison")
+        
+        os.makedirs(gaussian_dir, exist_ok=True)
+        os.makedirs(lorentzian_dir, exist_ok=True)
+        os.makedirs(comparison_dir, exist_ok=True)
         
         # ============================================
-        # X-DIRECTION FIGURE
+        # X-DIRECTION GAUSSIAN FIGURE
         # ============================================
         if len(row_pos) >= 3:
             fig_x = plt.figure(figsize=(16, 6))
@@ -424,13 +501,13 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             # Right panel: Main plot
             ax_x_main = fig_x.add_subplot(gs_x[0, 1])
             
-            # Calculate fit parameters and residuals
-            x_fit_params = {'center': x_center, 'sigma': x_sigma, 'amplitude': x_amplitude}
-            residuals_x = calculate_residuals(row_pos, row_charges, x_fit_params)
+            # Calculate fit parameters and residuals for Gaussian fit
+            x_gauss_params = {'center': x_center, 'sigma': x_sigma, 'amplitude': x_amplitude}
+            residuals_x_gauss = calculate_residuals(row_pos, row_charges, x_gauss_params, 'gaussian')
             
             # Residuals plot (left panel)
-            ax_x_res.errorbar(row_pos, residuals_x, fmt='bo', markersize=6, 
-                             capsize=3, label='Fit residuals', alpha=0.8)
+            ax_x_res.errorbar(row_pos, residuals_x_gauss, fmt='bo', markersize=6, 
+                             capsize=3, label='Gaussian residuals', alpha=0.8)
             ax_x_res.axhline(0, color='red', linestyle='--', alpha=0.7)
             ax_x_res.grid(True, alpha=0.3, linestyle=':')
             ax_x_res.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
@@ -440,24 +517,24 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             
             # Main plot (right panel)
             # Plot data points with error bars
-            ax_x_main.errorbar(row_pos, row_charges, fmt='bo', markersize=8, 
+            ax_x_main.errorbar(row_pos, row_charges, fmt='ko', markersize=8, 
                               capsize=4, label='Measured data', alpha=0.8, linewidth=1.5)
             
             # Create smooth curve for fitted Gaussian
             x_fit_range = np.linspace(row_pos.min() - 0.1, row_pos.max() + 0.1, 200)
-            y_fit = gaussian_1d(x_fit_range, x_amplitude, x_center, x_sigma)
+            y_gauss_fit = gaussian_1d(x_fit_range, x_amplitude, x_center, x_sigma)
             
-            # Plot fit curve
-            fit_label = r'$y(x) = A \exp\left(-\frac{(x - m)^2}{2\sigma^2}\right)+ B$'
-            ax_x_main.plot(x_fit_range, y_fit, 'r-', linewidth=2.5, 
-                          label=fit_label, alpha=0.9)
+            # Plot Gaussian fit curve
+            gauss_label = r'$y(x) = A \exp\left(-\frac{(x - m)^2}{2\sigma^2}\right)+ B$'
+            ax_x_main.plot(x_fit_range, y_gauss_fit, 'b-', linewidth=2.5, 
+                          label=gauss_label, alpha=0.9)
             
             # Mark true position
             ax_x_main.axvline(true_x, color='green', linestyle='--', linewidth=2, 
                              label=f'True X = {true_x:.3f} mm', alpha=0.8)
             
             # Mark fitted center
-            ax_x_main.axvline(x_center, color='orange', linestyle=':', linewidth=2, 
+            ax_x_main.axvline(x_center, color='blue', linestyle=':', linewidth=2, 
                              label=f'Fitted X = {x_center:.3f} mm', alpha=0.8)
             
             ax_x_main.grid(True, alpha=0.3, linestyle=':')
@@ -466,31 +543,87 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_x_main.set_title('Pixel Charge vs. Central Coordinate (Row)')
             ax_x_main.legend(loc='upper left')
             
-            '''
-            # Add fit information text box
-            fit_info = (f'μ = {x_center:.3f}±{x_center_err:.3f} mm\n'
-                       f'σ = {x_sigma:.3f}±{x_sigma_err:.3f} mm\n' 
-                       f'A = {x_amplitude:.2e} C\n'
-                       f'χ²/ndf = {x_chi2red:.2f}\n'
-                       f'N = {x_npoints}')
-            ax_x_main.text(0.02, 0.98, fit_info, transform=ax_x_main.transAxes, 
-                          verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-            '''
             # Add overall title with event information
             if show_event_info:
-                delta_x = x_center - true_x
+                delta_x_gauss = x_center - true_x
                 fig_x.suptitle(f'Event {event_idx}: X-Direction Gaussian Fit\n'
-                              f'True X: {true_x:.3f} mm, Fitted X: {x_center:.3f} mm, '
-                              f'ΔX: {delta_x:.3f} mm', 
+                              f'True X: {true_x:.3f} mm, Fitted: {x_center:.3f} mm (Δ={delta_x_gauss:.3f})', 
                               fontsize=14)
             
-            # Save X-direction plot
-            filename_x = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_X.png')
-            plt.savefig(filename_x, dpi=300, bbox_inches='tight', facecolor='white')
+            # Save X-direction Gaussian plot
+            filename_x_gauss = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_X.png')
+            plt.savefig(filename_x_gauss, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
         
         # ============================================
-        # Y-DIRECTION FIGURE
+        # X-DIRECTION LORENTZIAN FIGURE
+        # ============================================
+        if len(row_pos) >= 3:
+            fig_x_lor = plt.figure(figsize=(16, 6))
+            gs_x_lor = GridSpec(1, 2, width_ratios=[1, 1], wspace=0.3)
+            
+            # Left panel: Residuals
+            ax_x_lor_res = fig_x_lor.add_subplot(gs_x_lor[0, 0])
+            
+            # Right panel: Main plot
+            ax_x_lor_main = fig_x_lor.add_subplot(gs_x_lor[0, 1])
+            
+            # Calculate fit parameters and residuals for Lorentzian fit
+            x_lorentz_params = {'center': x_lorentz_center, 'gamma': x_lorentz_gamma, 'amplitude': x_lorentz_amplitude}
+            residuals_x_lorentz = calculate_residuals(row_pos, row_charges, x_lorentz_params, 'lorentzian')
+            
+            # Residuals plot (left panel)
+            ax_x_lor_res.errorbar(row_pos, residuals_x_lorentz, fmt='rs', markersize=6, 
+                                 capsize=3, label='Lorentzian residuals', alpha=0.8)
+            ax_x_lor_res.axhline(0, color='red', linestyle='--', alpha=0.7)
+            ax_x_lor_res.grid(True, alpha=0.3, linestyle=':')
+            ax_x_lor_res.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_x_lor_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(x_{\text{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_x_lor_res.set_title('Residuals of Pixel Charge vs. Central Coordinate (Row)')
+            ax_x_lor_res.legend(loc='upper right')
+            
+            # Main plot (right panel)
+            # Plot data points with error bars
+            ax_x_lor_main.errorbar(row_pos, row_charges, fmt='ko', markersize=8, 
+                                  capsize=4, label='Measured data', alpha=0.8, linewidth=1.5)
+            
+            # Create smooth curve for fitted Lorentzian
+            x_fit_range = np.linspace(row_pos.min() - 0.1, row_pos.max() + 0.1, 200)
+            y_lorentz_fit = lorentzian_1d(x_fit_range, x_lorentz_amplitude, x_lorentz_center, x_lorentz_gamma)
+            
+            # Plot Lorentzian fit curve
+            lorentz_label = r'$y(x) = \frac{A}{1+\left(\frac{x-m}{\gamma}\right)^2} + B$'
+            ax_x_lor_main.plot(x_fit_range, y_lorentz_fit, 'r-', linewidth=2.5, 
+                              label=lorentz_label, alpha=0.9)
+            
+            # Mark true position
+            ax_x_lor_main.axvline(true_x, color='green', linestyle='--', linewidth=2, 
+                                 label=f'True X = {true_x:.3f} mm', alpha=0.8)
+            
+            # Mark fitted center
+            ax_x_lor_main.axvline(x_lorentz_center, color='red', linestyle=':', linewidth=2, 
+                                 label=f'Fitted X = {x_lorentz_center:.3f} mm', alpha=0.8)
+            
+            ax_x_lor_main.grid(True, alpha=0.3, linestyle=':')
+            ax_x_lor_main.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_x_lor_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
+            ax_x_lor_main.set_title('Pixel Charge vs. Central Coordinate (Row)')
+            ax_x_lor_main.legend(loc='upper left')
+            
+            # Add overall title with event information
+            if show_event_info:
+                delta_x_lorentz = x_lorentz_center - true_x
+                fig_x_lor.suptitle(f'Event {event_idx}: X-Direction Lorentzian Fit\n'
+                                  f'True X: {true_x:.3f} mm, Fitted: {x_lorentz_center:.3f} mm (Δ={delta_x_lorentz:.3f})', 
+                                  fontsize=14)
+            
+            # Save X-direction Lorentzian plot
+            filename_x_lorentz = os.path.join(lorentzian_dir, f'lorentz_fit_event_{event_idx:04d}_X.png')
+            plt.savefig(filename_x_lorentz, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+        
+        # ============================================
+        # Y-DIRECTION GAUSSIAN FIGURE
         # ============================================
         if len(col_pos) >= 3:
             fig_y = plt.figure(figsize=(16, 6))
@@ -502,13 +635,13 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             # Right panel: Main plot
             ax_y_main = fig_y.add_subplot(gs_y[0, 1])
             
-            # Calculate fit parameters and residuals
-            y_fit_params = {'center': y_center, 'sigma': y_sigma, 'amplitude': y_amplitude}
-            residuals_y = calculate_residuals(col_pos, col_charges, y_fit_params)
+            # Calculate fit parameters and residuals for Gaussian fit
+            y_gauss_params = {'center': y_center, 'sigma': y_sigma, 'amplitude': y_amplitude}
+            residuals_y_gauss = calculate_residuals(col_pos, col_charges, y_gauss_params, 'gaussian')
             
             # Residuals plot (left panel)
-            ax_y_res.errorbar(col_pos, residuals_y, fmt='bo', markersize=6, 
-                             capsize=3, label='Fit residuals', alpha=0.8)
+            ax_y_res.errorbar(col_pos, residuals_y_gauss, fmt='bo', markersize=6, 
+                             capsize=3, label='Gaussian residuals', alpha=0.8)
             ax_y_res.axhline(0, color='red', linestyle='--', alpha=0.7)
             ax_y_res.grid(True, alpha=0.3, linestyle=':')
             ax_y_res.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
@@ -518,24 +651,24 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             
             # Main plot (right panel)
             # Plot data points with error bars
-            ax_y_main.errorbar(col_pos, col_charges, fmt='bo', markersize=8, 
+            ax_y_main.errorbar(col_pos, col_charges, fmt='ko', markersize=8, 
                               capsize=4, label='Measured data', alpha=0.8, linewidth=1.5)
             
             # Create smooth curve for fitted Gaussian
             y_fit_range = np.linspace(col_pos.min() - 0.1, col_pos.max() + 0.1, 200)
-            y_fit = gaussian_1d(y_fit_range, y_amplitude, y_center, y_sigma)
+            y_gauss_fit = gaussian_1d(y_fit_range, y_amplitude, y_center, y_sigma)
             
-            # Plot fit curve
-            fit_label = r'$y(x) = A \exp\left(-\frac{(x - m)^2}{2\sigma^2}\right)+ B$'
-            ax_y_main.plot(y_fit_range, y_fit, 'r-', linewidth=2.5, 
-                          label=fit_label, alpha=0.9)
+            # Plot Gaussian fit curve
+            gauss_label = r'$y(x) = A \exp\left(-\frac{(y - m)^2}{2\sigma^2}\right)+ B$'
+            ax_y_main.plot(y_fit_range, y_gauss_fit, 'b-', linewidth=2.5, 
+                          label=gauss_label, alpha=0.9)
             
             # Mark true position
             ax_y_main.axvline(true_y, color='green', linestyle='--', linewidth=2, 
                              label=f'True Y = {true_y:.3f} mm', alpha=0.8)
             
             # Mark fitted center
-            ax_y_main.axvline(y_center, color='orange', linestyle=':', linewidth=2, 
+            ax_y_main.axvline(y_center, color='blue', linestyle=':', linewidth=2, 
                              label=f'Fitted Y = {y_center:.3f} mm', alpha=0.8)
             
             ax_y_main.grid(True, alpha=0.3, linestyle=':')
@@ -543,31 +676,88 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_y_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
             ax_y_main.set_title('Pixel Charge vs. Central Coordinate (Column)')
             ax_y_main.legend(loc='upper left')
-            '''
-            # Add fit information text box
-            fit_info = (f'μ = {y_center:.3f}±{y_center_err:.3f} mm\n'
-                       f'σ = {y_sigma:.3f}±{y_sigma_err:.3f} mm\n' 
-                       f'A = {y_amplitude:.2e} C\n'
-                       f'χ²/ndf = {y_chi2red:.2f}\n'
-                       f'N = {y_npoints}')
-            ax_y_main.text(0.02, 0.98, fit_info, transform=ax_y_main.transAxes, 
-                          verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-            '''
+            
             # Add overall title with event information
             if show_event_info:
-                delta_y = y_center - true_y
+                delta_y_gauss = y_center - true_y
                 fig_y.suptitle(f'Event {event_idx}: Y-Direction Gaussian Fit\n'
-                              f'True Y: {true_y:.3f} mm, Fitted Y: {y_center:.3f} mm, '
-                              f'ΔY: {delta_y:.3f} mm', 
+                              f'True Y: {true_y:.3f} mm, Fitted: {y_center:.3f} mm (Δ={delta_y_gauss:.3f})', 
                               fontsize=14)
             
-            # Save Y-direction plot
-            filename_y = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_Y.png')
-            plt.savefig(filename_y, dpi=300, bbox_inches='tight', facecolor='white')
+            # Save Y-direction Gaussian plot
+            filename_y_gauss = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_Y.png')
+            plt.savefig(filename_y_gauss, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
         
         # ============================================
-        # MAIN DIAGONAL X FIGURE (X vs Charge for main diagonal pixels)
+        # Y-DIRECTION LORENTZIAN FIGURE
+        # ============================================
+        if len(col_pos) >= 3:
+            fig_y_lor = plt.figure(figsize=(16, 6))
+            gs_y_lor = GridSpec(1, 2, width_ratios=[1, 1], wspace=0.3)
+            
+            # Left panel: Residuals
+            ax_y_lor_res = fig_y_lor.add_subplot(gs_y_lor[0, 0])
+            
+            # Right panel: Main plot
+            ax_y_lor_main = fig_y_lor.add_subplot(gs_y_lor[0, 1])
+            
+            # Calculate fit parameters and residuals for Lorentzian fit
+            y_lorentz_params = {'center': y_lorentz_center, 'gamma': y_lorentz_gamma, 'amplitude': y_lorentz_amplitude}
+            residuals_y_lorentz = calculate_residuals(col_pos, col_charges, y_lorentz_params, 'lorentzian')
+            
+            # Residuals plot (left panel)
+            ax_y_lor_res.errorbar(col_pos, residuals_y_lorentz, fmt='rs', markersize=6, 
+                                 capsize=3, label='Lorentzian residuals', alpha=0.8)
+            ax_y_lor_res.axhline(0, color='red', linestyle='--', alpha=0.7)
+            ax_y_lor_res.grid(True, alpha=0.3, linestyle=':')
+            ax_y_lor_res.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_y_lor_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(y_{\text{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_y_lor_res.set_title('Residuals of Pixel Charge vs. Central Coordinate (Column)')
+            ax_y_lor_res.legend(loc='upper right')
+            
+            # Main plot (right panel)
+            # Plot data points with error bars
+            ax_y_lor_main.errorbar(col_pos, col_charges, fmt='ko', markersize=8, 
+                                  capsize=4, label='Measured data', alpha=0.8, linewidth=1.5)
+            
+            # Create smooth curve for fitted Lorentzian
+            y_fit_range = np.linspace(col_pos.min() - 0.1, col_pos.max() + 0.1, 200)
+            y_lorentz_fit = lorentzian_1d(y_fit_range, y_lorentz_amplitude, y_lorentz_center, y_lorentz_gamma)
+            
+            # Plot Lorentzian fit curve
+            lorentz_label = r'$y(x) = \frac{A}{1+\left(\frac{y-m}{\gamma}\right)^2} + B$'
+            ax_y_lor_main.plot(y_fit_range, y_lorentz_fit, 'r-', linewidth=2.5, 
+                              label=lorentz_label, alpha=0.9)
+            
+            # Mark true position
+            ax_y_lor_main.axvline(true_y, color='green', linestyle='--', linewidth=2, 
+                                 label=f'True Y = {true_y:.3f} mm', alpha=0.8)
+            
+            # Mark fitted center
+            ax_y_lor_main.axvline(y_lorentz_center, color='red', linestyle=':', linewidth=2, 
+                                 label=f'Fitted Y = {y_lorentz_center:.3f} mm', alpha=0.8)
+            
+            ax_y_lor_main.grid(True, alpha=0.3, linestyle=':')
+            ax_y_lor_main.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
+            ax_y_lor_main.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=12)
+            ax_y_lor_main.set_title('Pixel Charge vs. Central Coordinate (Column)')
+            ax_y_lor_main.legend(loc='upper left')
+            
+            # Add overall title with event information
+            if show_event_info:
+                delta_y_lorentz = y_lorentz_center - true_y
+                fig_y_lor.suptitle(f'Event {event_idx}: Y-Direction Lorentzian Fit\n'
+                                  f'True Y: {true_y:.3f} mm, Fitted: {y_lorentz_center:.3f} mm (Δ={delta_y_lorentz:.3f})', 
+                                  fontsize=14)
+            
+            # Save Y-direction Lorentzian plot
+            filename_y_lorentz = os.path.join(lorentzian_dir, f'lorentz_fit_event_{event_idx:04d}_Y.png')
+            plt.savefig(filename_y_lorentz, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+        
+        # ============================================
+        # MAIN DIAGONAL X FIGURE (X vs Charge for main diagonal pixels) - GAUSSIAN ONLY
         # ============================================
         if len(main_x_pos) >= 3 and main_diag_x_successful:
             fig_main_x = plt.figure(figsize=(16, 6))
@@ -629,7 +819,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                    fontsize=14)
             
             # Save main diagonal X plot
-            filename_main_x = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_MainDiagX.png')
+            filename_main_x = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_MainDiagX.png')
             plt.savefig(filename_main_x, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
             
@@ -696,7 +886,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                    fontsize=14)
             
             # Save main diagonal Y plot
-            filename_main_y = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_MainDiagY.png')
+            filename_main_y = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_MainDiagY.png')
             plt.savefig(filename_main_y, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
         
@@ -763,7 +953,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                   fontsize=14)
             
             # Save secondary diagonal X plot
-            filename_sec_x = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_SecDiagX.png')
+            filename_sec_x = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_SecDiagX.png')
             plt.savefig(filename_sec_x, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
             
@@ -830,36 +1020,47 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                   fontsize=14)
             
             # Save secondary diagonal Y plot
-            filename_sec_y = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_SecDiagY.png')
+            filename_sec_y = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_SecDiagY.png')
             plt.savefig(filename_sec_y, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
         
         # Generate success message
-        created_plots = []
-        if len(row_pos) >= 3:
-            created_plots.append('X-direction')
-        if len(col_pos) >= 3:
-            created_plots.append('Y-direction')
-        if len(main_x_pos) >= 3 and main_diag_x_successful:
-            created_plots.append('Main-diagonal-X')
-        if len(main_y_pos) >= 3 and main_diag_y_successful:
-            created_plots.append('Main-diagonal-Y')
-        if len(sec_x_pos) >= 3 and sec_diag_x_successful:
-            created_plots.append('Secondary-diagonal-X')
-        if len(sec_y_pos) >= 3 and sec_diag_y_successful:
-            created_plots.append('Secondary-diagonal-Y')
+        gaussian_plots = []
+        lorentzian_plots = []
         
-        return f"Event {event_idx}: {' and '.join(created_plots)} plots saved"
+        if len(row_pos) >= 3:
+            gaussian_plots.append('X-direction')
+            lorentzian_plots.append('X-direction')
+        if len(col_pos) >= 3:
+            gaussian_plots.append('Y-direction')
+            lorentzian_plots.append('Y-direction')
+        if len(main_x_pos) >= 3 and main_diag_x_successful:
+            gaussian_plots.append('Main-diagonal-X')
+        if len(main_y_pos) >= 3 and main_diag_y_successful:
+            gaussian_plots.append('Main-diagonal-Y')
+        if len(sec_x_pos) >= 3 and sec_diag_x_successful:
+            gaussian_plots.append('Secondary-diagonal-X')
+        if len(sec_y_pos) >= 3 and sec_diag_y_successful:
+            gaussian_plots.append('Secondary-diagonal-Y')
+        
+        success_msg = f"Event {event_idx}: "
+        if gaussian_plots:
+            success_msg += f"Gaussian plots ({', '.join(gaussian_plots)}) "
+        if lorentzian_plots:
+            success_msg += f"and Lorentzian plots ({', '.join(lorentzian_plots)}) "
+        success_msg += "saved to respective directories"
+        
+        return success_msg
         
     except Exception as e:
         return f"Event {event_idx}: Error creating plot - {e}"
 
 def create_overlay_fit_plots(event_idx, data, output_dir="plots", show_event_info=False):
     """
-    Create overlay plots comparing all fitting approaches for X and Y coordinates.
+    Create comparison plots showing ALL fitting approaches overlaid for each direction.
     
-    For X-coordinate: Row fit + Main diagonal X fit + Secondary diagonal X fit
-    For Y-coordinate: Column fit + Main diagonal Y fit + Secondary diagonal Y fit
+    X-direction: Row (Gaussian + Lorentzian), Main Diagonal X (Gaussian), Secondary Diagonal X (Gaussian)
+    Y-direction: Column (Gaussian + Lorentzian), Main Diagonal Y (Gaussian), Secondary Diagonal Y (Gaussian)
     
     Args:
         event_idx (int): Event index to plot
@@ -875,230 +1076,261 @@ def create_overlay_fit_plots(event_idx, data, output_dir="plots", show_event_inf
         (row_pos, row_charges), (col_pos, col_charges) = extract_row_column_data(event_idx, data)
         (main_x_pos, main_x_charges), (main_y_pos, main_y_charges), (sec_x_pos, sec_x_charges), (sec_y_pos, sec_y_charges) = extract_diagonal_data(event_idx, data)
         
+        # True hit position for comparison
+        true_x = data['TrueX'][event_idx]
+        true_y = data['TrueY'][event_idx]
+        
+        # Create comparison directory
+        comparison_dir = os.path.join(output_dir, "comparison")
+        os.makedirs(comparison_dir, exist_ok=True)
+        
         # Get fit parameters for this event
-        x_center = data['Fit2D_XCenter'][event_idx]
-        x_sigma = data['Fit2D_XSigma'][event_idx]
-        x_amplitude = data['Fit2D_XAmplitude'][event_idx]
+        # Row/Column Gaussian fits
+        row_gauss_center = data['Fit2D_XCenter'][event_idx]
+        row_gauss_sigma = data['Fit2D_XSigma'][event_idx]
+        row_gauss_amplitude = data['Fit2D_XAmplitude'][event_idx]
+        row_gauss_chi2 = data['Fit2D_XChi2red'][event_idx]
         
-        y_center = data['Fit2D_YCenter'][event_idx]
-        y_sigma = data['Fit2D_YSigma'][event_idx]
-        y_amplitude = data['Fit2D_YAmplitude'][event_idx]
+        col_gauss_center = data['Fit2D_YCenter'][event_idx]
+        col_gauss_sigma = data['Fit2D_YSigma'][event_idx]
+        col_gauss_amplitude = data['Fit2D_YAmplitude'][event_idx]
+        col_gauss_chi2 = data['Fit2D_YChi2red'][event_idx]
         
-        # Get diagonal fit parameters
+        # Row/Column Lorentzian fits
+        row_lorentz_center = data['Fit2D_Lorentz_XCenter'][event_idx]
+        row_lorentz_gamma = data['Fit2D_Lorentz_XGamma'][event_idx]
+        row_lorentz_amplitude = data['Fit2D_Lorentz_XAmplitude'][event_idx]
+        row_lorentz_chi2 = data['Fit2D_Lorentz_XChi2red'][event_idx]
+        
+        col_lorentz_center = data['Fit2D_Lorentz_YCenter'][event_idx]
+        col_lorentz_gamma = data['Fit2D_Lorentz_YGamma'][event_idx]
+        col_lorentz_amplitude = data['Fit2D_Lorentz_YAmplitude'][event_idx]
+        col_lorentz_chi2 = data['Fit2D_Lorentz_YChi2red'][event_idx]
+        
+        # Diagonal Gaussian fits
         main_diag_x_center = data['FitDiag_MainXCenter'][event_idx]
         main_diag_x_sigma = data['FitDiag_MainXSigma'][event_idx]
         main_diag_x_amplitude = data['FitDiag_MainXAmplitude'][event_idx]
+        main_diag_x_chi2 = data['FitDiag_MainXChi2red'][event_idx]
         main_diag_x_successful = data['FitDiag_MainXSuccessful'][event_idx]
         
         main_diag_y_center = data['FitDiag_MainYCenter'][event_idx]
         main_diag_y_sigma = data['FitDiag_MainYSigma'][event_idx]
         main_diag_y_amplitude = data['FitDiag_MainYAmplitude'][event_idx]
+        main_diag_y_chi2 = data['FitDiag_MainYChi2red'][event_idx]
         main_diag_y_successful = data['FitDiag_MainYSuccessful'][event_idx]
         
         sec_diag_x_center = data['FitDiag_SecXCenter'][event_idx]
         sec_diag_x_sigma = data['FitDiag_SecXSigma'][event_idx]
         sec_diag_x_amplitude = data['FitDiag_SecXAmplitude'][event_idx]
+        sec_diag_x_chi2 = data['FitDiag_SecXChi2red'][event_idx]
         sec_diag_x_successful = data['FitDiag_SecXSuccessful'][event_idx]
         
         sec_diag_y_center = data['FitDiag_SecYCenter'][event_idx]
         sec_diag_y_sigma = data['FitDiag_SecYSigma'][event_idx]
         sec_diag_y_amplitude = data['FitDiag_SecYAmplitude'][event_idx]
+        sec_diag_y_chi2 = data['FitDiag_SecYChi2red'][event_idx]
         sec_diag_y_successful = data['FitDiag_SecYSuccessful'][event_idx]
         
-        # True hit position for comparison
-        true_x = data['TrueX'][event_idx]
-        true_y = data['TrueY'][event_idx]
-        
-        os.makedirs(output_dir, exist_ok=True)
-        
         # ============================================
-        # X-COORDINATE OVERLAY FIGURE
+        # X-COORDINATE COMPARISON: ALL APPROACHES OVERLAID
         # ============================================
-        if len(row_pos) >= 3 or (len(main_x_pos) >= 3 and main_diag_x_successful) or (len(sec_x_pos) >= 3 and sec_diag_x_successful):
-            fig_x_overlay = plt.figure(figsize=(14, 8))
-            ax_x_overlay = fig_x_overlay.add_subplot(111)
+        if len(row_pos) >= 3:
+            fig_x_comparison = plt.figure(figsize=(16, 8))
+            ax_x_comparison = fig_x_comparison.add_subplot(111)
             
-            # Determine overall X range for plotting
-            all_x_positions = []
-            if len(row_pos) >= 3:
-                all_x_positions.extend(row_pos)
+            # Determine overall X range for plotting from all data sources
+            all_x_positions = list(row_pos)
             if len(main_x_pos) >= 3 and main_diag_x_successful:
                 all_x_positions.extend(main_x_pos)
             if len(sec_x_pos) >= 3 and sec_diag_x_successful:
                 all_x_positions.extend(sec_x_pos)
             
-            if all_x_positions:
-                x_min, x_max = min(all_x_positions), max(all_x_positions)
-                x_range = np.linspace(x_min - 0.2, x_max + 0.2, 300)
+            x_min, x_max = min(all_x_positions), max(all_x_positions)
+            x_range = np.linspace(x_min - 0.3, x_max + 0.3, 400)
+            
+            # Plot Row data points and fits
+            ax_x_comparison.errorbar(row_pos, row_charges, fmt='o', markersize=6, 
+                                   capsize=3, label='Row data', alpha=0.7, linewidth=1.5, 
+                                   color='darkblue', markeredgecolor='navy')
+            
+            # Row Gaussian fit
+            row_gauss_fit = gaussian_1d(x_range, row_gauss_amplitude, row_gauss_center, row_gauss_sigma)
+            ax_x_comparison.plot(x_range, row_gauss_fit, '-', linewidth=2.5, 
+                               label=f'Row Gaussian (χ²={row_gauss_chi2:.2f})', 
+                               color='blue', alpha=0.9)
+            
+            # Row Lorentzian fit
+            row_lorentz_fit = lorentzian_1d(x_range, row_lorentz_amplitude, row_lorentz_center, row_lorentz_gamma)
+            ax_x_comparison.plot(x_range, row_lorentz_fit, '--', linewidth=2.5, 
+                               label=f'Row Lorentzian (χ²={row_lorentz_chi2:.2f})', 
+                               color='red', alpha=0.9)
+            
+            # Main diagonal X data and fit (if available)
+            if len(main_x_pos) >= 3 and main_diag_x_successful:
+                ax_x_comparison.errorbar(main_x_pos, main_x_charges, fmt='s', markersize=6, 
+                                       capsize=3, label='Main diag data', alpha=0.7, linewidth=1.5,
+                                       color='darkgreen', markeredgecolor='forestgreen')
                 
-                # Plot Row data and fit (central row)
-                if len(row_pos) >= 3:
-                    ax_x_overlay.errorbar(row_pos, row_charges, fmt='o', markersize=8, 
-                                        capsize=4, label='Row data', alpha=0.8, linewidth=1.5, 
-                                        color='blue', markeredgecolor='darkblue')
-                    
-                    # Row fit curve
-                    row_fit = gaussian_1d(x_range, x_amplitude, x_center, x_sigma)
-                    ax_x_overlay.plot(x_range, row_fit, '-', linewidth=3, 
-                                    label=f'Row fit (μ={x_center:.3f} mm)', 
-                                    color='blue', alpha=0.9)
+                main_diag_x_fit = gaussian_1d(x_range, main_diag_x_amplitude, main_diag_x_center, main_diag_x_sigma)
+                ax_x_comparison.plot(x_range, main_diag_x_fit, '-.', linewidth=2.5, 
+                                   label=f'Main Diag Gaussian (χ²={main_diag_x_chi2:.2f})', 
+                                   color='green', alpha=0.9)
+            
+            # Secondary diagonal X data and fit (if available)
+            if len(sec_x_pos) >= 3 and sec_diag_x_successful:
+                ax_x_comparison.errorbar(sec_x_pos, sec_x_charges, fmt='^', markersize=6, 
+                                       capsize=3, label='Sec diag data', alpha=0.7, linewidth=1.5,
+                                       color='darkorange', markeredgecolor='orangered')
                 
-                # Plot Main diagonal X data and fit
-                if len(main_x_pos) >= 3 and main_diag_x_successful:
-                    ax_x_overlay.errorbar(main_x_pos, main_x_charges, fmt='s', markersize=8, 
-                                        capsize=4, label='Main diag data', alpha=0.8, linewidth=1.5,
-                                        color='red', markeredgecolor='darkred')
-                    
-                    # Main diagonal X fit curve
-                    main_diag_x_fit = gaussian_1d(x_range, main_diag_x_amplitude, main_diag_x_center, main_diag_x_sigma)
-                    ax_x_overlay.plot(x_range, main_diag_x_fit, '--', linewidth=3, 
-                                    label=f'Main diag fit (μ={main_diag_x_center:.3f} mm)', 
-                                    color='red', alpha=0.9)
-                
-                # Plot Secondary diagonal X data and fit
-                if len(sec_x_pos) >= 3 and sec_diag_x_successful:
-                    ax_x_overlay.errorbar(sec_x_pos, sec_x_charges, fmt='^', markersize=8, 
-                                        capsize=4, label='Sec diag data', alpha=0.8, linewidth=1.5,
-                                        color='purple', markeredgecolor='indigo')
-                    
-                    # Secondary diagonal X fit curve
-                    sec_diag_x_fit = gaussian_1d(x_range, sec_diag_x_amplitude, sec_diag_x_center, sec_diag_x_sigma)
-                    ax_x_overlay.plot(x_range, sec_diag_x_fit, ':', linewidth=3, 
-                                    label=f'Sec diag fit (μ={sec_diag_x_center:.3f} mm)', 
-                                    color='purple', alpha=0.9)
-                
-                # Mark fitted centers for each approach
-                if len(row_pos) >= 3:
-                    ax_x_overlay.axvline(x_center, color='blue', linestyle=':', linewidth=2, 
-                                       label=f'Row fit center = {x_center:.3f} mm', alpha=0.7)
-                
-                if len(main_x_pos) >= 3 and main_diag_x_successful:
-                    ax_x_overlay.axvline(main_diag_x_center, color='red', linestyle=':', linewidth=2, 
-                                       label=f'Main diag center = {main_diag_x_center:.3f} mm', alpha=0.7)
-                
-                if len(sec_x_pos) >= 3 and sec_diag_x_successful:
-                    ax_x_overlay.axvline(sec_diag_x_center, color='purple', linestyle=':', linewidth=2, 
-                                       label=f'Sec diag center = {sec_diag_x_center:.3f} mm', alpha=0.7)
-                
-                # Mark true position
-                ax_x_overlay.axvline(true_x, color='green', linestyle='-', linewidth=3, 
-                                   label=f'True X = {true_x:.3f} mm', alpha=0.8)
-                
-                ax_x_overlay.grid(True, alpha=0.3, linestyle=':')
-                ax_x_overlay.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=14)
-                ax_x_overlay.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=14)
-                ax_x_overlay.set_title('X-Coordinate: Comparison of Row, Main Diagonal, and Secondary Diagonal Fits', fontsize=16)
-                ax_x_overlay.legend(loc='best', fontsize=12)
-                
-                # Add overall title with event information
-                if show_event_info:
-                    fig_x_overlay.suptitle(f'Event {event_idx}: X-Coordinate Fit Comparison\n'
-                                         f'True X: {true_x:.3f} mm', 
-                                         fontsize=16)
-                
-                # Save X-coordinate overlay plot
-                filename_x_overlay = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_X_overlay.png')
-                plt.savefig(filename_x_overlay, dpi=300, bbox_inches='tight', facecolor='white')
-                plt.close()
+                sec_diag_x_fit = gaussian_1d(x_range, sec_diag_x_amplitude, sec_diag_x_center, sec_diag_x_sigma)
+                ax_x_comparison.plot(x_range, sec_diag_x_fit, ':', linewidth=2.5, 
+                                   label=f'Sec Diag Gaussian (χ²={sec_diag_x_chi2:.2f})', 
+                                   color='orange', alpha=0.9)
+            
+            # Mark true position
+            ax_x_comparison.axvline(true_x, color='black', linestyle='-', linewidth=3, 
+                                  label=f'True X = {true_x:.3f} mm', alpha=0.8)
+            
+            # Mark fitted centers with vertical lines
+            ax_x_comparison.axvline(row_gauss_center, color='blue', linestyle=':', linewidth=1.5, 
+                                  alpha=0.6, label=f'Row Gauss center = {row_gauss_center:.3f} mm')
+            ax_x_comparison.axvline(row_lorentz_center, color='red', linestyle=':', linewidth=1.5, 
+                                  alpha=0.6, label=f'Row Lorentz center = {row_lorentz_center:.3f} mm')
+            
+            if len(main_x_pos) >= 3 and main_diag_x_successful:
+                ax_x_comparison.axvline(main_diag_x_center, color='green', linestyle=':', linewidth=1.5, 
+                                      alpha=0.6, label=f'Main Diag center = {main_diag_x_center:.3f} mm')
+            
+            if len(sec_x_pos) >= 3 and sec_diag_x_successful:
+                ax_x_comparison.axvline(sec_diag_x_center, color='orange', linestyle=':', linewidth=1.5, 
+                                      alpha=0.6, label=f'Sec Diag center = {sec_diag_x_center:.3f} mm')
+            
+            ax_x_comparison.grid(True, alpha=0.3, linestyle=':')
+            ax_x_comparison.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=14)
+            ax_x_comparison.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=14)
+            ax_x_comparison.set_title('X-Direction: All Fitting Approaches Comparison', fontsize=16)
+            ax_x_comparison.legend(loc='best', fontsize=10, ncol=2)
+            
+            # Add overall title with event information
+            if show_event_info:
+                delta_row_gauss = row_gauss_center - true_x
+                delta_row_lorentz = row_lorentz_center - true_x
+                fig_x_comparison.suptitle(f'Event {event_idx}: X-Direction All Fits Comparison\n'
+                                        f'True: {true_x:.3f} mm, Row G: {row_gauss_center:.3f} (Δ={delta_row_gauss:.3f}), '
+                                        f'Row L: {row_lorentz_center:.3f} (Δ={delta_row_lorentz:.3f})', 
+                                        fontsize=14)
+            
+            # Save X-direction comparison plot
+            filename_x_comparison = os.path.join(comparison_dir, f'comparison_event_{event_idx:04d}_X_AllApproaches.png')
+            plt.savefig(filename_x_comparison, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
         
         # ============================================
-        # Y-COORDINATE OVERLAY FIGURE
+        # Y-COORDINATE COMPARISON: ALL APPROACHES OVERLAID
         # ============================================
-        if len(col_pos) >= 3 or (len(main_y_pos) >= 3 and main_diag_y_successful) or (len(sec_y_pos) >= 3 and sec_diag_y_successful):
-            fig_y_overlay = plt.figure(figsize=(14, 8))
-            ax_y_overlay = fig_y_overlay.add_subplot(111)
+        if len(col_pos) >= 3:
+            fig_y_comparison = plt.figure(figsize=(16, 8))
+            ax_y_comparison = fig_y_comparison.add_subplot(111)
             
-            # Determine overall Y range for plotting
-            all_y_positions = []
-            if len(col_pos) >= 3:
-                all_y_positions.extend(col_pos)
+            # Determine overall Y range for plotting from all data sources
+            all_y_positions = list(col_pos)
             if len(main_y_pos) >= 3 and main_diag_y_successful:
                 all_y_positions.extend(main_y_pos)
             if len(sec_y_pos) >= 3 and sec_diag_y_successful:
                 all_y_positions.extend(sec_y_pos)
             
-            if all_y_positions:
-                y_min, y_max = min(all_y_positions), max(all_y_positions)
-                y_range = np.linspace(y_min - 0.2, y_max + 0.2, 300)
+            y_min, y_max = min(all_y_positions), max(all_y_positions)
+            y_range = np.linspace(y_min - 0.3, y_max + 0.3, 400)
+            
+            # Plot Column data points and fits
+            ax_y_comparison.errorbar(col_pos, col_charges, fmt='o', markersize=6, 
+                                   capsize=3, label='Column data', alpha=0.7, linewidth=1.5, 
+                                   color='darkblue', markeredgecolor='navy')
+            
+            # Column Gaussian fit
+            col_gauss_fit = gaussian_1d(y_range, col_gauss_amplitude, col_gauss_center, col_gauss_sigma)
+            ax_y_comparison.plot(y_range, col_gauss_fit, '-', linewidth=2.5, 
+                               label=f'Column Gaussian (χ²={col_gauss_chi2:.2f})', 
+                               color='blue', alpha=0.9)
+            
+            # Column Lorentzian fit
+            col_lorentz_fit = lorentzian_1d(y_range, col_lorentz_amplitude, col_lorentz_center, col_lorentz_gamma)
+            ax_y_comparison.plot(y_range, col_lorentz_fit, '--', linewidth=2.5, 
+                               label=f'Column Lorentzian (χ²={col_lorentz_chi2:.2f})', 
+                               color='red', alpha=0.9)
+            
+            # Main diagonal Y data and fit (if available)
+            if len(main_y_pos) >= 3 and main_diag_y_successful:
+                ax_y_comparison.errorbar(main_y_pos, main_y_charges, fmt='s', markersize=6, 
+                                       capsize=3, label='Main diag data', alpha=0.7, linewidth=1.5,
+                                       color='darkgreen', markeredgecolor='forestgreen')
                 
-                # Plot Column data and fit (central column)
-                if len(col_pos) >= 3:
-                    ax_y_overlay.errorbar(col_pos, col_charges, fmt='o', markersize=8, 
-                                        capsize=4, label='Column data', alpha=0.8, linewidth=1.5, 
-                                        color='blue', markeredgecolor='darkblue')
-                    
-                    # Column fit curve
-                    col_fit = gaussian_1d(y_range, y_amplitude, y_center, y_sigma)
-                    ax_y_overlay.plot(y_range, col_fit, '-', linewidth=3, 
-                                    label=f'Column fit (μ={y_center:.3f} mm)', 
-                                    color='blue', alpha=0.9)
+                main_diag_y_fit = gaussian_1d(y_range, main_diag_y_amplitude, main_diag_y_center, main_diag_y_sigma)
+                ax_y_comparison.plot(y_range, main_diag_y_fit, '-.', linewidth=2.5, 
+                                   label=f'Main Diag Gaussian (χ²={main_diag_y_chi2:.2f})', 
+                                   color='green', alpha=0.9)
+            
+            # Secondary diagonal Y data and fit (if available)
+            if len(sec_y_pos) >= 3 and sec_diag_y_successful:
+                ax_y_comparison.errorbar(sec_y_pos, sec_y_charges, fmt='^', markersize=6, 
+                                       capsize=3, label='Sec diag data', alpha=0.7, linewidth=1.5,
+                                       color='darkorange', markeredgecolor='orangered')
                 
-                # Plot Main diagonal Y data and fit
-                if len(main_y_pos) >= 3 and main_diag_y_successful:
-                    ax_y_overlay.errorbar(main_y_pos, main_y_charges, fmt='s', markersize=8, 
-                                        capsize=4, label='Main diag data', alpha=0.8, linewidth=1.5,
-                                        color='red', markeredgecolor='darkred')
-                    
-                    # Main diagonal Y fit curve
-                    main_diag_y_fit = gaussian_1d(y_range, main_diag_y_amplitude, main_diag_y_center, main_diag_y_sigma)
-                    ax_y_overlay.plot(y_range, main_diag_y_fit, '--', linewidth=3, 
-                                    label=f'Main diag fit (μ={main_diag_y_center:.3f} mm)', 
-                                    color='red', alpha=0.9)
-                
-                # Plot Secondary diagonal Y data and fit
-                if len(sec_y_pos) >= 3 and sec_diag_y_successful:
-                    ax_y_overlay.errorbar(sec_y_pos, sec_y_charges, fmt='^', markersize=8, 
-                                        capsize=4, label='Sec diag data', alpha=0.8, linewidth=1.5,
-                                        color='purple', markeredgecolor='indigo')
-                    
-                    # Secondary diagonal Y fit curve
-                    sec_diag_y_fit = gaussian_1d(y_range, sec_diag_y_amplitude, sec_diag_y_center, sec_diag_y_sigma)
-                    ax_y_overlay.plot(y_range, sec_diag_y_fit, ':', linewidth=3, 
-                                    label=f'Sec diag fit (μ={sec_diag_y_center:.3f} mm)', 
-                                    color='purple', alpha=0.9)
-                
-                # Mark fitted centers for each approach
-                if len(col_pos) >= 3:
-                    ax_y_overlay.axvline(y_center, color='blue', linestyle=':', linewidth=2, 
-                                       label=f'Column fit center = {y_center:.3f} mm', alpha=0.7)
-                
-                if len(main_y_pos) >= 3 and main_diag_y_successful:
-                    ax_y_overlay.axvline(main_diag_y_center, color='red', linestyle=':', linewidth=2, 
-                                       label=f'Main diag center = {main_diag_y_center:.3f} mm', alpha=0.7)
-                
-                if len(sec_y_pos) >= 3 and sec_diag_y_successful:
-                    ax_y_overlay.axvline(sec_diag_y_center, color='purple', linestyle=':', linewidth=2, 
-                                       label=f'Sec diag center = {sec_diag_y_center:.3f} mm', alpha=0.7)
-                
-                # Mark true position
-                ax_y_overlay.axvline(true_y, color='green', linestyle='-', linewidth=3, 
-                                   label=f'True Y = {true_y:.3f} mm', alpha=0.8)
-                
-                ax_y_overlay.grid(True, alpha=0.3, linestyle=':')
-                ax_y_overlay.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=14)
-                ax_y_overlay.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=14)
-                ax_y_overlay.set_title('Y-Coordinate: Comparison of Column, Main Diagonal, and Secondary Diagonal Fits', fontsize=16)
-                ax_y_overlay.legend(loc='best', fontsize=12)
-                
-                # Add overall title with event information
-                if show_event_info:
-                    fig_y_overlay.suptitle(f'Event {event_idx}: Y-Coordinate Fit Comparison\n'
-                                         f'True Y: {true_y:.3f} mm', 
-                                         fontsize=16)
-                
-                # Save Y-coordinate overlay plot
-                filename_y_overlay = os.path.join(output_dir, f'gauss_fit_event_{event_idx:04d}_Y_overlay.png')
-                plt.savefig(filename_y_overlay, dpi=300, bbox_inches='tight', facecolor='white')
-                plt.close()
+                sec_diag_y_fit = gaussian_1d(y_range, sec_diag_y_amplitude, sec_diag_y_center, sec_diag_y_sigma)
+                ax_y_comparison.plot(y_range, sec_diag_y_fit, ':', linewidth=2.5, 
+                                   label=f'Sec Diag Gaussian (χ²={sec_diag_y_chi2:.2f})', 
+                                   color='orange', alpha=0.9)
+            
+            # Mark true position
+            ax_y_comparison.axvline(true_y, color='black', linestyle='-', linewidth=3, 
+                                  label=f'True Y = {true_y:.3f} mm', alpha=0.8)
+            
+            # Mark fitted centers with vertical lines
+            ax_y_comparison.axvline(col_gauss_center, color='blue', linestyle=':', linewidth=1.5, 
+                                  alpha=0.6, label=f'Col Gauss center = {col_gauss_center:.3f} mm')
+            ax_y_comparison.axvline(col_lorentz_center, color='red', linestyle=':', linewidth=1.5, 
+                                  alpha=0.6, label=f'Col Lorentz center = {col_lorentz_center:.3f} mm')
+            
+            if len(main_y_pos) >= 3 and main_diag_y_successful:
+                ax_y_comparison.axvline(main_diag_y_center, color='green', linestyle=':', linewidth=1.5, 
+                                      alpha=0.6, label=f'Main Diag center = {main_diag_y_center:.3f} mm')
+            
+            if len(sec_y_pos) >= 3 and sec_diag_y_successful:
+                ax_y_comparison.axvline(sec_diag_y_center, color='orange', linestyle=':', linewidth=1.5, 
+                                      alpha=0.6, label=f'Sec Diag center = {sec_diag_y_center:.3f} mm')
+            
+            ax_y_comparison.grid(True, alpha=0.3, linestyle=':')
+            ax_y_comparison.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=14)
+            ax_y_comparison.set_ylabel(r'$q_{\mathrm{px}}\,(\mathrm{C})$', fontsize=14)
+            ax_y_comparison.set_title('Y-Direction: All Fitting Approaches Comparison', fontsize=16)
+            ax_y_comparison.legend(loc='best', fontsize=10, ncol=2)
+            
+            # Add overall title with event information
+            if show_event_info:
+                delta_col_gauss = col_gauss_center - true_y
+                delta_col_lorentz = col_lorentz_center - true_y
+                fig_y_comparison.suptitle(f'Event {event_idx}: Y-Direction All Fits Comparison\n'
+                                        f'True: {true_y:.3f} mm, Col G: {col_gauss_center:.3f} (Δ={delta_col_gauss:.3f}), '
+                                        f'Col L: {col_lorentz_center:.3f} (Δ={delta_col_lorentz:.3f})', 
+                                        fontsize=14)
+            
+            # Save Y-direction comparison plot
+            filename_y_comparison = os.path.join(comparison_dir, f'comparison_event_{event_idx:04d}_Y_AllApproaches.png')
+            plt.savefig(filename_y_comparison, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
         
-        # Generate success message for overlay plots
-        created_overlays = []
-        if len(row_pos) >= 3 or (len(main_x_pos) >= 3 and main_diag_x_successful) or (len(sec_x_pos) >= 3 and sec_diag_x_successful):
-            created_overlays.append('X-overlay')
-        if len(col_pos) >= 3 or (len(main_y_pos) >= 3 and main_diag_y_successful) or (len(sec_y_pos) >= 3 and sec_diag_y_successful):
-            created_overlays.append('Y-overlay')
+        # Generate success message for comparison plots
+        created_comparisons = []
+        if len(row_pos) >= 3:
+            created_comparisons.append('X-direction All-Approaches')
+        if len(col_pos) >= 3:
+            created_comparisons.append('Y-direction All-Approaches')
         
-        return f"Event {event_idx}: {' and '.join(created_overlays)} plots saved"
+        if created_comparisons:
+            return f"Event {event_idx}: {' and '.join(created_comparisons)} comparison plots saved to comparison directory"
+        else:
+            return f"Event {event_idx}: No comparison plots created (insufficient data)"
         
     except Exception as e:
         return f"Event {event_idx}: Error creating overlay plot - {e}"
@@ -1309,7 +1541,7 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
         
         # Save summary plot
         os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.join(output_dir, 'gauss_fit_summary.png')
+        filename = os.path.join(output_dir, 'gauss_lorentz_fit_summary.png')
         plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
         
@@ -1321,18 +1553,18 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Create Gaussian fit plots for charge sharing analysis",
+        description="Create Gaussian and Lorentzian fit plots for charge sharing analysis",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("root_file", help="Path to ROOT file with 2D Gaussian fit data")
-    parser.add_argument("-o", "--output", default="gauss_plots", 
+    parser.add_argument("root_file", help="Path to ROOT file with 2D Gaussian and Lorentzian fit data")
+    parser.add_argument("-o", "--output", default="gauss_lorentz_plots", 
                        help="Output directory for plots")
     parser.add_argument("-n", "--num_events", type=int, default=10,
                        help="Number of individual events to plot")
     parser.add_argument("--summary_only", action="store_true",
                        help="Create only summary plots, skip individual events")
     parser.add_argument("--overlay_only", action="store_true",
-                       help="Create only overlay plots, skip individual direction plots")
+                       help="Create only comparison plots (all approaches overlaid), skip individual direction plots")
     parser.add_argument("--max_summary", type=int, default=100,
                        help="Maximum events to include in summary statistics")
     
@@ -1374,18 +1606,22 @@ def main():
                 if i % 5 == 0 or "Error" in result:
                     print(f"  {result}")
             
-            # Create overlay plots for comparison
-            overlay_result = create_overlay_fit_plots(i, data, args.output)
-            if "Error" not in overlay_result:
+            # Create comparison plots (Gaussian vs Lorentzian)
+            comparison_result = create_overlay_fit_plots(i, data, args.output)
+            if "Error" not in comparison_result:
                 overlay_success_count += 1
-            if i % 5 == 0 or "Error" in overlay_result:
-                print(f"  {overlay_result}")
+            if i % 5 == 0 or "Error" in comparison_result:
+                print(f"  {comparison_result}")
         
         if not args.overlay_only:
             print(f"\nSuccessfully created {success_count}/{n_events} individual plots")
-        print(f"Successfully created {overlay_success_count}/{n_events} overlay plots")
+        print(f"Successfully created {overlay_success_count}/{n_events} comparison plots")
     
     print(f"\nAll plots saved to: {args.output}/")
+    print(f"  - Gaussian fits: {args.output}/gaussian/")
+    print(f"  - Lorentzian fits: {args.output}/lorentzian/")
+    print(f"  - Comparison plots (all approaches overlaid): {args.output}/comparison/")
+    print(f"  - Summary plots: {args.output}/")
     return 0
 
 if __name__ == "__main__":
