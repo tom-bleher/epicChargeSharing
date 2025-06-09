@@ -4,6 +4,20 @@
 #include <vector>
 #include "globals.hh"
 
+// Structure to hold outlier removal results for Lorentzian fitting
+struct LorentzianOutlierRemovalResult {
+    std::vector<double> filtered_x_coords;
+    std::vector<double> filtered_y_coords;
+    std::vector<double> filtered_charge_values;
+    int outliers_removed;
+    bool filtering_applied;
+    bool success;
+    
+    // Constructor with default values
+    LorentzianOutlierRemovalResult() : 
+        outliers_removed(0), filtering_applied(false), success(false) {}
+};
+
 // Structure to hold 2D Lorentzian fit results (updated with new parameter names)
 struct LorentzianFit2DResultsCeres {
     // X direction fit results (central row)
@@ -129,6 +143,18 @@ struct DiagonalLorentzianFitResultsCeres {
         sec_diag_y_chi2red(0), sec_diag_y_pp(0), sec_diag_y_dof(0), sec_diag_y_fit_successful(false),
         fit_successful(false) {}
 };
+
+// Function to remove outliers from coordinate and charge data using boolean control for Lorentzian fitting
+// Uses robust MAD-based outlier detection with special considerations for Lorentzian's wider tails
+// Returns filtered coordinates and charges along with statistics
+LorentzianOutlierRemovalResult RemoveLorentzianOutliers(
+    const std::vector<double>& x_coords,
+    const std::vector<double>& y_coords,
+    const std::vector<double>& charge_values,
+    bool enable_outlier_removal,
+    double sigma_threshold = 2.5,
+    bool verbose = false
+);
 
 // Function to perform 2D Lorentzian fitting using Ceres Solver with robust optimization
 // Fits central row and column separately with Lorentzian functions
