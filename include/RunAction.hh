@@ -121,6 +121,20 @@ public:
     void FillTree();
 
 private:
+    // =============================================
+    // COORDINATE TRANSFORMATION HELPER METHODS
+    // =============================================
+    
+    // Apply rotation matrix transformation for diagonal coordinates
+    void TransformDiagonalCoordinates(G4double x_prime, G4double y_prime, G4double theta_deg, 
+                                      G4double& x_transformed, G4double& y_transformed);
+    
+    // Calculate transformed coordinates for all diagonal fits
+    void CalculateTransformedDiagonalCoordinates();
+    
+    // Calculate mean estimations from all fitting methods
+    void CalculateMeanEstimations();
+
     TFile* fRootFile;
     TTree* fTree;
     
@@ -155,6 +169,42 @@ private:
     G4double fLorentzMainDiagDeltaY;
     G4double fLorentzSecondDiagDeltaX;
     G4double fLorentzSecondDiagDeltaY;
+
+    // =============================================
+    // TRANSFORMED DIAGONAL COORDINATES (ROTATION MATRIX)
+    // =============================================
+    
+    // Transformed main diagonal coordinates (θ = 45°)
+    G4double fGaussMainDiagTransformedX;      // Transformed X from main diagonal (x' -> x)
+    G4double fGaussMainDiagTransformedY;      // Transformed Y from main diagonal (y' -> y)
+    G4double fLorentzMainDiagTransformedX;    // Transformed X from main diagonal (x' -> x)
+    G4double fLorentzMainDiagTransformedY;    // Transformed Y from main diagonal (y' -> y)
+    
+    // Transformed secondary diagonal coordinates (θ = -45°)
+    G4double fGaussSecondDiagTransformedX;    // Transformed X from secondary diagonal (x' -> x)
+    G4double fGaussSecondDiagTransformedY;    // Transformed Y from secondary diagonal (y' -> y)
+    G4double fLorentzSecondDiagTransformedX;  // Transformed X from secondary diagonal (x' -> x)
+    G4double fLorentzSecondDiagTransformedY;  // Transformed Y from secondary diagonal (y' -> y)
+    
+    // Delta values for transformed coordinates vs true position
+    G4double fGaussMainDiagTransformedDeltaX;   // x_transformed - x_true (main diagonal)
+    G4double fGaussMainDiagTransformedDeltaY;   // y_transformed - y_true (main diagonal)
+    G4double fGaussSecondDiagTransformedDeltaX; // x_transformed - x_true (secondary diagonal)
+    G4double fGaussSecondDiagTransformedDeltaY; // y_transformed - y_true (secondary diagonal)
+    G4double fLorentzMainDiagTransformedDeltaX;   // x_transformed - x_true (main diagonal)
+    G4double fLorentzMainDiagTransformedDeltaY;   // y_transformed - y_true (main diagonal)
+    G4double fLorentzSecondDiagTransformedDeltaX; // x_transformed - x_true (secondary diagonal)
+    G4double fLorentzSecondDiagTransformedDeltaY; // y_transformed - y_true (secondary diagonal)
+
+    // =============================================
+    // MEAN ESTIMATIONS FROM ALL FITTING METHODS
+    // =============================================
+    
+    // Mean of all X coordinate estimations (row, transformed diagonals)
+    G4double fGaussMeanTrueDeltaX;   // Mean delta X from all Gaussian estimation methods to True Position [mm]
+    G4double fGaussMeanTrueDeltaY;   // Mean delta Y from all Gaussian estimation methods to True Position [mm]
+    G4double fLorentzMeanTrueDeltaX; // Mean delta X from all Lorentzian estimation methods to True Position [mm]
+    G4double fLorentzMeanTrueDeltaY; // Mean delta Y from all Lorentzian estimation methods to True Position [mm]
 
     // =============================================
     // GAUSSIAN FITS VARIABLES

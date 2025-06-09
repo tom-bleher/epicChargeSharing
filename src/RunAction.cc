@@ -1,4 +1,5 @@
 #include "RunAction.hh"
+#include "Constants.hh"
 #include "G4RunManager.hh"
 #include "G4Run.hh"
 #include "G4SystemOfUnits.hh"
@@ -52,6 +53,28 @@ RunAction::RunAction()
   fLorentzMainDiagDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
   fLorentzSecondDiagDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
   fLorentzSecondDiagDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize transformed diagonal coordinate variables
+  fGaussMainDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussMainDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzMainDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzMainDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussSecondDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussSecondDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzSecondDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzSecondDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussMainDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussMainDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussSecondDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussSecondDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzMainDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzMainDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzSecondDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzSecondDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize mean estimation variables
+  fGaussMeanTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fGaussMeanTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzMeanTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fLorentzMeanTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
   // Initialize Gaussian fit variables
   fGaussFitRowAmplitude(0),
   fGaussFitRowAmplitudeErr(0),
@@ -283,6 +306,34 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("Hits/LorentzSecondDiagDeltaX", &fLorentzSecondDiagDeltaX, "LorentzSecondDiagDeltaX/D")->SetTitle("Delta X from Lorentzian Second Diagonal Fit to True Position [mm]");
     fTree->Branch("Hits/LorentzSecondDiagDeltaY", &fLorentzSecondDiagDeltaY, "LorentzSecondDiagDeltaY/D")->SetTitle("Delta Y from Lorentzian Second Diagonal Fit to True Position [mm]");
 
+    // TRANSFORMED DIAGONAL COORDINATES BRANCHES
+    // Transformed coordinates from rotation matrix (θ=45° and θ=-45°)
+    fTree->Branch("Hits/GaussMainDiagTransformedX", &fGaussMainDiagTransformedX, "GaussMainDiagTransformedX/D")->SetTitle("Transformed X from Gaussian Main Diagonal (rotation matrix) [mm]");
+    fTree->Branch("Hits/GaussMainDiagTransformedY", &fGaussMainDiagTransformedY, "GaussMainDiagTransformedY/D")->SetTitle("Transformed Y from Gaussian Main Diagonal (rotation matrix) [mm]");
+    fTree->Branch("Hits/GaussSecondDiagTransformedX", &fGaussSecondDiagTransformedX, "GaussSecondDiagTransformedX/D")->SetTitle("Transformed X from Gaussian Secondary Diagonal (rotation matrix) [mm]");
+    fTree->Branch("Hits/GaussSecondDiagTransformedY", &fGaussSecondDiagTransformedY, "GaussSecondDiagTransformedY/D")->SetTitle("Transformed Y from Gaussian Secondary Diagonal (rotation matrix) [mm]");
+    fTree->Branch("Hits/LorentzMainDiagTransformedX", &fLorentzMainDiagTransformedX, "LorentzMainDiagTransformedX/D")->SetTitle("Transformed X from Lorentzian Main Diagonal (rotation matrix) [mm]");
+    fTree->Branch("Hits/LorentzMainDiagTransformedY", &fLorentzMainDiagTransformedY, "LorentzMainDiagTransformedY/D")->SetTitle("Transformed Y from Lorentzian Main Diagonal (rotation matrix) [mm]");
+    fTree->Branch("Hits/LorentzSecondDiagTransformedX", &fLorentzSecondDiagTransformedX, "LorentzSecondDiagTransformedX/D")->SetTitle("Transformed X from Lorentzian Secondary Diagonal (rotation matrix) [mm]");
+    fTree->Branch("Hits/LorentzSecondDiagTransformedY", &fLorentzSecondDiagTransformedY, "LorentzSecondDiagTransformedY/D")->SetTitle("Transformed Y from Lorentzian Secondary Diagonal (rotation matrix) [mm]");
+    
+    // Delta values for transformed coordinates vs true position
+    fTree->Branch("Hits/GaussMainDiagTransformedDeltaX", &fGaussMainDiagTransformedDeltaX, "GaussMainDiagTransformedDeltaX/D")->SetTitle("Delta X from Gaussian Main Diagonal Transformed to True Position [mm]");
+    fTree->Branch("Hits/GaussMainDiagTransformedDeltaY", &fGaussMainDiagTransformedDeltaY, "GaussMainDiagTransformedDeltaY/D")->SetTitle("Delta Y from Gaussian Main Diagonal Transformed to True Position [mm]");
+    fTree->Branch("Hits/GaussSecondDiagTransformedDeltaX", &fGaussSecondDiagTransformedDeltaX, "GaussSecondDiagTransformedDeltaX/D")->SetTitle("Delta X from Gaussian Secondary Diagonal Transformed to True Position [mm]");
+    fTree->Branch("Hits/GaussSecondDiagTransformedDeltaY", &fGaussSecondDiagTransformedDeltaY, "GaussSecondDiagTransformedDeltaY/D")->SetTitle("Delta Y from Gaussian Secondary Diagonal Transformed to True Position [mm]");
+    fTree->Branch("Hits/LorentzMainDiagTransformedDeltaX", &fLorentzMainDiagTransformedDeltaX, "LorentzMainDiagTransformedDeltaX/D")->SetTitle("Delta X from Lorentzian Main Diagonal Transformed to True Position [mm]");
+    fTree->Branch("Hits/LorentzMainDiagTransformedDeltaY", &fLorentzMainDiagTransformedDeltaY, "LorentzMainDiagTransformedDeltaY/D")->SetTitle("Delta Y from Lorentzian Main Diagonal Transformed to True Position [mm]");
+    fTree->Branch("Hits/LorentzSecondDiagTransformedDeltaX", &fLorentzSecondDiagTransformedDeltaX, "LorentzSecondDiagTransformedDeltaX/D")->SetTitle("Delta X from Lorentzian Secondary Diagonal Transformed to True Position [mm]");
+    fTree->Branch("Hits/LorentzSecondDiagTransformedDeltaY", &fLorentzSecondDiagTransformedDeltaY, "LorentzSecondDiagTransformedDeltaY/D")->SetTitle("Delta Y from Lorentzian Secondary Diagonal Transformed to True Position [mm]");
+
+    // MEAN ESTIMATION BRANCHES
+    // Mean delta values from all estimation methods
+    fTree->Branch("Hits/GaussMeanTrueDeltaX", &fGaussMeanTrueDeltaX, "GaussMeanTrueDeltaX/D")->SetTitle("Mean Delta X from all Gaussian estimation methods to True Position [mm]");
+    fTree->Branch("Hits/GaussMeanTrueDeltaY", &fGaussMeanTrueDeltaY, "GaussMeanTrueDeltaY/D")->SetTitle("Mean Delta Y from all Gaussian estimation methods to True Position [mm]");
+    fTree->Branch("Hits/LorentzMeanTrueDeltaX", &fLorentzMeanTrueDeltaX, "LorentzMeanTrueDeltaX/D")->SetTitle("Mean Delta X from all Lorentzian estimation methods to True Position [mm]");
+    fTree->Branch("Hits/LorentzMeanTrueDeltaY", &fLorentzMeanTrueDeltaY, "LorentzMeanTrueDeltaY/D")->SetTitle("Mean Delta Y from all Lorentzian estimation methods to True Position [mm]");
+
     // GRIDNEIGHBORHOOD BRANCHES
     // Grid neighborhood data for 9x9 neighborhood around hits
     fTree->Branch("GridNeighborhood/GridNeighborhoodAngles", &fNonPixel_GridNeighborhoodAngles)->SetTitle("Angles from Hit to Neighborhood Grid Pixels [deg]");
@@ -502,6 +553,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                     TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", fGridPixelCornerOffset));
                     TNamed *detSizeMeta = new TNamed("GridDetectorSize", Form("%.6f", fGridDetSize));
                     TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
+                    TNamed *neighborhoodRadiusMeta = new TNamed("NeighborhoodRadius", Form("%d", Constants::NEIGHBORHOOD_RADIUS));
                     
                     // Write metadata to the ROOT file
                     pixelSizeMeta->Write();
@@ -509,6 +561,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                     pixelCornerOffsetMeta->Write();
                     detSizeMeta->Write();
                     numBlocksMeta->Write();
+                    neighborhoodRadiusMeta->Write();
                     
                     // Clean up metadata objects to prevent memory leaks
                     delete pixelSizeMeta;
@@ -516,6 +569,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                     delete pixelCornerOffsetMeta;
                     delete detSizeMeta;
                     delete numBlocksMeta;
+                    delete neighborhoodRadiusMeta;
                     
                     G4cout << "Saved detector grid metadata to ROOT file" << G4endl;
                     G4cout << "  Final parameters used: " << fGridPixelSize << ", " << fGridPixelSpacing 
@@ -631,6 +685,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                                 TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset", Form("%.6f", fGridPixelCornerOffset));
                                 TNamed *detSizeMeta = new TNamed("GridDetectorSize", Form("%.6f", fGridDetSize));
                                 TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
+                                TNamed *neighborhoodRadiusMeta = new TNamed("NeighborhoodRadius", Form("%d", Constants::NEIGHBORHOOD_RADIUS));
                                 
                                 // Write metadata to the merged ROOT file
                                 pixelSizeMeta->Write();
@@ -638,6 +693,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                                 pixelCornerOffsetMeta->Write();
                                 detSizeMeta->Write();
                                 numBlocksMeta->Write();
+                                neighborhoodRadiusMeta->Write();
                                 
                                 // Clean up metadata objects to prevent memory leaks
                                 delete pixelSizeMeta;
@@ -645,6 +701,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                                 delete pixelCornerOffsetMeta;
                                 delete detSizeMeta;
                                 delete numBlocksMeta;
+                                delete neighborhoodRadiusMeta;
                                 
                                 G4cout << "Saved detector grid metadata to merged ROOT file" << G4endl;
                                 G4cout << "  Final parameters used: " << fGridPixelSize << ", " << fGridPixelSpacing 
@@ -843,6 +900,9 @@ void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4d
         fGaussRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fGaussColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
+    
+    // Calculate mean estimations from all fitting methods
+    CalculateMeanEstimations();
 }
 
 void RunAction::SetDiagonalGaussianFitResults(G4double main_diag_x_center, G4double main_diag_x_sigma, G4double main_diag_x_amplitude,
@@ -949,6 +1009,12 @@ void RunAction::SetDiagonalGaussianFitResults(G4double main_diag_x_center, G4dou
         fGaussSecondDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fGaussSecondDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
+    
+    // Calculate transformed diagonal coordinates using rotation matrix
+    CalculateTransformedDiagonalCoordinates();
+    
+    // Calculate mean estimations from all fitting methods
+    CalculateMeanEstimations();
 }
 
 void RunAction::Set2DLorentzianFitResults(G4double x_center, G4double x_gamma, G4double x_amplitude,
@@ -1007,6 +1073,9 @@ void RunAction::Set2DLorentzianFitResults(G4double x_center, G4double x_gamma, G
         fLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fLorentzColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
+    
+    // Calculate mean estimations from all fitting methods
+    CalculateMeanEstimations();
 }
 
 void RunAction::SetDiagonalLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_amplitude,
@@ -1112,5 +1181,210 @@ void RunAction::SetDiagonalLorentzianFitResults(G4double main_diag_x_center, G4d
         fLorentzMainDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         fLorentzSecondDiagDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fLorentzSecondDiagDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    // Calculate transformed diagonal coordinates using rotation matrix
+    CalculateTransformedDiagonalCoordinates();
+    
+    // Calculate mean estimations from all fitting methods
+    CalculateMeanEstimations();
+}
+
+// =============================================
+// COORDINATE TRANSFORMATION HELPER METHODS
+// =============================================
+
+void RunAction::TransformDiagonalCoordinates(G4double x_prime, G4double y_prime, G4double theta_deg, 
+                                             G4double& x_transformed, G4double& y_transformed)
+{
+    // Convert angle to radians
+    const G4double PI = 3.14159265358979323846;
+    G4double theta_rad = theta_deg * PI / 180.0;
+    
+    // Calculate rotation matrix components
+    G4double cos_theta = std::cos(theta_rad);
+    G4double sin_theta = std::sin(theta_rad);
+    
+    // Apply rotation matrix transformation:
+    // [cos(θ) -sin(θ)] [x']   [x]
+    // [sin(θ)  cos(θ)] [y'] = [y]
+    x_transformed = cos_theta * x_prime - sin_theta * y_prime;
+    y_transformed = sin_theta * x_prime + cos_theta * y_prime;
+}
+
+void RunAction::CalculateTransformedDiagonalCoordinates()
+{
+    // Transform main diagonal coordinates (θ = 45°)
+    // For Gaussian fits
+    if (!std::isnan(fGaussFitMainDiagXCenter) && !std::isnan(fGaussFitMainDiagYCenter)) {
+        TransformDiagonalCoordinates(fGaussFitMainDiagXCenter, fGaussFitMainDiagYCenter, 45.0,
+                                    fGaussMainDiagTransformedX, fGaussMainDiagTransformedY);
+        // Calculate delta values
+        fGaussMainDiagTransformedDeltaX = fGaussMainDiagTransformedX - fTrueX;
+        fGaussMainDiagTransformedDeltaY = fGaussMainDiagTransformedY - fTrueY;
+    } else {
+        fGaussMainDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussMainDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussMainDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussMainDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    // For Lorentzian fits
+    if (!std::isnan(fLorentzFitMainDiagXCenter) && !std::isnan(fLorentzFitMainDiagYCenter)) {
+        TransformDiagonalCoordinates(fLorentzFitMainDiagXCenter, fLorentzFitMainDiagYCenter, 45.0,
+                                    fLorentzMainDiagTransformedX, fLorentzMainDiagTransformedY);
+        // Calculate delta values
+        fLorentzMainDiagTransformedDeltaX = fLorentzMainDiagTransformedX - fTrueX;
+        fLorentzMainDiagTransformedDeltaY = fLorentzMainDiagTransformedY - fTrueY;
+    } else {
+        fLorentzMainDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzMainDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzMainDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzMainDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    // Transform secondary diagonal coordinates (θ = -45°)
+    // For Gaussian fits
+    if (!std::isnan(fGaussFitSecondDiagXCenter) && !std::isnan(fGaussFitSecondDiagYCenter)) {
+        TransformDiagonalCoordinates(fGaussFitSecondDiagXCenter, fGaussFitSecondDiagYCenter, -45.0,
+                                    fGaussSecondDiagTransformedX, fGaussSecondDiagTransformedY);
+        // Calculate delta values
+        fGaussSecondDiagTransformedDeltaX = fGaussSecondDiagTransformedX - fTrueX;
+        fGaussSecondDiagTransformedDeltaY = fGaussSecondDiagTransformedY - fTrueY;
+    } else {
+        fGaussSecondDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussSecondDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussSecondDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fGaussSecondDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    // For Lorentzian fits
+    if (!std::isnan(fLorentzFitSecondDiagXCenter) && !std::isnan(fLorentzFitSecondDiagYCenter)) {
+        TransformDiagonalCoordinates(fLorentzFitSecondDiagXCenter, fLorentzFitSecondDiagYCenter, -45.0,
+                                    fLorentzSecondDiagTransformedX, fLorentzSecondDiagTransformedY);
+        // Calculate delta values
+        fLorentzSecondDiagTransformedDeltaX = fLorentzSecondDiagTransformedX - fTrueX;
+        fLorentzSecondDiagTransformedDeltaY = fLorentzSecondDiagTransformedY - fTrueY;
+    } else {
+        fLorentzSecondDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzSecondDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzSecondDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fLorentzSecondDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+}
+
+void RunAction::CalculateMeanEstimations()
+{
+    // Vectors to collect valid coordinate estimations
+    std::vector<G4double> gauss_x_coords, gauss_y_coords;
+    std::vector<G4double> lorentz_x_coords, lorentz_y_coords;
+    
+    // For Gaussian estimations, collect X coordinates:
+    // 1. Row fit center (gives X coordinate)
+    if (!std::isnan(fGaussFitRowCenter) && fGaussFitRowDOF > 0) {
+        gauss_x_coords.push_back(fGaussFitRowCenter);
+    }
+    
+    // 2. Main diagonal transformed X
+    if (!std::isnan(fGaussMainDiagTransformedX)) {
+        gauss_x_coords.push_back(fGaussMainDiagTransformedX);
+    }
+    
+    // 3. Secondary diagonal transformed X  
+    if (!std::isnan(fGaussSecondDiagTransformedX)) {
+        gauss_x_coords.push_back(fGaussSecondDiagTransformedX);
+    }
+    
+    // For Gaussian estimations, collect Y coordinates:
+    // 1. Column fit center (gives Y coordinate)
+    if (!std::isnan(fGaussFitColumnCenter) && fGaussFitColumnDOF > 0) {
+        gauss_y_coords.push_back(fGaussFitColumnCenter);
+    }
+    
+    // 2. Main diagonal transformed Y
+    if (!std::isnan(fGaussMainDiagTransformedY)) {
+        gauss_y_coords.push_back(fGaussMainDiagTransformedY);
+    }
+    
+    // 3. Secondary diagonal transformed Y
+    if (!std::isnan(fGaussSecondDiagTransformedY)) {
+        gauss_y_coords.push_back(fGaussSecondDiagTransformedY);
+    }
+    
+    // For Lorentzian estimations, collect X coordinates:
+    // 1. Row fit center (gives X coordinate)
+    if (!std::isnan(fLorentzFitRowCenter) && fLorentzFitRowDOF > 0) {
+        lorentz_x_coords.push_back(fLorentzFitRowCenter);
+    }
+    
+    // 2. Main diagonal transformed X
+    if (!std::isnan(fLorentzMainDiagTransformedX)) {
+        lorentz_x_coords.push_back(fLorentzMainDiagTransformedX);
+    }
+    
+    // 3. Secondary diagonal transformed X
+    if (!std::isnan(fLorentzSecondDiagTransformedX)) {
+        lorentz_x_coords.push_back(fLorentzSecondDiagTransformedX);
+    }
+    
+    // For Lorentzian estimations, collect Y coordinates:
+    // 1. Column fit center (gives Y coordinate)
+    if (!std::isnan(fLorentzFitColumnCenter) && fLorentzFitColumnDOF > 0) {
+        lorentz_y_coords.push_back(fLorentzFitColumnCenter);
+    }
+    
+    // 2. Main diagonal transformed Y
+    if (!std::isnan(fLorentzMainDiagTransformedY)) {
+        lorentz_y_coords.push_back(fLorentzMainDiagTransformedY);
+    }
+    
+    // 3. Secondary diagonal transformed Y
+    if (!std::isnan(fLorentzSecondDiagTransformedY)) {
+        lorentz_y_coords.push_back(fLorentzSecondDiagTransformedY);
+    }
+    
+    // Calculate mean X coordinate estimations and their deltas
+    if (!gauss_x_coords.empty()) {
+        G4double sum = 0.0;
+        for (const auto& coord : gauss_x_coords) {
+            sum += coord;
+        }
+        G4double mean_x = sum / gauss_x_coords.size();
+        fGaussMeanTrueDeltaX = mean_x - fTrueX;
+    } else {
+        fGaussMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    if (!gauss_y_coords.empty()) {
+        G4double sum = 0.0;
+        for (const auto& coord : gauss_y_coords) {
+            sum += coord;
+        }
+        G4double mean_y = sum / gauss_y_coords.size();
+        fGaussMeanTrueDeltaY = mean_y - fTrueY;
+    } else {
+        fGaussMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    if (!lorentz_x_coords.empty()) {
+        G4double sum = 0.0;
+        for (const auto& coord : lorentz_x_coords) {
+            sum += coord;
+        }
+        G4double mean_x = sum / lorentz_x_coords.size();
+        fLorentzMeanTrueDeltaX = mean_x - fTrueX;
+    } else {
+        fLorentzMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    if (!lorentz_y_coords.empty()) {
+        G4double sum = 0.0;
+        for (const auto& coord : lorentz_y_coords) {
+            sum += coord;
+        }
+        G4double mean_y = sum / lorentz_y_coords.size();
+        fLorentzMeanTrueDeltaY = mean_y - fTrueY;
+    } else {
+        fLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 }
