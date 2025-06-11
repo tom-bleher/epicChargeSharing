@@ -177,7 +177,8 @@ void EventAction::EndOfEventAction(const G4Event* event)
         x_coords, y_coords, charge_values,
         nearestPixel.x(), nearestPixel.y(),
         pixelSpacing, 
-        false); // verbose=false for production
+        false, // verbose=false for production
+        false); // enable_outlier_filtering
       
       if (fitResults.fit_successful) {
         // Removed verbose debug output for cleaner simulation logs
@@ -202,7 +203,8 @@ void EventAction::EndOfEventAction(const G4Event* event)
           x_coords, y_coords, charge_values,
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
-          false); // verbose=false for production
+          false, // verbose=false for production
+          true); // enable_outlier_filtering=true
         
         if (diagResults.fit_successful) {
           // Removed verbose debug output for cleaner simulation logs
@@ -248,7 +250,8 @@ void EventAction::EndOfEventAction(const G4Event* event)
           x_coords, y_coords, charge_values,
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
-          false); // verbose=false for production
+          false, // verbose=false for production
+          true); // enable_outlier_filtering=true
         
         if (lorentzFitResults.fit_successful) {
           // Removed verbose debug output for cleaner simulation logs
@@ -273,7 +276,8 @@ void EventAction::EndOfEventAction(const G4Event* event)
           x_coords, y_coords, charge_values,
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
-          false); // verbose=false for production
+          false, // verbose=false for production
+          true); // enable_outlier_filtering=true
         
         if (lorentzDiagResults.fit_successful) {
           // Removed verbose debug output for cleaner simulation logs
