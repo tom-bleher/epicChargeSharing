@@ -5,6 +5,7 @@
 #include "G4UImessenger.hh"
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "G4UIcmdWithAnInteger.hh"
+#include "G4UIcmdWithABool.hh"
 
 class DetectorConstruction;
 class G4UIdirectory;
@@ -33,6 +34,11 @@ private:
     G4UIcmdWithADoubleAndUnit* fCornerOffsetCmd;
     G4UIcmdWithAnInteger*      fNumBlocksCmd;
     G4UIcmdWithAnInteger* fNeighborhoodRadiusCmd;
+    
+    // Automatic radius selection commands
+    G4UIcmdWithABool* fAutoRadiusEnabledCmd;
+    G4UIcmdWithAnInteger* fMinAutoRadiusCmd;
+    G4UIcmdWithAnInteger* fMaxAutoRadiusCmd;
 };
 
 #endif

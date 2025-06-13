@@ -392,3 +392,47 @@ void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
     }
 }
 
+// Set automatic radius selection enabled
+void DetectorConstruction::SetAutoRadiusEnabled(G4bool enabled)
+{
+    G4cout << "Setting automatic radius selection enabled: " << (enabled ? "Enabled" : "Disabled") << G4endl;
+    
+    // Pass the setting to EventAction if it's available
+    if (fEventAction) {
+        fEventAction->SetAutoRadiusEnabled(enabled);
+        G4cout << "Updated EventAction with auto radius enabled: " << (enabled ? "Enabled" : "Disabled") << G4endl;
+    } else {
+        G4cout << "EventAction not yet available - auto radius enabled will be set when EventAction is connected" << G4endl;
+    }
+}
+
+// Set minimum automatic radius
+void DetectorConstruction::SetMinAutoRadius(G4int minRadius)
+{
+    G4cout << "Setting minimum automatic radius to: " << minRadius << G4endl;
+    
+    // Pass the setting to EventAction if it's available
+    if (fEventAction) {
+        fEventAction->SetAutoRadiusRange(minRadius, fEventAction->GetAutoRadiusEnabled() ? 
+                                        Constants::MAX_AUTO_RADIUS : minRadius);
+        G4cout << "Updated EventAction with minimum auto radius: " << minRadius << G4endl;
+    } else {
+        G4cout << "EventAction not yet available - minimum auto radius will be set when EventAction is connected" << G4endl;
+    }
+}
+
+// Set maximum automatic radius
+void DetectorConstruction::SetMaxAutoRadius(G4int maxRadius)
+{
+    G4cout << "Setting maximum automatic radius to: " << maxRadius << G4endl;
+    
+    // Pass the setting to EventAction if it's available
+    if (fEventAction) {
+        fEventAction->SetAutoRadiusRange(fEventAction->GetAutoRadiusEnabled() ? 
+                                        Constants::MIN_AUTO_RADIUS : maxRadius, maxRadius);
+        G4cout << "Updated EventAction with maximum auto radius: " << maxRadius << G4endl;
+    } else {
+        G4cout << "EventAction not yet available - maximum auto radius will be set when EventAction is connected" << G4endl;
+    }
+}
+

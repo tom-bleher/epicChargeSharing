@@ -4,6 +4,7 @@
 #include "Constants.hh"
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
+#include "2DGenLorentzFitCeres.hh"
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ParticleTable.hh"
@@ -36,7 +37,12 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fPixelTrueDeltaX(0),
   fPixelTrueDeltaY(0),
   fActualPixelDistance(-1.),
-  fPixelHit(false)
+  fPixelHit(false),
+  fAutoRadiusEnabled(Constants::ENABLE_AUTO_RADIUS),
+  fMinAutoRadius(Constants::MIN_AUTO_RADIUS),
+  fMaxAutoRadius(Constants::MAX_AUTO_RADIUS),
+  fSelectedRadius(4),
+  fSelectedFitQuality(0.0)
 { 
   G4cout << "EventAction: Using 2D Gaussian fitting for central row and column" << G4endl;
 }
@@ -125,7 +131,21 @@ void EventAction::EndOfEventAction(const G4Event* event)
     fNonPixel_GridNeighborhoodDistances.clear();
     fNonPixel_GridNeighborhoodCharge.clear();
   } else {
-    // Non-pixel hit: calculate neighborhood grid data
+    // Non-pixel hit: determine optimal radius and calculate neighborhood grid data
+    if (fAutoRadiusEnabled) {
+      // Perform automatic radius selection based on fit quality
+      fSelectedRadius = SelectOptimalRadius(fPosition, fPixelIndexI, fPixelIndexJ);
+      fNeighborhoodRadius = fSelectedRadius;
+      
+      G4cout << "EventAction: Auto-selected radius " << fSelectedRadius 
+             << " with fit quality " << fSelectedFitQuality << G4endl;
+    } else {
+      // Use fixed radius
+      fSelectedRadius = fNeighborhoodRadius;
+      fSelectedFitQuality = 0.0; // Not evaluated
+    }
+    
+    // Calculate neighborhood grid data with selected radius
     CalculateNeighborhoodGridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
     CalculateNeighborhoodChargeSharing();
   }
@@ -133,6 +153,9 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Pass neighborhood grid data to RunAction (will be empty for pixel hits)
   fRunAction->SetNeighborhoodGridData(fNonPixel_GridNeighborhoodAngles);
   fRunAction->SetNeighborhoodChargeData(fNonPixel_GridNeighborhoodChargeFractions, fNonPixel_GridNeighborhoodDistances, fNonPixel_GridNeighborhoodCharge, fNonPixel_GridNeighborhoodCharge);
+  
+  // Pass automatic radius selection results to RunAction
+  fRunAction->SetAutoRadiusResults(fSelectedRadius, fSelectedFitQuality, fAutoRadiusEnabled);
   
   // Perform 2D Gaussian fitting on charge distribution data (central row and column)
   // Only fit for non-pixel hits (not on pixel surface)
@@ -151,13 +174,14 @@ void EventAction::EndOfEventAction(const G4Event* event)
     for (size_t i = 0; i < fNonPixel_GridNeighborhoodChargeFractions.size(); ++i) {
       if (fNonPixel_GridNeighborhoodChargeFractions[i] > 0) { // Only include pixels with charge
         // Calculate grid position from array index
-        // The grid is stored in row-major order: i = row * gridSize + col
-        G4int row = i / gridSize;
-        G4int col = i % gridSize;
+        // The grid is stored in column-major order: i = col * gridSize + row
+        // because di (X) is outer loop, dj (Y) is inner loop in charge calculation
+        G4int col = i / gridSize;  // di (X) was outer loop
+        G4int row = i % gridSize;  // dj (Y) was inner loop
         
         // Convert grid position to pixel offset from center
-        G4int offsetI = col - fNeighborhoodRadius; // -4 to +4 for 9x9 grid
-        G4int offsetJ = row - fNeighborhoodRadius; // -4 to +4 for 9x9 grid
+        G4int offsetI = col - fNeighborhoodRadius; // -4 to +4 for 9x9 grid (X offset)
+        G4int offsetJ = row - fNeighborhoodRadius; // -4 to +4 for 9x9 grid (Y offset)
         
         // Calculate actual position
         G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
@@ -204,7 +228,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
           false, // verbose=false for production
-          true); // enable_outlier_filtering=true
+          false); // enable_outlier_filtering
         
         if (diagResults.fit_successful) {
           // Removed verbose debug output for cleaner simulation logs
@@ -251,7 +275,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
           false, // verbose=false for production
-          true); // enable_outlier_filtering=true
+          false); // enable_outlier_filtering
         
         if (lorentzFitResults.fit_successful) {
           // Removed verbose debug output for cleaner simulation logs
@@ -269,6 +293,11 @@ void EventAction::EndOfEventAction(const G4Event* event)
           lorentzFitResults.y_chi2red, lorentzFitResults.y_pp, lorentzFitResults.y_dof,
           lorentzFitResults.fit_successful);
           
+        // Pass 2D Lorentzian charge error data to RunAction
+        fRunAction->Set2DLorentzianChargeErrors(
+          lorentzFitResults.x_row_pixel_coords, lorentzFitResults.x_row_charge_values, lorentzFitResults.x_row_charge_errors,
+          lorentzFitResults.y_col_pixel_coords, lorentzFitResults.y_col_charge_values, lorentzFitResults.y_col_charge_errors);
+          
         // Perform diagonal Lorentzian fitting if 2D fitting was performed and successful
         if (lorentzFitResults.fit_successful) {
           // Perform diagonal Lorentzian fitting using the Ceres Solver implementation
@@ -277,7 +306,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
           false, // verbose=false for production
-          true); // enable_outlier_filtering=true
+          false); // enable_outlier_filtering
         
         if (lorentzDiagResults.fit_successful) {
           // Removed verbose debug output for cleaner simulation logs
@@ -302,6 +331,13 @@ void EventAction::EndOfEventAction(const G4Event* event)
           lorentzDiagResults.sec_diag_y_vertical_offset, lorentzDiagResults.sec_diag_y_vertical_offset_err,
           lorentzDiagResults.sec_diag_y_chi2red, lorentzDiagResults.sec_diag_y_pp, lorentzDiagResults.sec_diag_y_dof, lorentzDiagResults.sec_diag_y_fit_successful,
           lorentzDiagResults.fit_successful);
+          
+        // Pass diagonal Lorentzian charge error data to RunAction
+        fRunAction->SetDiagonalLorentzianChargeErrors(
+          lorentzDiagResults.main_diag_x_pixel_coords, lorentzDiagResults.main_diag_x_charge_values, lorentzDiagResults.main_diag_x_charge_errors,
+          lorentzDiagResults.main_diag_y_pixel_coords, lorentzDiagResults.main_diag_y_charge_values, lorentzDiagResults.main_diag_y_charge_errors,
+          lorentzDiagResults.sec_diag_x_pixel_coords, lorentzDiagResults.sec_diag_x_charge_values, lorentzDiagResults.sec_diag_x_charge_errors,
+          lorentzDiagResults.sec_diag_y_pixel_coords, lorentzDiagResults.sec_diag_y_charge_values, lorentzDiagResults.sec_diag_y_charge_errors);
       } else {
         // Set default diagonal Lorentzian fit values when 2D fitting failed
         fRunAction->SetDiagonalLorentzianFitResults(
@@ -325,6 +361,95 @@ void EventAction::EndOfEventAction(const G4Event* event)
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        false); // fit_successful = false
+    }
+      
+      // ===============================================
+      // GENLORENTZ FITTING (parallel to Gaussian and Lorentzian)
+      // ===============================================
+      
+      // Perform 2D GenLorentz fitting if we have enough data points
+      if (x_coords.size() >= 5) { // Need at least 5 points for 1D GenLorentz fit (5 parameters)
+        // Perform 2D GenLorentz fitting using the Ceres Solver implementation
+        GenLorentzFit2DResultsCeres genLorentzFitResults = Fit2DGenLorentzCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false, // verbose=false for production
+          false); // enable_outlier_filtering
+        
+        if (genLorentzFitResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass 2D GenLorentz fit results to RunAction
+        fRunAction->Set2DGenLorentzFitResults(
+          genLorentzFitResults.x_center, genLorentzFitResults.x_gamma, genLorentzFitResults.x_amplitude, genLorentzFitResults.x_power,
+          genLorentzFitResults.x_center_err, genLorentzFitResults.x_gamma_err, genLorentzFitResults.x_amplitude_err, genLorentzFitResults.x_power_err,
+          genLorentzFitResults.x_vertical_offset, genLorentzFitResults.x_vertical_offset_err,
+          genLorentzFitResults.x_chi2red, genLorentzFitResults.x_pp, genLorentzFitResults.x_dof,
+          genLorentzFitResults.y_center, genLorentzFitResults.y_gamma, genLorentzFitResults.y_amplitude, genLorentzFitResults.y_power,
+          genLorentzFitResults.y_center_err, genLorentzFitResults.y_gamma_err, genLorentzFitResults.y_amplitude_err, genLorentzFitResults.y_power_err,
+          genLorentzFitResults.y_vertical_offset, genLorentzFitResults.y_vertical_offset_err,
+          genLorentzFitResults.y_chi2red, genLorentzFitResults.y_pp, genLorentzFitResults.y_dof,
+          genLorentzFitResults.fit_successful);
+          
+        // Perform diagonal GenLorentz fitting if 2D fitting was performed and successful
+        if (genLorentzFitResults.fit_successful) {
+          // Perform diagonal GenLorentz fitting using the Ceres Solver implementation
+          DiagonalGenLorentzFitResultsCeres genLorentzDiagResults = FitDiagonalGenLorentzCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false, // verbose=false for production
+          false); // enable_outlier_filtering
+        
+        if (genLorentzDiagResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass diagonal GenLorentz fit results to RunAction
+        fRunAction->SetDiagonalGenLorentzFitResults(
+          genLorentzDiagResults.main_diag_x_center, genLorentzDiagResults.main_diag_x_gamma, genLorentzDiagResults.main_diag_x_amplitude, genLorentzDiagResults.main_diag_x_power,
+          genLorentzDiagResults.main_diag_x_center_err, genLorentzDiagResults.main_diag_x_gamma_err, genLorentzDiagResults.main_diag_x_amplitude_err, genLorentzDiagResults.main_diag_x_power_err,
+          genLorentzDiagResults.main_diag_x_vertical_offset, genLorentzDiagResults.main_diag_x_vertical_offset_err,
+          genLorentzDiagResults.main_diag_x_chi2red, genLorentzDiagResults.main_diag_x_pp, genLorentzDiagResults.main_diag_x_dof, genLorentzDiagResults.main_diag_x_fit_successful,
+          genLorentzDiagResults.main_diag_y_center, genLorentzDiagResults.main_diag_y_gamma, genLorentzDiagResults.main_diag_y_amplitude, genLorentzDiagResults.main_diag_y_power,
+          genLorentzDiagResults.main_diag_y_center_err, genLorentzDiagResults.main_diag_y_gamma_err, genLorentzDiagResults.main_diag_y_amplitude_err, genLorentzDiagResults.main_diag_y_power_err,
+          genLorentzDiagResults.main_diag_y_vertical_offset, genLorentzDiagResults.main_diag_y_vertical_offset_err,
+          genLorentzDiagResults.main_diag_y_chi2red, genLorentzDiagResults.main_diag_y_pp, genLorentzDiagResults.main_diag_y_dof, genLorentzDiagResults.main_diag_y_fit_successful,
+          genLorentzDiagResults.sec_diag_x_center, genLorentzDiagResults.sec_diag_x_gamma, genLorentzDiagResults.sec_diag_x_amplitude, genLorentzDiagResults.sec_diag_x_power,
+          genLorentzDiagResults.sec_diag_x_center_err, genLorentzDiagResults.sec_diag_x_gamma_err, genLorentzDiagResults.sec_diag_x_amplitude_err, genLorentzDiagResults.sec_diag_x_power_err,
+          genLorentzDiagResults.sec_diag_x_vertical_offset, genLorentzDiagResults.sec_diag_x_vertical_offset_err,
+          genLorentzDiagResults.sec_diag_x_chi2red, genLorentzDiagResults.sec_diag_x_pp, genLorentzDiagResults.sec_diag_x_dof, genLorentzDiagResults.sec_diag_x_fit_successful,
+          genLorentzDiagResults.sec_diag_y_center, genLorentzDiagResults.sec_diag_y_gamma, genLorentzDiagResults.sec_diag_y_amplitude, genLorentzDiagResults.sec_diag_y_power,
+          genLorentzDiagResults.sec_diag_y_center_err, genLorentzDiagResults.sec_diag_y_gamma_err, genLorentzDiagResults.sec_diag_y_amplitude_err, genLorentzDiagResults.sec_diag_y_power_err,
+          genLorentzDiagResults.sec_diag_y_vertical_offset, genLorentzDiagResults.sec_diag_y_vertical_offset_err,
+          genLorentzDiagResults.sec_diag_y_chi2red, genLorentzDiagResults.sec_diag_y_pp, genLorentzDiagResults.sec_diag_y_dof, genLorentzDiagResults.sec_diag_y_fit_successful,
+          genLorentzDiagResults.fit_successful);
+      } else {
+        // Set default diagonal GenLorentz fit values when 2D fitting failed
+        fRunAction->SetDiagonalGenLorentzFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          false); // fit_successful = false
+      }
+        
+    } else {
+      // Not enough data points for GenLorentz fitting
+      fRunAction->Set2DGenLorentzFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        false); // fit_successful = false
+      
+      // Set default diagonal GenLorentz fit values when not enough data points
+      fRunAction->SetDiagonalGenLorentzFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
         false); // fit_successful = false
     }
         
@@ -391,6 +516,20 @@ void EventAction::EndOfEventAction(const G4Event* event)
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+      false); // fit_successful = false
+    
+    // Set default GenLorentz values (no fitting performed)
+    fRunAction->Set2DGenLorentzFitResults(
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+      false); // fit_successful = false
+    
+    // Set default diagonal GenLorentz fit values when fitting is skipped
+    fRunAction->SetDiagonalGenLorentzFitResults(
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
       false); // fit_successful = false
   }
   
@@ -811,4 +950,169 @@ void EventAction::CalculateNeighborhoodChargeSharing()
       validIndex++;
     }
   }
+}
+
+// Perform automatic radius selection based on fit quality
+G4int EventAction::SelectOptimalRadius(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ)
+{
+  G4double bestFitQuality = -1.0;
+  G4int bestRadius = fNeighborhoodRadius; // Default fallback
+  
+  // Test different radii from min to max
+  for (G4int testRadius = fMinAutoRadius; testRadius <= fMaxAutoRadius; testRadius++) {
+    G4double fitQuality = EvaluateFitQuality(testRadius, hitPosition, hitPixelI, hitPixelJ);
+    
+    if (fitQuality > bestFitQuality) {
+      bestFitQuality = fitQuality;
+      bestRadius = testRadius;
+    }
+  }
+  
+  // Store the best fit quality found
+  fSelectedFitQuality = bestFitQuality;
+  
+  return bestRadius;
+}
+
+// Evaluate fit quality for a given radius
+G4double EventAction::EvaluateFitQuality(G4int radius, const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ)
+{
+  // Temporarily save current radius
+  G4int originalRadius = fNeighborhoodRadius;
+  fNeighborhoodRadius = radius;
+  
+  // Clear and recalculate neighborhood data with test radius
+  std::vector<G4double> tempAngles = fNonPixel_GridNeighborhoodAngles;
+  std::vector<G4double> tempChargeFractions = fNonPixel_GridNeighborhoodChargeFractions;
+  std::vector<G4double> tempDistances = fNonPixel_GridNeighborhoodDistances;
+  std::vector<G4double> tempCharge = fNonPixel_GridNeighborhoodCharge;
+  
+  // Calculate neighborhood data with test radius
+  CalculateNeighborhoodGridAngles(hitPosition, hitPixelI, hitPixelJ);
+  CalculateNeighborhoodChargeSharing();
+  
+  // Check if we have enough data points for fitting
+  G4int validPoints = 0;
+  for (size_t i = 0; i < fNonPixel_GridNeighborhoodChargeFractions.size(); ++i) {
+    if (fNonPixel_GridNeighborhoodChargeFractions[i] > 0) {
+      validPoints++;
+    }
+  }
+  
+  if (validPoints < Constants::MIN_POINTS_FOR_FIT) {
+    // Restore original data and radius
+    fNeighborhoodRadius = originalRadius;
+    fNonPixel_GridNeighborhoodAngles = tempAngles;
+    fNonPixel_GridNeighborhoodChargeFractions = tempChargeFractions;
+    fNonPixel_GridNeighborhoodDistances = tempDistances;
+    fNonPixel_GridNeighborhoodCharge = tempCharge;
+    return 0.0; // Poor quality due to insufficient data
+  }
+  
+  // Extract data for fitting
+  std::vector<double> x_coords, y_coords, charge_values;
+  G4double pixelSpacing = fDetector->GetPixelSpacing();
+  G4int gridSize = 2 * radius + 1;
+  G4ThreeVector nearestPixel = CalculateNearestPixel(hitPosition);
+  
+  for (size_t i = 0; i < fNonPixel_GridNeighborhoodChargeFractions.size(); ++i) {
+    if (fNonPixel_GridNeighborhoodChargeFractions[i] > 0) {
+      G4int col = i / gridSize;  // di (X) was outer loop
+      G4int row = i % gridSize;  // dj (Y) was inner loop
+      
+      G4int offsetI = col - radius; // X offset from center pixel
+      G4int offsetJ = row - radius; // Y offset from center pixel
+      
+      G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
+      G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
+      
+      x_coords.push_back(x_pos);
+      y_coords.push_back(y_pos);
+      charge_values.push_back(fNonPixel_GridNeighborhoodCharge[i]);
+    }
+  }
+  
+  G4double fitQuality = 0.0;
+  
+  if (x_coords.size() >= Constants::MIN_POINTS_FOR_FIT) {
+    // Perform quick Gaussian fit evaluation
+    GaussianFit2DResultsCeres fitResults = Fit2DGaussianCeres(
+      x_coords, y_coords, charge_values,
+      nearestPixel.x(), nearestPixel.y(),
+      pixelSpacing, 
+      false, // verbose=false
+      false); // enable_outlier_filtering
+    
+    if (fitResults.fit_successful) {
+      // Calculate fit quality based on residuals and fit parameters
+      // Use reduced chi-squared values and goodness of fit metrics
+      G4double rowQuality = (fitResults.x_chi2red > 0) ? 1.0 / (1.0 + fitResults.x_chi2red) : 0.0;
+      G4double colQuality = (fitResults.y_chi2red > 0) ? 1.0 / (1.0 + fitResults.y_chi2red) : 0.0;
+      
+      // Average the quality from row and column fits
+      fitQuality = (rowQuality + colQuality) / 2.0;
+      
+      // Apply penalty for outliers based on fit probability
+      G4double probPenalty = (fitResults.x_pp + fitResults.y_pp) / 2.0;
+      fitQuality *= probPenalty;
+      
+      // Clamp to [0, 1] range
+      fitQuality = std::max(0.0, std::min(1.0, fitQuality));
+    }
+  }
+  
+  // Restore original data and radius
+  fNeighborhoodRadius = originalRadius;
+  fNonPixel_GridNeighborhoodAngles = tempAngles;
+  fNonPixel_GridNeighborhoodChargeFractions = tempChargeFractions;
+  fNonPixel_GridNeighborhoodDistances = tempDistances;
+  fNonPixel_GridNeighborhoodCharge = tempCharge;
+  
+  return fitQuality;
+}
+
+// Calculate goodness of fit based on residuals
+G4double EventAction::CalculateGoodnessOfFit(const std::vector<double>& observed, const std::vector<double>& fitted)
+{
+  if (observed.size() != fitted.size() || observed.size() < 2) {
+    return 0.0;
+  }
+  
+  // Calculate residuals
+  std::vector<double> residuals;
+  for (size_t i = 0; i < observed.size(); ++i) {
+    residuals.push_back(observed[i] - fitted[i]);
+  }
+  
+  // Calculate mean and standard deviation of residuals
+  double mean = 0.0;
+  for (double residual : residuals) {
+    mean += residual;
+  }
+  mean /= residuals.size();
+  
+  double variance = 0.0;
+  for (double residual : residuals) {
+    variance += std::pow(residual - mean, 2);
+  }
+  variance /= (residuals.size() - 1);
+  double stddev = std::sqrt(variance);
+  
+  // Count outliers (residuals beyond threshold standard deviations)
+  int outliers = 0;
+  for (double residual : residuals) {
+    if (std::abs(residual - mean) > Constants::RESIDUAL_OUTLIER_THRESHOLD * stddev) {
+      outliers++;
+    }
+  }
+  
+  // Calculate quality metric: lower outlier fraction = higher quality
+  double outlierFraction = static_cast<double>(outliers) / residuals.size();
+  double quality = 1.0 - outlierFraction;
+  
+  // Apply penalty for high residual variance
+  double normalizedVariance = variance / (stddev * stddev + 1e-10);
+  quality *= std::exp(-normalizedVariance);
+  
+  return std::max(0.0, std::min(1.0, quality));
 }

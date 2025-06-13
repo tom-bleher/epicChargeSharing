@@ -36,6 +36,11 @@ public:
     // Method to get neighborhood radius  
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
     
+    // Methods for automatic radius selection
+    void SetAutoRadiusEnabled(G4bool enabled);
+    void SetMinAutoRadius(G4int minRadius);
+    void SetMaxAutoRadius(G4int maxRadius);
+    
     // Getter method for DetectorMessenger
     DetectorMessenger* GetDetectorMessenger() const { return fDetectorMessenger; }
     

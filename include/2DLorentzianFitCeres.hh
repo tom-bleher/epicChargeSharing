@@ -46,6 +46,15 @@ struct LorentzianFit2DResultsCeres {
     G4double y_pp;
     G4int y_dof;
     
+    // Charge error vectors for ROOT analysis
+    std::vector<double> x_row_pixel_coords;     // X coordinates of pixels in central row
+    std::vector<double> x_row_charge_values;    // Charge values for pixels in central row
+    std::vector<double> x_row_charge_errors;    // 3x3 neighborhood charge errors for central row
+    
+    std::vector<double> y_col_pixel_coords;     // Y coordinates of pixels in central column
+    std::vector<double> y_col_charge_values;    // Charge values for pixels in central column
+    std::vector<double> y_col_charge_errors;    // 3x3 neighborhood charge errors for central column
+    
     // Overall success status
     G4bool fit_successful;
     
@@ -120,6 +129,24 @@ struct DiagonalLorentzianFitResultsCeres {
     G4int sec_diag_y_dof;                // Y degrees of freedom in secondary diagonal Y fit
     G4bool sec_diag_y_fit_successful;    // Whether secondary diagonal Y fit was successful
     
+    // Charge error vectors for ROOT analysis - Main diagonal
+    std::vector<double> main_diag_x_pixel_coords;     // X coordinates of pixels on main diagonal
+    std::vector<double> main_diag_x_charge_values;    // Charge values for pixels on main diagonal (X fit)
+    std::vector<double> main_diag_x_charge_errors;    // 3x3 neighborhood charge errors for main diagonal X
+    
+    std::vector<double> main_diag_y_pixel_coords;     // Y coordinates of pixels on main diagonal
+    std::vector<double> main_diag_y_charge_values;    // Charge values for pixels on main diagonal (Y fit)
+    std::vector<double> main_diag_y_charge_errors;    // 3x3 neighborhood charge errors for main diagonal Y
+    
+    // Charge error vectors for ROOT analysis - Secondary diagonal
+    std::vector<double> sec_diag_x_pixel_coords;      // X coordinates of pixels on secondary diagonal
+    std::vector<double> sec_diag_x_charge_values;     // Charge values for pixels on secondary diagonal (X fit)
+    std::vector<double> sec_diag_x_charge_errors;     // 3x3 neighborhood charge errors for secondary diagonal X
+    
+    std::vector<double> sec_diag_y_pixel_coords;      // Y coordinates of pixels on secondary diagonal
+    std::vector<double> sec_diag_y_charge_values;     // Charge values for pixels on secondary diagonal (Y fit)
+    std::vector<double> sec_diag_y_charge_errors;     // 3x3 neighborhood charge errors for secondary diagonal Y
+    
     // Overall success status
     G4bool fit_successful;
     
@@ -186,6 +213,20 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
     double pixel_spacing,
     bool verbose = false,
     bool enable_outlier_filtering = false
+);
+
+// Function to calculate charge errors based on 3x3 neighborhood around each pixel
+// For each pixel on a line (row/column/diagonal), calculates error as (q_max - q_min)/sqrt(12)
+// where q_max and q_min are from the 3x3 neighborhood centered on that pixel
+std::vector<double> Calculate3x3ChargeErrors(
+    const std::vector<double>& line_x_coords,        // X coordinates of pixels on the line
+    const std::vector<double>& line_y_coords,        // Y coordinates of pixels on the line
+    const std::vector<double>& line_charge_values,   // Charge values for pixels on the line
+    const std::vector<double>& all_x_coords,         // All X coordinates in the dataset
+    const std::vector<double>& all_y_coords,         // All Y coordinates in the dataset
+    const std::vector<double>& all_charge_values,    // All charge values in the dataset
+    double pixel_spacing,                            // Pixel spacing for neighborhood search
+    bool verbose = false
 );
 
 #endif // LORENTZIANFITCERES2D_HH 
