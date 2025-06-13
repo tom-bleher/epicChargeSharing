@@ -47,6 +47,23 @@ DetectorMessenger::DetectorMessenger(DetectorConstruction* detector)
     fNeighborhoodRadiusCmd->SetRange("Radius>=1");
     fNeighborhoodRadiusCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
     
+    // Automatic radius selection commands
+    fAutoRadiusEnabledCmd = new G4UIcmdWithABool("/epicToy/detector/setAutoRadiusEnabled", this);
+    fAutoRadiusEnabledCmd->SetGuidance("Enable automatic radius selection based on fit quality");
+    fAutoRadiusEnabledCmd->SetParameterName("Enabled", false);
+    fAutoRadiusEnabledCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+    
+    fMinAutoRadiusCmd = new G4UIcmdWithAnInteger("/epicToy/detector/setMinAutoRadius", this);
+    fMinAutoRadiusCmd->SetGuidance("Set minimum radius for automatic selection");
+    fMinAutoRadiusCmd->SetParameterName("MinRadius", false);
+    fMinAutoRadiusCmd->SetRange("MinRadius>=1");
+    fMinAutoRadiusCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+    
+    fMaxAutoRadiusCmd = new G4UIcmdWithAnInteger("/epicToy/detector/setMaxAutoRadius", this);
+    fMaxAutoRadiusCmd->SetGuidance("Set maximum radius for automatic selection");
+    fMaxAutoRadiusCmd->SetParameterName("MaxRadius", false);
+    fMaxAutoRadiusCmd->SetRange("MaxRadius>=1");
+    fMaxAutoRadiusCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 }
 
 DetectorMessenger::~DetectorMessenger()
@@ -56,6 +73,9 @@ DetectorMessenger::~DetectorMessenger()
     delete fCornerOffsetCmd;
     delete fNumBlocksCmd;
     delete fNeighborhoodRadiusCmd;
+    delete fAutoRadiusEnabledCmd;
+    delete fMinAutoRadiusCmd;
+    delete fMaxAutoRadiusCmd;
     delete fDetDirectory;
     delete fEpicDirectory;
 }
@@ -95,5 +115,23 @@ void DetectorMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
         G4int newRadius = fNeighborhoodRadiusCmd->GetNewIntValue(newValue);
         G4cout << "Setting neighborhood radius to: " << newRadius << G4endl;
         fDetector->SetNeighborhoodRadius(newRadius);
+    }
+    else if (command == fAutoRadiusEnabledCmd) {
+        // Update the automatic radius selection enabled parameter
+        G4bool newEnabled = fAutoRadiusEnabledCmd->GetNewBoolValue(newValue);
+        G4cout << "Setting automatic radius selection enabled: " << (newEnabled ? "Enabled" : "Disabled") << G4endl;
+        fDetector->SetAutoRadiusEnabled(newEnabled);
+    }
+    else if (command == fMinAutoRadiusCmd) {
+        // Update the minimum automatic radius parameter
+        G4int newMinRadius = fMinAutoRadiusCmd->GetNewIntValue(newValue);
+        G4cout << "Setting minimum automatic radius to: " << newMinRadius << G4endl;
+        fDetector->SetMinAutoRadius(newMinRadius);
+    }
+    else if (command == fMaxAutoRadiusCmd) {
+        // Update the maximum automatic radius parameter
+        G4int newMaxRadius = fMaxAutoRadiusCmd->GetNewIntValue(newValue);
+        G4cout << "Setting maximum automatic radius to: " << newMaxRadius << G4endl;
+        fDetector->SetMaxAutoRadius(newMaxRadius);
     }
 }
