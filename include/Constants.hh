@@ -76,7 +76,6 @@ namespace HorizontalErrorConfig {
     // Assign larger uncertainty to highest-charge pixel to reduce its dominance
     constexpr double GAUSSIAN_CENTRAL_WEIGHT_FACTOR = 0.08;      // Most aggressive (8%) for sharpest profiles
     constexpr double LORENTZIAN_CENTRAL_WEIGHT_FACTOR = 0.10;    // Moderate (10%) for wider tails
-    constexpr double GENLORENTZ_CENTRAL_WEIGHT_FACTOR = 0.06;    // Most aggressive (6%) for sharpest profiles
     
     constexpr double CENTRAL_DOWNWEIGHT_THRESHOLD = 1.8;         // Charge concentration threshold
     constexpr double MAX_CENTRAL_PIXEL_UNCERTAINTY = 10.0;      // Maximum uncertainty multiplier
@@ -87,7 +86,6 @@ namespace HorizontalErrorConfig {
     // w_i ∝ 1/(1 + d_i/d₀) - give farther pixels more influence on position
     constexpr double GAUSSIAN_DISTANCE_SCALE_D0 = 30.0;         // Tightest scaling for Gaussian [μm]
     constexpr double LORENTZIAN_DISTANCE_SCALE_D0 = 40.0;       // Medium scaling for Lorentzian [μm]
-    constexpr double GENLORENTZ_DISTANCE_SCALE_D0 = 25.0;       // Tightest scaling for GenLorentz [μm]
     
     constexpr double DISTANCE_WEIGHT_CAP = 8.0;                 // Maximum distance-based weight multiplier
     
@@ -97,7 +95,6 @@ namespace HorizontalErrorConfig {
     // Employ Cauchy/Huber losses to moderate single pixel influence
     constexpr double GAUSSIAN_ROBUST_THRESHOLD = 0.06;          // Most aggressive for Gaussian
     constexpr double LORENTZIAN_ROBUST_THRESHOLD = 0.10;        // Moderate for Lorentzian
-    constexpr double GENLORENTZ_ROBUST_THRESHOLD = 0.08;        // Aggressive for GenLorentz
     
     constexpr double DYNAMIC_LOSS_THRESHOLD = 2.0;              // Threshold for dynamic switching [sigma]
     
@@ -129,9 +126,8 @@ namespace HorizontalErrorConfig {
     // DISTRIBUTION-SPECIFIC TUNING
     // ===========================
     // Fine-tuning factors for different profile shapes
-    constexpr double GAUSSIAN_SHARPNESS_FACTOR = 1.0;          // Reference (sharpest after GenLorentz)
+    constexpr double GAUSSIAN_SHARPNESS_FACTOR = 1.0;          // Reference for sharp profiles
     constexpr double LORENTZIAN_WIDTH_FACTOR = 0.8;            // Gentler for wider tails
-    constexpr double GENLORENTZ_SHARPNESS_FACTOR = 1.2;        // Most aggressive for sharpest profiles
 }
 
 // Convenience functions for applying horizontal error configurations
@@ -156,8 +152,6 @@ namespace HorizontalErrorUtils {
             // Apply distribution-specific scaling
             if (distribution_type == "LORENTZIAN") {
                 edge_factor *= HorizontalErrorConfig::LORENTZIAN_WIDTH_FACTOR;
-            } else if (distribution_type == "GENLORENTZ") {
-                edge_factor *= HorizontalErrorConfig::GENLORENTZ_SHARPNESS_FACTOR;
             }
             
             horizontal_error *= edge_factor;
@@ -176,8 +170,6 @@ namespace HorizontalErrorUtils {
             return HorizontalErrorConfig::GAUSSIAN_CENTRAL_WEIGHT_FACTOR;
         } else if (distribution_type == "LORENTZIAN") {
             return HorizontalErrorConfig::LORENTZIAN_CENTRAL_WEIGHT_FACTOR;
-        } else if (distribution_type == "GENLORENTZ") {
-            return HorizontalErrorConfig::GENLORENTZ_CENTRAL_WEIGHT_FACTOR;
         }
         return HorizontalErrorConfig::GAUSSIAN_CENTRAL_WEIGHT_FACTOR; // Default
     }
@@ -188,8 +180,6 @@ namespace HorizontalErrorUtils {
             return HorizontalErrorConfig::GAUSSIAN_DISTANCE_SCALE_D0;
         } else if (distribution_type == "LORENTZIAN") {
             return HorizontalErrorConfig::LORENTZIAN_DISTANCE_SCALE_D0;
-        } else if (distribution_type == "GENLORENTZ") {
-            return HorizontalErrorConfig::GENLORENTZ_DISTANCE_SCALE_D0;
         }
         return HorizontalErrorConfig::GAUSSIAN_DISTANCE_SCALE_D0; // Default
     }
@@ -200,8 +190,6 @@ namespace HorizontalErrorUtils {
             return HorizontalErrorConfig::GAUSSIAN_ROBUST_THRESHOLD;
         } else if (distribution_type == "LORENTZIAN") {
             return HorizontalErrorConfig::LORENTZIAN_ROBUST_THRESHOLD;
-        } else if (distribution_type == "GENLORENTZ") {
-            return HorizontalErrorConfig::GENLORENTZ_ROBUST_THRESHOLD;
         }
         return HorizontalErrorConfig::GAUSSIAN_ROBUST_THRESHOLD; // Default
     }
@@ -221,7 +209,6 @@ namespace HorizontalErrorConstants {
     // These give the highest-charge pixel larger assumed uncertainty to reduce its pull on the fit
     constexpr double GAUSSIAN_CENTRAL_PIXEL_WEIGHT_FACTOR = 0.08;    // Reduce to 8% (most aggressive for sharp peak)
     constexpr double LORENTZIAN_CENTRAL_PIXEL_WEIGHT_FACTOR = 0.10;  // Reduce to 10% (moderate for wider tails)
-    constexpr double GENLORENTZ_CENTRAL_PIXEL_WEIGHT_FACTOR = 0.06;  // Reduce to 6% (most aggressive for steepest profile)
     
     constexpr double CENTRAL_DOWNWEIGHT_THRESHOLD = 2.0;             // Charge concentration threshold for activation
     constexpr double MAX_CENTRAL_PIXEL_UNCERTAINTY = 8.0;           // Maximum uncertainty multiplier
@@ -229,8 +216,7 @@ namespace HorizontalErrorConstants {
     // Technique #2: Distance-based weighting parameters  
     // w_i ∝ 1/(1 + d_i/d₀) where d_i is distance from current estimate
     constexpr double GAUSSIAN_DISTANCE_SCALE_D0 = 30.0;         // Tightest for sharp Gaussian [μm]
-    constexpr double LORENTZIAN_DISTANCE_SCALE_D0 = 40.0;       // Moderate for wider Lorentzian [μm] 
-    constexpr double GENLORENTZ_DISTANCE_SCALE_D0 = 25.0;       // Tightest for sharpest GenLorentz [μm]
+    constexpr double LORENTZIAN_DISTANCE_SCALE_D0 = 40.0;       // Moderate for wider Lorentzian [μm]
     
     constexpr double DISTANCE_WEIGHT_CAP = 8.0;                 // Maximum weight multiplier
     
@@ -238,7 +224,6 @@ namespace HorizontalErrorConstants {
     // Cauchy/Huber losses to moderate single pixel influence
     constexpr double GAUSSIAN_ROBUST_THRESHOLD_FACTOR = 0.06;   // Most aggressive for sharp peaks
     constexpr double LORENTZIAN_ROBUST_THRESHOLD_FACTOR = 0.10; // Moderate for wider tails
-    constexpr double GENLORENTZ_ROBUST_THRESHOLD_FACTOR = 0.08; // Aggressive for steep profiles
     
     constexpr double DYNAMIC_LOSS_THRESHOLD = 2.0;              // Sigma threshold for switching
     
