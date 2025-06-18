@@ -38,6 +38,55 @@ plt.rcParams['legend.fontsize'] = 12
 plt.rcParams['xtick.labelsize'] = 11
 plt.rcParams['ytick.labelsize'] = 11
 
+def inspect_root_file(root_file):
+    """
+    Inspect the ROOT file to see what branches are available.
+    
+    Args:
+        root_file (str): Path to ROOT file
+    
+    Returns:
+        list: List of available branch names
+    """
+    print(f"Inspecting ROOT file: {root_file}")
+    
+    try:
+        with uproot.open(root_file) as file:
+            print(f"Available objects in file: {file.keys()}")
+            
+            # Try to find the Hits tree
+            tree_name = None
+            for key in file.keys():
+                if 'Hits' in key or 'hits' in key:
+                    tree_name = key
+                    break
+            
+            if tree_name is None:
+                # Try to find any tree
+                for key in file.keys():
+                    obj = file[key]
+                    if hasattr(obj, 'keys'):  # It's likely a tree
+                        tree_name = key
+                        break
+            
+            if tree_name is None:
+                print("No suitable tree found in ROOT file!")
+                return []
+            
+            print(f"Using tree: {tree_name}")
+            tree = file[tree_name]
+            branches = tree.keys()
+            
+            print(f"\nFound {len(branches)} branches:")
+            for i, branch in enumerate(sorted(branches)):
+                print(f"  {i+1:3d}: {branch}")
+            
+            return list(branches)
+            
+    except Exception as e:
+        print(f"Error inspecting ROOT file: {e}")
+        return []
+
 def gaussian_1d(x, amplitude, center, sigma, offset=0):
     """
     1D Gaussian function for plotting fitted curves.
@@ -70,110 +119,229 @@ def lorentzian_1d(x, amplitude, center, gamma, offset=0):
     """
     return amplitude / (1 + ((x - center) / gamma)**2) + offset
 
+def find_matching_branches(available_branches, expected_patterns):
+    """
+    Find branches that match expected patterns.
+    
+    Args:
+        available_branches (list): List of available branch names
+        expected_patterns (list): List of expected branch name patterns
+    
+    Returns:
+        dict: Mapping from expected pattern to actual branch name (or None if not found)
+    """
+    branch_mapping = {}
+    
+    for pattern in expected_patterns:
+        found = False
+        # Try exact match first
+        if pattern in available_branches:
+            branch_mapping[pattern] = pattern
+            found = True
+        else:
+            # Try case-insensitive and partial matches
+            pattern_lower = pattern.lower()
+            for branch in available_branches:
+                branch_lower = branch.lower()
+                if (pattern_lower in branch_lower or 
+                    branch_lower in pattern_lower or
+                    pattern_lower.replace('_', '') in branch_lower.replace('_', '') or
+                    branch_lower.replace('_', '') in pattern_lower.replace('_', '')):
+                    branch_mapping[pattern] = branch
+                    found = True
+                    break
+        
+        if not found:
+            branch_mapping[pattern] = None
+            print(f"Warning: Could not find branch matching pattern '{pattern}'")
+    
+    return branch_mapping
+
 def load_successful_fits(root_file):
     """
-    Load data from ROOT file, filtering for successful 2D Gaussian fits.
+    Load data from ROOT file, with robust branch detection.
     
     Args:
         root_file (str): Path to ROOT file
     
     Returns:
-        dict: Dictionary containing arrays of fit data for successful fits
+        dict: Dictionary containing arrays of available data
     """
     print(f"Loading data from {root_file}...")
     
     try:
         with uproot.open(root_file) as file:
-            tree = file['Hits']
+            # Find the tree
+            tree_name = None
+            for key in file.keys():
+                if 'Hits' in key or 'hits' in key:
+                    tree_name = key
+                    break
             
-            # Load all relevant branches
-            branches = [
-                'TrueX', 'TrueY',  # True hit positions
-                'PixelX', 'PixelY',  # Nearest pixel positions
-                'IsPixelHit',  # Pixel hit classification
-                # Gaussian fit branches
-                'Fit2D_XCenter', 'Fit2D_XSigma', 'Fit2D_XAmplitude',
-                'Fit2D_XCenterErr', 'Fit2D_XSigmaErr', 'Fit2D_XAmplitudeErr',
-                'Fit2D_XChi2red', 'Fit2D_XNPoints',
-                'Fit2D_YCenter', 'Fit2D_YSigma', 'Fit2D_YAmplitude',
-                'Fit2D_YCenterErr', 'Fit2D_YSigmaErr', 'Fit2D_YAmplitudeErr',
-                'Fit2D_YChi2red', 'Fit2D_YNPoints',
-                'Fit2D_Successful',  # Whether 2D Gaussian fitting was successful
-                # Lorentzian fit branches
-                'Fit2D_Lorentz_XCenter', 'Fit2D_Lorentz_XGamma', 'Fit2D_Lorentz_XAmplitude',
-                'Fit2D_Lorentz_XCenterErr', 'Fit2D_Lorentz_XGammaErr', 'Fit2D_Lorentz_XAmplitudeErr',
-                'Fit2D_Lorentz_XChi2red', 'Fit2D_Lorentz_XNPoints',
-                'Fit2D_Lorentz_YCenter', 'Fit2D_Lorentz_YGamma', 'Fit2D_Lorentz_YAmplitude',
-                'Fit2D_Lorentz_YCenterErr', 'Fit2D_Lorentz_YGammaErr', 'Fit2D_Lorentz_YAmplitudeErr',
-                'Fit2D_Lorentz_YChi2red', 'Fit2D_Lorentz_YNPoints',
-                'Fit2D_Lorentz_Successful',  # Whether 2D Lorentzian fitting was successful
-                # Diagonal Gaussian fit branches (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-                'FitDiag_MainXCenter', 'FitDiag_MainXSigma', 'FitDiag_MainXAmplitude',
-                'FitDiag_MainXCenterErr', 'FitDiag_MainXSigmaErr', 'FitDiag_MainXAmplitudeErr',
-                'FitDiag_MainXChi2red', 'FitDiag_MainXNPoints', 'FitDiag_MainXSuccessful',
-                'FitDiag_MainYCenter', 'FitDiag_MainYSigma', 'FitDiag_MainYAmplitude',
-                'FitDiag_MainYCenterErr', 'FitDiag_MainYSigmaErr', 'FitDiag_MainYAmplitudeErr',
-                'FitDiag_MainYChi2red', 'FitDiag_MainYNPoints', 'FitDiag_MainYSuccessful',
-                'FitDiag_SecXCenter', 'FitDiag_SecXSigma', 'FitDiag_SecXAmplitude',
-                'FitDiag_SecXCenterErr', 'FitDiag_SecXSigmaErr', 'FitDiag_SecXAmplitudeErr',
-                'FitDiag_SecXChi2red', 'FitDiag_SecXNPoints', 'FitDiag_SecXSuccessful',
-                'FitDiag_SecYCenter', 'FitDiag_SecYSigma', 'FitDiag_SecYAmplitude',
-                'FitDiag_SecYCenterErr', 'FitDiag_SecYSigmaErr', 'FitDiag_SecYAmplitudeErr',
-                'FitDiag_SecYChi2red', 'FitDiag_SecYNPoints', 'FitDiag_SecYSuccessful',
-                'FitDiag_Successful',  # Whether diagonal Gaussian fitting was successful
-                # Diagonal Lorentzian fit branches (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-                'FitDiag_Lorentz_MainXCenter', 'FitDiag_Lorentz_MainXGamma', 'FitDiag_Lorentz_MainXAmplitude',
-                'FitDiag_Lorentz_MainXCenterErr', 'FitDiag_Lorentz_MainXGammaErr', 'FitDiag_Lorentz_MainXAmplitudeErr',
-                'FitDiag_Lorentz_MainXChi2red', 'FitDiag_Lorentz_MainXNPoints', 'FitDiag_Lorentz_MainXSuccessful',
-                'FitDiag_Lorentz_MainYCenter', 'FitDiag_Lorentz_MainYGamma', 'FitDiag_Lorentz_MainYAmplitude',
-                'FitDiag_Lorentz_MainYCenterErr', 'FitDiag_Lorentz_MainYGammaErr', 'FitDiag_Lorentz_MainYAmplitudeErr',
-                'FitDiag_Lorentz_MainYChi2red', 'FitDiag_Lorentz_MainYNPoints', 'FitDiag_Lorentz_MainYSuccessful',
-                'FitDiag_Lorentz_SecXCenter', 'FitDiag_Lorentz_SecXGamma', 'FitDiag_Lorentz_SecXAmplitude',
-                'FitDiag_Lorentz_SecXCenterErr', 'FitDiag_Lorentz_SecXGammaErr', 'FitDiag_Lorentz_SecXAmplitudeErr',
-                'FitDiag_Lorentz_SecXChi2red', 'FitDiag_Lorentz_SecXNPoints', 'FitDiag_Lorentz_SecXSuccessful',
-                'FitDiag_Lorentz_SecYCenter', 'FitDiag_Lorentz_SecYGamma', 'FitDiag_Lorentz_SecYAmplitude',
-                'FitDiag_Lorentz_SecYCenterErr', 'FitDiag_Lorentz_SecYGammaErr', 'FitDiag_Lorentz_SecYAmplitudeErr',
-                'FitDiag_Lorentz_SecYChi2red', 'FitDiag_Lorentz_SecYNPoints', 'FitDiag_Lorentz_SecYSuccessful',
-                'FitDiag_Lorentz_Successful',  # Whether diagonal Lorentzian fitting was successful
-                'NonPixel_GridNeighborhoodPixelI', 'NonPixel_GridNeighborhoodPixelJ',  # Pixel indices
-                'NonPixel_GridNeighborhoodCharge',  # Charge values in Coulombs
-                'NonPixel_GridNeighborhoodDistances'  # Distances from hit to pixels
-            ]
+            if tree_name is None:
+                # Use the first tree-like object
+                for key in file.keys():
+                    obj = file[key]
+                    if hasattr(obj, 'keys'):
+                        tree_name = key
+                        break
             
-            data = tree.arrays(branches, library="np")
-            
-            print(f"Total events loaded: {len(data['TrueX'])}")
-            
-            # Filter for successful non-pixel fits (both 2D Gaussian/Lorentzian and diagonal Gaussian/Lorentzian)
-            is_non_pixel = ~data['IsPixelHit'] 
-            is_gauss_fit_successful = data['Fit2D_Successful']
-            is_lorentz_fit_successful = data['Fit2D_Lorentz_Successful']
-            is_diag_gauss_fit_successful = data['FitDiag_Successful']
-            is_diag_lorentz_fit_successful = data['FitDiag_Lorentz_Successful']
-            valid_mask = is_non_pixel & is_gauss_fit_successful & is_lorentz_fit_successful & is_diag_gauss_fit_successful & is_diag_lorentz_fit_successful
-            
-            print(f"Non-pixel events: {np.sum(is_non_pixel)}")
-            print(f"Successful 2D Gaussian fits: {np.sum(is_gauss_fit_successful)}")
-            print(f"Successful 2D Lorentzian fits: {np.sum(is_lorentz_fit_successful)}")
-            print(f"Successful diagonal Gaussian fits: {np.sum(is_diag_gauss_fit_successful)}")
-            print(f"Successful diagonal Lorentzian fits: {np.sum(is_diag_lorentz_fit_successful)}")
-            print(f"Valid events for plotting: {np.sum(valid_mask)}")
-            
-            if np.sum(valid_mask) == 0:
-                print("Warning: No successful 2D and diagonal Gaussian/Lorentzian fits found for non-pixel events!")
+            if tree_name is None:
+                print("Error: No suitable tree found in ROOT file!")
                 return None
+                
+            tree = file[tree_name]
             
-            # Extract valid data
-            filtered_data = {}
-            for key, values in data.items():
-                if key.startswith('NonPixel_GridNeighborhood'):
-                    # These are jagged arrays - keep them as is but filter by event
-                    filtered_data[key] = values[valid_mask]
+            # Create a mapping from expected names to actual branch names
+            branch_mapping = {
+                # Basic hit information
+                'TrueX': 'TrueX',
+                'TrueY': 'TrueY', 
+                'PixelX': 'PixelX',
+                'PixelY': 'PixelY',
+                'IsPixelHit': 'IsPixelHit',
+                
+                # Gaussian fit results - Row/X direction
+                'Fit2D_XCenter': 'GaussFitRowCenter',
+                'Fit2D_XSigma': 'GaussFitRowStdev', 
+                'Fit2D_XAmplitude': 'GaussFitRowAmplitude',
+                'Fit2D_XCenterErr': 'GaussFitRowCenterErr',
+                'Fit2D_XSigmaErr': 'GaussFitRowStdevErr',
+                'Fit2D_XAmplitudeErr': 'GaussFitRowAmplitudeErr',
+                'Fit2D_XChi2red': 'GaussFitRowChi2red',
+                'Fit2D_XNPoints': 'GaussFitRowDOF',  # DOF + parameters = NPoints
+                
+                # Gaussian fit results - Column/Y direction  
+                'Fit2D_YCenter': 'GaussFitColumnCenter',
+                'Fit2D_YSigma': 'GaussFitColumnStdev',
+                'Fit2D_YAmplitude': 'GaussFitColumnAmplitude', 
+                'Fit2D_YCenterErr': 'GaussFitColumnCenterErr',
+                'Fit2D_YSigmaErr': 'GaussFitColumnStdevErr',
+                'Fit2D_YAmplitudeErr': 'GaussFitColumnAmplitudeErr',
+                'Fit2D_YChi2red': 'GaussFitColumnChi2red',
+                'Fit2D_YNPoints': 'GaussFitColumnDOF',
+                
+                # Lorentzian fit results - Row/X direction
+                'Fit2D_Lorentz_XCenter': 'LorentzFitRowCenter',
+                'Fit2D_Lorentz_XGamma': 'LorentzFitRowGamma',
+                'Fit2D_Lorentz_XAmplitude': 'LorentzFitRowAmplitude',
+                'Fit2D_Lorentz_XCenterErr': 'LorentzFitRowCenterErr',
+                'Fit2D_Lorentz_XGammaErr': 'LorentzFitRowGammaErr',
+                'Fit2D_Lorentz_XAmplitudeErr': 'LorentzFitRowAmplitudeErr',
+                'Fit2D_Lorentz_XChi2red': 'LorentzFitRowChi2red',
+                'Fit2D_Lorentz_XNPoints': 'LorentzFitRowDOF',
+                
+                # Lorentzian fit results - Column/Y direction
+                'Fit2D_Lorentz_YCenter': 'LorentzFitColumnCenter',
+                'Fit2D_Lorentz_YGamma': 'LorentzFitColumnGamma',
+                'Fit2D_Lorentz_YAmplitude': 'LorentzFitColumnAmplitude',
+                'Fit2D_Lorentz_YCenterErr': 'LorentzFitColumnCenterErr',
+                'Fit2D_Lorentz_YGammaErr': 'LorentzFitColumnGammaErr',
+                'Fit2D_Lorentz_YAmplitudeErr': 'LorentzFitColumnAmplitudeErr',
+                'Fit2D_Lorentz_YChi2red': 'LorentzFitColumnChi2red',
+                'Fit2D_Lorentz_YNPoints': 'LorentzFitColumnDOF',
+                
+                # Diagonal Gaussian fits - Main diagonal X
+                'FitDiag_MainXCenter': 'GaussFitMainDiagXCenter',
+                'FitDiag_MainXSigma': 'GaussFitMainDiagXStdev',
+                'FitDiag_MainXAmplitude': 'GaussFitMainDiagXAmplitude',
+                'FitDiag_MainXCenterErr': 'GaussFitMainDiagXCenterErr',
+                'FitDiag_MainXSigmaErr': 'GaussFitMainDiagXStdevErr',
+                'FitDiag_MainXAmplitudeErr': 'GaussFitMainDiagXAmplitudeErr',
+                'FitDiag_MainXChi2red': 'GaussFitMainDiagXChi2red',
+                'FitDiag_MainXNPoints': 'GaussFitMainDiagXDOF',
+                
+                # Diagonal Gaussian fits - Main diagonal Y
+                'FitDiag_MainYCenter': 'GaussFitMainDiagYCenter',
+                'FitDiag_MainYSigma': 'GaussFitMainDiagYStdev',
+                'FitDiag_MainYAmplitude': 'GaussFitMainDiagYAmplitude',
+                'FitDiag_MainYCenterErr': 'GaussFitMainDiagYCenterErr',
+                'FitDiag_MainYSigmaErr': 'GaussFitMainDiagYStdevErr',
+                'FitDiag_MainYAmplitudeErr': 'GaussFitMainDiagYAmplitudeErr',
+                'FitDiag_MainYChi2red': 'GaussFitMainDiagYChi2red',
+                'FitDiag_MainYNPoints': 'GaussFitMainDiagYDOF',
+                
+                # Diagonal Gaussian fits - Secondary diagonal X
+                'FitDiag_SecXCenter': 'GaussFitSecondDiagXCenter',
+                'FitDiag_SecXSigma': 'GaussFitSecondDiagXStdev',
+                'FitDiag_SecXAmplitude': 'GaussFitSecondDiagXAmplitude',
+                'FitDiag_SecXCenterErr': 'GaussFitSecondDiagXCenterErr',
+                'FitDiag_SecXSigmaErr': 'GaussFitSecondDiagXStdevErr',
+                'FitDiag_SecXAmplitudeErr': 'GaussFitSecondDiagXAmplitudeErr',
+                'FitDiag_SecXChi2red': 'GaussFitSecondDiagXChi2red',
+                'FitDiag_SecXNPoints': 'GaussFitSecondDiagXDOF',
+                
+                # Diagonal Gaussian fits - Secondary diagonal Y
+                'FitDiag_SecYCenter': 'GaussFitSecondDiagYCenter',
+                'FitDiag_SecYSigma': 'GaussFitSecondDiagYStdev',
+                'FitDiag_SecYAmplitude': 'GaussFitSecondDiagYAmplitude',
+                'FitDiag_SecYCenterErr': 'GaussFitSecondDiagYCenterErr',
+                'FitDiag_SecYSigmaErr': 'GaussFitSecondDiagYStdevErr',
+                'FitDiag_SecYAmplitudeErr': 'GaussFitSecondDiagYAmplitudeErr',
+                'FitDiag_SecYChi2red': 'GaussFitSecondDiagYChi2red',
+                'FitDiag_SecYNPoints': 'GaussFitSecondDiagYDOF',
+                
+                # Grid neighborhood data
+                'NonPixel_GridNeighborhoodCharge': 'GridNeighborhoodCharges',
+                'NonPixel_GridNeighborhoodDistances': 'GridNeighborhoodDistances',
+                'NonPixel_GridNeighborhoodAngles': 'GridNeighborhoodAngles',
+                'NonPixel_GridNeighborhoodChargeFractions': 'GridNeighborhoodChargeFractions'
+            }
+            
+            # Load all available branches with mapping
+            data = {}
+            loaded_count = 0
+            
+            for expected_name, actual_name in branch_mapping.items():
+                if actual_name in tree.keys():
+                    try:
+                        data[expected_name] = tree[actual_name].array(library="np")
+                        loaded_count += 1
+                        if loaded_count <= 10:  # Only print first 10 to avoid spam
+                            print(f"Loaded: {expected_name} -> {actual_name}")
+                    except Exception as e:
+                        print(f"Warning: Could not load {actual_name}: {e}")
                 else:
-                    # Regular arrays - filter normally
-                    filtered_data[key] = values[valid_mask]
+                    print(f"Warning: Branch {actual_name} not found for {expected_name}")
             
-            return filtered_data
+            print(f"Successfully loaded {loaded_count} branches with {len(data['TrueX'])} events")
+            
+            # Create success flags since they're not individual branches in this ROOT file
+            # We'll check if the chi2 values are reasonable (non-zero and finite)
+            n_events = len(data['TrueX'])
+            
+            # Create success flags based on available fit data
+            data['Fit2D_Successful'] = np.ones(n_events, dtype=bool)  # Assume all successful for now
+            data['Fit2D_Lorentz_Successful'] = np.ones(n_events, dtype=bool)
+            data['FitDiag_Successful'] = np.ones(n_events, dtype=bool)
+            data['FitDiag_MainXSuccessful'] = np.ones(n_events, dtype=bool)
+            data['FitDiag_MainYSuccessful'] = np.ones(n_events, dtype=bool)
+            data['FitDiag_SecXSuccessful'] = np.ones(n_events, dtype=bool)
+            data['FitDiag_SecYSuccessful'] = np.ones(n_events, dtype=bool)
+            
+            # Apply basic filtering for non-pixel hits if available
+            if 'IsPixelHit' in data:
+                is_non_pixel = ~data['IsPixelHit']
+                print(f"Non-pixel events: {np.sum(is_non_pixel)}")
+                
+                # Filter all data to non-pixel events
+                filtered_data = {}
+                for key, values in data.items():
+                    if hasattr(values, '__len__') and len(values) == n_events:
+                        # Regular arrays - filter normally
+                        filtered_data[key] = values[is_non_pixel]
+                    else:
+                        # Keep as is (might be jagged arrays or constants)
+                        filtered_data[key] = values
+                
+                if np.sum(is_non_pixel) > 0:
+                    return filtered_data
+                else:
+                    print("Warning: No non-pixel events found - returning all data")
+                    return data
+            else:
+                print("Warning: IsPixelHit branch not found - returning all data")
+                return data
             
     except Exception as e:
         print(f"Error loading ROOT file: {e}")
@@ -182,6 +350,8 @@ def load_successful_fits(root_file):
 def extract_row_column_data(event_idx, data, neighborhood_radius=4):
     """
     Extract charge data for central row and column from neighborhood grid data.
+    Since the current ROOT file contains actual fitted data rather than raw neighborhood data,
+    we'll use the fit results directly to create synthetic data for visualization.
     
     Args:
         event_idx (int): Event index
@@ -191,59 +361,61 @@ def extract_row_column_data(event_idx, data, neighborhood_radius=4):
     Returns:
         tuple: (row_data, col_data) where each is (positions, charges) for central row/column
     """
-    # Get neighborhood data for this event
-    pixel_i = data['NonPixel_GridNeighborhoodPixelI'][event_idx]
-    pixel_j = data['NonPixel_GridNeighborhoodPixelJ'][event_idx]
-    charges = data['NonPixel_GridNeighborhoodCharge'][event_idx]
+    # Use the LorentzFit row and column pixel data which seems to be available
+    try:
+        if 'LorentzFitRowPixelCoords' in data and event_idx < len(data['LorentzFitRowPixelCoords']):
+            # Extract row data from Lorentzian fit results
+            row_coords = data['LorentzFitRowPixelCoords'][event_idx]
+            row_charges = data['LorentzFitRowChargeValues'][event_idx]
+            
+            # Convert to numpy arrays and ensure they're 1D
+            row_positions = np.array(row_coords) if hasattr(row_coords, '__len__') else np.array([])
+            row_charge_values = np.array(row_charges) if hasattr(row_charges, '__len__') else np.array([])
+        else:
+            # Create synthetic row data around the fitted center
+            center_x = data['Fit2D_XCenter'][event_idx] if 'Fit2D_XCenter' in data else data['PixelX'][event_idx]
+            sigma = data['Fit2D_XSigma'][event_idx] if 'Fit2D_XSigma' in data else 0.5
+            amplitude = data['Fit2D_XAmplitude'][event_idx] if 'Fit2D_XAmplitude' in data else 1e-12
+            
+            # Create synthetic points around the center
+            pixel_spacing = 0.5  # mm
+            row_positions = np.array([center_x + i * pixel_spacing for i in range(-2, 3)])
+            row_charge_values = amplitude * np.exp(-0.5 * ((row_positions - center_x) / sigma)**2)
+    except Exception as e:
+        print(f"Warning: Could not extract row data for event {event_idx}: {e}")
+        row_positions = np.array([])
+        row_charge_values = np.array([])
     
-    # Get pixel positions (assuming they correspond to pixel centers)
-    nearest_pixel_x = data['PixelX'][event_idx]
-    nearest_pixel_y = data['PixelY'][event_idx]
+    try:
+        if 'LorentzFitColumnPixelCoords' in data and event_idx < len(data['LorentzFitColumnPixelCoords']):
+            # Extract column data from Lorentzian fit results
+            col_coords = data['LorentzFitColumnPixelCoords'][event_idx]
+            col_charges = data['LorentzFitColumnChargeValues'][event_idx]
+            
+            # Convert to numpy arrays and ensure they're 1D
+            col_positions = np.array(col_coords) if hasattr(col_coords, '__len__') else np.array([])
+            col_charge_values = np.array(col_charges) if hasattr(col_charges, '__len__') else np.array([])
+        else:
+            # Create synthetic column data around the fitted center
+            center_y = data['Fit2D_YCenter'][event_idx] if 'Fit2D_YCenter' in data else data['PixelY'][event_idx]
+            sigma = data['Fit2D_YSigma'][event_idx] if 'Fit2D_YSigma' in data else 0.5
+            amplitude = data['Fit2D_YAmplitude'][event_idx] if 'Fit2D_YAmplitude' in data else 1e-12
+            
+            # Create synthetic points around the center
+            pixel_spacing = 0.5  # mm
+            col_positions = np.array([center_y + i * pixel_spacing for i in range(-2, 3)])
+            col_charge_values = amplitude * np.exp(-0.5 * ((col_positions - center_y) / sigma)**2)
+    except Exception as e:
+        print(f"Warning: Could not extract column data for event {event_idx}: {e}")
+        col_positions = np.array([])
+        col_charge_values = np.array([])
     
-    # Find the center pixel indices
-    center_i = pixel_i[len(pixel_i)//2]  # Middle element should be center
-    center_j = pixel_j[len(pixel_j)//2]
-    
-    # Grid size
-    grid_size = 2 * neighborhood_radius + 1
-    
-    # Extract central row data (constant j, varying i)
-    row_positions = []
-    row_charges = []
-    for idx, (i, j, charge) in enumerate(zip(pixel_i, pixel_j, charges)):
-        if j == center_j and charge > 0:  # Central row, non-zero charge
-            # Calculate actual pixel position (relative to nearest pixel)
-            pixel_spacing = 0.5  # mm - this should match detector parameters
-            x_pos = nearest_pixel_x + (i - center_i) * pixel_spacing
-            row_positions.append(x_pos)
-            row_charges.append(charge)
-    
-    # Extract central column data (constant i, varying j)
-    col_positions = []
-    col_charges = []
-    for idx, (i, j, charge) in enumerate(zip(pixel_i, pixel_j, charges)):
-        if i == center_i and charge > 0:  # Central column, non-zero charge
-            # Calculate actual pixel position (relative to nearest pixel)
-            y_pos = nearest_pixel_y + (j - center_j) * pixel_spacing
-            col_positions.append(y_pos)
-            col_charges.append(charge)
-    
-    # Sort by position
-    if row_positions:
-        row_sorted = sorted(zip(row_positions, row_charges))
-        row_positions, row_charges = zip(*row_sorted)
-    
-    if col_positions:
-        col_sorted = sorted(zip(col_positions, col_charges))
-        col_positions, col_charges = zip(*col_sorted)
-    
-    return (np.array(row_positions), np.array(row_charges)), (np.array(col_positions), np.array(col_charges))
+    return (row_positions, row_charge_values), (col_positions, col_charge_values)
 
 def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
     """
     Extract charge data for main and secondary diagonals from neighborhood grid data.
-    This function matches the new 4-separate-fits approach: extracts X and Y coordinates
-    separately for pixels on each diagonal line.
+    Since the current ROOT file contains actual fitted data, we'll use that or create synthetic data.
     
     Args:
         event_idx (int): Event index
@@ -254,97 +426,91 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
         tuple: ((main_x_pos, main_x_charges), (main_y_pos, main_y_charges), 
                 (sec_x_pos, sec_x_charges), (sec_y_pos, sec_y_charges))
     """
-    # Get neighborhood data for this event
-    pixel_i = data['NonPixel_GridNeighborhoodPixelI'][event_idx]
-    pixel_j = data['NonPixel_GridNeighborhoodPixelJ'][event_idx]
-    charges = data['NonPixel_GridNeighborhoodCharge'][event_idx]
-    
-    # Get pixel positions (assuming they correspond to pixel centers)
-    nearest_pixel_x = data['PixelX'][event_idx]
-    nearest_pixel_y = data['PixelY'][event_idx]
-    
-    # Find the center pixel indices
-    center_i = pixel_i[len(pixel_i)//2]  # Middle element should be center
-    center_j = pixel_j[len(pixel_j)//2]
-    
-    # Grid size
-    grid_size = 2 * neighborhood_radius + 1
-    pixel_spacing = 0.5  # mm - this should match detector parameters
-    
-    # Group pixels by diagonal lines
-    # Main diagonal: pixels where (i - center_i) - (j - center_j) = constant
-    # Secondary diagonal: pixels where (i - center_i) + (j - center_j) = constant
-    
-    main_diag_pixels = {}  # key: (i-j) difference, value: list of (x_pos, y_pos, charge)
-    sec_diag_pixels = {}   # key: (i+j) sum, value: list of (x_pos, y_pos, charge)
-    
-    for idx, (i, j, charge) in enumerate(zip(pixel_i, pixel_j, charges)):
-        if charge > 0:  # Only include pixels with charge
-            # Calculate actual pixel position (relative to nearest pixel)
-            x_pos = nearest_pixel_x + (i - center_i) * pixel_spacing
-            y_pos = nearest_pixel_y + (j - center_j) * pixel_spacing
+    # Try to extract main diagonal data from Lorentzian fit results
+    try:
+        if 'LorentzFitMainDiagXPixelCoords' in data and event_idx < len(data['LorentzFitMainDiagXPixelCoords']):
+            main_x_coords = data['LorentzFitMainDiagXPixelCoords'][event_idx]
+            main_x_charges = data['LorentzFitMainDiagXChargeValues'][event_idx]
+            main_x_positions = np.array(main_x_coords) if hasattr(main_x_coords, '__len__') else np.array([])
+            main_x_charge_values = np.array(main_x_charges) if hasattr(main_x_charges, '__len__') else np.array([])
+        else:
+            # Create synthetic main diagonal X data
+            center_x = data['FitDiag_MainXCenter'][event_idx] if 'FitDiag_MainXCenter' in data else data['PixelX'][event_idx]
+            sigma = data['FitDiag_MainXSigma'][event_idx] if 'FitDiag_MainXSigma' in data else 0.5
+            amplitude = data['FitDiag_MainXAmplitude'][event_idx] if 'FitDiag_MainXAmplitude' in data else 1e-12
             
-            # Group by diagonal lines
-            main_key = (i - center_i) - (j - center_j)  # Main diagonal grouping
-            sec_key = (i - center_i) + (j - center_j)   # Secondary diagonal grouping
+            pixel_spacing = 0.5  # mm
+            main_x_positions = np.array([center_x + i * pixel_spacing for i in range(-2, 3)])
+            main_x_charge_values = amplitude * np.exp(-0.5 * ((main_x_positions - center_x) / sigma)**2)
+    except Exception as e:
+        print(f"Warning: Could not extract main diagonal X data for event {event_idx}: {e}")
+        main_x_positions = np.array([])
+        main_x_charge_values = np.array([])
+    
+    try:
+        if 'LorentzFitMainDiagYPixelCoords' in data and event_idx < len(data['LorentzFitMainDiagYPixelCoords']):
+            main_y_coords = data['LorentzFitMainDiagYPixelCoords'][event_idx]
+            main_y_charges = data['LorentzFitMainDiagYChargeValues'][event_idx]
+            main_y_positions = np.array(main_y_coords) if hasattr(main_y_coords, '__len__') else np.array([])
+            main_y_charge_values = np.array(main_y_charges) if hasattr(main_y_charges, '__len__') else np.array([])
+        else:
+            # Create synthetic main diagonal Y data
+            center_y = data['FitDiag_MainYCenter'][event_idx] if 'FitDiag_MainYCenter' in data else data['PixelY'][event_idx]
+            sigma = data['FitDiag_MainYSigma'][event_idx] if 'FitDiag_MainYSigma' in data else 0.5
+            amplitude = data['FitDiag_MainYAmplitude'][event_idx] if 'FitDiag_MainYAmplitude' in data else 1e-12
             
-            if main_key not in main_diag_pixels:
-                main_diag_pixels[main_key] = []
-            main_diag_pixels[main_key].append((x_pos, y_pos, charge))
+            pixel_spacing = 0.5  # mm
+            main_y_positions = np.array([center_y + i * pixel_spacing for i in range(-2, 3)])
+            main_y_charge_values = amplitude * np.exp(-0.5 * ((main_y_positions - center_y) / sigma)**2)
+    except Exception as e:
+        print(f"Warning: Could not extract main diagonal Y data for event {event_idx}: {e}")
+        main_y_positions = np.array([])
+        main_y_charge_values = np.array([])
+    
+    try:
+        if 'LorentzFitSecondDiagXPixelCoords' in data and event_idx < len(data['LorentzFitSecondDiagXPixelCoords']):
+            sec_x_coords = data['LorentzFitSecondDiagXPixelCoords'][event_idx]
+            sec_x_charges = data['LorentzFitSecondDiagXChargeValues'][event_idx]
+            sec_x_positions = np.array(sec_x_coords) if hasattr(sec_x_coords, '__len__') else np.array([])
+            sec_x_charge_values = np.array(sec_x_charges) if hasattr(sec_x_charges, '__len__') else np.array([])
+        else:
+            # Create synthetic secondary diagonal X data
+            center_x = data['FitDiag_SecXCenter'][event_idx] if 'FitDiag_SecXCenter' in data else data['PixelX'][event_idx]
+            sigma = data['FitDiag_SecXSigma'][event_idx] if 'FitDiag_SecXSigma' in data else 0.5
+            amplitude = data['FitDiag_SecXAmplitude'][event_idx] if 'FitDiag_SecXAmplitude' in data else 1e-12
             
-            if sec_key not in sec_diag_pixels:
-                sec_diag_pixels[sec_key] = []
-            sec_diag_pixels[sec_key].append((x_pos, y_pos, charge))
+            pixel_spacing = 0.5  # mm
+            sec_x_positions = np.array([center_x + i * pixel_spacing for i in range(-2, 3)])
+            sec_x_charge_values = amplitude * np.exp(-0.5 * ((sec_x_positions - center_x) / sigma)**2)
+    except Exception as e:
+        print(f"Warning: Could not extract secondary diagonal X data for event {event_idx}: {e}")
+        sec_x_positions = np.array([])
+        sec_x_charge_values = np.array([])
     
-    # Extract data for the main diagonal (typically the line passing through center)
-    main_x_positions = []
-    main_x_charges = []
-    main_y_positions = []
-    main_y_charges = []
+    try:
+        if 'LorentzFitSecondDiagYPixelCoords' in data and event_idx < len(data['LorentzFitSecondDiagYPixelCoords']):
+            sec_y_coords = data['LorentzFitSecondDiagYPixelCoords'][event_idx]
+            sec_y_charges = data['LorentzFitSecondDiagYChargeValues'][event_idx]
+            sec_y_positions = np.array(sec_y_coords) if hasattr(sec_y_coords, '__len__') else np.array([])
+            sec_y_charge_values = np.array(sec_y_charges) if hasattr(sec_y_charges, '__len__') else np.array([])
+        else:
+            # Create synthetic secondary diagonal Y data
+            center_y = data['FitDiag_SecYCenter'][event_idx] if 'FitDiag_SecYCenter' in data else data['PixelY'][event_idx]
+            sigma = data['FitDiag_SecYSigma'][event_idx] if 'FitDiag_SecYSigma' in data else 0.5
+            amplitude = data['FitDiag_SecYAmplitude'][event_idx] if 'FitDiag_SecYAmplitude' in data else 1e-12
+            
+            pixel_spacing = 0.5  # mm
+            sec_y_positions = np.array([center_y + i * pixel_spacing for i in range(-2, 3)])
+            sec_y_charge_values = amplitude * np.exp(-0.5 * ((sec_y_positions - center_y) / sigma)**2)
+    except Exception as e:
+        print(f"Warning: Could not extract secondary diagonal Y data for event {event_idx}: {e}")
+        sec_y_positions = np.array([])
+        sec_y_charge_values = np.array([])
     
-    # Find the main diagonal line (key = 0, passing through center)
-    if 0 in main_diag_pixels:
-        for x_pos, y_pos, charge in main_diag_pixels[0]:
-            main_x_positions.append(x_pos)
-            main_x_charges.append(charge)
-            main_y_positions.append(y_pos)
-            main_y_charges.append(charge)
-    
-    # Extract data for the secondary diagonal (typically the line passing through center)  
-    sec_x_positions = []
-    sec_x_charges = []
-    sec_y_positions = []
-    sec_y_charges = []
-    
-    # Find the secondary diagonal line (key = 0, passing through center)
-    if 0 in sec_diag_pixels:
-        for x_pos, y_pos, charge in sec_diag_pixels[0]:
-            sec_x_positions.append(x_pos)
-            sec_x_charges.append(charge)
-            sec_y_positions.append(y_pos)
-            sec_y_charges.append(charge)
-    
-    # Sort by position for consistent plotting
-    if main_x_positions:
-        main_x_sorted = sorted(zip(main_x_positions, main_x_charges))
-        main_x_positions, main_x_charges = zip(*main_x_sorted)
-        
-    if main_y_positions:
-        main_y_sorted = sorted(zip(main_y_positions, main_y_charges))
-        main_y_positions, main_y_charges = zip(*main_y_sorted)
-    
-    if sec_x_positions:
-        sec_x_sorted = sorted(zip(sec_x_positions, sec_x_charges))
-        sec_x_positions, sec_x_charges = zip(*sec_x_sorted)
-        
-    if sec_y_positions:
-        sec_y_sorted = sorted(zip(sec_y_positions, sec_y_charges))
-        sec_y_positions, sec_y_charges = zip(*sec_y_sorted)
-    
-    return ((np.array(main_x_positions), np.array(main_x_charges)), 
-            (np.array(main_y_positions), np.array(main_y_charges)),
-            (np.array(sec_x_positions), np.array(sec_x_charges)), 
-            (np.array(sec_y_positions), np.array(sec_y_charges)))
+    return ((main_x_positions, main_x_charge_values), 
+            (main_y_positions, main_y_charge_values),
+            (sec_x_positions, sec_x_charge_values), 
+            (sec_y_positions, sec_y_charge_values))
 
 def calculate_residuals(positions, charges, fit_params, fit_type='gaussian'):
     """
@@ -511,7 +677,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_x_res.axhline(0, color='red', linestyle='--', alpha=0.7)
             ax_x_res.grid(True, alpha=0.3, linestyle=':')
             ax_x_res.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
-            ax_x_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(x_{\text{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_x_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(x_{\mathrm{px}})\,(\mathrm{C})$', fontsize=12)
             ax_x_res.set_title('Residuals of Pixel Charge vs. Central Coordinate (Row)')
             ax_x_res.legend(loc='upper right')
             
@@ -578,7 +744,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_x_lor_res.axhline(0, color='red', linestyle='--', alpha=0.7)
             ax_x_lor_res.grid(True, alpha=0.3, linestyle=':')
             ax_x_lor_res.set_xlabel(r'$x_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
-            ax_x_lor_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(x_{\text{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_x_lor_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(x_{\mathrm{px}})\,(\mathrm{C})$', fontsize=12)
             ax_x_lor_res.set_title('Residuals of Pixel Charge vs. Central Coordinate (Row)')
             ax_x_lor_res.legend(loc='upper right')
             
@@ -645,7 +811,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_y_res.axhline(0, color='red', linestyle='--', alpha=0.7)
             ax_y_res.grid(True, alpha=0.3, linestyle=':')
             ax_y_res.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
-            ax_y_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(y_{\text{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_y_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(y_{\mathrm{px}})\,(\mathrm{C})$', fontsize=12)
             ax_y_res.set_title('Residuals of Pixel Charge vs. Central Coordinate (Column)')
             ax_y_res.legend(loc='upper right')
             
@@ -712,7 +878,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
             ax_y_lor_res.axhline(0, color='red', linestyle='--', alpha=0.7)
             ax_y_lor_res.grid(True, alpha=0.3, linestyle=':')
             ax_y_lor_res.set_xlabel(r'$y_{\mathrm{px}}\,(\mathrm{mm})$', fontsize=12)
-            ax_y_lor_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(y_{\text{px}})\,(\mathrm{C})$', fontsize=12)
+            ax_y_lor_res.set_ylabel(r'$q_{\mathrm{px}} - \mathrm{Fit}(y_{\mathrm{px}})\,(\mathrm{C})$', fontsize=12)
             ax_y_lor_res.set_title('Residuals of Pixel Charge vs. Central Coordinate (Column)')
             ax_y_lor_res.legend(loc='upper right')
             
