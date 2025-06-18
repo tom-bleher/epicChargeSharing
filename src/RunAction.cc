@@ -1247,12 +1247,22 @@ void RunAction::TransformDiagonalCoordinates(G4double x_prime, G4double y_prime,
 
 void RunAction::CalculateTransformedDiagonalCoordinates()
 {
-    // Transform main diagonal coordinates (θ = 45°)
-    // For Gaussian fits
+    // NOTE:
+    // The centers obtained from the diagonal fits (main and secondary) are already
+    // expressed in the detector's global X–Y coordinate system because each fit
+    // was performed against the real X or Y pixel coordinates.  They therefore
+    // do NOT need to be rotated back into that system.  The previous
+    // implementation applied an additional ±45° rotation which distorted the
+    // reconstructed positions.  The transformed coordinates should simply be
+    // the fitted (x, y) centers themselves.  We now copy them directly and
+    // calculate the deltas with respect to the true hit position.
+
+    // ---------------------------------------------------------------------
+    // Main diagonal (slope +1)
+    // ---------------------------------------------------------------------
     if (!std::isnan(fGaussFitMainDiagXCenter) && !std::isnan(fGaussFitMainDiagYCenter)) {
-        TransformDiagonalCoordinates(fGaussFitMainDiagXCenter, fGaussFitMainDiagYCenter, 45.0,
-                                    fGaussMainDiagTransformedX, fGaussMainDiagTransformedY);
-        // Calculate delta values
+        fGaussMainDiagTransformedX = fGaussFitMainDiagXCenter;
+        fGaussMainDiagTransformedY = fGaussFitMainDiagYCenter;
         fGaussMainDiagTransformedDeltaX = fGaussMainDiagTransformedX - fTrueX;
         fGaussMainDiagTransformedDeltaY = fGaussMainDiagTransformedY - fTrueY;
     } else {
@@ -1261,12 +1271,10 @@ void RunAction::CalculateTransformedDiagonalCoordinates()
         fGaussMainDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fGaussMainDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
-    
-    // For Lorentzian fits
+
     if (!std::isnan(fLorentzFitMainDiagXCenter) && !std::isnan(fLorentzFitMainDiagYCenter)) {
-        TransformDiagonalCoordinates(fLorentzFitMainDiagXCenter, fLorentzFitMainDiagYCenter, 45.0,
-                                    fLorentzMainDiagTransformedX, fLorentzMainDiagTransformedY);
-        // Calculate delta values
+        fLorentzMainDiagTransformedX = fLorentzFitMainDiagXCenter;
+        fLorentzMainDiagTransformedY = fLorentzFitMainDiagYCenter;
         fLorentzMainDiagTransformedDeltaX = fLorentzMainDiagTransformedX - fTrueX;
         fLorentzMainDiagTransformedDeltaY = fLorentzMainDiagTransformedY - fTrueY;
     } else {
@@ -1275,13 +1283,13 @@ void RunAction::CalculateTransformedDiagonalCoordinates()
         fLorentzMainDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fLorentzMainDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
-    
-    // Transform secondary diagonal coordinates (θ = -45°)
-    // For Gaussian fits
+
+    // ---------------------------------------------------------------------
+    // Secondary diagonal (slope ‑1)
+    // ---------------------------------------------------------------------
     if (!std::isnan(fGaussFitSecondDiagXCenter) && !std::isnan(fGaussFitSecondDiagYCenter)) {
-        TransformDiagonalCoordinates(fGaussFitSecondDiagXCenter, fGaussFitSecondDiagYCenter, -45.0,
-                                    fGaussSecondDiagTransformedX, fGaussSecondDiagTransformedY);
-        // Calculate delta values
+        fGaussSecondDiagTransformedX = fGaussFitSecondDiagXCenter;
+        fGaussSecondDiagTransformedY = fGaussFitSecondDiagYCenter;
         fGaussSecondDiagTransformedDeltaX = fGaussSecondDiagTransformedX - fTrueX;
         fGaussSecondDiagTransformedDeltaY = fGaussSecondDiagTransformedY - fTrueY;
     } else {
@@ -1290,12 +1298,10 @@ void RunAction::CalculateTransformedDiagonalCoordinates()
         fGaussSecondDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fGaussSecondDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
-    
-    // For Lorentzian fits
+
     if (!std::isnan(fLorentzFitSecondDiagXCenter) && !std::isnan(fLorentzFitSecondDiagYCenter)) {
-        TransformDiagonalCoordinates(fLorentzFitSecondDiagXCenter, fLorentzFitSecondDiagYCenter, -45.0,
-                                    fLorentzSecondDiagTransformedX, fLorentzSecondDiagTransformedY);
-        // Calculate delta values
+        fLorentzSecondDiagTransformedX = fLorentzFitSecondDiagXCenter;
+        fLorentzSecondDiagTransformedY = fLorentzFitSecondDiagYCenter;
         fLorentzSecondDiagTransformedDeltaX = fLorentzSecondDiagTransformedX - fTrueX;
         fLorentzSecondDiagTransformedDeltaY = fLorentzSecondDiagTransformedY - fTrueY;
     } else {
@@ -1304,8 +1310,6 @@ void RunAction::CalculateTransformedDiagonalCoordinates()
         fLorentzSecondDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fLorentzSecondDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
-    
-
 }
 
 void RunAction::CalculateMeanEstimations()
