@@ -285,7 +285,12 @@ def load_successful_fits(root_file):
                 'NonPixel_GridNeighborhoodCharge': 'GridNeighborhoodCharges',
                 'NonPixel_GridNeighborhoodDistances': 'GridNeighborhoodDistances',
                 'NonPixel_GridNeighborhoodAngles': 'GridNeighborhoodAngles',
-                'NonPixel_GridNeighborhoodChargeFractions': 'GridNeighborhoodChargeFractions'
+                'NonPixel_GridNeighborhoodChargeFractions': 'GridNeighborhoodChargeFractions',
+                
+                # Nearest pixel positions
+                'NearestPixelX': 'NearestPixelX',
+                'NearestPixelY': 'NearestPixelY',
+                'NearestPixelZ': 'NearestPixelZ'
             }
             
             # Load all available branches with mapping
@@ -350,8 +355,7 @@ def load_successful_fits(root_file):
 def extract_row_column_data(event_idx, data, neighborhood_radius=4):
     """
     Extract charge data for central row and column from neighborhood grid data.
-    Since the current ROOT file contains actual fitted data rather than raw neighborhood data,
-    we'll use the fit results directly to create synthetic data for visualization.
+    Now properly extracts from the full 9x9 grid stored in GridNeighborhoodCharges branch.
     
     Args:
         event_idx (int): Event index
@@ -361,61 +365,180 @@ def extract_row_column_data(event_idx, data, neighborhood_radius=4):
     Returns:
         tuple: (row_data, col_data) where each is (positions, charges) for central row/column
     """
-    # Use the LorentzFit row and column pixel data which seems to be available
-    try:
-        if 'LorentzFitRowPixelCoords' in data and event_idx < len(data['LorentzFitRowPixelCoords']):
-            # Extract row data from Lorentzian fit results
-            row_coords = data['LorentzFitRowPixelCoords'][event_idx]
-            row_charges = data['LorentzFitRowChargeValues'][event_idx]
-            
-            # Convert to numpy arrays and ensure they're 1D
-            row_positions = np.array(row_coords) if hasattr(row_coords, '__len__') else np.array([])
-            row_charge_values = np.array(row_charges) if hasattr(row_charges, '__len__') else np.array([])
-        else:
-            # Create synthetic row data around the fitted center
-            center_x = data['Fit2D_XCenter'][event_idx] if 'Fit2D_XCenter' in data else data['PixelX'][event_idx]
-            sigma = data['Fit2D_XSigma'][event_idx] if 'Fit2D_XSigma' in data else 0.5
-            amplitude = data['Fit2D_XAmplitude'][event_idx] if 'Fit2D_XAmplitude' in data else 1e-12
-            
-            # Create synthetic points around the center
-            pixel_spacing = 0.5  # mm
-            row_positions = np.array([center_x + i * pixel_spacing for i in range(-2, 3)])
-            row_charge_values = amplitude * np.exp(-0.5 * ((row_positions - center_x) / sigma)**2)
-    except Exception as e:
-        print(f"Warning: Could not extract row data for event {event_idx}: {e}")
-        row_positions = np.array([])
-        row_charge_values = np.array([])
     
-    try:
-        if 'LorentzFitColumnPixelCoords' in data and event_idx < len(data['LorentzFitColumnPixelCoords']):
-            # Extract column data from Lorentzian fit results
-            col_coords = data['LorentzFitColumnPixelCoords'][event_idx]
-            col_charges = data['LorentzFitColumnChargeValues'][event_idx]
+    # First try to use the raw neighborhood grid data (preferred method)
+    if 'NonPixel_GridNeighborhoodCharge' in data and event_idx < len(data['NonPixel_GridNeighborhoodCharge']):
+        try:
+            # Extract raw grid data
+            grid_charges = data['NonPixel_GridNeighborhoodCharge'][event_idx]
+            grid_charge_fractions = data['NonPixel_GridNeighborhoodChargeFractions'][event_idx] if 'NonPixel_GridNeighborhoodChargeFractions' in data else None
             
-            # Convert to numpy arrays and ensure they're 1D
-            col_positions = np.array(col_coords) if hasattr(col_coords, '__len__') else np.array([])
-            col_charge_values = np.array(col_charges) if hasattr(col_charges, '__len__') else np.array([])
-        else:
-            # Create synthetic column data around the fitted center
-            center_y = data['Fit2D_YCenter'][event_idx] if 'Fit2D_YCenter' in data else data['PixelY'][event_idx]
-            sigma = data['Fit2D_YSigma'][event_idx] if 'Fit2D_YSigma' in data else 0.5
-            amplitude = data['Fit2D_YAmplitude'][event_idx] if 'Fit2D_YAmplitude' in data else 1e-12
+            # Get nearest pixel position for reference
+            center_x = data['NearestPixelX'][event_idx] if 'NearestPixelX' in data else data['PixelX'][event_idx]
+            center_y = data['NearestPixelY'][event_idx] if 'NearestPixelY' in data else data['PixelY'][event_idx]
             
-            # Create synthetic points around the center
+            # Grid parameters
+            grid_size = 2 * neighborhood_radius + 1  # Should be 9 for radius 4
             pixel_spacing = 0.5  # mm
-            col_positions = np.array([center_y + i * pixel_spacing for i in range(-2, 3)])
-            col_charge_values = amplitude * np.exp(-0.5 * ((col_positions - center_y) / sigma)**2)
-    except Exception as e:
-        print(f"Warning: Could not extract column data for event {event_idx}: {e}")
-        col_positions = np.array([])
-        col_charge_values = np.array([])
+            
+            # Extract central row (Y = center_y, varying X)
+            row_positions = []
+            row_charges = []
+            
+            # Central row corresponds to j = neighborhood_radius (middle of grid)
+            center_row = neighborhood_radius
+            for i in range(grid_size):  # i varies from 0 to 8 (X direction)
+                grid_idx = i * grid_size + center_row  # Column-major indexing
+                if grid_idx < len(grid_charges) and grid_charges[grid_idx] > 0:
+                    # Calculate X position for this pixel
+                    offset_i = i - neighborhood_radius  # -4 to +4
+                    x_pos = center_x + offset_i * pixel_spacing
+                    row_positions.append(x_pos)
+                    row_charges.append(grid_charges[grid_idx])
+            
+            # Extract central column (X = center_x, varying Y)
+            col_positions = []
+            col_charges = []
+            
+            # Central column corresponds to i = neighborhood_radius (middle of grid)
+            center_col = neighborhood_radius
+            for j in range(grid_size):  # j varies from 0 to 8 (Y direction)
+                grid_idx = center_col * grid_size + j  # Column-major indexing
+                if grid_idx < len(grid_charges) and grid_charges[grid_idx] > 0:
+                    # Calculate Y position for this pixel
+                    offset_j = j - neighborhood_radius  # -4 to +4
+                    y_pos = center_y + offset_j * pixel_spacing
+                    col_positions.append(y_pos)
+                    col_charges.append(grid_charges[grid_idx])
+            
+            row_positions = np.array(row_positions)
+            row_charge_values = np.array(row_charges)
+            col_positions = np.array(col_positions)
+            col_charge_values = np.array(col_charges)
+            
+            print(f"Event {event_idx}: Extracted {len(row_positions)} row points, {len(col_positions)} col points from grid")
+            
+        except Exception as e:
+            print(f"Warning: Could not extract grid data for event {event_idx}: {e}")
+            # Fall back to fit results
+            row_positions, row_charge_values = extract_from_fit_results(event_idx, data, 'row')
+            col_positions, col_charge_values = extract_from_fit_results(event_idx, data, 'col')
+    else:
+        # Fall back to fit results if grid data not available
+        print(f"Warning: NonPixel_GridNeighborhoodCharge not available for event {event_idx}, using fit results")
+        row_positions, row_charge_values = extract_from_fit_results(event_idx, data, 'row')
+        col_positions, col_charge_values = extract_from_fit_results(event_idx, data, 'col')
     
     return (row_positions, row_charge_values), (col_positions, col_charge_values)
+
+
+def extract_from_fit_results(event_idx, data, direction):
+    """
+    Extract data from fit results as fallback when grid data is not available.
+    """
+    try:
+        if direction == 'row':
+            if 'LorentzFitRowPixelCoords' in data and event_idx < len(data['LorentzFitRowPixelCoords']):
+                coords = data['LorentzFitRowPixelCoords'][event_idx]
+                charges = data['LorentzFitRowChargeValues'][event_idx]
+                positions = np.array(coords) if hasattr(coords, '__len__') else np.array([])
+                charge_values = np.array(charges) if hasattr(charges, '__len__') else np.array([])
+            else:
+                # Create synthetic row data
+                center = data['Fit2D_XCenter'][event_idx] if 'Fit2D_XCenter' in data else data['PixelX'][event_idx]
+                sigma = data['Fit2D_XSigma'][event_idx] if 'Fit2D_XSigma' in data else 0.5
+                amplitude = data['Fit2D_XAmplitude'][event_idx] if 'Fit2D_XAmplitude' in data else 1e-12
+                pixel_spacing = 0.5
+                positions = np.array([center + i * pixel_spacing for i in range(-4, 5)])  # Full 9 points
+                charge_values = amplitude * np.exp(-0.5 * ((positions - center) / sigma)**2)
+        else:  # column
+            if 'LorentzFitColumnPixelCoords' in data and event_idx < len(data['LorentzFitColumnPixelCoords']):
+                coords = data['LorentzFitColumnPixelCoords'][event_idx]
+                charges = data['LorentzFitColumnChargeValues'][event_idx]
+                positions = np.array(coords) if hasattr(coords, '__len__') else np.array([])
+                charge_values = np.array(charges) if hasattr(charges, '__len__') else np.array([])
+            else:
+                # Create synthetic column data
+                center = data['Fit2D_YCenter'][event_idx] if 'Fit2D_YCenter' in data else data['PixelY'][event_idx]
+                sigma = data['Fit2D_YSigma'][event_idx] if 'Fit2D_YSigma' in data else 0.5
+                amplitude = data['Fit2D_YAmplitude'][event_idx] if 'Fit2D_YAmplitude' in data else 1e-12
+                pixel_spacing = 0.5
+                positions = np.array([center + i * pixel_spacing for i in range(-4, 5)])  # Full 9 points
+                charge_values = amplitude * np.exp(-0.5 * ((positions - center) / sigma)**2)
+                
+    except Exception as e:
+        print(f"Warning: Could not extract {direction} data for event {event_idx}: {e}")
+        positions = np.array([])
+        charge_values = np.array([])
+    
+    return positions, charge_values
+
+
+def extract_full_grid_data(event_idx, data, neighborhood_radius=4):
+    """
+    Extract all pixels with charge from the full neighborhood grid for 2D visualization.
+    
+    Args:
+        event_idx (int): Event index
+        data (dict): Filtered data dictionary
+        neighborhood_radius (int): Radius of neighborhood grid (default: 4 for 9x9)
+    
+    Returns:
+        tuple: (x_positions, y_positions, charge_values) for all pixels with charge > 0
+    """
+    
+    if 'NonPixel_GridNeighborhoodCharge' in data and event_idx < len(data['NonPixel_GridNeighborhoodCharge']):
+        try:
+            # Extract raw grid data
+            grid_charges = data['NonPixel_GridNeighborhoodCharge'][event_idx]
+            
+            # Get nearest pixel position for reference
+            center_x = data['NearestPixelX'][event_idx] if 'NearestPixelX' in data else data['PixelX'][event_idx]
+            center_y = data['NearestPixelY'][event_idx] if 'NearestPixelY' in data else data['PixelY'][event_idx]
+            
+            # Grid parameters
+            grid_size = 2 * neighborhood_radius + 1  # Should be 9 for radius 4
+            pixel_spacing = 0.5  # mm
+            
+            # Extract all pixels with charge > 0
+            x_positions = []
+            y_positions = []
+            charge_values = []
+            
+            for i in range(grid_size):  # X direction (columns)
+                for j in range(grid_size):  # Y direction (rows)
+                    grid_idx = i * grid_size + j  # Column-major indexing
+                    if grid_idx < len(grid_charges) and grid_charges[grid_idx] > 0:
+                        # Calculate actual position for this pixel
+                        offset_i = i - neighborhood_radius  # -4 to +4 for X
+                        offset_j = j - neighborhood_radius  # -4 to +4 for Y
+                        x_pos = center_x + offset_i * pixel_spacing
+                        y_pos = center_y + offset_j * pixel_spacing
+                        
+                        x_positions.append(x_pos)
+                        y_positions.append(y_pos)
+                        charge_values.append(grid_charges[grid_idx])
+            
+            x_positions = np.array(x_positions)
+            y_positions = np.array(y_positions)
+            charge_values = np.array(charge_values)
+            
+            print(f"Event {event_idx}: Extracted {len(x_positions)} total grid points with charge > 0")
+            
+            return x_positions, y_positions, charge_values
+            
+        except Exception as e:
+            print(f"Warning: Could not extract full grid data for event {event_idx}: {e}")
+            return np.array([]), np.array([]), np.array([])
+    else:
+        print(f"Warning: NonPixel_GridNeighborhoodCharge not available for event {event_idx}")
+        return np.array([]), np.array([]), np.array([])
+
 
 def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
     """
     Extract charge data for main and secondary diagonals from neighborhood grid data.
-    Since the current ROOT file contains actual fitted data, we'll use that or create synthetic data.
+    Now properly extracts from the full 9x9 grid when available.
     
     Args:
         event_idx (int): Event index
@@ -425,6 +548,101 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
     Returns:
         tuple: ((main_x_pos, main_x_charges), (main_y_pos, main_y_charges), 
                 (sec_x_pos, sec_x_charges), (sec_y_pos, sec_y_charges))
+    """
+    
+    # First try to extract diagonal data from the raw grid
+    if 'NonPixel_GridNeighborhoodCharge' in data and event_idx < len(data['NonPixel_GridNeighborhoodCharge']):
+        try:
+            # Extract raw grid data
+            grid_charges = data['NonPixel_GridNeighborhoodCharge'][event_idx]
+            
+            # Get nearest pixel position for reference
+            center_x = data['NearestPixelX'][event_idx] if 'NearestPixelX' in data else data['PixelX'][event_idx]
+            center_y = data['NearestPixelY'][event_idx] if 'NearestPixelY' in data else data['PixelY'][event_idx]
+            
+            # Grid parameters
+            grid_size = 2 * neighborhood_radius + 1  # Should be 9 for radius 4
+            pixel_spacing = 0.5  # mm
+            
+            # Extract main diagonal (i == j, top-left to bottom-right)
+            main_x_positions = []
+            main_x_charges = []
+            main_y_positions = []
+            main_y_charges = []
+            
+            for k in range(grid_size):  # k varies from 0 to 8
+                i = k  # X index
+                j = k  # Y index (same as X for main diagonal)
+                grid_idx = i * grid_size + j  # Column-major indexing
+                if grid_idx < len(grid_charges) and grid_charges[grid_idx] > 0:
+                    # Calculate position for this diagonal pixel
+                    offset_i = i - neighborhood_radius  # -4 to +4 for X
+                    offset_j = j - neighborhood_radius  # -4 to +4 for Y
+                    x_pos = center_x + offset_i * pixel_spacing
+                    y_pos = center_y + offset_j * pixel_spacing
+                    
+                    # For diagonal plots, we need to project to 1D coordinate
+                    # Main diagonal: use distance along diagonal from center
+                    diag_coord = offset_i * pixel_spacing  # Could also use offset_j * pixel_spacing
+                    
+                    main_x_positions.append(diag_coord)
+                    main_x_charges.append(grid_charges[grid_idx])
+                    main_y_positions.append(diag_coord)  # Same coordinate for both X and Y projections
+                    main_y_charges.append(grid_charges[grid_idx])
+            
+            # Extract secondary diagonal (i + j == grid_size - 1, top-right to bottom-left)
+            sec_x_positions = []
+            sec_x_charges = []
+            sec_y_positions = []
+            sec_y_charges = []
+            
+            for k in range(grid_size):  # k varies from 0 to 8
+                i = k  # X index
+                j = grid_size - 1 - k  # Y index (complementary for secondary diagonal)
+                grid_idx = i * grid_size + j  # Column-major indexing
+                if grid_idx < len(grid_charges) and grid_charges[grid_idx] > 0:
+                    # Calculate position for this diagonal pixel
+                    offset_i = i - neighborhood_radius  # -4 to +4 for X
+                    offset_j = j - neighborhood_radius  # -4 to +4 for Y
+                    
+                    # For secondary diagonal: use distance along diagonal from center
+                    # Secondary diagonal runs from top-right to bottom-left
+                    diag_coord = offset_i * pixel_spacing  # X coordinate along the diagonal
+                    
+                    sec_x_positions.append(diag_coord)
+                    sec_x_charges.append(grid_charges[grid_idx])
+                    sec_y_positions.append(diag_coord)
+                    sec_y_charges.append(grid_charges[grid_idx])
+            
+            main_x_positions = np.array(main_x_positions)
+            main_x_charge_values = np.array(main_x_charges)
+            main_y_positions = np.array(main_y_positions)
+            main_y_charge_values = np.array(main_y_charges)
+            sec_x_positions = np.array(sec_x_positions)
+            sec_x_charge_values = np.array(sec_x_charges)
+            sec_y_positions = np.array(sec_y_positions)
+            sec_y_charge_values = np.array(sec_y_charges)
+            
+            print(f"Event {event_idx}: Extracted {len(main_x_positions)} main diagonal points, {len(sec_x_positions)} secondary diagonal points")
+            
+        except Exception as e:
+            print(f"Warning: Could not extract diagonal grid data for event {event_idx}: {e}")
+            # Fall back to fit results
+            return extract_diagonal_from_fit_results(event_idx, data)
+    else:
+        # Fall back to fit results if grid data not available
+        print(f"Warning: NonPixel_GridNeighborhoodCharge not available for event {event_idx}, using fit results for diagonals")
+        return extract_diagonal_from_fit_results(event_idx, data)
+    
+    return ((main_x_positions, main_x_charge_values), 
+            (main_y_positions, main_y_charge_values),
+            (sec_x_positions, sec_x_charge_values), 
+            (sec_y_positions, sec_y_charge_values))
+
+
+def extract_diagonal_from_fit_results(event_idx, data):
+    """
+    Extract diagonal data from fit results as fallback.
     """
     # Try to extract main diagonal data from Lorentzian fit results
     try:
@@ -440,7 +658,7 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
             amplitude = data['FitDiag_MainXAmplitude'][event_idx] if 'FitDiag_MainXAmplitude' in data else 1e-12
             
             pixel_spacing = 0.5  # mm
-            main_x_positions = np.array([center_x + i * pixel_spacing for i in range(-2, 3)])
+            main_x_positions = np.array([center_x + i * pixel_spacing for i in range(-4, 5)])  # Full 9 points
             main_x_charge_values = amplitude * np.exp(-0.5 * ((main_x_positions - center_x) / sigma)**2)
     except Exception as e:
         print(f"Warning: Could not extract main diagonal X data for event {event_idx}: {e}")
@@ -460,7 +678,7 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
             amplitude = data['FitDiag_MainYAmplitude'][event_idx] if 'FitDiag_MainYAmplitude' in data else 1e-12
             
             pixel_spacing = 0.5  # mm
-            main_y_positions = np.array([center_y + i * pixel_spacing for i in range(-2, 3)])
+            main_y_positions = np.array([center_y + i * pixel_spacing for i in range(-4, 5)])  # Full 9 points
             main_y_charge_values = amplitude * np.exp(-0.5 * ((main_y_positions - center_y) / sigma)**2)
     except Exception as e:
         print(f"Warning: Could not extract main diagonal Y data for event {event_idx}: {e}")
@@ -480,7 +698,7 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
             amplitude = data['FitDiag_SecXAmplitude'][event_idx] if 'FitDiag_SecXAmplitude' in data else 1e-12
             
             pixel_spacing = 0.5  # mm
-            sec_x_positions = np.array([center_x + i * pixel_spacing for i in range(-2, 3)])
+            sec_x_positions = np.array([center_x + i * pixel_spacing for i in range(-4, 5)])  # Full 9 points
             sec_x_charge_values = amplitude * np.exp(-0.5 * ((sec_x_positions - center_x) / sigma)**2)
     except Exception as e:
         print(f"Warning: Could not extract secondary diagonal X data for event {event_idx}: {e}")
@@ -500,7 +718,7 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
             amplitude = data['FitDiag_SecYAmplitude'][event_idx] if 'FitDiag_SecYAmplitude' in data else 1e-12
             
             pixel_spacing = 0.5  # mm
-            sec_y_positions = np.array([center_y + i * pixel_spacing for i in range(-2, 3)])
+            sec_y_positions = np.array([center_y + i * pixel_spacing for i in range(-4, 5)])  # Full 9 points
             sec_y_charge_values = amplitude * np.exp(-0.5 * ((sec_y_positions - center_y) / sigma)**2)
     except Exception as e:
         print(f"Warning: Could not extract secondary diagonal Y data for event {event_idx}: {e}")
@@ -717,6 +935,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                               fontsize=14)
             
             # Save X-direction Gaussian plot
+            autoscale_axes(fig_x)
             filename_x_gauss = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_X.png')
             plt.savefig(filename_x_gauss, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -784,6 +1003,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                   fontsize=14)
             
             # Save X-direction Lorentzian plot
+            autoscale_axes(fig_x_lor)
             filename_x_lorentz = os.path.join(lorentzian_dir, f'lorentz_fit_event_{event_idx:04d}_X.png')
             plt.savefig(filename_x_lorentz, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -851,6 +1071,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                               fontsize=14)
             
             # Save Y-direction Gaussian plot
+            autoscale_axes(fig_y)
             filename_y_gauss = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_Y.png')
             plt.savefig(filename_y_gauss, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -918,6 +1139,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                   fontsize=14)
             
             # Save Y-direction Lorentzian plot
+            autoscale_axes(fig_y_lor)
             filename_y_lorentz = os.path.join(lorentzian_dir, f'lorentz_fit_event_{event_idx:04d}_Y.png')
             plt.savefig(filename_y_lorentz, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -985,6 +1207,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                    fontsize=14)
             
             # Save main diagonal X plot
+            autoscale_axes(fig_main_x)
             filename_main_x = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_MainDiagX.png')
             plt.savefig(filename_main_x, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -1052,6 +1275,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                    fontsize=14)
             
             # Save main diagonal Y plot
+            autoscale_axes(fig_main_y)
             filename_main_y = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_MainDiagY.png')
             plt.savefig(filename_main_y, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -1119,6 +1343,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                   fontsize=14)
             
             # Save secondary diagonal X plot
+            autoscale_axes(fig_sec_x)
             filename_sec_x = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_SecDiagX.png')
             plt.savefig(filename_sec_x, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -1186,6 +1411,7 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
                                   fontsize=14)
             
             # Save secondary diagonal Y plot
+            autoscale_axes(fig_sec_y)
             filename_sec_y = os.path.join(gaussian_dir, f'gauss_fit_event_{event_idx:04d}_SecDiagY.png')
             plt.savefig(filename_sec_y, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -1388,6 +1614,7 @@ def create_overlay_fit_plots(event_idx, data, output_dir="plots", show_event_inf
                                         fontsize=14)
             
             # Save X-direction comparison plot
+            autoscale_axes(fig_x_comparison)
             filename_x_comparison = os.path.join(comparison_dir, f'comparison_event_{event_idx:04d}_X_AllApproaches.png')
             plt.savefig(filename_x_comparison, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -1482,6 +1709,7 @@ def create_overlay_fit_plots(event_idx, data, output_dir="plots", show_event_inf
                                         fontsize=14)
             
             # Save Y-direction comparison plot
+            autoscale_axes(fig_y_comparison)
             filename_y_comparison = os.path.join(comparison_dir, f'comparison_event_{event_idx:04d}_Y_AllApproaches.png')
             plt.savefig(filename_y_comparison, dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
@@ -1704,7 +1932,7 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
                 bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
         
         plt.tight_layout()
-        
+        autoscale_axes(fig)
         # Save summary plot
         os.makedirs(output_dir, exist_ok=True)
         filename = os.path.join(output_dir, 'gauss_lorentz_fit_summary.png')
@@ -1715,6 +1943,21 @@ def create_summary_plots(data, output_dir="plots", max_events=50):
         
     except Exception as e:
         return f"Error creating summary plots: {e}"
+
+def autoscale_axes(fig):
+    """Rescale x and y limits for all axes in the given figure.
+
+    This calls relim() and autoscale_view() on every Axes object so that the
+    limits are always determined from the current artist data. It should be
+    invoked after all plotting commands for a figure and right before the
+    figure is saved.
+
+    Args:
+        fig (matplotlib.figure.Figure): Figure whose axes need rescaling.
+    """
+    for ax in fig.get_axes():
+        ax.relim()
+        ax.autoscale_view()
 
 def main():
     """Main function for command line execution."""
