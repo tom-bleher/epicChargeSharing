@@ -4,7 +4,7 @@
 #include "Constants.hh"
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
-#include "2DGenLorentzFitCeres.hh"
+
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ParticleTable.hh"
@@ -364,94 +364,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         false); // fit_successful = false
     }
       
-      // ===============================================
-      // GENLORENTZ FITTING (parallel to Gaussian and Lorentzian)
-      // ===============================================
-      
-      // Perform 2D GenLorentz fitting if we have enough data points
-      if (x_coords.size() >= 5) { // Need at least 5 points for 1D GenLorentz fit (5 parameters)
-        // Perform 2D GenLorentz fitting using the Ceres Solver implementation
-        GenLorentzFit2DResultsCeres genLorentzFitResults = Fit2DGenLorentzCeres(
-          x_coords, y_coords, charge_values,
-          nearestPixel.x(), nearestPixel.y(),
-          pixelSpacing, 
-          false, // verbose=false for production
-          false); // enable_outlier_filtering
-        
-        if (genLorentzFitResults.fit_successful) {
-          // Removed verbose debug output for cleaner simulation logs
-        }
-        
-        // Pass 2D GenLorentz fit results to RunAction
-        fRunAction->Set2DGenLorentzFitResults(
-          genLorentzFitResults.x_center, genLorentzFitResults.x_gamma, genLorentzFitResults.x_amplitude, genLorentzFitResults.x_power,
-          genLorentzFitResults.x_center_err, genLorentzFitResults.x_gamma_err, genLorentzFitResults.x_amplitude_err, genLorentzFitResults.x_power_err,
-          genLorentzFitResults.x_vertical_offset, genLorentzFitResults.x_vertical_offset_err,
-          genLorentzFitResults.x_chi2red, genLorentzFitResults.x_pp, genLorentzFitResults.x_dof,
-          genLorentzFitResults.y_center, genLorentzFitResults.y_gamma, genLorentzFitResults.y_amplitude, genLorentzFitResults.y_power,
-          genLorentzFitResults.y_center_err, genLorentzFitResults.y_gamma_err, genLorentzFitResults.y_amplitude_err, genLorentzFitResults.y_power_err,
-          genLorentzFitResults.y_vertical_offset, genLorentzFitResults.y_vertical_offset_err,
-          genLorentzFitResults.y_chi2red, genLorentzFitResults.y_pp, genLorentzFitResults.y_dof,
-          genLorentzFitResults.fit_successful);
-          
-        // Perform diagonal GenLorentz fitting if 2D fitting was performed and successful
-        if (genLorentzFitResults.fit_successful) {
-          // Perform diagonal GenLorentz fitting using the Ceres Solver implementation
-          DiagonalGenLorentzFitResultsCeres genLorentzDiagResults = FitDiagonalGenLorentzCeres(
-          x_coords, y_coords, charge_values,
-          nearestPixel.x(), nearestPixel.y(),
-          pixelSpacing, 
-          false, // verbose=false for production
-          false); // enable_outlier_filtering
-        
-        if (genLorentzDiagResults.fit_successful) {
-          // Removed verbose debug output for cleaner simulation logs
-        }
-        
-        // Pass diagonal GenLorentz fit results to RunAction
-        fRunAction->SetDiagonalGenLorentzFitResults(
-          genLorentzDiagResults.main_diag_x_center, genLorentzDiagResults.main_diag_x_gamma, genLorentzDiagResults.main_diag_x_amplitude, genLorentzDiagResults.main_diag_x_power,
-          genLorentzDiagResults.main_diag_x_center_err, genLorentzDiagResults.main_diag_x_gamma_err, genLorentzDiagResults.main_diag_x_amplitude_err, genLorentzDiagResults.main_diag_x_power_err,
-          genLorentzDiagResults.main_diag_x_vertical_offset, genLorentzDiagResults.main_diag_x_vertical_offset_err,
-          genLorentzDiagResults.main_diag_x_chi2red, genLorentzDiagResults.main_diag_x_pp, genLorentzDiagResults.main_diag_x_dof, genLorentzDiagResults.main_diag_x_fit_successful,
-          genLorentzDiagResults.main_diag_y_center, genLorentzDiagResults.main_diag_y_gamma, genLorentzDiagResults.main_diag_y_amplitude, genLorentzDiagResults.main_diag_y_power,
-          genLorentzDiagResults.main_diag_y_center_err, genLorentzDiagResults.main_diag_y_gamma_err, genLorentzDiagResults.main_diag_y_amplitude_err, genLorentzDiagResults.main_diag_y_power_err,
-          genLorentzDiagResults.main_diag_y_vertical_offset, genLorentzDiagResults.main_diag_y_vertical_offset_err,
-          genLorentzDiagResults.main_diag_y_chi2red, genLorentzDiagResults.main_diag_y_pp, genLorentzDiagResults.main_diag_y_dof, genLorentzDiagResults.main_diag_y_fit_successful,
-          genLorentzDiagResults.sec_diag_x_center, genLorentzDiagResults.sec_diag_x_gamma, genLorentzDiagResults.sec_diag_x_amplitude, genLorentzDiagResults.sec_diag_x_power,
-          genLorentzDiagResults.sec_diag_x_center_err, genLorentzDiagResults.sec_diag_x_gamma_err, genLorentzDiagResults.sec_diag_x_amplitude_err, genLorentzDiagResults.sec_diag_x_power_err,
-          genLorentzDiagResults.sec_diag_x_vertical_offset, genLorentzDiagResults.sec_diag_x_vertical_offset_err,
-          genLorentzDiagResults.sec_diag_x_chi2red, genLorentzDiagResults.sec_diag_x_pp, genLorentzDiagResults.sec_diag_x_dof, genLorentzDiagResults.sec_diag_x_fit_successful,
-          genLorentzDiagResults.sec_diag_y_center, genLorentzDiagResults.sec_diag_y_gamma, genLorentzDiagResults.sec_diag_y_amplitude, genLorentzDiagResults.sec_diag_y_power,
-          genLorentzDiagResults.sec_diag_y_center_err, genLorentzDiagResults.sec_diag_y_gamma_err, genLorentzDiagResults.sec_diag_y_amplitude_err, genLorentzDiagResults.sec_diag_y_power_err,
-          genLorentzDiagResults.sec_diag_y_vertical_offset, genLorentzDiagResults.sec_diag_y_vertical_offset_err,
-          genLorentzDiagResults.sec_diag_y_chi2red, genLorentzDiagResults.sec_diag_y_pp, genLorentzDiagResults.sec_diag_y_dof, genLorentzDiagResults.sec_diag_y_fit_successful,
-          genLorentzDiagResults.fit_successful);
-      } else {
-        // Set default diagonal GenLorentz fit values when 2D fitting failed
-        fRunAction->SetDiagonalGenLorentzFitResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-          false); // fit_successful = false
-      }
-        
-    } else {
-      // Not enough data points for GenLorentz fitting
-      fRunAction->Set2DGenLorentzFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-        false); // fit_successful = false
-      
-      // Set default diagonal GenLorentz fit values when not enough data points
-      fRunAction->SetDiagonalGenLorentzFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-        false); // fit_successful = false
-    }
+
         
     } else {
       // Not enough data points for fitting
@@ -518,19 +431,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
       false); // fit_successful = false
     
-    // Set default GenLorentz values (no fitting performed)
-    fRunAction->Set2DGenLorentzFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-      false); // fit_successful = false
-    
-    // Set default diagonal GenLorentz fit values when fitting is skipped
-    fRunAction->SetDiagonalGenLorentzFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, power, center_err, gamma_err, amplitude_err, power_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-      false); // fit_successful = false
+
   }
   
   fRunAction->FillTree();
