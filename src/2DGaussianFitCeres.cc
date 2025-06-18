@@ -187,6 +187,7 @@ struct DataStatistics {
     double min_val, max_val;
     double weighted_mean;
     double total_weight;
+    double robust_center; // Improved center estimate
     bool valid;
 };
 
@@ -226,13 +227,36 @@ DataStatistics CalculateRobustStatistics(const std::vector<double>& x_vals,
     stats.q25 = sorted_y[n/4];
     stats.q75 = sorted_y[3*n/4];
     
-    // Median Absolute Deviation (more robust than std_dev)
+    // Fast median-of-absolute-deviations using nth_element (O(n))
     std::vector<double> abs_deviations;
+    abs_deviations.reserve(y_vals.size());
     for (double val : y_vals) {
         abs_deviations.push_back(std::abs(val - stats.median));
     }
-    std::sort(abs_deviations.begin(), abs_deviations.end());
-    stats.mad = abs_deviations[n/2] * 1.4826; // Scale factor for normal distribution
+
+    std::nth_element(abs_deviations.begin(), abs_deviations.begin() + n/2, abs_deviations.end());
+    double mad_raw = abs_deviations[n/2];
+
+    // If even number of elements, average the two central values for better robustness
+    if (n % 2 == 0) {
+        double second_val;
+        std::nth_element(abs_deviations.begin(), abs_deviations.begin() + n/2 - 1, abs_deviations.end());
+        second_val = abs_deviations[n/2 - 1];
+        mad_raw = 0.5 * (mad_raw + second_val);
+    }
+
+    stats.mad = mad_raw * 1.4826; // Consistency factor for normal distribution
+    
+    // ------------------------------------------------------------------------------------
+    // Numerical stability safeguard: ensure MAD is positive and finite
+    // A zero or non-finite MAD leads to divide-by-zero or NaN weights which break the fit.
+    // If MAD is too small (or not finite), fall back to the standard deviation or
+    // a small positive epsilon value.
+    // ------------------------------------------------------------------------------------
+    if (!std::isfinite(stats.mad) || stats.mad < 1e-12) {
+        stats.mad = (std::isfinite(stats.std_dev) && stats.std_dev > 1e-12) ?
+                    stats.std_dev : 1e-12;
+    }
     
     // Weighted statistics (weight by charge value for position estimation)
     stats.weighted_mean = 0.0;
@@ -248,8 +272,10 @@ DataStatistics CalculateRobustStatistics(const std::vector<double>& x_vals,
     
     if (stats.total_weight > 0) {
         stats.weighted_mean /= stats.total_weight;
+        stats.robust_center = stats.weighted_mean;
     } else {
         stats.weighted_mean = std::accumulate(x_vals.begin(), x_vals.end(), 0.0) / x_vals.size();
+        stats.robust_center = stats.weighted_mean;
     }
     
     stats.valid = true;
@@ -768,7 +794,7 @@ std::vector<double> CalculateDataWeights(const std::vector<double>& x_vals,
 //    - Bias correction scale: 25% optimized for Gaussian distributions
 // 
 // ADVANCED FEATURES:
-// - Edge pixel upweighting (2x boost) for better position sensitivity
+// - Edge pixel upweighting (2.0x boost) for better position sensitivity
 // - Charge-weighted uncertainty (higher charge = more precise position)
 // - Inter-pixel correlation weighting (radius: 1.5 pixels)
 // - Systematic bias correction (strength: 40%)
@@ -860,58 +886,16 @@ bool FitGaussianCeres(
             double loss_parameter;
         };
         
-        std::vector<FittingConfig> configs;
+        // Build solver configurations once per dataset so parameters reflect current estimates
+        const std::vector<FittingConfig> configs = {
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-15, 1e-15, 800, "NONE", 0.0},            // cheap first pass
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-15, 1e-15, 1500, "HUBER", estimates.amplitude * config.robust_threshold_factor},
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amplitude * config.robust_threshold_factor * 1.8},
+            {ceres::DENSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amplitude * config.robust_threshold_factor * 1.4},
+            {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amplitude * config.robust_threshold_factor * 2.5}
+        };
         
-        FittingConfig config1;
-        config1.linear_solver = ceres::DENSE_QR;
-        config1.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config1.function_tolerance = 1e-15;
-        config1.gradient_tolerance = 1e-15;
-        config1.max_iterations = 2000;
-        config1.loss_function = "HUBER";
-        config1.loss_parameter = estimates.amplitude * config.robust_threshold_factor;
-        configs.push_back(config1);
-        
-        FittingConfig config2;
-        config2.linear_solver = ceres::DENSE_QR;
-        config2.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config2.function_tolerance = 1e-12;
-        config2.gradient_tolerance = 1e-12;
-        config2.max_iterations = 1500;
-        config2.loss_function = "CAUCHY";
-        config2.loss_parameter = estimates.amplitude * config.robust_threshold_factor * 1.8;
-        configs.push_back(config2);
-        
-        FittingConfig config3;
-        config3.linear_solver = ceres::DENSE_QR;
-        config3.trust_region = ceres::DOGLEG;
-        config3.function_tolerance = 1e-10;
-        config3.gradient_tolerance = 1e-10;
-        config3.max_iterations = 1000;
-        config3.loss_function = "NONE";
-        config3.loss_parameter = 0.0;
-        configs.push_back(config3);
-        
-        FittingConfig config4;
-        config4.linear_solver = ceres::DENSE_NORMAL_CHOLESKY;
-        config4.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config4.function_tolerance = 1e-12;
-        config4.gradient_tolerance = 1e-12;
-        config4.max_iterations = 1500;
-        config4.loss_function = "HUBER";
-        config4.loss_parameter = estimates.amplitude * config.robust_threshold_factor * 1.4;
-        configs.push_back(config4);
-        
-        FittingConfig config5;
-        config5.linear_solver = ceres::SPARSE_NORMAL_CHOLESKY;
-        config5.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config5.function_tolerance = 1e-12;
-        config5.gradient_tolerance = 1e-12;
-        config5.max_iterations = 1200;
-        config5.loss_function = "CAUCHY";
-        config5.loss_parameter = estimates.amplitude * config.robust_threshold_factor * 2.5;
-        configs.push_back(config5);
-        
+        // Progressive solver escalation
         for (const auto& config : configs) {
             // Set up parameter array with estimates
             double parameters[4];
@@ -939,41 +923,45 @@ bool FitGaussianCeres(
                 }
             }
             
+            // Container to own loss functions so their lifetime exceeds Problem::Solve
+            std::vector<std::unique_ptr<ceres::LossFunction>> owned_losses;
+            
             for (size_t i = 0; i < clean_x.size(); ++i) {
                 ceres::CostFunction* cost_function;
+                ceres::LossFunction* loss_function = nullptr;
+                
+                // Calculate pixel-specific horizontal uncertainty for this pixel (needed for both pixel integration and dynamic loss switching)
+                double horizontal_uncertainty = 0.0;
+                if (weight_config.enable_horizontal_error_correction) {
+                    // Base horizontal error from pixel size
+                    horizontal_uncertainty = weight_config.horizontal_error_scale * pixel_spacing;
+                    
+                    // Enhanced pixel-specific horizontal error calculation
+                    double dx = std::abs(clean_x[i] - estimates.center);
+                    double pixel_edge_distance = pixel_spacing / 2.0;
+                    
+                    // Increase uncertainty for pixels farther from center
+                    if (dx > pixel_edge_distance) {
+                        double edge_factor = 1.0 + (dx - pixel_edge_distance) / pixel_spacing;
+                        horizontal_uncertainty *= edge_factor;
+                    }
+                    
+                    // Charge-dependent horizontal uncertainty
+                    if (weight_config.enable_charge_weighted_uncertainty) {
+                        double charge_factor = 1.0 / std::sqrt(std::max(0.1, clean_y[i] / stats.mean));
+                        horizontal_uncertainty *= charge_factor;
+                    }
+                    
+                    // Position-dependent horizontal error from spatial error maps
+                    if (weight_config.enable_spatial_error_maps) {
+                        double position_error = weight_config.position_dependent_bias_scale * 
+                                               std::abs(dx) / pixel_spacing * pixel_spacing;
+                        horizontal_uncertainty += position_error;
+                    }
+                }
                 
                 // Technique #4: Choose between pixel integration and point evaluation
                 if (weight_config.enable_pixel_integration) {
-                    // Calculate pixel-specific horizontal uncertainty for this pixel
-                    double horizontal_uncertainty = 0.0;
-                    if (weight_config.enable_horizontal_error_correction) {
-                        // Base horizontal error from pixel size
-                        horizontal_uncertainty = weight_config.horizontal_error_scale * pixel_spacing;
-                        
-                        // Enhanced pixel-specific horizontal error calculation
-                        double dx = std::abs(clean_x[i] - estimates.center);
-                        double pixel_edge_distance = pixel_spacing / 2.0;
-                        
-                        // Increase uncertainty for pixels farther from center
-                        if (dx > pixel_edge_distance) {
-                            double edge_factor = 1.0 + (dx - pixel_edge_distance) / pixel_spacing;
-                            horizontal_uncertainty *= edge_factor;
-                        }
-                        
-                        // Charge-dependent horizontal uncertainty
-                        if (weight_config.enable_charge_weighted_uncertainty) {
-                            double charge_factor = 1.0 / std::sqrt(std::max(0.1, clean_y[i] / stats.mean));
-                            horizontal_uncertainty *= charge_factor;
-                        }
-                        
-                        // Position-dependent horizontal error from spatial error maps
-                        if (weight_config.enable_spatial_error_maps) {
-                            double position_error = weight_config.position_dependent_bias_scale * 
-                                                   std::abs(dx) / pixel_spacing * pixel_spacing;
-                            horizontal_uncertainty += position_error;
-                        }
-                    }
-                    
                     cost_function = PixelIntegratedGaussianCostFunction::Create(
                         clean_x[i], clean_y[i], pixel_spacing, data_weights[i], horizontal_uncertainty);
                 } else {
@@ -982,40 +970,33 @@ bool FitGaussianCeres(
                 }
                 
                 // Technique #3: Enhanced robust loss functions with dynamic switching
-                ceres::LossFunction* loss_function = nullptr;
-                if (weight_config.enable_robust_losses) {
-                    if (config.loss_function == "HUBER") {
-                        loss_function = new ceres::HuberLoss(config.loss_parameter);
-                    } else if (config.loss_function == "CAUCHY") {
-                        loss_function = new ceres::CauchyLoss(config.loss_parameter);
-                    }
-                    
-                    // Technique: Dynamic loss switching based on pixel characteristics
-                    if (weight_config.enable_dynamic_loss_switching) {
-                        // For central high-charge pixels, use stronger robust loss to reduce dominance
-                        size_t max_charge_idx = std::distance(clean_y.begin(), 
-                            std::max_element(clean_y.begin(), clean_y.end()));
-                        
-                        if (i == max_charge_idx && clean_y[i] > stats.mean * weight_config.central_downweight_threshold) {
-                            // Use more aggressive robust loss for central pixel
-                            double stronger_parameter = config.loss_parameter * 0.5;
-                            if (config.loss_function == "HUBER") {
-                                delete loss_function;
-                                loss_function = new ceres::HuberLoss(stronger_parameter);
-                            } else if (config.loss_function == "CAUCHY") {
-                                delete loss_function;
-                                loss_function = new ceres::CauchyLoss(stronger_parameter);
-                            }
+                if (weight_config.enable_dynamic_loss_switching) {
+                    // For central high-charge pixels, use stronger robust loss to reduce dominance
+                    if (i == max_charge_idx && clean_y[i] > stats.mean * weight_config.central_downweight_threshold) {
+                        // Use more aggressive robust loss for central pixel
+                        double stronger_parameter = config.loss_parameter * 0.5;
+                        if (config.loss_function == "HUBER") {
+                            owned_losses.emplace_back(std::make_unique<ceres::HuberLoss>(stronger_parameter));
+                            loss_function = owned_losses.back().get();
+                        } else if (config.loss_function == "CAUCHY") {
+                            owned_losses.emplace_back(std::make_unique<ceres::CauchyLoss>(stronger_parameter));
+                            loss_function = owned_losses.back().get();
                         }
                     }
                 }
                 
+                // Add residual block with appropriate loss function (nullptr if no loss function)
                 problem.AddResidualBlock(cost_function, loss_function, parameters);
             }
             
             // Set robust bounds based on physics and estimates
             double amp_min = std::max(1e-20, estimates.amplitude * 0.01);
-            double amp_max = estimates.amplitude * 100.0;
+
+            double max_charge_val = *std::max_element(clean_y.begin(), clean_y.end());
+            double physics_amp_max = max_charge_val * 1.5;
+            double algo_amp_max = estimates.amplitude * 100.0;
+            double amp_max = std::min(physics_amp_max, algo_amp_max);
+
             problem.SetParameterLowerBound(parameters, 0, amp_min);
             problem.SetParameterUpperBound(parameters, 0, amp_max);
             
@@ -1023,8 +1004,8 @@ bool FitGaussianCeres(
             problem.SetParameterLowerBound(parameters, 1, estimates.center - center_range);
             problem.SetParameterUpperBound(parameters, 1, estimates.center + center_range);
             
-            problem.SetParameterLowerBound(parameters, 2, pixel_spacing * 0.1);
-            problem.SetParameterUpperBound(parameters, 2, pixel_spacing * 5.0);
+            problem.SetParameterLowerBound(parameters, 2, pixel_spacing * 0.05);
+            problem.SetParameterUpperBound(parameters, 2, pixel_spacing * 3.0);
             
             double offset_range = std::max(estimates.amplitude * 0.5, std::abs(estimates.offset) * 2.0);
             problem.SetParameterLowerBound(parameters, 3, estimates.offset - offset_range);
@@ -1113,7 +1094,8 @@ bool FitGaussianCeres(
                 }
                 
                 // Calculate reduced chi-squared
-                double chi2 = summary.final_cost;
+                // Ceres reports 0.5 * Σ r_i^2, so multiply by 2 to obtain χ².
+                double chi2 = summary.final_cost * 2.0;
                 int dof = std::max(1, static_cast<int>(clean_x.size()) - 4);
                 chi2_reduced = chi2 / dof;
                 

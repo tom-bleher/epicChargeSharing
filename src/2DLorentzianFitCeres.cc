@@ -111,7 +111,7 @@ private:
 };
 
 // Enhanced cost function for Lorentzian fitting with numerical stability
-// Function form: y(x) = A / (1 + ((x - m) / γ)^2) + B
+// Function form: y(x) = A / (1 + ((x - m) / γ)^2) + B  
 struct LorentzianCostFunction {
     LorentzianCostFunction(double x, double y, double weight = 1.0) 
         : x_(x), y_(y), weight_(weight) {}
@@ -179,9 +179,15 @@ struct LorentzianParameterEstimates {
 
 // Robust statistics calculations (reusing from Gaussian implementation)
 struct DataStatistics {
-    double mean, median, std_dev, mad;
-    double q25, q75, min_val, max_val;
-    double weighted_mean, total_weight;
+    double mean;
+    double median;
+    double std_dev;
+    double mad; // Median Absolute Deviation
+    double q25, q75; // Quartiles
+    double min_val, max_val;
+    double weighted_mean;
+    double total_weight;
+    double robust_center; // Improved center estimate
     bool valid;
 };
 
@@ -229,6 +235,17 @@ DataStatistics CalculateRobustStatisticsLorentzian(const std::vector<double>& x_
     std::sort(abs_deviations.begin(), abs_deviations.end());
     stats.mad = abs_deviations[n/2] * 1.4826;
     
+    // ------------------------------------------------------------------------------------
+    // Numerical stability safeguard: ensure MAD is positive and finite.
+    // A zero or non-finite MAD can later produce divide-by-zero errors or NaNs in weighting
+    // and outlier filtering, ultimately destabilising the fit.  When this happens we fall
+    // back to the standard deviation (if sensible) or a small epsilon.
+    // ------------------------------------------------------------------------------------
+    if (!std::isfinite(stats.mad) || stats.mad < 1e-12) {
+        stats.mad = (std::isfinite(stats.std_dev) && stats.std_dev > 1e-12) ?
+                    stats.std_dev : 1e-12;
+    }
+    
     // Weighted statistics
     stats.weighted_mean = 0.0;
     stats.total_weight = 0.0;
@@ -243,8 +260,10 @@ DataStatistics CalculateRobustStatisticsLorentzian(const std::vector<double>& x_
     
     if (stats.total_weight > 0) {
         stats.weighted_mean /= stats.total_weight;
+        stats.robust_center = stats.weighted_mean;
     } else {
         stats.weighted_mean = std::accumulate(x_vals.begin(), x_vals.end(), 0.0) / x_vals.size();
+        stats.robust_center = stats.weighted_mean;
     }
     
     stats.valid = true;
@@ -915,7 +934,12 @@ bool FitLorentzianCeres(
             
             // Set bounds
             double amp_min = std::max(1e-20, estimates.amplitude * 0.01);
-            double amp_max = estimates.amplitude * 100.0;
+
+            double max_charge_val = *std::max_element(clean_y.begin(), clean_y.end());
+            double physics_amp_max = max_charge_val * 1.5;
+            double algo_amp_max = estimates.amplitude * 100.0;
+            double amp_max = std::min(physics_amp_max, algo_amp_max);
+
             problem.SetParameterLowerBound(parameters, 0, amp_min);
             problem.SetParameterUpperBound(parameters, 0, amp_max);
             
@@ -923,8 +947,8 @@ bool FitLorentzianCeres(
             problem.SetParameterLowerBound(parameters, 1, estimates.center - center_range);
             problem.SetParameterUpperBound(parameters, 1, estimates.center + center_range);
             
-            problem.SetParameterLowerBound(parameters, 2, pixel_spacing * 0.1);
-            problem.SetParameterUpperBound(parameters, 2, pixel_spacing * 5.0);
+            problem.SetParameterLowerBound(parameters, 2, pixel_spacing * 0.05);
+            problem.SetParameterUpperBound(parameters, 2, pixel_spacing * 4.0);
             
             double baseline_range = std::max(estimates.amplitude * 0.5, std::abs(estimates.baseline) * 2.0);
             problem.SetParameterLowerBound(parameters, 3, estimates.baseline - baseline_range);
@@ -1011,7 +1035,8 @@ bool FitLorentzianCeres(
                 }
                 
                 // Calculate reduced chi-squared
-                double chi2 = summary.final_cost;
+                // Ceres returns 0.5 * Σ r_i^2, multiply by 2 to get χ².
+                double chi2 = summary.final_cost * 2.0;
                 int dof = std::max(1, static_cast<int>(clean_x.size()) - 4);
                 chi2_reduced = chi2 / dof;
                 
@@ -1270,52 +1295,39 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
     // Tolerance for grouping pixels into diagonals
     double tolerance = pixel_spacing * 0.1;
     
-    // Group pixels by diagonal lines
-    std::map<double, std::vector<std::pair<double, double>>> main_diagonal_data;
-    std::map<double, std::vector<std::pair<double, double>>> sec_diagonal_data;
-    
-    // Group data points by diagonal
+    // Group pixels by diagonal lines, using coordinate along the diagonal ("s")
+    // so that the fit abscissa is the true distance along the ±45° axis.
+    // Define   s_main = (dx + dy) / sqrt(2)
+    //         s_sec  = (dx - dy) / sqrt(2)
+    // where dx=x-centreX, dy=y-centreY.  We store (s, charge).
+
+    const double inv_sqrt2 = 1.0 / std::sqrt(2.0);
+
+    std::map<double, std::vector<std::pair<double, double>>> main_diagonal_data; // id -> (s, q)
+    std::map<double, std::vector<std::pair<double, double>>> sec_diagonal_data;  // id -> (s, q)
+
     for (size_t i = 0; i < x_coords.size(); ++i) {
         double x = x_coords[i];
         double y = y_coords[i];
         double charge = charge_values[i];
-        
-        if (charge <= 0) continue; // Skip non-positive charges
-        
-        // Main diagonal: constant value of (x - y)
-        double main_diag_id = x - y;
-        
-        // Secondary diagonal: constant value of (x + y)  
-        double sec_diag_id = x + y;
-        
-        // Find or create main diagonal - store both x and y coordinates with charge
-        bool found_main_diag = false;
-        for (auto& diag_pair : main_diagonal_data) {
-            if (std::abs(diag_pair.first - main_diag_id) < tolerance) {
-                diag_pair.second.push_back(std::make_pair(x, charge));
-                diag_pair.second.push_back(std::make_pair(y, charge));
-                found_main_diag = true;
-                break;
-            }
+
+        if (charge <= 0) continue;
+
+        double dx = x - center_x_estimate;
+        double dy = y - center_y_estimate;
+
+        // Identify membership of each pixel to diagonals using tolerance on (dx-dy) and (dx+dy)
+        double diff = dx - dy;   // main diagonal indicator
+        double sum  = dx + dy;   // secondary diagonal indicator
+
+        if (std::abs(diff) < tolerance) {
+            double s = (dx + dy) * inv_sqrt2; // coordinate along main diagonal
+            main_diagonal_data[diff].emplace_back(s, charge);
         }
-        if (!found_main_diag) {
-            main_diagonal_data[main_diag_id].push_back(std::make_pair(x, charge));
-            main_diagonal_data[main_diag_id].push_back(std::make_pair(y, charge));
-        }
-        
-        // Find or create secondary diagonal - store both x and y coordinates with charge
-        bool found_sec_diag = false;
-        for (auto& diag_pair : sec_diagonal_data) {
-            if (std::abs(diag_pair.first - sec_diag_id) < tolerance) {
-                diag_pair.second.push_back(std::make_pair(x, charge));
-                diag_pair.second.push_back(std::make_pair(y, charge));
-                found_sec_diag = true;
-                break;
-            }
-        }
-        if (!found_sec_diag) {
-            sec_diagonal_data[sec_diag_id].push_back(std::make_pair(x, charge));
-            sec_diagonal_data[sec_diag_id].push_back(std::make_pair(y, charge));
+
+        if (std::abs(sum) < tolerance) {
+            double s = (dx - dy) * inv_sqrt2; // (dx-dy)/sqrt(2)
+            sec_diagonal_data[sum].emplace_back(s, charge);
         }
     }
     
@@ -1354,11 +1366,11 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
         
         auto& main_diag_data = main_diagonal_data[best_main_diag_id];
         
-        // Extract X coordinates and charges (every other pair starting from index 0)
+        // Extract diagonal coordinate (s) and charge values
         std::vector<double> x_vals, charge_vals;
-        for (size_t i = 0; i < main_diag_data.size(); i += 2) {
-            x_vals.push_back(main_diag_data[i].first);
-            charge_vals.push_back(main_diag_data[i].second);
+        for (const auto& p : main_diag_data) {
+            x_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
         // Sort by X coordinate
@@ -1420,9 +1432,9 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
         
         // Extract Y coordinates and charges (every other pair starting from index 1)
         std::vector<double> y_vals, charge_vals;
-        for (size_t i = 1; i < main_diag_data.size(); i += 2) {
-            y_vals.push_back(main_diag_data[i].first);
-            charge_vals.push_back(main_diag_data[i].second);
+        for (const auto& p : main_diag_data) {
+            y_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
         // Sort by Y coordinate
@@ -1484,9 +1496,9 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
         
         // Extract X coordinates and charges (every other pair starting from index 0)
         std::vector<double> x_vals, charge_vals;
-        for (size_t i = 0; i < sec_diag_data.size(); i += 2) {
-            x_vals.push_back(sec_diag_data[i].first);
-            charge_vals.push_back(sec_diag_data[i].second);
+        for (const auto& p : sec_diag_data) {
+            x_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
         // Sort by X coordinate
@@ -1548,9 +1560,9 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
         
         // Extract Y coordinates and charges (every other pair starting from index 1)
         std::vector<double> y_vals, charge_vals;
-        for (size_t i = 1; i < sec_diag_data.size(); i += 2) {
-            y_vals.push_back(sec_diag_data[i].first);
-            charge_vals.push_back(sec_diag_data[i].second);
+        for (const auto& p : sec_diag_data) {
+            y_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
         // Sort by Y coordinate

@@ -60,6 +60,26 @@ namespace Constants {
     // Charge sharing calculations
     const G4double ALPHA_WEIGHT_MULTIPLIER = 1000.0;     // Weight for very close pixels
     
+    // ========================
+    // FITTING MODEL CONTROL FLAGS
+    // ========================
+    
+    // Enable/disable different fitting models for performance and flexibility
+    // Set to 'false' to disable a fitting model and skip its computation entirely
+    // This reduces simulation time and ROOT output file size when specific models aren't needed
+    const G4bool ENABLE_GAUSSIAN_FITTING = true;         // Enable Gaussian fitting (2D and diagonal)
+    const G4bool ENABLE_LORENTZIAN_FITTING = true;       // Enable Lorentzian fitting (2D and diagonal) 
+    const G4bool ENABLE_SKEWED_LORENTZIAN_FITTING = false; // Enable Skewed Lorentzian fitting (2D and diagonal)
+    
+    // Individual fitting type control (only used if main model is enabled)
+    const G4bool ENABLE_2D_FITTING = true;               // Enable central row/column fitting
+    const G4bool ENABLE_DIAGONAL_FITTING = true;         // Enable diagonal fitting
+    
+    // USAGE EXAMPLES:
+    // - To disable all Skewed Lorentzian: set ENABLE_SKEWED_LORENTZIAN_FITTING = false
+    // - To enable only 2D fits (not diagonals): set ENABLE_DIAGONAL_FITTING = false  
+    // - To run only Gaussian fits: set ENABLE_LORENTZIAN_FITTING and ENABLE_SKEWED_LORENTZIAN_FITTING to false
+    
 } // namespace Constants
 
 // ================================================================================================

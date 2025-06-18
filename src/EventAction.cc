@@ -4,6 +4,7 @@
 #include "Constants.hh"
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
+#include "2DSkewedLorentzianFitCeres.hh"
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
@@ -155,7 +156,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
   fRunAction->SetNeighborhoodChargeData(fNonPixel_GridNeighborhoodChargeFractions, fNonPixel_GridNeighborhoodDistances, fNonPixel_GridNeighborhoodCharge, fNonPixel_GridNeighborhoodCharge);
   
   // Pass automatic radius selection results to RunAction
-  fRunAction->SetAutoRadiusResults(fSelectedRadius, fSelectedFitQuality, fAutoRadiusEnabled);
+  fRunAction->SetAutoRadiusResults(fSelectedRadius);
   
   // Perform 2D Gaussian fitting on charge distribution data (central row and column)
   // Only fit for non-pixel hits (not on pixel surface)
@@ -194,8 +195,12 @@ void EventAction::EndOfEventAction(const G4Event* event)
       }
     }
     
-    // Perform 2D fitting if we have enough data points
-    if (x_coords.size() >= 3) { // Need at least 3 points for 1D Gaussian fit
+    // ===============================================
+    // GAUSSIAN FITTING (conditionally enabled)
+    // ===============================================
+    
+    // Perform 2D fitting if we have enough data points and Gaussian fitting is enabled
+    if (x_coords.size() >= 3 && Constants::ENABLE_GAUSSIAN_FITTING && Constants::ENABLE_2D_FITTING) { // Need at least 3 points for 1D Gaussian fit
       // Perform 2D Gaussian fitting using the Ceres Solver implementation
       GaussianFit2DResultsCeres fitResults = Fit2DGaussianCeres(
         x_coords, y_coords, charge_values,
@@ -220,8 +225,8 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.y_chi2red, fitResults.y_pp, fitResults.y_dof,
         fitResults.fit_successful);
         
-              // Perform diagonal fitting if 2D fitting was performed and successful
-        if (fitResults.fit_successful) {
+        // Perform diagonal fitting if 2D fitting was performed and successful and diagonal fitting is enabled
+        if (fitResults.fit_successful && Constants::ENABLE_DIAGONAL_FITTING) {
           // Perform diagonal Gaussian fitting using the Ceres Solver implementation
           DiagonalFitResultsCeres diagResults = FitDiagonalGaussianCeres(
           x_coords, y_coords, charge_values,
@@ -264,11 +269,11 @@ void EventAction::EndOfEventAction(const G4Event* event)
       }
       
       // ===============================================
-      // LORENTZIAN FITTING (parallel to Gaussian)
+      // LORENTZIAN FITTING (conditionally enabled)
       // ===============================================
       
-      // Perform 2D Lorentzian fitting if we have enough data points
-      if (x_coords.size() >= 3) { // Need at least 3 points for 1D Lorentzian fit
+      // Perform 2D Lorentzian fitting if we have enough data points and Lorentzian fitting is enabled
+      if (x_coords.size() >= 3 && Constants::ENABLE_LORENTZIAN_FITTING && Constants::ENABLE_2D_FITTING) { // Need at least 3 points for 1D Lorentzian fit
         // Perform 2D Lorentzian fitting using the Ceres Solver implementation
         LorentzianFit2DResultsCeres lorentzFitResults = Fit2DLorentzianCeres(
           x_coords, y_coords, charge_values,
@@ -293,13 +298,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
           lorentzFitResults.y_chi2red, lorentzFitResults.y_pp, lorentzFitResults.y_dof,
           lorentzFitResults.fit_successful);
           
-        // Pass 2D Lorentzian charge error data to RunAction
-        fRunAction->Set2DLorentzianChargeErrors(
-          lorentzFitResults.x_row_pixel_coords, lorentzFitResults.x_row_charge_values, lorentzFitResults.x_row_charge_errors,
-          lorentzFitResults.y_col_pixel_coords, lorentzFitResults.y_col_charge_values, lorentzFitResults.y_col_charge_errors);
+        // Note: Lorentzian charge error data was removed as per user request
           
-        // Perform diagonal Lorentzian fitting if 2D fitting was performed and successful
-        if (lorentzFitResults.fit_successful) {
+        // Perform diagonal Lorentzian fitting if 2D fitting was performed and successful and diagonal fitting is enabled
+        if (lorentzFitResults.fit_successful && Constants::ENABLE_DIAGONAL_FITTING) {
           // Perform diagonal Lorentzian fitting using the Ceres Solver implementation
           DiagonalLorentzianFitResultsCeres lorentzDiagResults = FitDiagonalLorentzianCeres(
           x_coords, y_coords, charge_values,
@@ -332,12 +334,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
           lorentzDiagResults.sec_diag_y_chi2red, lorentzDiagResults.sec_diag_y_pp, lorentzDiagResults.sec_diag_y_dof, lorentzDiagResults.sec_diag_y_fit_successful,
           lorentzDiagResults.fit_successful);
           
-        // Pass diagonal Lorentzian charge error data to RunAction
-        fRunAction->SetDiagonalLorentzianChargeErrors(
-          lorentzDiagResults.main_diag_x_pixel_coords, lorentzDiagResults.main_diag_x_charge_values, lorentzDiagResults.main_diag_x_charge_errors,
-          lorentzDiagResults.main_diag_y_pixel_coords, lorentzDiagResults.main_diag_y_charge_values, lorentzDiagResults.main_diag_y_charge_errors,
-          lorentzDiagResults.sec_diag_x_pixel_coords, lorentzDiagResults.sec_diag_x_charge_values, lorentzDiagResults.sec_diag_x_charge_errors,
-          lorentzDiagResults.sec_diag_y_pixel_coords, lorentzDiagResults.sec_diag_y_charge_values, lorentzDiagResults.sec_diag_y_charge_errors);
+        // Note: Diagonal Lorentzian charge error data was removed as per user request
       } else {
         // Set default diagonal Lorentzian fit values when 2D fitting failed
         fRunAction->SetDiagonalLorentzianFitResults(
@@ -349,51 +346,148 @@ void EventAction::EndOfEventAction(const G4Event* event)
       }
         
     } else {
-      // Not enough data points for Lorentzian fitting
-      fRunAction->Set2DLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-        false); // fit_successful = false
-      
-      // Set default diagonal Lorentzian fit values when not enough data points
-      fRunAction->SetDiagonalLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-        false); // fit_successful = false
+      // Not enough data points for Lorentzian fitting or Lorentzian fitting is disabled
+      if (Constants::ENABLE_LORENTZIAN_FITTING) {
+        fRunAction->Set2DLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+          false); // fit_successful = false
+        
+        // Set default diagonal Lorentzian fit values when not enough data points
+        fRunAction->SetDiagonalLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          false); // fit_successful = false
+      }
     }
       
+      // ===============================================
+      // SKEWED LORENTZIAN FITTING (conditionally enabled)
+      // ===============================================
+      
+      // Perform 2D Skewed Lorentzian fitting if we have enough data points and Skewed Lorentzian fitting is enabled
+      if (x_coords.size() >= 3 && Constants::ENABLE_SKEWED_LORENTZIAN_FITTING && Constants::ENABLE_2D_FITTING) { // Need at least 3 points for Skewed Lorentzian fit
+        // Perform 2D Skewed Lorentzian fitting using the Ceres Solver implementation
+        SkewedLorentzianFit2DResultsCeres skewedLorentzFitResults = Fit2DSkewedLorentzianCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false, // verbose=false for production
+          false); // enable_outlier_filtering
+        
+        if (skewedLorentzFitResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass 2D Skewed Lorentzian fit results to RunAction
+        fRunAction->Set2DSkewedLorentzianFitResults(
+          skewedLorentzFitResults.x_center, skewedLorentzFitResults.x_beta, skewedLorentzFitResults.x_lambda, skewedLorentzFitResults.x_gamma, skewedLorentzFitResults.x_amplitude,
+          skewedLorentzFitResults.x_center_err, skewedLorentzFitResults.x_beta_err, skewedLorentzFitResults.x_lambda_err, skewedLorentzFitResults.x_gamma_err, skewedLorentzFitResults.x_amplitude_err,
+          skewedLorentzFitResults.x_vertical_offset, skewedLorentzFitResults.x_vertical_offset_err,
+          skewedLorentzFitResults.x_chi2red, skewedLorentzFitResults.x_pp, skewedLorentzFitResults.x_dof,
+          skewedLorentzFitResults.y_center, skewedLorentzFitResults.y_beta, skewedLorentzFitResults.y_lambda, skewedLorentzFitResults.y_gamma, skewedLorentzFitResults.y_amplitude,
+          skewedLorentzFitResults.y_center_err, skewedLorentzFitResults.y_beta_err, skewedLorentzFitResults.y_lambda_err, skewedLorentzFitResults.y_gamma_err, skewedLorentzFitResults.y_amplitude_err,
+          skewedLorentzFitResults.y_vertical_offset, skewedLorentzFitResults.y_vertical_offset_err,
+          skewedLorentzFitResults.y_chi2red, skewedLorentzFitResults.y_pp, skewedLorentzFitResults.y_dof,
+          skewedLorentzFitResults.fit_successful);
+          
+        // Perform diagonal Skewed Lorentzian fitting if 2D fitting was performed and successful and diagonal fitting is enabled
+        if (skewedLorentzFitResults.fit_successful && Constants::ENABLE_DIAGONAL_FITTING) {
+          // Perform diagonal Skewed Lorentzian fitting using the Ceres Solver implementation
+          DiagonalSkewedLorentzianFitResultsCeres skewedLorentzDiagResults = FitDiagonalSkewedLorentzianCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false, // verbose=false for production
+          false); // enable_outlier_filtering
+        
+        if (skewedLorentzDiagResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass diagonal Skewed Lorentzian fit results to RunAction
+        fRunAction->SetDiagonalSkewedLorentzianFitResults(
+          skewedLorentzDiagResults.main_diag_x_center, skewedLorentzDiagResults.main_diag_x_beta, skewedLorentzDiagResults.main_diag_x_lambda, skewedLorentzDiagResults.main_diag_x_gamma, skewedLorentzDiagResults.main_diag_x_amplitude,
+          skewedLorentzDiagResults.main_diag_x_center_err, skewedLorentzDiagResults.main_diag_x_beta_err, skewedLorentzDiagResults.main_diag_x_lambda_err, skewedLorentzDiagResults.main_diag_x_gamma_err, skewedLorentzDiagResults.main_diag_x_amplitude_err,
+          skewedLorentzDiagResults.main_diag_x_vertical_offset, skewedLorentzDiagResults.main_diag_x_vertical_offset_err,
+          skewedLorentzDiagResults.main_diag_x_chi2red, skewedLorentzDiagResults.main_diag_x_pp, skewedLorentzDiagResults.main_diag_x_dof, skewedLorentzDiagResults.main_diag_x_fit_successful,
+          skewedLorentzDiagResults.main_diag_y_center, skewedLorentzDiagResults.main_diag_y_beta, skewedLorentzDiagResults.main_diag_y_lambda, skewedLorentzDiagResults.main_diag_y_gamma, skewedLorentzDiagResults.main_diag_y_amplitude,
+          skewedLorentzDiagResults.main_diag_y_center_err, skewedLorentzDiagResults.main_diag_y_beta_err, skewedLorentzDiagResults.main_diag_y_lambda_err, skewedLorentzDiagResults.main_diag_y_gamma_err, skewedLorentzDiagResults.main_diag_y_amplitude_err,
+          skewedLorentzDiagResults.main_diag_y_vertical_offset, skewedLorentzDiagResults.main_diag_y_vertical_offset_err,
+          skewedLorentzDiagResults.main_diag_y_chi2red, skewedLorentzDiagResults.main_diag_y_pp, skewedLorentzDiagResults.main_diag_y_dof, skewedLorentzDiagResults.main_diag_y_fit_successful,
+          skewedLorentzDiagResults.sec_diag_x_center, skewedLorentzDiagResults.sec_diag_x_beta, skewedLorentzDiagResults.sec_diag_x_lambda, skewedLorentzDiagResults.sec_diag_x_gamma, skewedLorentzDiagResults.sec_diag_x_amplitude,
+          skewedLorentzDiagResults.sec_diag_x_center_err, skewedLorentzDiagResults.sec_diag_x_beta_err, skewedLorentzDiagResults.sec_diag_x_lambda_err, skewedLorentzDiagResults.sec_diag_x_gamma_err, skewedLorentzDiagResults.sec_diag_x_amplitude_err,
+          skewedLorentzDiagResults.sec_diag_x_vertical_offset, skewedLorentzDiagResults.sec_diag_x_vertical_offset_err,
+          skewedLorentzDiagResults.sec_diag_x_chi2red, skewedLorentzDiagResults.sec_diag_x_pp, skewedLorentzDiagResults.sec_diag_x_dof, skewedLorentzDiagResults.sec_diag_x_fit_successful,
+          skewedLorentzDiagResults.sec_diag_y_center, skewedLorentzDiagResults.sec_diag_y_beta, skewedLorentzDiagResults.sec_diag_y_lambda, skewedLorentzDiagResults.sec_diag_y_gamma, skewedLorentzDiagResults.sec_diag_y_amplitude,
+          skewedLorentzDiagResults.sec_diag_y_center_err, skewedLorentzDiagResults.sec_diag_y_beta_err, skewedLorentzDiagResults.sec_diag_y_lambda_err, skewedLorentzDiagResults.sec_diag_y_gamma_err, skewedLorentzDiagResults.sec_diag_y_amplitude_err,
+          skewedLorentzDiagResults.sec_diag_y_vertical_offset, skewedLorentzDiagResults.sec_diag_y_vertical_offset_err,
+          skewedLorentzDiagResults.sec_diag_y_chi2red, skewedLorentzDiagResults.sec_diag_y_pp, skewedLorentzDiagResults.sec_diag_y_dof, skewedLorentzDiagResults.sec_diag_y_fit_successful,
+          skewedLorentzDiagResults.fit_successful);
+          
+      } else {
+        // Set default diagonal Skewed Lorentzian fit values when 2D fitting failed
+        fRunAction->SetDiagonalSkewedLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          false); // fit_successful = false
+      }
+        
+    } else {
+      // Not enough data points for Skewed Lorentzian fitting or Skewed Lorentzian fitting is disabled
+      if (Constants::ENABLE_SKEWED_LORENTZIAN_FITTING) {
+        fRunAction->Set2DSkewedLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+          false); // fit_successful = false
+        
+        // Set default diagonal Skewed Lorentzian fit values when not enough data points
+        fRunAction->SetDiagonalSkewedLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          false); // fit_successful = false
+      }
+    }
 
         
     } else {
-      // Not enough data points for fitting
-      fRunAction->Set2DGaussianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-        false); // fit_successful = false
+      // Not enough data points for fitting or Gaussian fitting is disabled
+      if (Constants::ENABLE_GAUSSIAN_FITTING) {
+        fRunAction->Set2DGaussianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+          false); // fit_successful = false
+        
+        // Set default diagonal fit values when not enough data points
+        fRunAction->SetDiagonalGaussianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          false); // fit_successful = false
+      }
       
-      // Set default diagonal fit values when not enough data points
-      fRunAction->SetDiagonalGaussianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-        false); // fit_successful = false
-      
-      // Not enough data points for Lorentzian fitting
-      fRunAction->Set2DLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-        false); // fit_successful = false
-      
-      // Set default diagonal Lorentzian fit values when not enough data points
-      fRunAction->SetDiagonalLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-        false); // fit_successful = false
+      // Not enough data points for Lorentzian fitting or Lorentzian fitting is disabled
+      if (Constants::ENABLE_LORENTZIAN_FITTING) {
+        fRunAction->Set2DLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+          false); // fit_successful = false
+        
+        // Set default diagonal Lorentzian fit values when not enough data points
+        fRunAction->SetDiagonalLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+          false); // fit_successful = false
+      }
     }
   } else {
     // Skip fitting due to conditions not met
@@ -403,34 +497,53 @@ void EventAction::EndOfEventAction(const G4Event* event)
       // Removed verbose debug output for cleaner simulation logs
     }
     
-    // Set default values (no fitting performed)
-    fRunAction->Set2DGaussianFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-      false); // fit_successful = false
+    // Set default values (no fitting performed or fitting is disabled)
+    if (Constants::ENABLE_GAUSSIAN_FITTING) {
+      fRunAction->Set2DGaussianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        false); // fit_successful = false
+      
+      // Set default diagonal fit values when fitting is skipped
+      fRunAction->SetDiagonalGaussianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        false); // fit_successful = false
+    }
     
-    // Set default diagonal fit values when fitting is skipped
-    fRunAction->SetDiagonalGaussianFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-      false); // fit_successful = false
+    // Set default Lorentzian values (no fitting performed or Lorentzian fitting is disabled)
+    if (Constants::ENABLE_LORENTZIAN_FITTING) {
+      fRunAction->Set2DLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        false); // fit_successful = false
+      
+      // Set default diagonal Lorentzian fit values when fitting is skipped
+      fRunAction->SetDiagonalLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        false); // fit_successful = false
+    }
     
-    // Set default Lorentzian values (no fitting performed)
-    fRunAction->Set2DLorentzianFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-      false); // fit_successful = false
-    
-    // Set default diagonal Lorentzian fit values when fitting is skipped
-    fRunAction->SetDiagonalLorentzianFitResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-      false); // fit_successful = false
-    
+    // Set default Skewed Lorentzian values (no fitting performed or Skewed Lorentzian fitting is disabled)
+    if (Constants::ENABLE_SKEWED_LORENTZIAN_FITTING) {
+      fRunAction->Set2DSkewedLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        false); // fit_successful = false
+      
+      // Set default diagonal Skewed Lorentzian fit values when fitting is skipped
+      fRunAction->SetDiagonalSkewedLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        false); // fit_successful = false
+    }
 
   }
   

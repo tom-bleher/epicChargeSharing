@@ -98,13 +98,7 @@ public:
                                   G4double y_chi2red, G4double y_pp, G4int y_dof,
                                   G4bool fit_successful);
     
-    // Method to set 2D Lorentzian charge error data from 3x3 neighborhood calculations
-    void Set2DLorentzianChargeErrors(const std::vector<G4double>& x_row_pixel_coords,
-                                     const std::vector<G4double>& x_row_charge_values,
-                                     const std::vector<G4double>& x_row_charge_errors,
-                                     const std::vector<G4double>& y_col_pixel_coords,
-                                     const std::vector<G4double>& y_col_charge_values,
-                                     const std::vector<G4double>& y_col_charge_errors);
+
     
     // Method to set diagonal Lorentzian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
     void SetDiagonalLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_amplitude,
@@ -125,19 +119,36 @@ public:
                                         G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
                                         G4bool fit_successful);
 
-    // Method to set diagonal Lorentzian charge error data from 3x3 neighborhood calculations  
-    void SetDiagonalLorentzianChargeErrors(const std::vector<G4double>& main_diag_x_pixel_coords,
-                                           const std::vector<G4double>& main_diag_x_charge_values,
-                                           const std::vector<G4double>& main_diag_x_charge_errors,
-                                           const std::vector<G4double>& main_diag_y_pixel_coords,
-                                           const std::vector<G4double>& main_diag_y_charge_values,
-                                           const std::vector<G4double>& main_diag_y_charge_errors,
-                                           const std::vector<G4double>& sec_diag_x_pixel_coords,
-                                           const std::vector<G4double>& sec_diag_x_charge_values,
-                                           const std::vector<G4double>& sec_diag_x_charge_errors,
-                                           const std::vector<G4double>& sec_diag_y_pixel_coords,
-                                           const std::vector<G4double>& sec_diag_y_charge_values,
-                                           const std::vector<G4double>& sec_diag_y_charge_errors);
+    // Method to set 2D Skewed Lorentzian fit results (central row and column fitting)
+    void Set2DSkewedLorentzianFitResults(G4double x_center, G4double x_beta, G4double x_lambda, G4double x_gamma, G4double x_amplitude,
+                                        G4double x_center_err, G4double x_beta_err, G4double x_lambda_err, G4double x_gamma_err, G4double x_amplitude_err,
+                                        G4double x_vertical_offset, G4double x_vertical_offset_err,
+                                        G4double x_chi2red, G4double x_pp, G4int x_dof,
+                                        G4double y_center, G4double y_beta, G4double y_lambda, G4double y_gamma, G4double y_amplitude,
+                                        G4double y_center_err, G4double y_beta_err, G4double y_lambda_err, G4double y_gamma_err, G4double y_amplitude_err,
+                                        G4double y_vertical_offset, G4double y_vertical_offset_err,
+                                        G4double y_chi2red, G4double y_pp, G4int y_dof,
+                                        G4bool fit_successful);
+    
+    // Method to set diagonal Skewed Lorentzian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+    void SetDiagonalSkewedLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_beta, G4double main_diag_x_lambda, G4double main_diag_x_gamma, G4double main_diag_x_amplitude,
+                                              G4double main_diag_x_center_err, G4double main_diag_x_beta_err, G4double main_diag_x_lambda_err, G4double main_diag_x_gamma_err, G4double main_diag_x_amplitude_err,
+                                              G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
+                                              G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
+                                              G4double main_diag_y_center, G4double main_diag_y_beta, G4double main_diag_y_lambda, G4double main_diag_y_gamma, G4double main_diag_y_amplitude,
+                                              G4double main_diag_y_center_err, G4double main_diag_y_beta_err, G4double main_diag_y_lambda_err, G4double main_diag_y_gamma_err, G4double main_diag_y_amplitude_err,
+                                              G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
+                                              G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
+                                              G4double sec_diag_x_center, G4double sec_diag_x_beta, G4double sec_diag_x_lambda, G4double sec_diag_x_gamma, G4double sec_diag_x_amplitude,
+                                              G4double sec_diag_x_center_err, G4double sec_diag_x_beta_err, G4double sec_diag_x_lambda_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_amplitude_err,
+                                              G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
+                                              G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
+                                              G4double sec_diag_y_center, G4double sec_diag_y_beta, G4double sec_diag_y_lambda, G4double sec_diag_y_gamma, G4double sec_diag_y_amplitude,
+                                              G4double sec_diag_y_center_err, G4double sec_diag_y_beta_err, G4double sec_diag_y_lambda_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_amplitude_err,
+                                              G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
+                                              G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
+                                              G4bool fit_successful);
+
     
 
     
@@ -145,7 +156,7 @@ public:
     void FillTree();
     
     // Method to store automatic radius selection results
-    void SetAutoRadiusResults(G4int selectedRadius, G4double fitQuality, G4bool autoRadiusEnabled);
+    void SetAutoRadiusResults(G4int selectedRadius);
 
 private:
     // =============================================
@@ -186,16 +197,10 @@ private:
     // Delta variables for estimations vs true position
     G4double fGaussRowDeltaX;
     G4double fGaussColumnDeltaY;
-    G4double fGaussMainDiagDeltaX;
-    G4double fGaussMainDiagDeltaY;
-    G4double fGaussSecondDiagDeltaX;
-    G4double fGaussSecondDiagDeltaY;
     G4double fLorentzRowDeltaX;
     G4double fLorentzColumnDeltaY;
-    G4double fLorentzMainDiagDeltaX;
-    G4double fLorentzMainDiagDeltaY;
-    G4double fLorentzSecondDiagDeltaX;
-    G4double fLorentzSecondDiagDeltaY;
+    G4double fSkewedLorentzRowDeltaX;
+    G4double fSkewedLorentzColumnDeltaY;
 
     // =============================================
     // TRANSFORMED DIAGONAL COORDINATES (ROTATION MATRIX)
@@ -212,6 +217,10 @@ private:
     G4double fGaussSecondDiagTransformedY;    // Transformed Y from secondary diagonal (y' -> y)
     G4double fLorentzSecondDiagTransformedX;  // Transformed X from secondary diagonal (x' -> x)
     G4double fLorentzSecondDiagTransformedY;  // Transformed Y from secondary diagonal (y' -> y)
+    G4double fSkewedLorentzMainDiagTransformedX;    // Transformed X from skewed Lorentzian main diagonal (x' -> x)
+    G4double fSkewedLorentzMainDiagTransformedY;    // Transformed Y from skewed Lorentzian main diagonal (y' -> y)
+    G4double fSkewedLorentzSecondDiagTransformedX;  // Transformed X from skewed Lorentzian secondary diagonal (x' -> x)
+    G4double fSkewedLorentzSecondDiagTransformedY;  // Transformed Y from skewed Lorentzian secondary diagonal (y' -> y)
     
     // Delta values for transformed coordinates vs true position
     G4double fGaussMainDiagTransformedDeltaX;   // x_transformed - x_true (main diagonal)
@@ -222,6 +231,10 @@ private:
     G4double fLorentzMainDiagTransformedDeltaY;   // y_transformed - y_true (main diagonal)
     G4double fLorentzSecondDiagTransformedDeltaX; // x_transformed - x_true (secondary diagonal)
     G4double fLorentzSecondDiagTransformedDeltaY; // y_transformed - y_true (secondary diagonal)
+    G4double fSkewedLorentzMainDiagTransformedDeltaX;   // x_transformed - x_true (skewed Lorentzian main diagonal)
+    G4double fSkewedLorentzMainDiagTransformedDeltaY;   // y_transformed - y_true (skewed Lorentzian main diagonal)
+    G4double fSkewedLorentzSecondDiagTransformedDeltaX; // x_transformed - x_true (skewed Lorentzian secondary diagonal)
+    G4double fSkewedLorentzSecondDiagTransformedDeltaY; // y_transformed - y_true (skewed Lorentzian secondary diagonal)
 
     // =============================================
     // MEAN ESTIMATIONS FROM ALL FITTING METHODS
@@ -232,14 +245,14 @@ private:
     G4double fGaussMeanTrueDeltaY;   // Mean delta Y from all Gaussian estimation methods to True Position [mm]
     G4double fLorentzMeanTrueDeltaX; // Mean delta X from all Lorentzian estimation methods to True Position [mm]
     G4double fLorentzMeanTrueDeltaY; // Mean delta Y from all Lorentzian estimation methods to True Position [mm]
+    G4double fSkewedLorentzMeanTrueDeltaX; // Mean delta X from all skewed Lorentzian estimation methods to True Position [mm]
+    G4double fSkewedLorentzMeanTrueDeltaY; // Mean delta Y from all skewed Lorentzian estimation methods to True Position [mm]
 
     // =============================================
     // AUTOMATIC RADIUS SELECTION VARIABLES
     // =============================================
     
     G4int fSelectedRadius;          // Automatically selected radius for this event
-    G4double fSelectedFitQuality;   // Fit quality for the selected radius (0-1 scale)
-    G4bool fAutoRadiusEnabled;      // Whether automatic radius selection was enabled for this event
 
     // =============================================
     // GAUSSIAN FITS VARIABLES
@@ -406,32 +419,110 @@ private:
     G4int fLorentzFitSecondDiagYDOF;
 
     // =============================================
-    // LORENTZIAN CHARGE ERRORS (3x3 NEIGHBORHOOD)
+    // SKEWED LORENTZIAN FITS VARIABLES
     // =============================================
     
-    // Central row and column charge error data
-    std::vector<G4double> fLorentzFitRowPixelCoords;
-    std::vector<G4double> fLorentzFitRowChargeValues;
-    std::vector<G4double> fLorentzFitRowChargeErrors;
-    std::vector<G4double> fLorentzFitColumnPixelCoords;
-    std::vector<G4double> fLorentzFitColumnChargeValues;
-    std::vector<G4double> fLorentzFitColumnChargeErrors;
+    // SkewedLorentzFitRow/SkewedLorentzFitRowX
+    G4double fSkewedLorentzFitRowAmplitude;
+    G4double fSkewedLorentzFitRowAmplitudeErr;
+    G4double fSkewedLorentzFitRowBeta;
+    G4double fSkewedLorentzFitRowBetaErr;
+    G4double fSkewedLorentzFitRowLambda;
+    G4double fSkewedLorentzFitRowLambdaErr;
+    G4double fSkewedLorentzFitRowGamma;
+    G4double fSkewedLorentzFitRowGammaErr;
+    G4double fSkewedLorentzFitRowVerticalOffset;
+    G4double fSkewedLorentzFitRowVerticalOffsetErr;
+    G4double fSkewedLorentzFitRowCenter;
+    G4double fSkewedLorentzFitRowCenterErr;
+    G4double fSkewedLorentzFitRowChi2red;
+    G4double fSkewedLorentzFitRowPp;
+    G4int fSkewedLorentzFitRowDOF;
     
-    // Diagonal charge error data
-    std::vector<G4double> fLorentzFitMainDiagXPixelCoords;
-    std::vector<G4double> fLorentzFitMainDiagXChargeValues;
-    std::vector<G4double> fLorentzFitMainDiagXChargeErrors;
-    std::vector<G4double> fLorentzFitMainDiagYPixelCoords;
-    std::vector<G4double> fLorentzFitMainDiagYChargeValues;
-    std::vector<G4double> fLorentzFitMainDiagYChargeErrors;
-    std::vector<G4double> fLorentzFitSecondDiagXPixelCoords;
-    std::vector<G4double> fLorentzFitSecondDiagXChargeValues;
-    std::vector<G4double> fLorentzFitSecondDiagXChargeErrors;
-    std::vector<G4double> fLorentzFitSecondDiagYPixelCoords;
-    std::vector<G4double> fLorentzFitSecondDiagYChargeValues;
-    std::vector<G4double> fLorentzFitSecondDiagYChargeErrors;
-
-
+    // SkewedLorentzFitColumn/SkewedLorentzFitColumnY
+    G4double fSkewedLorentzFitColumnAmplitude;
+    G4double fSkewedLorentzFitColumnAmplitudeErr;
+    G4double fSkewedLorentzFitColumnBeta;
+    G4double fSkewedLorentzFitColumnBetaErr;
+    G4double fSkewedLorentzFitColumnLambda;
+    G4double fSkewedLorentzFitColumnLambdaErr;
+    G4double fSkewedLorentzFitColumnGamma;
+    G4double fSkewedLorentzFitColumnGammaErr;
+    G4double fSkewedLorentzFitColumnVerticalOffset;
+    G4double fSkewedLorentzFitColumnVerticalOffsetErr;
+    G4double fSkewedLorentzFitColumnCenter;
+    G4double fSkewedLorentzFitColumnCenterErr;
+    G4double fSkewedLorentzFitColumnChi2red;
+    G4double fSkewedLorentzFitColumnPp;
+    G4int fSkewedLorentzFitColumnDOF;
+    
+    // SkewedLorentzFitMainDiag/SkewedLorentzFitMainDiagX
+    G4double fSkewedLorentzFitMainDiagXAmplitude;
+    G4double fSkewedLorentzFitMainDiagXAmplitudeErr;
+    G4double fSkewedLorentzFitMainDiagXBeta;
+    G4double fSkewedLorentzFitMainDiagXBetaErr;
+    G4double fSkewedLorentzFitMainDiagXLambda;
+    G4double fSkewedLorentzFitMainDiagXLambdaErr;
+    G4double fSkewedLorentzFitMainDiagXGamma;
+    G4double fSkewedLorentzFitMainDiagXGammaErr;
+    G4double fSkewedLorentzFitMainDiagXVerticalOffset;
+    G4double fSkewedLorentzFitMainDiagXVerticalOffsetErr;
+    G4double fSkewedLorentzFitMainDiagXCenter;
+    G4double fSkewedLorentzFitMainDiagXCenterErr;
+    G4double fSkewedLorentzFitMainDiagXChi2red;
+    G4double fSkewedLorentzFitMainDiagXPp;
+    G4int fSkewedLorentzFitMainDiagXDOF;
+    
+    // SkewedLorentzFitMainDiag/SkewedLorentzFitMainDiagY
+    G4double fSkewedLorentzFitMainDiagYAmplitude;
+    G4double fSkewedLorentzFitMainDiagYAmplitudeErr;
+    G4double fSkewedLorentzFitMainDiagYBeta;
+    G4double fSkewedLorentzFitMainDiagYBetaErr;
+    G4double fSkewedLorentzFitMainDiagYLambda;
+    G4double fSkewedLorentzFitMainDiagYLambdaErr;
+    G4double fSkewedLorentzFitMainDiagYGamma;
+    G4double fSkewedLorentzFitMainDiagYGammaErr;
+    G4double fSkewedLorentzFitMainDiagYVerticalOffset;
+    G4double fSkewedLorentzFitMainDiagYVerticalOffsetErr;
+    G4double fSkewedLorentzFitMainDiagYCenter;
+    G4double fSkewedLorentzFitMainDiagYCenterErr;
+    G4double fSkewedLorentzFitMainDiagYChi2red;
+    G4double fSkewedLorentzFitMainDiagYPp;
+    G4int fSkewedLorentzFitMainDiagYDOF;
+    
+    // SkewedLorentzFitSecondDiag/SkewedLorentzFitSecondDiagX
+    G4double fSkewedLorentzFitSecondDiagXAmplitude;
+    G4double fSkewedLorentzFitSecondDiagXAmplitudeErr;
+    G4double fSkewedLorentzFitSecondDiagXBeta;
+    G4double fSkewedLorentzFitSecondDiagXBetaErr;
+    G4double fSkewedLorentzFitSecondDiagXLambda;
+    G4double fSkewedLorentzFitSecondDiagXLambdaErr;
+    G4double fSkewedLorentzFitSecondDiagXGamma;
+    G4double fSkewedLorentzFitSecondDiagXGammaErr;
+    G4double fSkewedLorentzFitSecondDiagXVerticalOffset;
+    G4double fSkewedLorentzFitSecondDiagXVerticalOffsetErr;
+    G4double fSkewedLorentzFitSecondDiagXCenter;
+    G4double fSkewedLorentzFitSecondDiagXCenterErr;
+    G4double fSkewedLorentzFitSecondDiagXChi2red;
+    G4double fSkewedLorentzFitSecondDiagXPp;
+    G4int fSkewedLorentzFitSecondDiagXDOF;
+    
+    // SkewedLorentzFitSecondDiag/SkewedLorentzFitSecondDiagY
+    G4double fSkewedLorentzFitSecondDiagYAmplitude;
+    G4double fSkewedLorentzFitSecondDiagYAmplitudeErr;
+    G4double fSkewedLorentzFitSecondDiagYBeta;
+    G4double fSkewedLorentzFitSecondDiagYBetaErr;
+    G4double fSkewedLorentzFitSecondDiagYLambda;
+    G4double fSkewedLorentzFitSecondDiagYLambdaErr;
+    G4double fSkewedLorentzFitSecondDiagYGamma;
+    G4double fSkewedLorentzFitSecondDiagYGammaErr;
+    G4double fSkewedLorentzFitSecondDiagYVerticalOffset;
+    G4double fSkewedLorentzFitSecondDiagYVerticalOffsetErr;
+    G4double fSkewedLorentzFitSecondDiagYCenter;
+    G4double fSkewedLorentzFitSecondDiagYCenterErr;
+    G4double fSkewedLorentzFitSecondDiagYChi2red;
+    G4double fSkewedLorentzFitSecondDiagYPp;
+    G4int fSkewedLorentzFitSecondDiagYDOF;
 
     // Legacy variables that may still be used
     G4double fPixelZ; // Nearest to hit pixel center Z [mm]
@@ -445,7 +536,6 @@ private:
 
     // Variables for particle information (reduced set)
     G4double fInitialEnergy;        // Initial particle energy [MeV]
-    G4double fMomentum;             // Particle momentum [MeV/c]
     
     // Variables for detector grid parameters (stored as ROOT metadata)
     G4double fGridPixelSize;        // Pixel size [mm]
