@@ -338,14 +338,15 @@ def load_successful_fits(root_file):
                 'NonPixel_GridNeighborhoodChargeFractions': 'GridNeighborhoodChargeFractions',
                 
                 # Nearest pixel positions
-                'NearestPixelX': 'NearestPixelX',
-                'NearestPixelY': 'NearestPixelY',
-                'NearestPixelZ': 'NearestPixelZ'
+                'NearestPixelX': 'PixelX',
+                'NearestPixelY': 'PixelY', 
+                'NearestPixelZ': 'PixelZ'
             }
             
             # Load all available branches with mapping
             data = {}
             loaded_count = 0
+            skipped_skewed_count = 0
             
             for expected_name, actual_name in branch_mapping.items():
                 if actual_name in tree.keys():
@@ -357,7 +358,14 @@ def load_successful_fits(root_file):
                     except Exception as e:
                         print(f"Warning: Could not load {actual_name}: {e}")
                 else:
-                    print(f"Warning: Branch {actual_name} not found for {expected_name}")
+                    # Suppress warnings for skewed Lorentzian branches if they're expected to be missing
+                    if 'SkewLorentz' in expected_name:
+                        skipped_skewed_count += 1
+                    else:
+                        print(f"Warning: Branch {actual_name} not found for {expected_name}")
+            
+            if skipped_skewed_count > 0:
+                print(f"Note: Skipped {skipped_skewed_count} skewed Lorentzian branches (fitting disabled)")
             
             print(f"Successfully loaded {loaded_count} branches with {len(data['TrueX'])} events")
             
@@ -634,7 +642,7 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
                     
                     # For diagonal plots, we need to project to 1D coordinate
                     # Main diagonal: use distance along diagonal from center
-                    diag_coord = offset_i * pixel_spacing  # Could also use offset_j * pixel_spacing
+                    diag_coord = offset_i * pixel_spacing * np.sqrt(2)  # √2 × pitch per step
                     
                     main_x_positions.append(diag_coord)
                     main_x_charges.append(grid_charges[grid_idx])
@@ -658,7 +666,7 @@ def extract_diagonal_data(event_idx, data, neighborhood_radius=4):
                     
                     # For secondary diagonal: use distance along diagonal from center
                     # Secondary diagonal runs from top-right to bottom-left
-                    diag_coord = offset_i * pixel_spacing  # X coordinate along the diagonal
+                    diag_coord = offset_i * pixel_spacing * np.sqrt(2)  # X coordinate along the diagonal
                     
                     sec_x_positions.append(diag_coord)
                     sec_x_charges.append(grid_charges[grid_idx])
@@ -840,6 +848,12 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         if len(row_pos) < 3 and len(col_pos) < 3:
             return f"Event {event_idx}: Not enough data points for plotting"
         
+        # Check if skewed Lorentzian data is available
+        has_skewed_lorentz = all(key in data for key in [
+            'Fit2D_SkewLorentz_XCenter', 'Fit2D_SkewLorentz_YCenter',
+            'Fit2D_SkewLorentz_XGamma', 'Fit2D_SkewLorentz_YGamma'
+        ])
+        
         # Get fit parameters
         x_lorentz_center = data['Fit2D_Lorentz_XCenter'][event_idx]
         x_lorentz_gamma = data['Fit2D_Lorentz_XGamma'][event_idx]
@@ -851,18 +865,19 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         y_lorentz_amplitude = data['Fit2D_Lorentz_YAmplitude'][event_idx]
         y_lorentz_chi2red = data['Fit2D_Lorentz_YChi2red'][event_idx]
         
-        # Get real skewed Lorentzian parameters from ROOT file
-        x_skew_lorentz_center = data['Fit2D_SkewLorentz_XCenter'][event_idx]
-        x_skew_lorentz_gamma = data['Fit2D_SkewLorentz_XGamma'][event_idx]  # This is actually Beta
-        x_skew_lorentz_amplitude = data['Fit2D_SkewLorentz_XAmplitude'][event_idx]
-        x_skew_lorentz_skewness = data['Fit2D_SkewLorentz_XSkewness'][event_idx]  # This is actually Lambda
-        x_skew_lorentz_chi2red = data['Fit2D_SkewLorentz_XChi2red'][event_idx]
-        
-        y_skew_lorentz_center = data['Fit2D_SkewLorentz_YCenter'][event_idx]
-        y_skew_lorentz_gamma = data['Fit2D_SkewLorentz_YGamma'][event_idx]  # This is actually Beta
-        y_skew_lorentz_amplitude = data['Fit2D_SkewLorentz_YAmplitude'][event_idx]
-        y_skew_lorentz_skewness = data['Fit2D_SkewLorentz_YSkewness'][event_idx]  # This is actually Lambda
-        y_skew_lorentz_chi2red = data['Fit2D_SkewLorentz_YChi2red'][event_idx]
+        # Get skewed Lorentzian parameters only if available
+        if has_skewed_lorentz:
+            x_skew_lorentz_center = data['Fit2D_SkewLorentz_XCenter'][event_idx]
+            x_skew_lorentz_gamma = data['Fit2D_SkewLorentz_XGamma'][event_idx]  # This is actually Beta
+            x_skew_lorentz_amplitude = data['Fit2D_SkewLorentz_XAmplitude'][event_idx]
+            x_skew_lorentz_skewness = data['Fit2D_SkewLorentz_XSkewness'][event_idx]  # This is actually Lambda
+            x_skew_lorentz_chi2red = data['Fit2D_SkewLorentz_XChi2red'][event_idx]
+            
+            y_skew_lorentz_center = data['Fit2D_SkewLorentz_YCenter'][event_idx]
+            y_skew_lorentz_gamma = data['Fit2D_SkewLorentz_YGamma'][event_idx]  # This is actually Beta
+            y_skew_lorentz_amplitude = data['Fit2D_SkewLorentz_YAmplitude'][event_idx]
+            y_skew_lorentz_skewness = data['Fit2D_SkewLorentz_YSkewness'][event_idx]  # This is actually Lambda
+            y_skew_lorentz_chi2red = data['Fit2D_SkewLorentz_YChi2red'][event_idx]
         
         # Diagonal parameters (using Gaussian fits)
         main_diag_x_center = data['FitDiag_MainXCenter'][event_idx]
@@ -891,9 +906,11 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         
         # Create directories
         lorentzian_dir = os.path.join(output_dir, "lorentzian")
-        skewed_lorentzian_dir = os.path.join(output_dir, "skewed_lorentzian")
         os.makedirs(lorentzian_dir, exist_ok=True)
-        os.makedirs(skewed_lorentzian_dir, exist_ok=True)
+        
+        if has_skewed_lorentz:
+            skewed_lorentzian_dir = os.path.join(output_dir, "skewed_lorentzian")
+            os.makedirs(skewed_lorentzian_dir, exist_ok=True)
         
         def create_individual_plot(positions, charges, fit_params, true_pos, title, filename, fit_type='lorentzian'):
             """Helper to create individual plots."""
@@ -1000,47 +1017,48 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         # SKEWED LORENTZIAN INDIVIDUAL PLOTS
         # ============================================
         
-        # Row (X-direction) Skewed Lorentzian
-        if len(row_pos) >= 3:
-            x_skew_params = {'center': x_skew_lorentz_center, 'gamma': x_skew_lorentz_gamma, 
-                           'amplitude': x_skew_lorentz_amplitude, 'skewness': x_skew_lorentz_skewness}
-            create_individual_plot(row_pos, row_charges, x_skew_params, true_x,
-                                 'Row (X-direction) Skewed Lorentzian Fit',
-                                 os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_row.png'), 'skewed_lorentzian')
-        
-        # Column (Y-direction) Skewed Lorentzian
-        if len(col_pos) >= 3:
-            y_skew_params = {'center': y_skew_lorentz_center, 'gamma': y_skew_lorentz_gamma,
-                           'amplitude': y_skew_lorentz_amplitude, 'skewness': y_skew_lorentz_skewness}
-            create_individual_plot(col_pos, col_charges, y_skew_params, true_y,
-                                 'Column (Y-direction) Skewed Lorentzian Fit',
-                                 os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_column.png'), 'skewed_lorentzian')
-        
-        # Diagonal plots for Skewed Lorentzian - use Skewed Lorentzian fit on diagonal data
-        if len(main_x_pos) >= 3:
-            # Project skewed Lorentzian parameters to diagonal
-            main_x_skew_params = {'center': main_diag_x_center, 'gamma': main_diag_x_sigma, 'amplitude': main_diag_x_amplitude, 'skewness': x_skew_lorentz_skewness}
-            create_individual_plot(main_x_pos, main_x_charges, main_x_skew_params, true_x,
-                                 'Main Diagonal X Skewed Lorentzian Fit',
-                                 os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_diag_main_x.png'), 'skewed_lorentzian')
-        
-        if len(main_y_pos) >= 3:
-            main_y_skew_params = {'center': main_diag_y_center, 'gamma': main_diag_y_sigma, 'amplitude': main_diag_y_amplitude, 'skewness': y_skew_lorentz_skewness}
-            create_individual_plot(main_y_pos, main_y_charges, main_y_skew_params, true_y,
-                                 'Main Diagonal Y Skewed Lorentzian Fit',
-                                 os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_diag_main_y.png'), 'skewed_lorentzian')
-        
-        if len(sec_x_pos) >= 3:
-            sec_x_skew_params = {'center': sec_diag_x_center, 'gamma': sec_diag_x_sigma, 'amplitude': sec_diag_x_amplitude, 'skewness': x_skew_lorentz_skewness}
-            create_individual_plot(sec_x_pos, sec_x_charges, sec_x_skew_params, true_x,
-                                 'Secondary Diagonal X Skewed Lorentzian Fit',
-                                 os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_diag_sec_x.png'), 'skewed_lorentzian')
-        
-        if len(sec_y_pos) >= 3:
-            sec_y_skew_params = {'center': sec_diag_y_center, 'gamma': sec_diag_y_sigma, 'amplitude': sec_diag_y_amplitude, 'skewness': y_skew_lorentz_skewness}
-            create_individual_plot(sec_y_pos, sec_y_charges, sec_y_skew_params, true_y,
-                                 'Secondary Diagonal Y Skewed Lorentzian Fit',
-                                 os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_diag_sec_y.png'), 'skewed_lorentzian')
+        if has_skewed_lorentz:
+            # Row (X-direction) Skewed Lorentzian
+            if len(row_pos) >= 3:
+                x_skew_params = {'center': x_skew_lorentz_center, 'gamma': x_skew_lorentz_gamma, 
+                               'amplitude': x_skew_lorentz_amplitude, 'skewness': x_skew_lorentz_skewness}
+                create_individual_plot(row_pos, row_charges, x_skew_params, true_x,
+                                     'Row (X-direction) Skewed Lorentzian Fit',
+                                     os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_row.png'), 'skewed_lorentzian')
+            
+            # Column (Y-direction) Skewed Lorentzian
+            if len(col_pos) >= 3:
+                y_skew_params = {'center': y_skew_lorentz_center, 'gamma': y_skew_lorentz_gamma,
+                               'amplitude': y_skew_lorentz_amplitude, 'skewness': y_skew_lorentz_skewness}
+                create_individual_plot(col_pos, col_charges, y_skew_params, true_y,
+                                     'Column (Y-direction) Skewed Lorentzian Fit',
+                                     os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_column.png'), 'skewed_lorentzian')
+            
+            # Diagonal plots for Skewed Lorentzian - use Skewed Lorentzian fit on diagonal data
+            if len(main_x_pos) >= 3:
+                # Project skewed Lorentzian parameters to diagonal
+                main_x_skew_params = {'center': main_diag_x_center, 'gamma': main_diag_x_sigma, 'amplitude': main_diag_x_amplitude, 'skewness': x_skew_lorentz_skewness}
+                create_individual_plot(main_x_pos, main_x_charges, main_x_skew_params, true_x,
+                                     'Main Diagonal X Skewed Lorentzian Fit',
+                                     os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_diag_main_x.png'), 'skewed_lorentzian')
+            
+            if len(main_y_pos) >= 3:
+                main_y_skew_params = {'center': main_diag_y_center, 'gamma': main_diag_y_sigma, 'amplitude': main_diag_y_amplitude, 'skewness': y_skew_lorentz_skewness}
+                create_individual_plot(main_y_pos, main_y_charges, main_y_skew_params, true_y,
+                                     'Main Diagonal Y Skewed Lorentzian Fit',
+                                     os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_diag_main_y.png'), 'skewed_lorentzian')
+            
+            if len(sec_x_pos) >= 3:
+                sec_x_skew_params = {'center': sec_diag_x_center, 'gamma': sec_diag_x_sigma, 'amplitude': sec_diag_x_amplitude, 'skewness': x_skew_lorentz_skewness}
+                create_individual_plot(sec_x_pos, sec_x_charges, sec_x_skew_params, true_x,
+                                     'Secondary Diagonal X Skewed Lorentzian Fit',
+                                     os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_diag_sec_x.png'), 'skewed_lorentzian')
+            
+            if len(sec_y_pos) >= 3:
+                sec_y_skew_params = {'center': sec_diag_y_center, 'gamma': sec_diag_y_sigma, 'amplitude': sec_diag_y_amplitude, 'skewness': y_skew_lorentz_skewness}
+                create_individual_plot(sec_y_pos, sec_y_charges, sec_y_skew_params, true_y,
+                                     'Secondary Diagonal Y Skewed Lorentzian Fit',
+                                     os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_diag_sec_y.png'), 'skewed_lorentzian')
         
         # ============================================
         # ALL LINES OVERPLOTTED - LORENTZIAN (All directions)
@@ -1139,97 +1157,98 @@ def create_gauss_fit_plot(event_idx, data, output_dir="plots", show_event_info=F
         # ============================================
         # ALL LINES OVERPLOTTED - SKEWED LORENTZIAN (All directions)
         # ============================================
-        fig_skew_all = plt.figure(figsize=(20, 15))
-        gs_skew_all = GridSpec(3, 2, hspace=0.4, wspace=0.3)
+        if has_skewed_lorentz:
+            fig_skew_all = plt.figure(figsize=(20, 15))
+            gs_skew_all = GridSpec(3, 2, hspace=0.4, wspace=0.3)
+            
+            # Row plot
+            if len(row_pos) >= 3:
+                ax_row = fig_skew_all.add_subplot(gs_skew_all[0, 0])
+                ax_row.errorbar(row_pos, row_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+                x_range = np.linspace(row_pos.min() - 0.1, row_pos.max() + 0.1, 200)
+                y_fit = skewed_lorentzian_1d(x_range, x_skew_lorentz_amplitude, x_skew_lorentz_center, x_skew_lorentz_gamma, x_skew_lorentz_skewness)
+                ax_row.plot(x_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={x_skew_lorentz_chi2red:.2f})')
+                ax_row.axvline(true_x, color='green', linestyle='--', label=f'True X = {true_x:.3f} mm')
+                ax_row.set_xlabel('X Position [mm]')
+                ax_row.set_ylabel('Charge [C]')
+                ax_row.set_title('Row (X-direction)')
+                ax_row.legend()
+                ax_row.grid(True, alpha=0.3)
+            
+            # Column plot
+            if len(col_pos) >= 3:
+                ax_col = fig_skew_all.add_subplot(gs_skew_all[0, 1])
+                ax_col.errorbar(col_pos, col_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+                y_range = np.linspace(col_pos.min() - 0.1, col_pos.max() + 0.1, 200)
+                y_fit = skewed_lorentzian_1d(y_range, y_skew_lorentz_amplitude, y_skew_lorentz_center, y_skew_lorentz_gamma, y_skew_lorentz_skewness)
+                ax_col.plot(y_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={y_skew_lorentz_chi2red:.2f})')
+                ax_col.axvline(true_y, color='green', linestyle='--', label=f'True Y = {true_y:.3f} mm')
+                ax_col.set_xlabel('Y Position [mm]')
+                ax_col.set_ylabel('Charge [C]')
+                ax_col.set_title('Column (Y-direction)')
+                ax_col.legend()
+                ax_col.grid(True, alpha=0.3)
+            
+            # Add diagonal plots for skewed Lorentzian - all lines overplotted
+            if len(main_x_pos) >= 3:
+                ax_main_x = fig_skew_all.add_subplot(gs_skew_all[1, 0])
+                ax_main_x.errorbar(main_x_pos, main_x_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+                x_range = np.linspace(main_x_pos.min() - 0.1, main_x_pos.max() + 0.1, 200)
+                y_fit = skewed_lorentzian_1d(x_range, main_diag_x_amplitude, main_diag_x_center, main_diag_x_sigma, x_skew_lorentz_skewness)
+                ax_main_x.plot(x_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={main_diag_x_chi2red:.2f})')
+                ax_main_x.axvline(true_x, color='green', linestyle='--', label=f'True X = {true_x:.3f} mm')
+                ax_main_x.set_xlabel('X Position [mm]')
+                ax_main_x.set_ylabel('Charge [C]')
+                ax_main_x.set_title('Main Diagonal X')
+                ax_main_x.legend()
+                ax_main_x.grid(True, alpha=0.3)
+            
+            if len(main_y_pos) >= 3:
+                ax_main_y = fig_skew_all.add_subplot(gs_skew_all[1, 1])
+                ax_main_y.errorbar(main_y_pos, main_y_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+                y_range = np.linspace(main_y_pos.min() - 0.1, main_y_pos.max() + 0.1, 200)
+                y_fit = skewed_lorentzian_1d(y_range, main_diag_y_amplitude, main_diag_y_center, main_diag_y_sigma, y_skew_lorentz_skewness)
+                ax_main_y.plot(y_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={main_diag_y_chi2red:.2f})')
+                ax_main_y.axvline(true_y, color='green', linestyle='--', label=f'True Y = {true_y:.3f} mm')
+                ax_main_y.set_xlabel('Y Position [mm]')
+                ax_main_y.set_ylabel('Charge [C]')
+                ax_main_y.set_title('Main Diagonal Y')
+                ax_main_y.legend()
+                ax_main_y.grid(True, alpha=0.3)
+            
+            if len(sec_x_pos) >= 3:
+                ax_sec_x = fig_skew_all.add_subplot(gs_skew_all[2, 0])
+                ax_sec_x.errorbar(sec_x_pos, sec_x_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+                x_range = np.linspace(sec_x_pos.min() - 0.1, sec_x_pos.max() + 0.1, 200)
+                y_fit = skewed_lorentzian_1d(x_range, sec_diag_x_amplitude, sec_diag_x_center, sec_diag_x_sigma, x_skew_lorentz_skewness)
+                ax_sec_x.plot(x_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={sec_diag_x_chi2red:.2f})')
+                ax_sec_x.axvline(true_x, color='green', linestyle='--', label=f'True X = {true_x:.3f} mm')
+                ax_sec_x.set_xlabel('X Position [mm]')
+                ax_sec_x.set_ylabel('Charge [C]')
+                ax_sec_x.set_title('Secondary Diagonal X')
+                ax_sec_x.legend()
+                ax_sec_x.grid(True, alpha=0.3)
+            
+            if len(sec_y_pos) >= 3:
+                ax_sec_y = fig_skew_all.add_subplot(gs_skew_all[2, 1])
+                ax_sec_y.errorbar(sec_y_pos, sec_y_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+                y_range = np.linspace(sec_y_pos.min() - 0.1, sec_y_pos.max() + 0.1, 200)
+                y_fit = skewed_lorentzian_1d(y_range, sec_diag_y_amplitude, sec_diag_y_center, sec_diag_y_sigma, y_skew_lorentz_skewness)
+                ax_sec_y.plot(y_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={sec_diag_y_chi2red:.2f})')
+                ax_sec_y.axvline(true_y, color='green', linestyle='--', label=f'True Y = {true_y:.3f} mm')
+                ax_sec_y.set_xlabel('Y Position [mm]')
+                ax_sec_y.set_ylabel('Charge [C]')
+                ax_sec_y.set_title('Secondary Diagonal Y')
+                ax_sec_y.legend()
+                ax_sec_y.grid(True, alpha=0.3)
+            
+            plt.suptitle(f'Event {event_idx}: Skewed Lorentzian Fits (All Directions)', fontsize=16)
+            plt.tight_layout()
+            plt.savefig(os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_all_skewed_lorentzian.png'), 
+                       dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
         
-        # Row plot
-        if len(row_pos) >= 3:
-            ax_row = fig_skew_all.add_subplot(gs_skew_all[0, 0])
-            ax_row.errorbar(row_pos, row_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
-            x_range = np.linspace(row_pos.min() - 0.1, row_pos.max() + 0.1, 200)
-            y_fit = skewed_lorentzian_1d(x_range, x_skew_lorentz_amplitude, x_skew_lorentz_center, x_skew_lorentz_gamma, x_skew_lorentz_skewness)
-            ax_row.plot(x_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={x_skew_lorentz_chi2red:.2f})')
-            ax_row.axvline(true_x, color='green', linestyle='--', label=f'True X = {true_x:.3f} mm')
-            ax_row.set_xlabel('X Position [mm]')
-            ax_row.set_ylabel('Charge [C]')
-            ax_row.set_title('Row (X-direction)')
-            ax_row.legend()
-            ax_row.grid(True, alpha=0.3)
-        
-        # Column plot
-        if len(col_pos) >= 3:
-            ax_col = fig_skew_all.add_subplot(gs_skew_all[0, 1])
-            ax_col.errorbar(col_pos, col_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
-            y_range = np.linspace(col_pos.min() - 0.1, col_pos.max() + 0.1, 200)
-            y_fit = skewed_lorentzian_1d(y_range, y_skew_lorentz_amplitude, y_skew_lorentz_center, y_skew_lorentz_gamma, y_skew_lorentz_skewness)
-            ax_col.plot(y_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={y_skew_lorentz_chi2red:.2f})')
-            ax_col.axvline(true_y, color='green', linestyle='--', label=f'True Y = {true_y:.3f} mm')
-            ax_col.set_xlabel('Y Position [mm]')
-            ax_col.set_ylabel('Charge [C]')
-            ax_col.set_title('Column (Y-direction)')
-            ax_col.legend()
-            ax_col.grid(True, alpha=0.3)
-        
-        # Add diagonal plots for skewed Lorentzian - all lines overplotted
-        if len(main_x_pos) >= 3:
-            ax_main_x = fig_skew_all.add_subplot(gs_skew_all[1, 0])
-            ax_main_x.errorbar(main_x_pos, main_x_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
-            x_range = np.linspace(main_x_pos.min() - 0.1, main_x_pos.max() + 0.1, 200)
-            y_fit = skewed_lorentzian_1d(x_range, main_diag_x_amplitude, main_diag_x_center, main_diag_x_sigma, x_skew_lorentz_skewness)
-            ax_main_x.plot(x_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={main_diag_x_chi2red:.2f})')
-            ax_main_x.axvline(true_x, color='green', linestyle='--', label=f'True X = {true_x:.3f} mm')
-            ax_main_x.set_xlabel('X Position [mm]')
-            ax_main_x.set_ylabel('Charge [C]')
-            ax_main_x.set_title('Main Diagonal X')
-            ax_main_x.legend()
-            ax_main_x.grid(True, alpha=0.3)
-        
-        if len(main_y_pos) >= 3:
-            ax_main_y = fig_skew_all.add_subplot(gs_skew_all[1, 1])
-            ax_main_y.errorbar(main_y_pos, main_y_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
-            y_range = np.linspace(main_y_pos.min() - 0.1, main_y_pos.max() + 0.1, 200)
-            y_fit = skewed_lorentzian_1d(y_range, main_diag_y_amplitude, main_diag_y_center, main_diag_y_sigma, y_skew_lorentz_skewness)
-            ax_main_y.plot(y_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={main_diag_y_chi2red:.2f})')
-            ax_main_y.axvline(true_y, color='green', linestyle='--', label=f'True Y = {true_y:.3f} mm')
-            ax_main_y.set_xlabel('Y Position [mm]')
-            ax_main_y.set_ylabel('Charge [C]')
-            ax_main_y.set_title('Main Diagonal Y')
-            ax_main_y.legend()
-            ax_main_y.grid(True, alpha=0.3)
-        
-        if len(sec_x_pos) >= 3:
-            ax_sec_x = fig_skew_all.add_subplot(gs_skew_all[2, 0])
-            ax_sec_x.errorbar(sec_x_pos, sec_x_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
-            x_range = np.linspace(sec_x_pos.min() - 0.1, sec_x_pos.max() + 0.1, 200)
-            y_fit = skewed_lorentzian_1d(x_range, sec_diag_x_amplitude, sec_diag_x_center, sec_diag_x_sigma, x_skew_lorentz_skewness)
-            ax_sec_x.plot(x_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={sec_diag_x_chi2red:.2f})')
-            ax_sec_x.axvline(true_x, color='green', linestyle='--', label=f'True X = {true_x:.3f} mm')
-            ax_sec_x.set_xlabel('X Position [mm]')
-            ax_sec_x.set_ylabel('Charge [C]')
-            ax_sec_x.set_title('Secondary Diagonal X')
-            ax_sec_x.legend()
-            ax_sec_x.grid(True, alpha=0.3)
-        
-        if len(sec_y_pos) >= 3:
-            ax_sec_y = fig_skew_all.add_subplot(gs_skew_all[2, 1])
-            ax_sec_y.errorbar(sec_y_pos, sec_y_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
-            y_range = np.linspace(sec_y_pos.min() - 0.1, sec_y_pos.max() + 0.1, 200)
-            y_fit = skewed_lorentzian_1d(y_range, sec_diag_y_amplitude, sec_diag_y_center, sec_diag_y_sigma, y_skew_lorentz_skewness)
-            ax_sec_y.plot(y_range, y_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={sec_diag_y_chi2red:.2f})')
-            ax_sec_y.axvline(true_y, color='green', linestyle='--', label=f'True Y = {true_y:.3f} mm')
-            ax_sec_y.set_xlabel('Y Position [mm]')
-            ax_sec_y.set_ylabel('Charge [C]')
-            ax_sec_y.set_title('Secondary Diagonal Y')
-            ax_sec_y.legend()
-            ax_sec_y.grid(True, alpha=0.3)
-        
-        plt.suptitle(f'Event {event_idx}: Skewed Lorentzian Fits (All Directions)', fontsize=16)
-        plt.tight_layout()
-        plt.savefig(os.path.join(skewed_lorentzian_dir, f'event_{event_idx:04d}_all_skewed_lorentzian.png'), 
-                   dpi=300, bbox_inches='tight', facecolor='white')
-        plt.close()
-        
-        return f"Event {event_idx}: Lorentzian and Skewed Lorentzian plots created successfully"
+        return f"Event {event_idx}: Lorentzian{' and Skewed Lorentzian' if has_skewed_lorentz else ''} plots created successfully"
         
     except Exception as e:
         return f"Event {event_idx}: Error creating plots - {e}"
@@ -1392,6 +1411,166 @@ def create_summary_plots(data, output_dir, max_events):
     """
     print(f"Summary plots functionality not yet implemented (would process up to {max_events} events)")
     return "Summary plots placeholder completed"
+
+def create_comparison_plot(event_idx, data, output_dir="plots"):
+    """
+    Create comparison plots between Lorentzian and Skewed Lorentzian fits for a single event.
+    """
+    try:
+        # Check if skewed Lorentzian data is available
+        has_skewed_lorentz = all(key in data for key in [
+            'Fit2D_SkewLorentz_XCenter', 'Fit2D_SkewLorentz_YCenter',
+            'Fit2D_SkewLorentz_XGamma', 'Fit2D_SkewLorentz_YGamma'
+        ])
+        
+        if not has_skewed_lorentz:
+            return f"Event {event_idx}: Skewed Lorentzian data not available, skipping comparison plot"
+        
+        # Extract all data
+        (row_pos, row_charges), (col_pos, col_charges) = extract_row_column_data(event_idx, data)
+        (main_x_pos, main_x_charges), (main_y_pos, main_y_charges), (sec_x_pos, sec_x_charges), (sec_y_pos, sec_y_charges) = extract_diagonal_data(event_idx, data)
+        
+        if len(row_pos) < 3 and len(col_pos) < 3:
+            return f"Event {event_idx}: Not enough data points for comparison"
+        
+        # Get Lorentzian fit parameters
+        x_lorentz_center = data['Fit2D_Lorentz_XCenter'][event_idx]
+        x_lorentz_gamma = data['Fit2D_Lorentz_XGamma'][event_idx]
+        x_lorentz_amplitude = data['Fit2D_Lorentz_XAmplitude'][event_idx]
+        x_lorentz_chi2red = data['Fit2D_Lorentz_XChi2red'][event_idx]
+        
+        y_lorentz_center = data['Fit2D_Lorentz_YCenter'][event_idx]
+        y_lorentz_gamma = data['Fit2D_Lorentz_YGamma'][event_idx]
+        y_lorentz_amplitude = data['Fit2D_Lorentz_YAmplitude'][event_idx]
+        y_lorentz_chi2red = data['Fit2D_Lorentz_YChi2red'][event_idx]
+        
+        # Get Skewed Lorentzian fit parameters (now using real data!)
+        x_skew_center = data['Fit2D_SkewLorentz_XCenter'][event_idx]
+        x_skew_gamma = data['Fit2D_SkewLorentz_XGamma'][event_idx]  # This is actually Beta
+        x_skew_amplitude = data['Fit2D_SkewLorentz_XAmplitude'][event_idx]
+        x_skew_skewness = data['Fit2D_SkewLorentz_XSkewness'][event_idx]  # This is actually Lambda
+        x_skew_chi2red = data['Fit2D_SkewLorentz_XChi2red'][event_idx]
+        
+        y_skew_center = data['Fit2D_SkewLorentz_YCenter'][event_idx]
+        y_skew_gamma = data['Fit2D_SkewLorentz_YGamma'][event_idx]  # This is actually Beta
+        y_skew_amplitude = data['Fit2D_SkewLorentz_YAmplitude'][event_idx]
+        y_skew_skewness = data['Fit2D_SkewLorentz_YSkewness'][event_idx]  # This is actually Lambda
+        y_skew_chi2red = data['Fit2D_SkewLorentz_YChi2red'][event_idx]
+        
+        # True positions
+        true_x = data['TrueX'][event_idx]
+        true_y = data['TrueY'][event_idx]
+        
+        # Create comparison directory
+        comparison_dir = os.path.join(output_dir, "lorentzian_vs_skewed")
+        os.makedirs(comparison_dir, exist_ok=True)
+        
+        created_comparisons = []
+        
+        # Row comparison
+        if len(row_pos) >= 3:
+            fig, ax = plt.subplots(figsize=(12, 8))
+            
+            # Plot data
+            ax.errorbar(row_pos, row_charges, fmt='ko', markersize=8, capsize=4, label='Data', alpha=0.8)
+            
+            # Plot fits
+            x_range = np.linspace(row_pos.min() - 0.1, row_pos.max() + 0.1, 200)
+            lorentz_fit = lorentzian_1d(x_range, x_lorentz_amplitude, x_lorentz_center, x_lorentz_gamma)
+            skew_fit = skewed_lorentzian_1d(x_range, x_skew_amplitude, x_skew_center, x_skew_gamma, x_skew_skewness)
+            
+            ax.plot(x_range, lorentz_fit, 'r--', linewidth=2.5, label=f'Lorentzian (χ²={x_lorentz_chi2red:.2f})', alpha=0.9)
+            ax.plot(x_range, skew_fit, 'm-', linewidth=2.5, label=f'Skewed Lorentzian (χ²={x_skew_chi2red:.2f})', alpha=0.9)
+            
+            # Add true position
+            ax.axvline(true_x, color='green', linestyle='--', linewidth=2, label=f'True X = {true_x:.3f} mm', alpha=0.8)
+            
+            ax.set_xlabel('X Position [mm]')
+            ax.set_ylabel('Charge [C]')
+            ax.set_title(f'Event {event_idx}: Row (X-direction) Comparison')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            
+            plt.savefig(os.path.join(comparison_dir, f'event_{event_idx:04d}_row_comparison.png'), 
+                       dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+            created_comparisons.append('Row comparison')
+        
+        # Column comparison
+        if len(col_pos) >= 3:
+            fig, ax = plt.subplots(figsize=(12, 8))
+            
+            # Plot data
+            ax.errorbar(col_pos, col_charges, fmt='ko', markersize=8, capsize=4, label='Data', alpha=0.8)
+            
+            # Plot fits
+            y_range = np.linspace(col_pos.min() - 0.1, col_pos.max() + 0.1, 200)
+            lorentz_fit = lorentzian_1d(y_range, y_lorentz_amplitude, y_lorentz_center, y_lorentz_gamma)
+            skew_fit = skewed_lorentzian_1d(y_range, y_skew_amplitude, y_skew_center, y_skew_gamma, y_skew_skewness)
+            
+            ax.plot(y_range, lorentz_fit, 'r--', linewidth=2.5, label=f'Lorentzian (χ²={y_lorentz_chi2red:.2f})', alpha=0.9)
+            ax.plot(y_range, skew_fit, 'm-', linewidth=2.5, label=f'Skewed Lorentzian (χ²={y_skew_chi2red:.2f})', alpha=0.9)
+            
+            # Add true position
+            ax.axvline(true_y, color='green', linestyle='--', linewidth=2, label=f'True Y = {true_y:.3f} mm', alpha=0.8)
+            
+            ax.set_xlabel('Y Position [mm]')
+            ax.set_ylabel('Charge [C]')
+            ax.set_title(f'Event {event_idx}: Column (Y-direction) Comparison')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            
+            plt.savefig(os.path.join(comparison_dir, f'event_{event_idx:04d}_column_comparison.png'), 
+                       dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+            created_comparisons.append('Column comparison')
+        
+        # Combined comparison plot
+        if len(row_pos) >= 3 and len(col_pos) >= 3:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+            
+            # Row subplot
+            ax1.errorbar(row_pos, row_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+            x_range = np.linspace(row_pos.min() - 0.1, row_pos.max() + 0.1, 200)
+            lorentz_fit = lorentzian_1d(x_range, x_lorentz_amplitude, x_lorentz_center, x_lorentz_gamma)
+            skew_fit = skewed_lorentzian_1d(x_range, x_skew_amplitude, x_skew_center, x_skew_gamma, x_skew_skewness)
+            ax1.plot(x_range, lorentz_fit, 'r--', linewidth=2, label=f'Lorentzian (χ²={x_lorentz_chi2red:.2f})')
+            ax1.plot(x_range, skew_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={x_skew_chi2red:.2f})')
+            ax1.axvline(true_x, color='green', linestyle='--', label=f'True X = {true_x:.3f} mm')
+            ax1.set_xlabel('X Position [mm]')
+            ax1.set_ylabel('Charge [C]')
+            ax1.set_title('Row (X-direction)')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+            
+            # Column subplot
+            ax2.errorbar(col_pos, col_charges, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+            y_range = np.linspace(col_pos.min() - 0.1, col_pos.max() + 0.1, 200)
+            lorentz_fit = lorentzian_1d(y_range, y_lorentz_amplitude, y_lorentz_center, y_lorentz_gamma)
+            skew_fit = skewed_lorentzian_1d(y_range, y_skew_amplitude, y_skew_center, y_skew_gamma, y_skew_skewness)
+            ax2.plot(y_range, lorentz_fit, 'r--', linewidth=2, label=f'Lorentzian (χ²={y_lorentz_chi2red:.2f})')
+            ax2.plot(y_range, skew_fit, 'm-', linewidth=2, label=f'Skewed Lorentzian (χ²={y_skew_chi2red:.2f})')
+            ax2.axvline(true_y, color='green', linestyle='--', label=f'True Y = {true_y:.3f} mm')
+            ax2.set_xlabel('Y Position [mm]')
+            ax2.set_ylabel('Charge [C]')
+            ax2.set_title('Column (Y-direction)')
+            ax2.legend()
+            ax2.grid(True, alpha=0.3)
+            
+            plt.suptitle(f'Event {event_idx}: Lorentzian vs Skewed Lorentzian Comparison', fontsize=16)
+            plt.tight_layout()
+            plt.savefig(os.path.join(comparison_dir, f'event_{event_idx:04d}_all_comparison.png'), 
+                       dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+            created_comparisons.append('All directions comparison')
+        
+        if created_comparisons:
+            return f"Event {event_idx}: {' and '.join(created_comparisons)} saved to lorentzian_vs_skewed directory"
+        else:
+            return f"Event {event_idx}: No comparison plots created (insufficient data)"
+            
+    except Exception as e:
+        return f"Event {event_idx}: Error creating comparison plot - {e}"
 
 def main():
     """Main function for command line execution."""
