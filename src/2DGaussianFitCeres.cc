@@ -497,7 +497,7 @@ struct WeightingConfig {
     double max_central_pixel_uncertainty = 10.0;     // Maximum uncertainty multiplier for central pixel
     
     // Distance-based weighting parameters (technique #2)
-    double distance_scale_d0 = 30.0;                 // d₀ parameter: w_i ∝ 1/(1 + d_i/d₀) [μm] (tightest for Gaussian)
+    double distance_scale_d0 = 10.0;                 // d₀ parameter: w_i ∝ 1/(1 + d_i/d₀) [μm] (physics d₀ = 10 µm)
     double distance_weight_cap = 8.0;                // Maximum distance-based weight multiplier
     
     // Robust loss parameters (technique #3)
@@ -604,13 +604,8 @@ std::vector<double> CalculateDataWeights(const std::vector<double>& x_vals,
         double distance_weight = 1.0;
         if (config.enable_distance_based_weights && estimates.sigma > 0) {
             double dx = std::abs(x_vals[i] - estimates.center);
-            
-            // Implement the exact formula: w_i ∝ 1/(1 + d_i/d₀)
-            // This naturally gives more weight to pixels closer to the current center estimate
-            // which helps with convergence while still allowing position refinement
-            distance_weight = 1.0 / (1.0 + dx / config.distance_scale_d0);
-            
-            // Apply configurable cap to prevent extreme weighting
+            double d0_scaled = config.distance_scale_d0 * (pixel_spacing / 50.0);
+            distance_weight = 1.0 / (1.0 + dx / d0_scaled);
             distance_weight = std::min(config.distance_weight_cap, distance_weight);
         }
         
@@ -746,8 +741,21 @@ std::vector<double> CalculateDataWeights(const std::vector<double>& x_vals,
             profile_weight = std::max(0.05, profile_weight); // Allow more aggressive downweighting
         }
         
-        // Combine all weighting factors including horizontal error correction
-        weight = charge_weight * distance_weight * spatial_weight * profile_weight * 
+        // ---- Analytic charge-sharing base weight ---------------------------------
+        const double dx_distance = std::abs(x_vals[i] - estimates.center);
+        const double l_pixel     = pixel_spacing;                       // approximate pad length
+        const double num_cs      = (l_pixel * 0.5) * 1.41421356237;    // (l/2)*√2
+        const double denom_cs    = num_cs + dx_distance;
+        const double alpha_cs    = std::atan(num_cs / std::max(1e-12, denom_cs)); // solid angle term
+        // Scale d0 with pixel spacing so that d0 remains 0.2·pitch for any line orientation
+        const double d0_cs       = std::max(1e-6, config.distance_scale_d0 * (pixel_spacing / 50.0));
+        double       log_term    = std::log(std::max(1e-6, dx_distance) / d0_cs);
+        if (std::abs(log_term) < 1e-6) log_term = (log_term < 0 ? -1e-6 : 1e-6);
+        const double cs_weight   = alpha_cs / std::abs(log_term);
+        // -------------------------------------------------------------------------
+        
+        // Combine all weighting factors (analytic charge-sharing base + modifiers)
+        weight = cs_weight * charge_weight * spatial_weight * profile_weight * 
                 edge_weight * horizontal_error_weight * spatial_error_weight * correlation_weight;
         
         // Ensure weight is reasonable and apply final normalization
@@ -770,7 +778,7 @@ std::vector<double> CalculateDataWeights(const std::vector<double>& x_vals,
 //    - Prevents highest-charge pixel from dominating position reconstruction
 // 
 // 2. DISTANCE-BASED WEIGHTING
-//    - Formula: w_i ∝ 1/(1 + d_i/d₀) where d₀ = 30μm for Gaussian (tightest)
+//    - Formula: w_i ∝ 1/(1 + d_i/d₀) where d₀ = 10μm (physics d₀ value)
 //    - Gives more weight to pixels closer to current center estimate
 //    - Stabilizes convergence while allowing position refinement
 //    - Caps maximum weight at 8x to prevent extreme values
@@ -1326,6 +1334,9 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     // Tolerance for grouping pixels into diagonals
     double tolerance = pixel_spacing * 0.1;
     
+    // Effective centre-to-centre pitch along a ±45° diagonal is √2 times the horizontal pitch.
+    const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // ≈ √2
+    
     // Group pixels by diagonal lines
     std::map<double, std::vector<std::pair<double, double>>> main_diagonal_data; // main_diag_id -> [(x, charge), (y, charge)]
     std::map<double, std::vector<std::pair<double, double>>> sec_diagonal_data;  // sec_diag_id -> [(x, charge), (y, charge)]
@@ -1437,7 +1448,7 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
             }
             
             main_diag_x_success = FitGaussianCeres(
-                x_sorted, charge_x_sorted, center_x_estimate, pixel_spacing,
+                x_sorted, charge_x_sorted, 0.0, diag_pixel_spacing,
                 result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_sigma, result.main_diag_x_vertical_offset,
                 result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_sigma_err, result.main_diag_x_vertical_offset_err,
                 result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
@@ -1482,7 +1493,7 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
             }
             
             main_diag_y_success = FitGaussianCeres(
-                y_sorted, charge_y_sorted, center_y_estimate, pixel_spacing,
+                y_sorted, charge_y_sorted, 0.0, diag_pixel_spacing,
                 result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_sigma, result.main_diag_y_vertical_offset,
                 result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_sigma_err, result.main_diag_y_vertical_offset_err,
                 result.main_diag_y_chi2red, verbose, enable_outlier_filtering);
@@ -1527,7 +1538,7 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
             }
             
             sec_diag_x_success = FitGaussianCeres(
-                x_sorted, charge_x_sorted, center_x_estimate, pixel_spacing,
+                x_sorted, charge_x_sorted, 0.0, diag_pixel_spacing,
                 result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_sigma, result.sec_diag_x_vertical_offset,
                 result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_sigma_err, result.sec_diag_x_vertical_offset_err,
                 result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
@@ -1572,7 +1583,7 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
             }
             
             sec_diag_y_success = FitGaussianCeres(
-                y_sorted, charge_y_sorted, center_y_estimate, pixel_spacing,
+                y_sorted, charge_y_sorted, 0.0, diag_pixel_spacing,
                 result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_sigma, result.sec_diag_y_vertical_offset,
                 result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_sigma_err, result.sec_diag_y_vertical_offset_err,
                 result.sec_diag_y_chi2red, verbose, enable_outlier_filtering);

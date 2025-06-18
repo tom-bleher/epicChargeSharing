@@ -262,6 +262,18 @@ bool FitSkewedLorentzianCeres(
         } else if (y_vals[i] < stats.q25) {
             weight = 0.5; // Lower weight for weak signals
         }
+        // Analytic charge-sharing weight (α_i / ln(d_i/d₀))
+        const double dx_distance = std::abs(x_vals[i] - center_estimate);
+        const double l_pixel     = pixel_spacing;
+        const double num_cs      = (l_pixel * 0.5) * 1.41421356237;
+        const double denom_cs    = num_cs + dx_distance;
+        const double alpha_cs    = std::atan(num_cs / std::max(1e-12, denom_cs));
+        const double d0_cs       = 10.0 * (pixel_spacing / 50.0); // scale with pitch
+        double       log_term    = std::log(std::max(1e-6, dx_distance) / d0_cs);
+        if (std::abs(log_term) < 1e-6) log_term = (log_term < 0 ? -1e-6 : 1e-6);
+        const double cs_weight   = alpha_cs / std::abs(log_term);
+        
+        weight *= cs_weight;  // combine analytic weight with adaptive signal strength scaling
         
         ceres::CostFunction* cost_function = ImprovedSkewedLorentzianCostFunction::Create(x_vals[i], y_vals[i], weight);
         problem.AddResidualBlock(cost_function, nullptr, parameters);
@@ -683,6 +695,9 @@ DiagonalSkewedLorentzianFitResultsCeres FitDiagonalSkewedLorentzianCeres(
         }
     }
     
+    // Effective centre-to-centre pitch along diagonal
+    const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // √2 × pitch
+
     // Create diagonal data arrays
     // Main diagonal: points where (x-center_x) ≈ (y-center_y)
     // Secondary diagonal: points where (x-center_x) ≈ -(y-center_y)
@@ -731,7 +746,7 @@ DiagonalSkewedLorentzianFitResultsCeres FitDiagonalSkewedLorentzianCeres(
         }
         
         result.main_diag_x_fit_successful = FitSkewedLorentzianCeres(
-            x_vals, y_vals, 0.0, pixel_spacing,
+            x_vals, y_vals, 0.0, diag_pixel_spacing,
             result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_beta, 
             result.main_diag_x_lambda, result.main_diag_x_gamma, result.main_diag_x_vertical_offset,
             result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_beta_err,
@@ -757,7 +772,7 @@ DiagonalSkewedLorentzianFitResultsCeres FitDiagonalSkewedLorentzianCeres(
         }
         
         result.main_diag_y_fit_successful = FitSkewedLorentzianCeres(
-            x_vals, y_vals, 0.0, pixel_spacing,
+            x_vals, y_vals, 0.0, diag_pixel_spacing,
             result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_beta,
             result.main_diag_y_lambda, result.main_diag_y_gamma, result.main_diag_y_vertical_offset,
             result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_beta_err,
@@ -783,7 +798,7 @@ DiagonalSkewedLorentzianFitResultsCeres FitDiagonalSkewedLorentzianCeres(
         }
         
         result.sec_diag_x_fit_successful = FitSkewedLorentzianCeres(
-            x_vals, y_vals, 0.0, pixel_spacing,
+            x_vals, y_vals, 0.0, diag_pixel_spacing,
             result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_beta,
             result.sec_diag_x_lambda, result.sec_diag_x_gamma, result.sec_diag_x_vertical_offset,
             result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_beta_err,
@@ -809,7 +824,7 @@ DiagonalSkewedLorentzianFitResultsCeres FitDiagonalSkewedLorentzianCeres(
         }
         
         result.sec_diag_y_fit_successful = FitSkewedLorentzianCeres(
-            x_vals, y_vals, 0.0, pixel_spacing,
+            x_vals, y_vals, 0.0, diag_pixel_spacing,
             result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_beta,
             result.sec_diag_y_lambda, result.sec_diag_y_gamma, result.sec_diag_y_vertical_offset,
             result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_beta_err,
