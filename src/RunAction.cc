@@ -1391,98 +1391,86 @@ void RunAction::TransformDiagonalCoordinates(G4double x_prime, G4double y_prime,
 
 void RunAction::CalculateTransformedDiagonalCoordinates()
 {
-    // NOTE:
-    // The centers obtained from the diagonal fits (main and secondary) are already
-    // expressed in the detector's global X–Y coordinate system because each fit
-    // was performed against the real X or Y pixel coordinates.  They therefore
-    // do NOT need to be rotated back into that system.  The previous
-    // implementation applied an additional ±45° rotation which distorted the
-    // reconstructed positions.  The transformed coordinates should simply be
-    // the fitted (x, y) centers themselves.  We now copy them directly and
-    // calculate the deltas with respect to the true hit position.
+    const double NaN = std::numeric_limits<G4double>::quiet_NaN();
+    const double invSqrt2 = 1.0 / 1.4142135623730951; // 1/√2
 
-    // ---------------------------------------------------------------------
-    // Main diagonal (slope +1)
-    // ---------------------------------------------------------------------
-    if (!std::isnan(fGaussFitMainDiagXCenter) && !std::isnan(fGaussFitMainDiagYCenter)) {
-        fGaussMainDiagTransformedX = fGaussFitMainDiagXCenter;
-        fGaussMainDiagTransformedY = fGaussFitMainDiagYCenter;
-        fGaussMainDiagTransformedDeltaX = fGaussMainDiagTransformedX - fTrueX;
-        fGaussMainDiagTransformedDeltaY = fGaussMainDiagTransformedY - fTrueY;
+    auto setXY = [&](double xPred, double yPred,
+                     double &outX, double &outY,
+                     double &deltaX, double &deltaY)
+    {
+        outX   = xPred;
+        outY   = yPred;
+        deltaX = std::isnan(xPred) ? NaN : (xPred - fTrueX);
+        deltaY = std::isnan(yPred) ? NaN : (yPred - fTrueY);
+    };
+
+    // ------------------
+    //   G A U S S I A N
+    // ------------------
+    // Fits return absolute positions along X/Y → no rotation needed
+    double gMainX = (fGaussFitMainDiagXDOF > 0) ? fGaussFitMainDiagXCenter : NaN;
+    double gMainY = (fGaussFitMainDiagYDOF > 0) ? fGaussFitMainDiagYCenter : NaN;
+    setXY(gMainX, gMainY,
+          fGaussMainDiagTransformedX, fGaussMainDiagTransformedY,
+          fGaussMainDiagTransformedDeltaX, fGaussMainDiagTransformedDeltaY);
+
+    double gSecX  = (fGaussFitSecondDiagXDOF > 0) ? fGaussFitSecondDiagXCenter : NaN;
+    double gSecY  = (fGaussFitSecondDiagYDOF > 0) ? fGaussFitSecondDiagYCenter : NaN;
+    setXY(gSecX, gSecY,
+          fGaussSecondDiagTransformedX, fGaussSecondDiagTransformedY,
+          fGaussSecondDiagTransformedDeltaX, fGaussSecondDiagTransformedDeltaY);
+
+    // ------------------
+    //   L O R E N T Z I A N
+    // ------------------
+    auto sToDxDyMain = [&](double s){ return std::make_pair(s*invSqrt2, s*invSqrt2); };
+    auto sToDxDySec  = [&](double s){ return std::make_pair(s*invSqrt2, -s*invSqrt2); };
+
+    // Main diagonal
+    double sMain = NaN;
+    if (fLorentzFitMainDiagXDOF > 0)       sMain = fLorentzFitMainDiagXCenter;
+    else if (fLorentzFitMainDiagYDOF > 0)  sMain = fLorentzFitMainDiagYCenter;
+    if (!std::isnan(sMain)) {
+        auto [dx,dy] = sToDxDyMain(sMain);
+        setXY(fPixelX+dx, fPixelY+dy,
+              fLorentzMainDiagTransformedX, fLorentzMainDiagTransformedY,
+              fLorentzMainDiagTransformedDeltaX, fLorentzMainDiagTransformedDeltaY);
     } else {
-        fGaussMainDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
-        fGaussMainDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
-        fGaussMainDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fGaussMainDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        setXY(NaN,NaN,
+              fLorentzMainDiagTransformedX, fLorentzMainDiagTransformedY,
+              fLorentzMainDiagTransformedDeltaX, fLorentzMainDiagTransformedDeltaY);
     }
 
-    if (!std::isnan(fLorentzFitMainDiagXCenter) && !std::isnan(fLorentzFitMainDiagYCenter)) {
-        fLorentzMainDiagTransformedX = fLorentzFitMainDiagXCenter;
-        fLorentzMainDiagTransformedY = fLorentzFitMainDiagYCenter;
-        fLorentzMainDiagTransformedDeltaX = fLorentzMainDiagTransformedX - fTrueX;
-        fLorentzMainDiagTransformedDeltaY = fLorentzMainDiagTransformedY - fTrueY;
+    // Secondary diagonal
+    double sSec = NaN;
+    if (fLorentzFitSecondDiagXDOF > 0)       sSec = fLorentzFitSecondDiagXCenter;
+    else if (fLorentzFitSecondDiagYDOF > 0)  sSec = fLorentzFitSecondDiagYCenter;
+    if (!std::isnan(sSec)) {
+        auto [dx,dy] = sToDxDySec(sSec);
+        setXY(fPixelX+dx, fPixelY+dy,
+              fLorentzSecondDiagTransformedX, fLorentzSecondDiagTransformedY,
+              fLorentzSecondDiagTransformedDeltaX, fLorentzSecondDiagTransformedDeltaY);
     } else {
-        fLorentzMainDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
-        fLorentzMainDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
-        fLorentzMainDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fLorentzMainDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        setXY(NaN,NaN,
+              fLorentzSecondDiagTransformedX, fLorentzSecondDiagTransformedY,
+              fLorentzSecondDiagTransformedDeltaX, fLorentzSecondDiagTransformedDeltaY);
     }
 
-    // ---------------------------------------------------------------------
-    // Secondary diagonal (slope ‑1)
-    // ---------------------------------------------------------------------
-    if (!std::isnan(fGaussFitSecondDiagXCenter) && !std::isnan(fGaussFitSecondDiagYCenter)) {
-        fGaussSecondDiagTransformedX = fGaussFitSecondDiagXCenter;
-        fGaussSecondDiagTransformedY = fGaussFitSecondDiagYCenter;
-        fGaussSecondDiagTransformedDeltaX = fGaussSecondDiagTransformedX - fTrueX;
-        fGaussSecondDiagTransformedDeltaY = fGaussSecondDiagTransformedY - fTrueY;
-    } else {
-        fGaussSecondDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
-        fGaussSecondDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
-        fGaussSecondDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fGaussSecondDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
+    // -------------------------------
+    // S K E W E D   L O R E N T Z I A N
+    // -------------------------------
+    // Centres are absolute coordinates (similar to Gaussian)
+    double skMainX = (fSkewedLorentzFitMainDiagXDOF > 0) ? fSkewedLorentzFitMainDiagXCenter : NaN;
+    double skMainY = (fSkewedLorentzFitMainDiagYDOF > 0) ? fSkewedLorentzFitMainDiagYCenter : NaN;
+    setXY(skMainX, skMainY,
+          fSkewedLorentzMainDiagTransformedX, fSkewedLorentzMainDiagTransformedY,
+          fSkewedLorentzMainDiagTransformedDeltaX, fSkewedLorentzMainDiagTransformedDeltaY);
 
-    if (!std::isnan(fLorentzFitSecondDiagXCenter) && !std::isnan(fLorentzFitSecondDiagYCenter)) {
-        fLorentzSecondDiagTransformedX = fLorentzFitSecondDiagXCenter;
-        fLorentzSecondDiagTransformedY = fLorentzFitSecondDiagYCenter;
-        fLorentzSecondDiagTransformedDeltaX = fLorentzSecondDiagTransformedX - fTrueX;
-        fLorentzSecondDiagTransformedDeltaY = fLorentzSecondDiagTransformedY - fTrueY;
-    } else {
-        fLorentzSecondDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
-        fLorentzSecondDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
-        fLorentzSecondDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fLorentzSecondDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
-
-    // ---------------------------------------------------------------------
-    // SKEWED LORENTZIAN DIAGONALS
-    // ---------------------------------------------------------------------
-    // Main diagonal (slope +1)
-    if (!std::isnan(fSkewedLorentzFitMainDiagXCenter) && !std::isnan(fSkewedLorentzFitMainDiagYCenter)) {
-        fSkewedLorentzMainDiagTransformedX = fSkewedLorentzFitMainDiagXCenter;
-        fSkewedLorentzMainDiagTransformedY = fSkewedLorentzFitMainDiagYCenter;
-        fSkewedLorentzMainDiagTransformedDeltaX = fSkewedLorentzMainDiagTransformedX - fTrueX;
-        fSkewedLorentzMainDiagTransformedDeltaY = fSkewedLorentzMainDiagTransformedY - fTrueY;
-    } else {
-        fSkewedLorentzMainDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
-        fSkewedLorentzMainDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
-        fSkewedLorentzMainDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fSkewedLorentzMainDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
-
-    // Secondary diagonal (slope -1)
-    if (!std::isnan(fSkewedLorentzFitSecondDiagXCenter) && !std::isnan(fSkewedLorentzFitSecondDiagYCenter)) {
-        fSkewedLorentzSecondDiagTransformedX = fSkewedLorentzFitSecondDiagXCenter;
-        fSkewedLorentzSecondDiagTransformedY = fSkewedLorentzFitSecondDiagYCenter;
-        fSkewedLorentzSecondDiagTransformedDeltaX = fSkewedLorentzSecondDiagTransformedX - fTrueX;
-        fSkewedLorentzSecondDiagTransformedDeltaY = fSkewedLorentzSecondDiagTransformedY - fTrueY;
-    } else {
-        fSkewedLorentzSecondDiagTransformedX = std::numeric_limits<G4double>::quiet_NaN();
-        fSkewedLorentzSecondDiagTransformedY = std::numeric_limits<G4double>::quiet_NaN();
-        fSkewedLorentzSecondDiagTransformedDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fSkewedLorentzSecondDiagTransformedDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
+    double skSecX  = (fSkewedLorentzFitSecondDiagXDOF > 0) ? fSkewedLorentzFitSecondDiagXCenter : NaN;
+    double skSecY  = (fSkewedLorentzFitSecondDiagYDOF > 0) ? fSkewedLorentzFitSecondDiagYCenter : NaN;
+    setXY(skSecX, skSecY,
+          fSkewedLorentzSecondDiagTransformedX, fSkewedLorentzSecondDiagTransformedY,
+          fSkewedLorentzSecondDiagTransformedDeltaX, fSkewedLorentzSecondDiagTransformedDeltaY);
 }
 
 void RunAction::CalculateMeanEstimations()
