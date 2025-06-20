@@ -1,5 +1,6 @@
 #include "2DGaussianFitCeres.hh"
 #include "CeresLoggingInit.hh"
+#include "Constants.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <cmath>
@@ -28,92 +29,23 @@ void InitializeCeres() {
     CeresLoggingInitializer::InitializeOnce();
 }
 
-// Enhanced cost function with pixel integration for more accurate modeling with horizontal errors
-struct PixelIntegratedGaussianCostFunction {
-    PixelIntegratedGaussianCostFunction(double pixel_center_x, double pixel_y, double pixel_size, 
-                                      double weight = 1.0, double horizontal_uncertainty = 0.0) 
-        : pixel_center_x_(pixel_center_x), pixel_y_(pixel_y), pixel_size_(pixel_size), 
-          weight_(weight), horizontal_uncertainty_(horizontal_uncertainty) {}
-    
-    template <typename T>
-    bool operator()(const T* const params, T* residual) const {
-        // params[0] = A (amplitude)
-        // params[1] = m (center)
-        // params[2] = sigma (width)
-        // params[3] = B (offset)
-        
-        const T& A = params[0];
-        const T& m = params[1];
-        const T& sigma = params[2];
-        const T& B = params[3];
-        
-        // Robust handling of sigma
-        T safe_sigma = ceres::abs(sigma);
-        if (safe_sigma < T(1e-12)) {
-            safe_sigma = T(1e-12);
-        }
-        
-        // Include horizontal uncertainty in effective sigma for pixel integration
-        // This models the fact that the true hit position within the pixel is uncertain
-        T effective_sigma = safe_sigma;
-        if (horizontal_uncertainty_ > 0) {
-            T horizontal_sigma = T(horizontal_uncertainty_);
-            // Combine fit sigma with horizontal positional uncertainty in quadrature
-            effective_sigma = ceres::sqrt(safe_sigma * safe_sigma + horizontal_sigma * horizontal_sigma);
-        }
-        
-        // Pixel integration using analytic formula for Gaussian integral with effective sigma
-        // ∫[x-Δx/2 to x+Δx/2] A*exp(-(t-m)²/(2σ_eff²)) dt + B*Δx
-        
-        T half_pixel = T(pixel_size_) / T(2.0);
-        T x_left = T(pixel_center_x_) - half_pixel;
-        T x_right = T(pixel_center_x_) + half_pixel;
-        
-        // Use error function for analytic integration with effective sigma
-        T sqrt_2_sigma = T(1.41421356237) * effective_sigma;
-        T erf_left = ceres::erf((x_left - m) / sqrt_2_sigma);
-        T erf_right = ceres::erf((x_right - m) / sqrt_2_sigma);
-        
-        // Integrated Gaussian: A * σ_eff * √(2π) * [erf(right) - erf(left)] / 2 + B * pixel_size
-        T sqrt_2pi_sigma = T(2.50662827463) * effective_sigma;
-        T integrated_gaussian = A * sqrt_2pi_sigma * (erf_right - erf_left) / T(2.0);
-        T baseline_contribution = B * T(pixel_size_);
-        
-        T predicted = integrated_gaussian + baseline_contribution;
-        
-        // Apply additional horizontal error weighting to residual
-        T effective_weight = T(weight_);
-        if (horizontal_uncertainty_ > 0) {
-            // Reduce weight for pixels with larger horizontal uncertainty
-            // This implements the "horizontal error" weighting described in the request
-            T uncertainty_factor = T(1.0) + T(horizontal_uncertainty_) / T(pixel_size_);
-            effective_weight /= uncertainty_factor;
-        }
-        
-        // Weighted residual with horizontal error correction
-        residual[0] = effective_weight * (predicted - T(pixel_y_));
-        
-        return true;
+// Calculate uncertainty as 5% of max charge in line (if enabled)
+double CalculateUncertainty(double max_charge_in_line) {
+    if (!Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
-    static ceres::CostFunction* Create(double pixel_center_x, double pixel_y, double pixel_size, 
-                                     double weight = 1.0, double horizontal_uncertainty = 0.0) {
-        return (new ceres::AutoDiffCostFunction<PixelIntegratedGaussianCostFunction, 1, 4>(
-            new PixelIntegratedGaussianCostFunction(pixel_center_x, pixel_y, pixel_size, weight, horizontal_uncertainty)));
-    }
-    
-private:
-    const double pixel_center_x_;
-    const double pixel_y_;
-    const double pixel_size_;
-    const double weight_;
-    const double horizontal_uncertainty_;
-};
+    // Uncertainty = 5% of max charge when enabled
+    double uncertainty = 0.05 * max_charge_in_line;
+    if (uncertainty < 1e-20) uncertainty = 1e-20; // Prevent division by zero (very small for coulomb range)
+    return uncertainty;
+}
 
-// Enhanced cost function for Gaussian fitting with better numerical stability
+// Gaussian cost function with uncertainty (5% of max charge)
+// Function form: y(x) = A * exp(-(x - m)^2 / (2 * σ^2)) + B
 struct GaussianCostFunction {
-    GaussianCostFunction(double x, double y, double weight = 1.0) 
-        : x_(x), y_(y), weight_(weight) {}
+    GaussianCostFunction(double x, double y, double uncertainty) 
+        : x_(x), y_(y), uncertainty_(uncertainty) {}
     
     template <typename T>
     bool operator()(const T* const params, T* residual) const {
@@ -146,21 +78,21 @@ struct GaussianCostFunction {
         
         T predicted = A * ceres::exp(exponent) + B;
         
-        // Weighted residual for robust fitting
-        residual[0] = T(weight_) * (predicted - T(y_));
+        // Residual divided by uncertainty (standard weighted least squares)
+        residual[0] = (predicted - T(y_)) / T(uncertainty_);
         
         return true;
     }
     
-    static ceres::CostFunction* Create(double x, double y, double weight = 1.0) {
+    static ceres::CostFunction* Create(double x, double y, double uncertainty) {
         return (new ceres::AutoDiffCostFunction<GaussianCostFunction, 1, 4>(
-            new GaussianCostFunction(x, y, weight)));
+            new GaussianCostFunction(x, y, uncertainty)));
     }
     
 private:
     const double x_;
     const double y_;
-    const double weight_;
+    const double uncertainty_;
 };
 
 // Advanced parameter estimation with physics-based initialization
@@ -462,308 +394,9 @@ std::pair<std::vector<double>, std::vector<double>> FilterOutliers(
     return std::make_pair(filtered_x, filtered_y);
 }
 
-// Enhanced weighting strategies for spatial uncertainty and bias reduction (Gaussian) with "horizontal errors"
-// Implements the specific techniques requested:
-// 1. Downweight central pixel: Assign larger uncertainty to highest-charge pixel
-// 2. Distance-based weights: w_i ∝ 1/(1 + d_i/d₀) where d_i is distance from current estimate
-// 3. Robust losses: Use Cauchy/Huber loss functions to moderate single pixel influence
-// 4. Pixel integration: Model pixel response by integrating over pixel area
-// 5. Spatial error maps: Position-dependent weighting based on reconstruction error maps
-struct WeightingConfig {
-    // Core horizontal error techniques
-    bool enable_central_pixel_downweight = true;      // Technique #1: Downweight central pixel
-    bool enable_distance_based_weights = true;        // Technique #2: Distance-based weighting
-    bool enable_robust_losses = true;                 // Technique #3: Robust loss functions
-    bool enable_pixel_integration = true;             // Technique #4: Pixel integration model
-    bool enable_spatial_error_maps = true;            // Technique #5: Spatial error maps
-    
-    // Advanced weighting features for enhanced performance
-    bool enable_spatial_uncertainty = true;           // Spatial uncertainty from pixel finite size
-    bool enable_adaptive_central_weighting = true;    // Adaptive central pixel downweighting
-    bool enable_edge_pixel_upweighting = true;        // Give edge pixels higher weight for position info
-    bool enable_robust_profile_weighting = true;      // Weight based on expected vs. measured profile
-    bool enable_iterative_reweighting = true;         // Iteratively update weights during fitting
-    bool enable_horizontal_error_correction = true;   // Implement horizontal errors from pixel integration
-    bool enable_systematic_bias_correction = true;    // Correct for systematic reconstruction bias
-    bool enable_adaptive_robust_losses = true;        // Adaptively select robust loss functions
-    bool enable_charge_weighted_uncertainty = true;   // Weight uncertainties by charge magnitude
-    bool enable_pixel_edge_uncertainty = true;        // Additional uncertainty for pixels near edges
-    bool enable_correlation_weighting = true;         // Weight based on inter-pixel correlations
-    bool enable_dynamic_loss_switching = true;        // Dynamically switch loss functions based on residuals
-    
-    // Horizontal error parameters (technique #1: central pixel downweighting)
-    double central_pixel_weight_factor = 0.08;        // Reduce central pixel weight to 8% (most aggressive for Gaussian)
-    double central_downweight_threshold = 1.8;        // Charge concentration threshold for adaptive downweighting
-    double max_central_pixel_uncertainty = 10.0;     // Maximum uncertainty multiplier for central pixel
-    
-    // Distance-based weighting parameters (technique #2)
-    double distance_scale_d0 = 10.0;                 // d₀ parameter: w_i ∝ 1/(1 + d_i/d₀) [μm] (physics d₀ = 10 µm)
-    double distance_weight_cap = 8.0;                // Maximum distance-based weight multiplier
-    
-    // Robust loss parameters (technique #3)
-    double robust_threshold_factor = 0.06;           // Threshold for robust loss functions (most aggressive for Gaussian)
-    double dynamic_loss_threshold = 2.0;             // Threshold for dynamic loss function switching [sigma]
-    
-    // Pixel integration parameters (technique #4)
-    double horizontal_error_scale = 0.6;             // Scale factor for horizontal errors (fraction of pixel size)
-    double spatial_uncertainty_factor = 0.5;        // Pixel size uncertainty factor for horizontal errors
-    double pixel_edge_uncertainty_factor = 1.0;     // Additional uncertainty for pixels near edges
-    double pixel_integration_samples = 5;           // Number of samples for pixel integration (when not using analytical)
-    
-    // Spatial error map parameters (technique #5)
-    double spatial_error_map_strength = 0.3;        // Strength of spatial error map corrections
-    double position_dependent_bias_scale = 0.25;    // Scale for position-dependent bias corrections
-    
-    // Additional parameters for enhanced performance
-    double edge_pixel_boost_factor = 2.0;           // Boost factor for edge pixels (increased for better position info)
-    double charge_uncertainty_floor = 0.02;         // Minimum relative charge uncertainty (2%)
-    double systematic_bias_strength = 0.4;          // Strength of systematic bias correction (strongest for Gaussian)
-    double correlation_radius = 1.5;                // Radius for inter-pixel correlation weighting [pixels]
-    double adaptive_weight_update_rate = 0.7;       // Rate for iterative weight updates
-};
 
-// Calculate weights for data points with enhanced spatial uncertainty handling
-std::vector<double> CalculateDataWeights(const std::vector<double>& x_vals,
-                                       const std::vector<double>& y_vals,
-                                       const ParameterEstimates& estimates,
-                                       double pixel_spacing = 50.0,
-                                       const WeightingConfig& config = WeightingConfig()) {
-    std::vector<double> weights(x_vals.size(), 1.0);
-    
-    DataStatistics stats = CalculateRobustStatistics(x_vals, y_vals);
-    if (!stats.valid) {
-        return weights;
-    }
-    
-    // Find the highest charge pixel (central pixel candidate) and charge statistics
-    size_t max_charge_idx = 0;
-    double max_charge = y_vals[0];
-    double total_charge = 0.0;
-    for (size_t i = 0; i < y_vals.size(); ++i) {
-        total_charge += y_vals[i];
-        if (y_vals[i] > max_charge) {
-            max_charge = y_vals[i];
-            max_charge_idx = i;
-        }
-    }
-    double mean_charge = total_charge / y_vals.size();
-    
-    // Identify edge pixels (those farthest from center estimate)
-    std::vector<std::pair<double, size_t>> distance_indices;
-    for (size_t i = 0; i < x_vals.size(); ++i) {
-        double dx = std::abs(x_vals[i] - estimates.center);
-        distance_indices.push_back(std::make_pair(dx, i));
-    }
-    std::sort(distance_indices.begin(), distance_indices.end(), std::greater<std::pair<double, size_t>>());
-    
-    // Mark edge pixels (top 30% by distance)
-    std::set<size_t> edge_pixel_indices;
-    size_t num_edge_pixels = std::max(1, static_cast<int>(x_vals.size() * 0.3));
-    for (size_t i = 0; i < num_edge_pixels && i < distance_indices.size(); ++i) {
-        edge_pixel_indices.insert(distance_indices[i].second);
-    }
-    
-    for (size_t i = 0; i < y_vals.size(); ++i) {
-        double weight = 1.0;
-        
-        // 1. Base weight by charge magnitude (higher charge = higher weight)
-        double charge_weight = std::sqrt(std::max(0.0, y_vals[i] - estimates.offset));
-        charge_weight = std::max(0.1, std::min(10.0, charge_weight / stats.mad));
-        
-        // 2. Enhanced central pixel downweighting strategy with systematic bias correction
-        if (config.enable_central_pixel_downweight && i == max_charge_idx) {
-            if (config.enable_adaptive_central_weighting) {
-                // Adaptive downweighting based on charge concentration
-                double charge_concentration = max_charge / mean_charge;
-                double adaptive_factor = config.central_pixel_weight_factor;
-                if (charge_concentration > config.central_downweight_threshold) {
-                    // More aggressive downweighting for highly concentrated charge
-                    adaptive_factor *= 0.6; // Stronger downweighting as requested
-                    
-                    // Apply systematic bias correction: central pixels tend to pull fits inward
-                    if (config.enable_systematic_bias_correction) {
-                        double bias_correction = 1.0 - config.systematic_bias_strength * 
-                                               (charge_concentration - config.central_downweight_threshold);
-                        adaptive_factor *= std::max(0.1, bias_correction);
-                    }
-                }
-                charge_weight *= adaptive_factor;
-                
-                // Additional uncertainty for central pixel to implement "horizontal errors"
-                if (config.enable_charge_weighted_uncertainty) {
-                    double uncertainty_multiplier = 1.0 + (charge_concentration - 1.0) * 0.5;
-                    uncertainty_multiplier = std::min(config.max_central_pixel_uncertainty, uncertainty_multiplier);
-                    charge_weight /= uncertainty_multiplier; // Larger uncertainty = smaller weight
-                }
-            } else {
-                charge_weight *= config.central_pixel_weight_factor;
-            }
-        }
-        
-        // 3. Enhanced distance-based weighting: w_i ∝ 1/(1 + d_i/d₀) for center estimation
-        double distance_weight = 1.0;
-        if (config.enable_distance_based_weights && estimates.sigma > 0) {
-            double dx = std::abs(x_vals[i] - estimates.center);
-            double d0_scaled = config.distance_scale_d0 * (pixel_spacing / 50.0);
-            distance_weight = 1.0 / (1.0 + dx / d0_scaled);
-            distance_weight = std::min(config.distance_weight_cap, distance_weight);
-        }
-        
-        // 4. Edge pixel upweighting for enhanced position sensitivity
-        double edge_weight = 1.0;
-        if (config.enable_edge_pixel_upweighting && edge_pixel_indices.count(i) > 0) {
-            edge_weight = config.edge_pixel_boost_factor;
-        }
-        
-        // 4. Spatial uncertainty and "horizontal errors": account for pixel integration area
-        double spatial_weight = 1.0;
-        if (config.enable_spatial_uncertainty) {
-            // Pixels have inherent spatial uncertainty due to finite size
-            // Add uncertainty proportional to pixel size - this is the "horizontal error"
-            double spatial_sigma = config.spatial_uncertainty_factor * pixel_spacing;
-            double total_sigma = std::sqrt(estimates.sigma * estimates.sigma + spatial_sigma * spatial_sigma);
-            
-            // Weight by inverse of total uncertainty
-            if (total_sigma > 0) {
-                spatial_weight = estimates.sigma / total_sigma;
-            }
-        }
-        
-        // 5. Enhanced horizontal error correction for pixel integration with edge effects
-        double horizontal_error_weight = 1.0;
-        if (config.enable_horizontal_error_correction) {
-            // Calculate horizontal error based on pixel position relative to estimated center
-            double dx = std::abs(x_vals[i] - estimates.center);
-            double pixel_edge_distance = pixel_spacing / 2.0;
-            
-            // Base horizontal uncertainty from pixel size (the fundamental "horizontal error")
-            double horizontal_error = config.horizontal_error_scale * pixel_spacing;
-            
-            // Additional uncertainty for pixels near pixel edges
-            if (config.enable_pixel_edge_uncertainty) {
-                double edge_proximity = std::max(0.0, pixel_edge_distance - (dx - pixel_edge_distance));
-                if (edge_proximity > 0) {
-                    double edge_factor = 1.0 + config.pixel_edge_uncertainty_factor * 
-                                        (edge_proximity / pixel_edge_distance);
-                    horizontal_error *= edge_factor;
-                }
-            }
-            
-            // If the pixel is at the edge relative to the fitted center, increase uncertainty
-            if (dx > pixel_edge_distance) {
-                horizontal_error *= (1.0 + (dx - pixel_edge_distance) / pixel_spacing);
-            }
-            
-            // Charge-dependent horizontal error: higher charge pixels have more precise position info
-            if (config.enable_charge_weighted_uncertainty) {
-                double charge_factor = std::max(config.charge_uncertainty_floor, 
-                                               1.0 / std::sqrt(y_vals[i] / mean_charge));
-                horizontal_error *= charge_factor;
-            }
-            
-            // Weight inversely proportional to horizontal error
-            horizontal_error_weight = 1.0 / (1.0 + horizontal_error / pixel_spacing);
-        }
-        
-        // 6. Spatial error maps for position-dependent weighting
-        double spatial_error_weight = 1.0;
-        if (config.enable_spatial_error_maps) {
-            // Model systematic position-dependent reconstruction errors
-            double dx = x_vals[i] - estimates.center;
-            double pixel_position_error = 0.0;
-            
-            // Near pixel center: minimal error
-            // Near pixel edges: increased error due to charge sharing
-            double normalized_distance = std::abs(dx) / (pixel_spacing / 2.0);
-            if (normalized_distance < 1.0) {
-                // Quadratic increase in error near pixel edges
-                pixel_position_error = config.position_dependent_bias_scale * 
-                                     normalized_distance * normalized_distance * pixel_spacing;
-            } else {
-                // Linear increase for pixels beyond immediate neighbors
-                pixel_position_error = config.position_dependent_bias_scale * 
-                                     (1.0 + (normalized_distance - 1.0)) * pixel_spacing;
-            }
-            
-            spatial_error_weight = 1.0 / (1.0 + config.spatial_error_map_strength * 
-                                         pixel_position_error / pixel_spacing);
-        }
-        
-        // 7. Inter-pixel correlation weighting
-        double correlation_weight = 1.0;
-        if (config.enable_correlation_weighting) {
-            // Weight based on local charge distribution consistency
-            double local_charge_variance = 0.0;
-            double local_charge_sum = 0.0;
-            int neighbor_count = 0;
-            
-            // Check neighboring pixels within correlation radius
-            for (size_t j = 0; j < y_vals.size(); ++j) {
-                if (i == j) continue;
-                double distance = std::abs(x_vals[j] - x_vals[i]) / pixel_spacing;
-                if (distance <= config.correlation_radius) {
-                    local_charge_sum += y_vals[j];
-                    neighbor_count++;
-                }
-            }
-            
-            if (neighbor_count > 0) {
-                double local_mean = local_charge_sum / neighbor_count;
-                for (size_t j = 0; j < y_vals.size(); ++j) {
-                    if (i == j) continue;
-                    double distance = std::abs(x_vals[j] - x_vals[i]) / pixel_spacing;
-                    if (distance <= config.correlation_radius) {
-                        double deviation = y_vals[j] - local_mean;
-                        local_charge_variance += deviation * deviation;
-                    }
-                }
-                local_charge_variance /= neighbor_count;
-                
-                // Higher variance = less reliable, lower weight
-                double variance_factor = 1.0 / (1.0 + local_charge_variance / (mean_charge * mean_charge));
-                correlation_weight = 0.5 + 0.5 * variance_factor; // Range [0.5, 1.0]
-            }
-        }
-        
-        // 5. Enhanced robust weighting based on expected Gaussian profile
-        double profile_weight = 1.0;
-        if (config.enable_robust_profile_weighting && estimates.sigma > 0) {
-            double dx = std::abs(x_vals[i] - estimates.center);
-            double expected_value = estimates.amplitude * std::exp(-0.5 * dx * dx / (estimates.sigma * estimates.sigma)) + estimates.offset;
-            
-            // Calculate normalized residual with robust scaling
-            double residual = std::abs(y_vals[i] - expected_value);
-            double expected_error = std::max(1.0, std::sqrt(expected_value)); // Poisson-like error model
-            double normalized_residual = residual / expected_error;
-            
-            // Apply robust weighting: reduce influence of outliers
-            profile_weight = 1.0 / (1.0 + normalized_residual * normalized_residual);
-            profile_weight = std::max(0.05, profile_weight); // Allow more aggressive downweighting
-        }
-        
-        // ---- Analytic charge-sharing base weight ---------------------------------
-        const double dx_distance = std::abs(x_vals[i] - estimates.center);
-        const double l_pixel     = pixel_spacing;                       // approximate pad length
-        const double num_cs      = (l_pixel * 0.5) * 1.41421356237;    // (l/2)*√2
-        const double denom_cs    = num_cs + dx_distance;
-        const double alpha_cs    = std::atan(num_cs / std::max(1e-12, denom_cs)); // solid angle term
-        // Scale d0 with pixel spacing so that d0 remains 0.2·pitch for any line orientation
-        const double d0_cs       = std::max(1e-6, config.distance_scale_d0 * (pixel_spacing / 50.0));
-        double       log_term    = std::log(std::max(1e-6, dx_distance) / d0_cs);
-        if (std::abs(log_term) < 1e-6) log_term = (log_term < 0 ? -1e-6 : 1e-6);
-        const double cs_weight   = alpha_cs / std::abs(log_term);
-        // -------------------------------------------------------------------------
-        
-        // Combine all weighting factors (analytic charge-sharing base + modifiers)
-        weight = cs_weight * charge_weight * spatial_weight * profile_weight * 
-                edge_weight * horizontal_error_weight * spatial_error_weight * correlation_weight;
-        
-        // Ensure weight is reasonable and apply final normalization
-        weights[i] = std::max(0.01, std::min(100.0, weight));
-    }
-    
-    return weights;
-}
+
+
 
 // ========================================================================================================
 // HORIZONTAL ERROR TECHNIQUES IMPLEMENTATION - Core Gaussian fitting function using Ceres Solver
@@ -879,9 +512,9 @@ bool FitGaussianCeres(
             continue;
         }
         
-        // Calculate data weights
-        WeightingConfig config;
-        std::vector<double> data_weights = CalculateDataWeights(clean_x, clean_y, estimates, pixel_spacing, config);
+        // Calculate uncertainty as 5% of max charge
+        double max_charge = *std::max_element(clean_y.begin(), clean_y.end());
+        double uncertainty = CalculateUncertainty(max_charge);
         
         // Multiple fitting attempts with different configurations
         struct FittingConfig {
@@ -897,10 +530,10 @@ bool FitGaussianCeres(
         // Build solver configurations once per dataset so parameters reflect current estimates
         const std::vector<FittingConfig> configs = {
             {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-15, 1e-15, 800, "NONE", 0.0},            // cheap first pass
-            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-15, 1e-15, 1500, "HUBER", estimates.amplitude * config.robust_threshold_factor},
-            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amplitude * config.robust_threshold_factor * 1.8},
-            {ceres::DENSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amplitude * config.robust_threshold_factor * 1.4},
-            {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amplitude * config.robust_threshold_factor * 2.5}
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-15, 1e-15, 1500, "HUBER", estimates.amplitude * 0.1},
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amplitude * 0.18},
+            {ceres::DENSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amplitude * 0.14},
+            {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amplitude * 0.25}
         };
         
         // Progressive solver escalation
@@ -915,86 +548,13 @@ bool FitGaussianCeres(
             // Build the problem
             ceres::Problem problem;
             
-            // Add residual blocks with weights and loss functions
-            WeightingConfig weight_config;
-            
-            // Calculate robust statistics for weighting and outlier detection
-            DataStatistics stats = CalculateRobustStatistics(clean_x, clean_y);
-            
-            // Find the highest charge pixel for central pixel downweighting
-            size_t max_charge_idx = 0;
-            double max_charge = clean_y[0];
-            for (size_t i = 0; i < clean_y.size(); ++i) {
-                if (clean_y[i] > max_charge) {
-                    max_charge = clean_y[i];
-                    max_charge_idx = i;
-                }
-            }
-            
-            // Container to own loss functions so their lifetime exceeds Problem::Solve
-            std::vector<std::unique_ptr<ceres::LossFunction>> owned_losses;
-            
+            // Add residual blocks with uncertainties
             for (size_t i = 0; i < clean_x.size(); ++i) {
-                ceres::CostFunction* cost_function;
-                ceres::LossFunction* loss_function = nullptr;
+                ceres::CostFunction* cost_function = GaussianCostFunction::Create(
+                    clean_x[i], clean_y[i], uncertainty);
                 
-                // Calculate pixel-specific horizontal uncertainty for this pixel (needed for both pixel integration and dynamic loss switching)
-                double horizontal_uncertainty = 0.0;
-                if (weight_config.enable_horizontal_error_correction) {
-                    // Base horizontal error from pixel size
-                    horizontal_uncertainty = weight_config.horizontal_error_scale * pixel_spacing;
-                    
-                    // Enhanced pixel-specific horizontal error calculation
-                    double dx = std::abs(clean_x[i] - estimates.center);
-                    double pixel_edge_distance = pixel_spacing / 2.0;
-                    
-                    // Increase uncertainty for pixels farther from center
-                    if (dx > pixel_edge_distance) {
-                        double edge_factor = 1.0 + (dx - pixel_edge_distance) / pixel_spacing;
-                        horizontal_uncertainty *= edge_factor;
-                    }
-                    
-                    // Charge-dependent horizontal uncertainty
-                    if (weight_config.enable_charge_weighted_uncertainty) {
-                        double charge_factor = 1.0 / std::sqrt(std::max(0.1, clean_y[i] / stats.mean));
-                        horizontal_uncertainty *= charge_factor;
-                    }
-                    
-                    // Position-dependent horizontal error from spatial error maps
-                    if (weight_config.enable_spatial_error_maps) {
-                        double position_error = weight_config.position_dependent_bias_scale * 
-                                               std::abs(dx) / pixel_spacing * pixel_spacing;
-                        horizontal_uncertainty += position_error;
-                    }
-                }
-                
-                // Technique #4: Choose between pixel integration and point evaluation
-                if (weight_config.enable_pixel_integration) {
-                    cost_function = PixelIntegratedGaussianCostFunction::Create(
-                        clean_x[i], clean_y[i], pixel_spacing, data_weights[i], horizontal_uncertainty);
-                } else {
-                    cost_function = GaussianCostFunction::Create(
-                        clean_x[i], clean_y[i], data_weights[i]);
-                }
-                
-                // Technique #3: Enhanced robust loss functions with dynamic switching
-                if (weight_config.enable_dynamic_loss_switching) {
-                    // For central high-charge pixels, use stronger robust loss to reduce dominance
-                    if (i == max_charge_idx && clean_y[i] > stats.mean * weight_config.central_downweight_threshold) {
-                        // Use more aggressive robust loss for central pixel
-                        double stronger_parameter = config.loss_parameter * 0.5;
-                        if (config.loss_function == "HUBER") {
-                            owned_losses.emplace_back(std::make_unique<ceres::HuberLoss>(stronger_parameter));
-                            loss_function = owned_losses.back().get();
-                        } else if (config.loss_function == "CAUCHY") {
-                            owned_losses.emplace_back(std::make_unique<ceres::CauchyLoss>(stronger_parameter));
-                            loss_function = owned_losses.back().get();
-                        }
-                    }
-                }
-                
-                // Add residual block with appropriate loss function (nullptr if no loss function)
-                problem.AddResidualBlock(cost_function, loss_function, parameters);
+                // No loss functions - simple weighted least squares
+                problem.AddResidualBlock(cost_function, nullptr, parameters);
             }
             
             // Set robust bounds based on physics and estimates
@@ -1293,6 +853,30 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
     // Set overall success status
     result.fit_successful = x_fit_success && y_fit_success;
     
+    // Calculate and store charge uncertainties (5% of max charge for each direction) only if enabled
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        if (x_fit_success && rows_data.find(best_row_y) != rows_data.end()) {
+            auto& row_data = rows_data[best_row_y];
+            double max_charge_x = 0.0;
+            for (const auto& point : row_data) {
+                max_charge_x = std::max(max_charge_x, point.second);
+            }
+            result.x_charge_uncertainty = 0.05 * max_charge_x;
+        }
+        
+        if (y_fit_success && cols_data.find(best_col_x) != cols_data.end()) {
+            auto& col_data = cols_data[best_col_x];
+            double max_charge_y = 0.0;
+            for (const auto& point : col_data) {
+                max_charge_y = std::max(max_charge_y, point.second);
+            }
+            result.y_charge_uncertainty = 0.05 * max_charge_y;
+        }
+    } else {
+        result.x_charge_uncertainty = 0.0;
+        result.y_charge_uncertainty = 0.0;
+    }
+    
     if (verbose) {
         std::cout << "2D Gaussian fit (Ceres) " << (result.fit_successful ? "successful" : "failed") 
                  << " (X: " << (x_fit_success ? "OK" : "FAIL") 
@@ -1337,52 +921,43 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     // Effective centre-to-centre pitch along a ±45° diagonal is √2 times the horizontal pitch.
     const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // ≈ √2
     
-    // Group pixels by diagonal lines
-    std::map<double, std::vector<std::pair<double, double>>> main_diagonal_data; // main_diag_id -> [(x, charge), (y, charge)]
-    std::map<double, std::vector<std::pair<double, double>>> sec_diagonal_data;  // sec_diag_id -> [(x, charge), (y, charge)]
-    
-    // Group data points by diagonal
+    // ------------------------------------------------------------------------------------
+    // New diagonal grouping (one entry per pixel) using true coordinate along the ±45° axis.
+    // We project each hit onto the diagonal direction so that the abscissa that the
+    // 1-D fitter sees is spaced by   pitch·√2   exactly as in the real geometry.
+    // Define the diagonal coordinate s as (dx ± dy)/√2, where dx = x-cx, dy = y-cy.
+    // ------------------------------------------------------------------------------------
+    const double inv_sqrt2 = 1.0 / std::sqrt(2.0);
+
+    // Maps:   diagonal identifier  →  vector of (s, charge)
+    std::map<double, std::vector<std::pair<double, double>>> main_diagonal_data; // slope +1
+    std::map<double, std::vector<std::pair<double, double>>> sec_diagonal_data;  // slope −1
+
     for (size_t i = 0; i < x_coords.size(); ++i) {
-        double x = x_coords[i];
-        double y = y_coords[i];
+        double x      = x_coords[i];
+        double y      = y_coords[i];
         double charge = charge_values[i];
-        
-        if (charge <= 0) continue; // Skip non-positive charges
-        
-        // Main diagonal: constant value of (x - y)
-        double main_diag_id = x - y;
-        
-        // Secondary diagonal: constant value of (x + y)  
-        double sec_diag_id = x + y;
-        
-        // Find or create main diagonal - store both x and y coordinates with charge
-        bool found_main_diag = false;
-        for (auto& diag_pair : main_diagonal_data) {
-            if (std::abs(diag_pair.first - main_diag_id) < tolerance) {
-                diag_pair.second.push_back(std::make_pair(x, charge));
-                diag_pair.second.push_back(std::make_pair(y, charge));
-                found_main_diag = true;
-                break;
-            }
+
+        if (charge <= 0) continue; // ignore empty / negative pixels
+
+        // Coordinates relative to centre estimates (for robust diagonal id)
+        double dx = x - center_x_estimate;
+        double dy = y - center_y_estimate;
+
+        // Indicators for membership to the two sets of diagonals
+        double diff = dx - dy;   // main diagonal (slope +1)
+        double sum  = dx + dy;   // secondary diagonal (slope −1)
+
+        // Main diagonal
+        if (std::abs(diff) < tolerance) {
+            double s = (dx + dy) * inv_sqrt2;          // coordinate along +45° direction
+            main_diagonal_data[diff].emplace_back(s, charge);
         }
-        if (!found_main_diag) {
-            main_diagonal_data[main_diag_id].push_back(std::make_pair(x, charge));
-            main_diagonal_data[main_diag_id].push_back(std::make_pair(y, charge));
-        }
-        
-        // Find or create secondary diagonal - store both x and y coordinates with charge
-        bool found_sec_diag = false;
-        for (auto& diag_pair : sec_diagonal_data) {
-            if (std::abs(diag_pair.first - sec_diag_id) < tolerance) {
-                diag_pair.second.push_back(std::make_pair(x, charge));
-                diag_pair.second.push_back(std::make_pair(y, charge));
-                found_sec_diag = true;
-                break;
-            }
-        }
-        if (!found_sec_diag) {
-            sec_diagonal_data[sec_diag_id].push_back(std::make_pair(x, charge));
-            sec_diagonal_data[sec_diag_id].push_back(std::make_pair(y, charge));
+
+        // Secondary diagonal
+        if (std::abs(sum) < tolerance) {
+            double s = (dx - dy) * inv_sqrt2;          // coordinate along −45° direction
+            sec_diagonal_data[sum].emplace_back(s, charge);
         }
     }
     
@@ -1392,7 +967,7 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     double min_main_diag_dist = std::numeric_limits<double>::max();
     for (const auto& diag_pair : main_diagonal_data) {
         double dist = std::abs(diag_pair.first - center_main_diag_id);
-        if (dist < min_main_diag_dist && diag_pair.second.size() >= 8) { // Need at least 4 points for each x and y fit
+        if (dist < min_main_diag_dist && diag_pair.second.size() >= 4) { // Need at least 4 points for each x and y fit
             min_main_diag_dist = dist;
             best_main_diag_id = diag_pair.first;
         }
@@ -1404,7 +979,7 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     double min_sec_diag_dist = std::numeric_limits<double>::max();
     for (const auto& diag_pair : sec_diagonal_data) {
         double dist = std::abs(diag_pair.first - center_sec_diag_id);
-        if (dist < min_sec_diag_dist && diag_pair.second.size() >= 8) { // Need at least 4 points for each x and y fit
+        if (dist < min_sec_diag_dist && diag_pair.second.size() >= 4) { // Need at least 4 points for each x and y fit
             min_sec_diag_dist = dist;
             best_sec_diag_id = diag_pair.first;
         }
@@ -1417,15 +992,15 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     
     // Fit main diagonal X direction
     if (main_diagonal_data.find(best_main_diag_id) != main_diagonal_data.end() && 
-        main_diagonal_data[best_main_diag_id].size() >= 8) {
+        main_diagonal_data[best_main_diag_id].size() >= 4) {
         
         auto& main_diag_data = main_diagonal_data[best_main_diag_id];
         
-        // Extract X coordinates and charges (every other pair starting from index 0)
+        // Extract diagonal coordinate (s) and charge values for +45° direction
         std::vector<double> x_vals, charge_vals;
-        for (size_t i = 0; i < main_diag_data.size(); i += 2) {
-            x_vals.push_back(main_diag_data[i].first);
-            charge_vals.push_back(main_diag_data[i].second);
+        for (const auto& p : main_diag_data) {
+            x_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
         // Sort by X coordinate
@@ -1462,15 +1037,15 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     
     // Fit main diagonal Y direction
     if (main_diagonal_data.find(best_main_diag_id) != main_diagonal_data.end() && 
-        main_diagonal_data[best_main_diag_id].size() >= 8) {
+        main_diagonal_data[best_main_diag_id].size() >= 4) {
         
         auto& main_diag_data = main_diagonal_data[best_main_diag_id];
         
-        // Extract Y coordinates and charges (every other pair starting from index 1)
+        // Re-use same dataset for the complementary fit (naming kept for backward compatibility)
         std::vector<double> y_vals, charge_vals;
-        for (size_t i = 1; i < main_diag_data.size(); i += 2) {
-            y_vals.push_back(main_diag_data[i].first);
-            charge_vals.push_back(main_diag_data[i].second);
+        for (const auto& p : main_diag_data) {
+            y_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
         // Sort by Y coordinate
@@ -1507,15 +1082,15 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     
     // Fit secondary diagonal X direction
     if (sec_diagonal_data.find(best_sec_diag_id) != sec_diagonal_data.end() && 
-        sec_diagonal_data[best_sec_diag_id].size() >= 8) {
+        sec_diagonal_data[best_sec_diag_id].size() >= 4) {
         
         auto& sec_diag_data = sec_diagonal_data[best_sec_diag_id];
         
-        // Extract X coordinates and charges (every other pair starting from index 0)
+        // Extract diagonal coordinate (s) and charge values for −45° direction
         std::vector<double> x_vals, charge_vals;
-        for (size_t i = 0; i < sec_diag_data.size(); i += 2) {
-            x_vals.push_back(sec_diag_data[i].first);
-            charge_vals.push_back(sec_diag_data[i].second);
+        for (const auto& p : sec_diag_data) {
+            x_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
         // Sort by X coordinate
@@ -1552,15 +1127,15 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     
     // Fit secondary diagonal Y direction
     if (sec_diagonal_data.find(best_sec_diag_id) != sec_diagonal_data.end() && 
-        sec_diagonal_data[best_sec_diag_id].size() >= 8) {
+        sec_diagonal_data[best_sec_diag_id].size() >= 4) {
         
         auto& sec_diag_data = sec_diagonal_data[best_sec_diag_id];
         
-        // Extract Y coordinates and charges (every other pair starting from index 1)
+        // Same dataset re-used for complementary fit
         std::vector<double> y_vals, charge_vals;
-        for (size_t i = 1; i < sec_diag_data.size(); i += 2) {
-            y_vals.push_back(sec_diag_data[i].first);
-            charge_vals.push_back(sec_diag_data[i].second);
+        for (const auto& p : sec_diag_data) {
+            y_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
         // Sort by Y coordinate

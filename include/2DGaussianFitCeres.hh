@@ -46,6 +46,10 @@ struct GaussianFit2DResultsCeres {
     G4double y_pp;
     G4int y_dof;
     
+    // Charge uncertainties (5% of max charge)
+    G4double x_charge_uncertainty;  // Vertical charge uncertainty for X direction fit
+    G4double y_charge_uncertainty;  // Vertical charge uncertainty for Y direction fit
+    
     // Overall success status
     G4bool fit_successful;
     
@@ -59,6 +63,7 @@ struct GaussianFit2DResultsCeres {
         y_center_err(0), y_sigma_err(0), y_amplitude_err(0),
         y_vertical_offset(0), y_vertical_offset_err(0),
         y_chi2red(0), y_pp(0), y_dof(0),
+        x_charge_uncertainty(0), y_charge_uncertainty(0),
         fit_successful(false) {}
 };
 
