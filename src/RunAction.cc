@@ -79,6 +79,11 @@ RunAction::RunAction()
   fGaussFitRowChi2red(0),
   fGaussFitRowPp(0),
   fGaussFitRowDOF(0),
+  // Initialize charge uncertainties (5% of max charge)
+  fGaussFitRowChargeUncertainty(0),
+  fGaussFitColumnChargeUncertainty(0),
+  fLorentzFitRowChargeUncertainty(0),
+  fLorentzFitColumnChargeUncertainty(0),
   fGaussFitColumnAmplitude(0),
   fGaussFitColumnAmplitudeErr(0),
   fGaussFitColumnStdev(0),
@@ -147,7 +152,6 @@ RunAction::RunAction()
   fLorentzFitRowPp(0),
   fLorentzFitRowDOF(0),
   fLorentzFitColumnAmplitude(0),
-  fLorentzFitColumnAmplitudeErr(0),
   fLorentzFitColumnGamma(0),
   fLorentzFitColumnGammaErr(0),
   fLorentzFitColumnVerticalOffset(0),
@@ -456,8 +460,8 @@ void RunAction::BeginOfRunAction(const G4Run*)
     // GAUSSIAN FITS BRANCHES (conditionally created)
     // =============================================
     if (Constants::ENABLE_GAUSSIAN_FITTING) {
-      // GaussFitRow/GaussFitRowX
-      fTree->Branch("GaussFitRowAmplitude", &fGaussFitRowAmplitude, "GaussFitRowAmplitude/D")->SetTitle("Gaussian Row Fit Amplitude");
+    // GaussFitRow/GaussFitRowX
+    fTree->Branch("GaussFitRowAmplitude", &fGaussFitRowAmplitude, "GaussFitRowAmplitude/D")->SetTitle("Gaussian Row Fit Amplitude");
     fTree->Branch("GaussFitRowAmplitudeErr", &fGaussFitRowAmplitudeErr, "GaussFitRowAmplitudeErr/D")->SetTitle("Gaussian Row Fit Amplitude Error");
     fTree->Branch("GaussFitRowStdev", &fGaussFitRowStdev, "GaussFitRowStdev/D")->SetTitle("Gaussian Row Fit Standard Deviation");
     fTree->Branch("GaussFitRowStdevErr", &fGaussFitRowStdevErr, "GaussFitRowStdevErr/D")->SetTitle("Gaussian Row Fit Standard Deviation Error");
@@ -468,6 +472,10 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("GaussFitRowChi2red", &fGaussFitRowChi2red, "GaussFitRowChi2red/D")->SetTitle("Gaussian Row Fit Reduced Chi-squared");
     fTree->Branch("GaussFitRowPp", &fGaussFitRowPp, "GaussFitRowPp/D")->SetTitle("Gaussian Row Fit P-value");
     fTree->Branch("GaussFitRowDOF", &fGaussFitRowDOF, "GaussFitRowDOF/I")->SetTitle("Gaussian Row Fit Degrees of Freedom");
+    // Conditionally create charge uncertainty branch for Gaussian row fit
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fTree->Branch("GaussFitRowChargeUncertainty", &fGaussFitRowChargeUncertainty, "GaussFitRowChargeUncertainty/D")->SetTitle("Gaussian Row Fit Charge Uncertainty");
+    }
     
     // GaussFitColumn/GaussFitColumnY
     fTree->Branch("GaussFitColumnAmplitude", &fGaussFitColumnAmplitude, "GaussFitColumnAmplitude/D")->SetTitle("Gaussian Column Fit Amplitude");
@@ -481,6 +489,10 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("GaussFitColumnChi2red", &fGaussFitColumnChi2red, "GaussFitColumnChi2red/D")->SetTitle("Gaussian Column Fit Reduced Chi-squared");
     fTree->Branch("GaussFitColumnPp", &fGaussFitColumnPp, "GaussFitColumnPp/D")->SetTitle("Gaussian Column Fit P-value");
     fTree->Branch("GaussFitColumnDOF", &fGaussFitColumnDOF, "GaussFitColumnDOF/I")->SetTitle("Gaussian Column Fit Degrees of Freedom");
+    // Conditionally create charge uncertainty branch for Gaussian column fit
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fTree->Branch("GaussFitColumnChargeUncertainty", &fGaussFitColumnChargeUncertainty, "GaussFitColumnChargeUncertainty/D")->SetTitle("Gaussian Column Fit Charge Uncertainty");
+    }
     
     // GaussFitMainDiag/GaussFitMainDiagX
     fTree->Branch("GaussFitMainDiagXAmplitude", &fGaussFitMainDiagXAmplitude, "GaussFitMainDiagXAmplitude/D")->SetTitle("Gaussian Main Diagonal X Fit Amplitude");
@@ -552,6 +564,10 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("LorentzFitRowChi2red", &fLorentzFitRowChi2red, "LorentzFitRowChi2red/D")->SetTitle("Lorentzian Row Fit Reduced Chi-squared");
     fTree->Branch("LorentzFitRowPp", &fLorentzFitRowPp, "LorentzFitRowPp/D")->SetTitle("Lorentzian Row Fit P-value");
     fTree->Branch("LorentzFitRowDOF", &fLorentzFitRowDOF, "LorentzFitRowDOF/I")->SetTitle("Lorentzian Row Fit Degrees of Freedom");
+    // Conditionally create charge uncertainty branch for Lorentzian row fit
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fTree->Branch("LorentzFitRowChargeUncertainty", &fLorentzFitRowChargeUncertainty, "LorentzFitRowChargeUncertainty/D")->SetTitle("Lorentzian Row Fit Charge Uncertainty");
+    }
 
     // LorentzFitColumn/LorentzFitColumnY
     fTree->Branch("LorentzFitColumnAmplitude", &fLorentzFitColumnAmplitude, "LorentzFitColumnAmplitude/D")->SetTitle("Lorentzian Column Fit Amplitude");
@@ -565,6 +581,10 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("LorentzFitColumnChi2red", &fLorentzFitColumnChi2red, "LorentzFitColumnChi2red/D")->SetTitle("Lorentzian Column Fit Reduced Chi-squared");
     fTree->Branch("LorentzFitColumnPp", &fLorentzFitColumnPp, "LorentzFitColumnPp/D")->SetTitle("Lorentzian Column Fit P-value");
     fTree->Branch("LorentzFitColumnDOF", &fLorentzFitColumnDOF, "LorentzFitColumnDOF/I")->SetTitle("Lorentzian Column Fit Degrees of Freedom");
+    // Conditionally create charge uncertainty branch for Lorentzian column fit
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fTree->Branch("LorentzFitColumnChargeUncertainty", &fLorentzFitColumnChargeUncertainty, "LorentzFitColumnChargeUncertainty/D")->SetTitle("Lorentzian Column Fit Charge Uncertainty");
+    }
 
     // LorentzFitMainDiag/LorentzFitMainDiagX
     fTree->Branch("LorentzFitMainDiagXAmplitude", &fLorentzFitMainDiagXAmplitude, "LorentzFitMainDiagXAmplitude/D")->SetTitle("Lorentzian Main Diagonal X Fit Amplitude");
@@ -1096,6 +1116,7 @@ void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4d
                                         G4double y_center_err, G4double y_sigma_err, G4double y_amplitude_err,
                                         G4double y_vertical_offset, G4double y_vertical_offset_err,
                                         G4double y_chi2red, G4double y_pp, G4int y_dof,
+                                        G4double x_charge_uncertainty, G4double y_charge_uncertainty,
                                         G4bool fit_successful)
 {
     // Store 2D Gaussian fit results from central row (X fit)
@@ -1123,6 +1144,15 @@ void RunAction::Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4d
     fGaussFitColumnChi2red = y_chi2red;
     fGaussFitColumnPp = y_pp;
     fGaussFitColumnDOF = y_dof;
+    
+    // Store charge uncertainties (5% of max charge) only if feature is enabled
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fGaussFitRowChargeUncertainty = x_charge_uncertainty;
+        fGaussFitColumnChargeUncertainty = y_charge_uncertainty;
+    } else {
+        fGaussFitRowChargeUncertainty = 0.0;
+        fGaussFitColumnChargeUncertainty = 0.0;
+    }
     
     // Calculate delta values for row and column fits vs true position
     // Use individual fit validity checks similar to diagonal fits for consistency
@@ -1237,6 +1267,7 @@ void RunAction::Set2DLorentzianFitResults(G4double x_center, G4double x_gamma, G
                                           G4double y_center_err, G4double y_gamma_err, G4double y_amplitude_err,
                                           G4double y_vertical_offset, G4double y_vertical_offset_err,
                                           G4double y_chi2red, G4double y_pp, G4int y_dof,
+                                          G4double x_charge_uncertainty, G4double y_charge_uncertainty,
                                           G4bool fit_successful)
 {
     // Store 2D Lorentzian fit results from central row (X fit)
@@ -1264,6 +1295,15 @@ void RunAction::Set2DLorentzianFitResults(G4double x_center, G4double x_gamma, G
     fLorentzFitColumnChi2red = y_chi2red;
     fLorentzFitColumnPp = y_pp;
     fLorentzFitColumnDOF = y_dof;
+    
+    // Store charge uncertainties (5% of max charge) only if feature is enabled
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fLorentzFitRowChargeUncertainty = x_charge_uncertainty;
+        fLorentzFitColumnChargeUncertainty = y_charge_uncertainty;
+    } else {
+        fLorentzFitRowChargeUncertainty = 0.0;
+        fLorentzFitColumnChargeUncertainty = 0.0;
+    }
     
     // Calculate delta values for row and column fits vs true position
     if (fit_successful) {
@@ -1407,31 +1447,49 @@ void RunAction::CalculateTransformedDiagonalCoordinates()
     // ------------------
     //   G A U S S I A N
     // ------------------
-    // Fits return absolute positions along X/Y → no rotation needed
-    double gMainX = (fGaussFitMainDiagXDOF > 0) ? fGaussFitMainDiagXCenter : NaN;
-    double gMainY = (fGaussFitMainDiagYDOF > 0) ? fGaussFitMainDiagYCenter : NaN;
-    setXY(gMainX, gMainY,
-          fGaussMainDiagTransformedX, fGaussMainDiagTransformedY,
-          fGaussMainDiagTransformedDeltaX, fGaussMainDiagTransformedDeltaY);
-
-    double gSecX  = (fGaussFitSecondDiagXDOF > 0) ? fGaussFitSecondDiagXCenter : NaN;
-    double gSecY  = (fGaussFitSecondDiagYDOF > 0) ? fGaussFitSecondDiagYCenter : NaN;
-    setXY(gSecX, gSecY,
-          fGaussSecondDiagTransformedX, fGaussSecondDiagTransformedY,
-          fGaussSecondDiagTransformedDeltaX, fGaussSecondDiagTransformedDeltaY);
-
-    // ------------------
-    //   L O R E N T Z I A N
-    // ------------------
+    // FIX: Gaussian diagonal fits also return diagonal coordinates that need transformation
     auto sToDxDyMain = [&](double s){ return std::make_pair(s*invSqrt2, s*invSqrt2); };
     auto sToDxDySec  = [&](double s){ return std::make_pair(s*invSqrt2, -s*invSqrt2); };
 
     // Main diagonal
     double sMain = NaN;
-    if (fLorentzFitMainDiagXDOF > 0)       sMain = fLorentzFitMainDiagXCenter;
-    else if (fLorentzFitMainDiagYDOF > 0)  sMain = fLorentzFitMainDiagYCenter;
+    if (fGaussFitMainDiagXDOF > 0)       sMain = fGaussFitMainDiagXCenter;
+    else if (fGaussFitMainDiagYDOF > 0)  sMain = fGaussFitMainDiagYCenter;
     if (!std::isnan(sMain)) {
         auto [dx,dy] = sToDxDyMain(sMain);
+        setXY(fPixelX+dx, fPixelY+dy,
+              fGaussMainDiagTransformedX, fGaussMainDiagTransformedY,
+              fGaussMainDiagTransformedDeltaX, fGaussMainDiagTransformedDeltaY);
+    } else {
+        setXY(NaN,NaN,
+              fGaussMainDiagTransformedX, fGaussMainDiagTransformedY,
+              fGaussMainDiagTransformedDeltaX, fGaussMainDiagTransformedDeltaY);
+    }
+
+    // Secondary diagonal
+    double sSec = NaN;
+    if (fGaussFitSecondDiagXDOF > 0)       sSec = fGaussFitSecondDiagXCenter;
+    else if (fGaussFitSecondDiagYDOF > 0)  sSec = fGaussFitSecondDiagYCenter;
+    if (!std::isnan(sSec)) {
+        auto [dx,dy] = sToDxDySec(sSec);
+        setXY(fPixelX+dx, fPixelY+dy,
+              fGaussSecondDiagTransformedX, fGaussSecondDiagTransformedY,
+              fGaussSecondDiagTransformedDeltaX, fGaussSecondDiagTransformedDeltaY);
+    } else {
+        setXY(NaN,NaN,
+              fGaussSecondDiagTransformedX, fGaussSecondDiagTransformedY,
+              fGaussSecondDiagTransformedDeltaX, fGaussSecondDiagTransformedDeltaY);
+    }
+
+    // ------------------
+    //   L O R E N T Z I A N
+    // ------------------
+    // Main diagonal
+    double sMainLorentz = NaN;
+    if (fLorentzFitMainDiagXDOF > 0)       sMainLorentz = fLorentzFitMainDiagXCenter;
+    else if (fLorentzFitMainDiagYDOF > 0)  sMainLorentz = fLorentzFitMainDiagYCenter;
+    if (!std::isnan(sMainLorentz)) {
+        auto [dx,dy] = sToDxDyMain(sMainLorentz);
         setXY(fPixelX+dx, fPixelY+dy,
               fLorentzMainDiagTransformedX, fLorentzMainDiagTransformedY,
               fLorentzMainDiagTransformedDeltaX, fLorentzMainDiagTransformedDeltaY);
@@ -1442,11 +1500,11 @@ void RunAction::CalculateTransformedDiagonalCoordinates()
     }
 
     // Secondary diagonal
-    double sSec = NaN;
-    if (fLorentzFitSecondDiagXDOF > 0)       sSec = fLorentzFitSecondDiagXCenter;
-    else if (fLorentzFitSecondDiagYDOF > 0)  sSec = fLorentzFitSecondDiagYCenter;
-    if (!std::isnan(sSec)) {
-        auto [dx,dy] = sToDxDySec(sSec);
+    double sSecLorentz = NaN;
+    if (fLorentzFitSecondDiagXDOF > 0)       sSecLorentz = fLorentzFitSecondDiagXCenter;
+    else if (fLorentzFitSecondDiagYDOF > 0)  sSecLorentz = fLorentzFitSecondDiagYCenter;
+    if (!std::isnan(sSecLorentz)) {
+        auto [dx,dy] = sToDxDySec(sSecLorentz);
         setXY(fPixelX+dx, fPixelY+dy,
               fLorentzSecondDiagTransformedX, fLorentzSecondDiagTransformedY,
               fLorentzSecondDiagTransformedDeltaX, fLorentzSecondDiagTransformedDeltaY);
