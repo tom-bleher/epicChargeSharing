@@ -223,6 +223,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.y_center_err, fitResults.y_sigma_err, fitResults.y_amplitude_err,
         fitResults.y_vertical_offset, fitResults.y_vertical_offset_err,
         fitResults.y_chi2red, fitResults.y_pp, fitResults.y_dof,
+        fitResults.x_charge_uncertainty, fitResults.y_charge_uncertainty,
         fitResults.fit_successful);
         
         // Perform diagonal fitting if 2D fitting was performed and successful and diagonal fitting is enabled
@@ -296,6 +297,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
           lorentzFitResults.y_center_err, lorentzFitResults.y_gamma_err, lorentzFitResults.y_amplitude_err,
           lorentzFitResults.y_vertical_offset, lorentzFitResults.y_vertical_offset_err,
           lorentzFitResults.y_chi2red, lorentzFitResults.y_pp, lorentzFitResults.y_dof,
+          lorentzFitResults.x_charge_uncertainty, lorentzFitResults.y_charge_uncertainty,
           lorentzFitResults.fit_successful);
           
         // Note: Lorentzian charge error data was removed as per user request
@@ -351,6 +353,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fRunAction->Set2DLorentzianFitResults(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+          0, 0,  // charge uncertainties (x_charge_uncertainty, y_charge_uncertainty)
           false); // fit_successful = false
         
         // Set default diagonal Lorentzian fit values when not enough data points
@@ -462,6 +465,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fRunAction->Set2DGaussianFitResults(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+          0, 0,  // charge uncertainties (x_charge_uncertainty, y_charge_uncertainty)
           false); // fit_successful = false
         
         // Set default diagonal fit values when not enough data points
@@ -478,6 +482,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fRunAction->Set2DLorentzianFitResults(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+          0, 0,  // charge uncertainties (x_charge_uncertainty, y_charge_uncertainty)
           false); // fit_successful = false
         
         // Set default diagonal Lorentzian fit values when not enough data points
@@ -502,6 +507,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       fRunAction->Set2DGaussianFitResults(
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amplitude, center_err, sigma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        0, 0,  // charge uncertainties (x_charge_uncertainty, y_charge_uncertainty)
         false); // fit_successful = false
       
       // Set default diagonal fit values when fitting is skipped
@@ -518,6 +524,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       fRunAction->Set2DLorentzianFitResults(
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amplitude, center_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        0, 0,  // charge uncertainties (x_charge_uncertainty, y_charge_uncertainty)
         false); // fit_successful = false
       
       // Set default diagonal Lorentzian fit values when fitting is skipped

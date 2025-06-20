@@ -66,6 +66,7 @@ public:
                                 G4double y_center_err, G4double y_sigma_err, G4double y_amplitude_err,
                                 G4double y_vertical_offset, G4double y_vertical_offset_err,
                                 G4double y_chi2red, G4double y_pp, G4int y_dof,
+                                G4double x_charge_uncertainty, G4double y_charge_uncertainty,
                                 G4bool fit_successful);
     
     // Method to set diagonal Gaussian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
@@ -96,6 +97,7 @@ public:
                                   G4double y_center_err, G4double y_gamma_err, G4double y_amplitude_err,
                                   G4double y_vertical_offset, G4double y_vertical_offset_err,
                                   G4double y_chi2red, G4double y_pp, G4int y_dof,
+                                  G4double x_charge_uncertainty, G4double y_charge_uncertainty,
                                   G4bool fit_successful);
     
 
@@ -271,6 +273,9 @@ private:
     G4double fGaussFitRowPp;
     G4int fGaussFitRowDOF;
     
+    // Charge uncertainties (5% of max charge for Gaussian fits)
+    G4double fGaussFitRowChargeUncertainty;     // Row charge uncertainty (5% of max charge)
+    
     // GaussFitColumn/GaussFitColumnY
     G4double fGaussFitColumnAmplitude;
     G4double fGaussFitColumnAmplitudeErr;
@@ -283,6 +288,9 @@ private:
     G4double fGaussFitColumnChi2red;
     G4double fGaussFitColumnPp;
     G4int fGaussFitColumnDOF;
+    
+    // Charge uncertainty for Gaussian column fit
+    G4double fGaussFitColumnChargeUncertainty;  // Column charge uncertainty (5% of max charge)
     
     // GaussFitMainDiag/GaussFitMainDiagX
     G4double fGaussFitMainDiagXAmplitude;
@@ -353,6 +361,9 @@ private:
     G4double fLorentzFitRowPp;
     G4int fLorentzFitRowDOF;
     
+    // Charge uncertainty for Lorentzian row fit  
+    G4double fLorentzFitRowChargeUncertainty;   // Row charge uncertainty (5% of max charge)
+    
     // LorentzFitColumn/LorentzFitColumnY
     G4double fLorentzFitColumnAmplitude;
     G4double fLorentzFitColumnAmplitudeErr;
@@ -365,6 +376,9 @@ private:
     G4double fLorentzFitColumnChi2red;
     G4double fLorentzFitColumnPp;
     G4int fLorentzFitColumnDOF;
+    
+    // Charge uncertainty for Lorentzian column fit
+    G4double fLorentzFitColumnChargeUncertainty; // Column charge uncertainty (5% of max charge)
     
     // LorentzFitMainDiag/LorentzFitMainDiagX
     G4double fLorentzFitMainDiagXAmplitude;
