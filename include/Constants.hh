@@ -43,7 +43,7 @@ namespace Constants {
     // Automatic radius selection parameters
     const G4int MIN_AUTO_RADIUS = 4;                     // Minimum radius for auto selection (5x5 grid)
     const G4int MAX_AUTO_RADIUS = 10;                     // Maximum radius for auto selection (13x13 grid)
-    const G4bool ENABLE_AUTO_RADIUS = true;             // Enable automatic radius selection per hit
+    const G4bool ENABLE_AUTO_RADIUS = false;             // Enable automatic radius selection per hit
     
     // Fit quality thresholds for radius selection
     const G4double MIN_FIT_QUALITY_THRESHOLD = 0.5;      // Minimum acceptable fit quality (0-1 scale)
@@ -75,10 +75,21 @@ namespace Constants {
     const G4bool ENABLE_2D_FITTING = true;               // Enable central row/column fitting
     const G4bool ENABLE_DIAGONAL_FITTING = true;         // Enable diagonal fitting
     
+    // ========================
+    // VERTICAL CHARGE UNCERTAINTIES CONTROL
+    // ========================
+    
+    // Enable/disable vertical charge uncertainties in fitting and ROOT output
+    // When enabled: Uses 5% of max charge as uncertainty for weighted least squares fitting
+    // When disabled: Uses uniform weighting (uncertainty = 1.0) for unweighted fitting
+    // Also controls whether uncertainty values are saved to ROOT file branches
+    const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = false;  // Enable charge uncertainties
+    
     // USAGE EXAMPLES:
     // - To disable all Skewed Lorentzian: set ENABLE_SKEWED_LORENTZIAN_FITTING = false
     // - To enable only 2D fits (not diagonals): set ENABLE_DIAGONAL_FITTING = false  
     // - To run only Gaussian fits: set ENABLE_LORENTZIAN_FITTING and ENABLE_SKEWED_LORENTZIAN_FITTING to false
+    // - To disable charge uncertainties: set ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = false
     
 } // namespace Constants
 
