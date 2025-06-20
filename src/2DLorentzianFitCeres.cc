@@ -1,5 +1,6 @@
 #include "2DLorentzianFitCeres.hh"
 #include "CeresLoggingInit.hh"
+#include "Constants.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <cmath>
@@ -28,93 +29,23 @@ void InitializeCeresLorentzian() {
     CeresLoggingInitializer::InitializeOnce();
 }
 
-// Enhanced cost function with pixel integration for Lorentzian (analytical integration with horizontal errors)
-struct PixelIntegratedLorentzianCostFunction {
-    PixelIntegratedLorentzianCostFunction(double pixel_center_x, double pixel_y, double pixel_size, 
-                                        double weight = 1.0, double horizontal_uncertainty = 0.0) 
-        : pixel_center_x_(pixel_center_x), pixel_y_(pixel_y), pixel_size_(pixel_size), 
-          weight_(weight), horizontal_uncertainty_(horizontal_uncertainty) {}
-    
-    template <typename T>
-    bool operator()(const T* const params, T* residual) const {
-        // params[0] = A (amplitude)
-        // params[1] = m (center)
-        // params[2] = gamma (HWHM)
-        // params[3] = B (baseline)
-        
-        const T& A = params[0];
-        const T& m = params[1];
-        const T& gamma = params[2];
-        const T& B = params[3];
-        
-        // Robust handling of gamma
-        T safe_gamma = ceres::abs(gamma);
-        if (safe_gamma < T(1e-12)) {
-            safe_gamma = T(1e-12);
-        }
-        
-        // Include horizontal uncertainty in effective gamma for pixel integration
-        // For Lorentzian: horizontal uncertainty affects the width parameter
-        T effective_gamma = safe_gamma;
-        if (horizontal_uncertainty_ > 0) {
-            T horizontal_gamma = T(horizontal_uncertainty_);
-            // Combine fit gamma with horizontal positional uncertainty
-            // For Lorentzian, uncertainties add in quadrature for the width parameter
-            effective_gamma = ceres::sqrt(safe_gamma * safe_gamma + horizontal_gamma * horizontal_gamma);
-        }
-        
-        // Pixel integration using analytical formula for Lorentzian integral with effective gamma
-        // ∫[x-Δx/2 to x+Δx/2] A / (1 + ((t-m)/γ_eff)²) dt + B*Δx
-        
-        T half_pixel = T(pixel_size_) / T(2.0);
-        T x_left = T(pixel_center_x_) - half_pixel;
-        T x_right = T(pixel_center_x_) + half_pixel;
-        
-        // Analytical integral: A * γ_eff * [arctan((x-m)/γ_eff)]
-        T left_arg = (x_left - m) / effective_gamma;
-        T right_arg = (x_right - m) / effective_gamma;
-        T arctan_left = ceres::atan(left_arg);
-        T arctan_right = ceres::atan(right_arg);
-        
-        T integrated_lorentzian = A * effective_gamma * (arctan_right - arctan_left);
-        T baseline_contribution = B * T(pixel_size_);
-        
-        T predicted = integrated_lorentzian + baseline_contribution;
-        
-        // Apply additional horizontal error weighting to residual
-        T effective_weight = T(weight_);
-        if (horizontal_uncertainty_ > 0) {
-            // Reduce weight for pixels with larger horizontal uncertainty
-            // This implements the "horizontal error" weighting for Lorentzian distributions
-            T uncertainty_factor = T(1.0) + T(horizontal_uncertainty_) / T(pixel_size_);
-            effective_weight /= uncertainty_factor;
-        }
-        
-        // Weighted residual with horizontal error correction
-        residual[0] = effective_weight * (predicted - T(pixel_y_));
-        
-        return true;
+// Calculate uncertainty as 5% of max charge in line (if enabled)
+double CalculateLorentzianUncertainty(double max_charge_in_line) {
+    if (!Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
-    static ceres::CostFunction* Create(double pixel_center_x, double pixel_y, double pixel_size, 
-                                     double weight = 1.0, double horizontal_uncertainty = 0.0) {
-        return (new ceres::AutoDiffCostFunction<PixelIntegratedLorentzianCostFunction, 1, 4>(
-            new PixelIntegratedLorentzianCostFunction(pixel_center_x, pixel_y, pixel_size, weight, horizontal_uncertainty)));
-    }
-    
-private:
-    const double pixel_center_x_;
-    const double pixel_y_;
-    const double pixel_size_;
-    const double weight_;
-    const double horizontal_uncertainty_;
-};
+    // Uncertainty = 5% of max charge when enabled
+    double uncertainty = 0.05 * max_charge_in_line;
+    if (uncertainty < 1e-20) uncertainty = 1e-20; // Prevent division by zero (very small for coulomb range)
+    return uncertainty;
+}
 
-// Enhanced cost function for Lorentzian fitting with numerical stability
+// Lorentzian cost function with uncertainty (5% of max charge)
 // Function form: y(x) = A / (1 + ((x - m) / γ)^2) + B  
 struct LorentzianCostFunction {
-    LorentzianCostFunction(double x, double y, double weight = 1.0) 
-        : x_(x), y_(y), weight_(weight) {}
+    LorentzianCostFunction(double x, double y, double uncertainty) 
+        : x_(x), y_(y), uncertainty_(uncertainty) {}
     
     template <typename T>
     bool operator()(const T* const params, T* residual) const {
@@ -146,21 +77,21 @@ struct LorentzianCostFunction {
         
         T predicted = A / denominator + B;
         
-        // Weighted residual for robust fitting
-        residual[0] = T(weight_) * (predicted - T(y_));
+        // Residual divided by uncertainty (standard weighted least squares)
+        residual[0] = (predicted - T(y_)) / T(uncertainty_);
         
         return true;
     }
     
-    static ceres::CostFunction* Create(double x, double y, double weight = 1.0) {
+    static ceres::CostFunction* Create(double x, double y, double uncertainty) {
         return (new ceres::AutoDiffCostFunction<LorentzianCostFunction, 1, 4>(
-            new LorentzianCostFunction(x, y, weight)));
+            new LorentzianCostFunction(x, y, uncertainty)));
     }
     
 private:
     const double x_;
     const double y_;
-    const double weight_;
+    const double uncertainty_;
 };
 
 // Parameter estimation structures for Lorentzian
@@ -376,275 +307,9 @@ LorentzianParameterEstimates EstimateLorentzianParameters(
     return estimates;
 }
 
-// Enhanced weighting strategies for spatial uncertainty and bias reduction (Lorentzian) with "horizontal errors"
-// Implements the specific techniques requested:
-// 1. Downweight central pixel: Assign larger uncertainty to highest-charge pixel
-// 2. Distance-based weights: w_i ∝ 1/(1 + d_i/d₀) where d_i is distance from current estimate
-// 3. Robust losses: Use Cauchy/Huber loss functions to moderate single pixel influence
-// 4. Pixel integration: Model pixel response by integrating over pixel area
-// 5. Spatial error maps: Position-dependent weighting based on reconstruction error maps
-struct LorentzianWeightingConfig {
-    // Core horizontal error techniques
-    bool enable_central_pixel_downweight = true;      // Technique #1: Downweight central pixel
-    bool enable_distance_based_weights = true;        // Technique #2: Distance-based weighting
-    bool enable_robust_losses = true;                 // Technique #3: Robust loss functions
-    bool enable_pixel_integration = true;             // Technique #4: Pixel integration model
-    bool enable_spatial_error_maps = true;            // Technique #5: Spatial error maps
-    
-    // Advanced weighting features for enhanced performance
-    bool enable_spatial_uncertainty = true;           // Spatial uncertainty from pixel finite size
-    bool enable_adaptive_central_weighting = true;    // Adaptive central pixel downweighting
-    bool enable_edge_pixel_upweighting = true;        // Give edge pixels higher weight for position info
-    bool enable_robust_profile_weighting = true;      // Weight based on expected vs. measured profile
-    bool enable_iterative_reweighting = true;         // Iteratively update weights during fitting
-    bool enable_horizontal_error_correction = true;   // Implement horizontal errors from pixel integration
-    bool enable_systematic_bias_correction = true;    // Correct for systematic reconstruction bias
-    bool enable_adaptive_robust_losses = true;        // Adaptively select robust loss functions
-    bool enable_charge_weighted_uncertainty = true;   // Weight uncertainties by charge magnitude
-    bool enable_pixel_edge_uncertainty = true;        // Additional uncertainty for pixels near edges
-    bool enable_correlation_weighting = true;         // Weight based on inter-pixel correlations
-    bool enable_dynamic_loss_switching = true;        // Dynamically switch loss functions based on residuals
-    
-    // Horizontal error parameters (technique #1: central pixel downweighting)
-    double central_pixel_weight_factor = 0.10;        // Reduce central pixel weight to 10% (more aggressive for Lorentzian)
-    double central_downweight_threshold = 2.2;        // Charge concentration threshold for adaptive downweighting
-    double max_central_pixel_uncertainty = 7.5;      // Maximum uncertainty multiplier for central pixel
-    
-    // Distance-based weighting parameters (technique #2)
-    double distance_scale_d0 = 10.0;                 // d₀ parameter: w_i ∝ 1/(1 + d_i/d₀) [μm] (physics d₀ = 10 µm)
-    double distance_weight_cap = 6.0;                // Maximum distance-based weight multiplier
-    
-    // Robust loss parameters (technique #3)
-    double robust_threshold_factor = 0.10;           // Threshold for robust loss functions (more aggressive for Lorentzian)
-    double dynamic_loss_threshold = 1.8;             // Threshold for dynamic loss function switching [sigma]
-    
-    // Pixel integration parameters (technique #4)
-    double horizontal_error_scale = 0.50;            // Scale factor for horizontal errors (fraction of pixel size)
-    double spatial_uncertainty_factor = 0.48;       // Pixel size uncertainty factor for horizontal errors
-    double pixel_edge_uncertainty_factor = 0.85;    // Additional uncertainty for pixels near edges
-    
-    // Spatial error map parameters (technique #5)
-    double spatial_error_map_strength = 0.28;       // Strength of spatial error map corrections
-    double position_dependent_bias_scale = 0.22;    // Scale for position-dependent bias corrections
-    
-    // Additional parameters for enhanced performance
-    double edge_pixel_boost_factor = 1.8;           // Boost factor for edge pixels (higher for Lorentzian)
-    double charge_uncertainty_floor = 0.03;         // Minimum relative charge uncertainty (3%)
-    double systematic_bias_strength = 0.32;         // Strength of systematic bias correction (stronger for Lorentzian)
-    double correlation_radius = 1.6;                // Radius for inter-pixel correlation weighting [pixels] (larger for Lorentzian tails)
-    double adaptive_weight_update_rate = 0.65;      // Rate for iterative weight updates (slightly lower for Lorentzian stability)
-};
 
-// Calculate weights for Lorentzian fitting with enhanced spatial uncertainty handling
-std::vector<double> CalculateLorentzianDataWeights(const std::vector<double>& x_vals,
-                                                  const std::vector<double>& y_vals,
-                                                  const LorentzianParameterEstimates& estimates,
-                                                  double pixel_spacing = 50.0,
-                                                  const LorentzianWeightingConfig& config = LorentzianWeightingConfig()) {
-    std::vector<double> weights(x_vals.size(), 1.0);
-    
-    DataStatistics stats = CalculateRobustStatisticsLorentzian(x_vals, y_vals);
-    if (!stats.valid) {
-        return weights;
-    }
-    
-    // Find the highest charge pixel (central pixel candidate) and charge statistics
-    size_t max_charge_idx = 0;
-    double max_charge = y_vals[0];
-    double total_charge = 0.0;
-    for (size_t i = 0; i < y_vals.size(); ++i) {
-        total_charge += y_vals[i];
-        if (y_vals[i] > max_charge) {
-            max_charge = y_vals[i];
-            max_charge_idx = i;
-        }
-    }
-    double mean_charge = total_charge / y_vals.size();
-    
-    // Identify edge pixels (those farthest from center estimate)
-    std::vector<std::pair<double, size_t>> distance_indices;
-    for (size_t i = 0; i < x_vals.size(); ++i) {
-        double dx = std::abs(x_vals[i] - estimates.center);
-        distance_indices.push_back(std::make_pair(dx, i));
-    }
-    std::sort(distance_indices.begin(), distance_indices.end(), std::greater<std::pair<double, size_t>>());
-    
-    // Mark edge pixels (top 30% by distance)
-    std::set<size_t> edge_pixel_indices;
-    size_t num_edge_pixels = std::max(1, static_cast<int>(x_vals.size() * 0.3));
-    for (size_t i = 0; i < num_edge_pixels && i < distance_indices.size(); ++i) {
-        edge_pixel_indices.insert(distance_indices[i].second);
-    }
-    
-    for (size_t i = 0; i < y_vals.size(); ++i) {
-        double weight = 1.0;
-        
-        // 1. Base weight by charge magnitude (higher charge = higher weight)
-        double charge_weight = std::sqrt(std::max(0.0, y_vals[i] - estimates.baseline));
-        charge_weight = std::max(0.1, std::min(10.0, charge_weight / stats.mad));
-        
-        // 2. Enhanced central pixel downweighting strategy
-        if (config.enable_central_pixel_downweight && i == max_charge_idx) {
-            if (config.enable_adaptive_central_weighting) {
-                // Adaptive downweighting based on charge concentration
-                double charge_concentration = max_charge / mean_charge;
-                double adaptive_factor = config.central_pixel_weight_factor;
-                if (charge_concentration > config.central_downweight_threshold) {
-                    // More aggressive downweighting for highly concentrated charge
-                    adaptive_factor *= 0.75; // Balanced downweighting for Lorentzian
-                }
-                charge_weight *= adaptive_factor;
-            } else {
-                charge_weight *= config.central_pixel_weight_factor;
-            }
-        }
-        
-        // 3. Enhanced distance-based weighting: w_i ∝ 1/(1 + d_i/d₀) for center estimation
-        double distance_weight = 1.0;
-        if (config.enable_distance_based_weights && estimates.gamma > 0) {
-            double dx = std::abs(x_vals[i] - estimates.center);
-            double d0_scaled = config.distance_scale_d0 * (pixel_spacing / 50.0);
-            distance_weight = 1.0 / (1.0 + dx / d0_scaled);
-            distance_weight = std::min(config.distance_weight_cap, distance_weight);
-        }
-        
-        // 4. Edge pixel upweighting for enhanced position sensitivity
-        double edge_weight = 1.0;
-        if (config.enable_edge_pixel_upweighting && edge_pixel_indices.count(i) > 0) {
-            edge_weight = config.edge_pixel_boost_factor;
-        }
-        
-        // 4. Spatial uncertainty and "horizontal errors": account for pixel integration area
-        double spatial_weight = 1.0;
-        if (config.enable_spatial_uncertainty) {
-            // Pixels have inherent spatial uncertainty due to finite size
-            // Add uncertainty proportional to pixel size - this is the "horizontal error"
-            double spatial_gamma = config.spatial_uncertainty_factor * pixel_spacing;
-            double total_gamma = std::sqrt(estimates.gamma * estimates.gamma + spatial_gamma * spatial_gamma);
-            
-            // Weight by inverse of total uncertainty
-            if (total_gamma > 0) {
-                spatial_weight = estimates.gamma / total_gamma;
-            }
-        }
-        
-        // 5. Enhanced horizontal error correction for pixel integration
-        double horizontal_error_weight = 1.0;
-        if (config.enable_horizontal_error_correction) {
-            // Calculate horizontal error based on pixel position relative to estimated center
-            double dx = std::abs(x_vals[i] - estimates.center);
-            double pixel_edge_distance = pixel_spacing / 2.0;
-            
-            // Pixels closer to edges have larger horizontal uncertainty
-            double horizontal_error = config.horizontal_error_scale * pixel_spacing;
-            
-            // If the pixel is at the edge relative to the fitted center, increase uncertainty
-            if (dx > pixel_edge_distance) {
-                horizontal_error *= (1.0 + (dx - pixel_edge_distance) / pixel_spacing);
-            }
-            
-            // Weight inversely proportional to horizontal error
-            horizontal_error_weight = 1.0 / (1.0 + horizontal_error / pixel_spacing);
-        }
-        
-        // 5. Enhanced robust weighting based on expected Lorentzian profile
-        double profile_weight = 1.0;
-        if (config.enable_robust_profile_weighting && estimates.gamma > 0) {
-            double dx = std::abs(x_vals[i] - estimates.center);
-            double normalized_dx = dx / estimates.gamma;
-            double expected_value = estimates.amplitude / (1.0 + normalized_dx * normalized_dx) + estimates.baseline;
-            
-            // Calculate normalized residual with robust scaling
-            double residual = std::abs(y_vals[i] - expected_value);
-            double expected_error = std::max(1.0, std::sqrt(expected_value)); // Poisson-like error model
-            double normalized_residual = residual / expected_error;
-            
-            // Apply robust weighting: reduce influence of outliers (less aggressive for Lorentzian wide tails)
-            profile_weight = 1.0 / (1.0 + 0.8 * normalized_residual * normalized_residual);
-            profile_weight = std::max(0.1, profile_weight); // Keep reasonable minimum
-        }
-        
-        // 6. Spatial error maps for position-dependent weighting (Lorentzian-specific)
-        double spatial_error_weight = 1.0;
-        if (config.enable_spatial_error_maps) {
-            // Model systematic position-dependent reconstruction errors for Lorentzian distributions
-            double dx = x_vals[i] - estimates.center;
-            double pixel_position_error = 0.0;
-            
-            // Lorentzian has wider tails, so position error grows more slowly
-            double normalized_distance = std::abs(dx) / (pixel_spacing / 2.0);
-            if (normalized_distance < 1.0) {
-                // Quadratic increase in error near pixel edges (less aggressive than Gaussian)
-                pixel_position_error = config.position_dependent_bias_scale * 
-                                     normalized_distance * normalized_distance * pixel_spacing * 0.8;
-            } else {
-                // Linear increase for pixels beyond immediate neighbors (gentler for Lorentzian)
-                pixel_position_error = config.position_dependent_bias_scale * 
-                                     (1.0 + (normalized_distance - 1.0) * 0.6) * pixel_spacing;
-            }
-            
-            spatial_error_weight = 1.0 / (1.0 + config.spatial_error_map_strength * 
-                                         pixel_position_error / pixel_spacing);
-        }
-        
-        // 7. Inter-pixel correlation weighting (adapted for Lorentzian tails)
-        double correlation_weight = 1.0;
-        if (config.enable_correlation_weighting) {
-            // Weight based on local charge distribution consistency
-            double local_charge_variance = 0.0;
-            double local_charge_sum = 0.0;
-            int neighbor_count = 0;
-            
-            // Check neighboring pixels within correlation radius (larger for Lorentzian)
-            for (size_t j = 0; j < y_vals.size(); ++j) {
-                if (i == j) continue;
-                double distance = std::abs(x_vals[j] - x_vals[i]) / pixel_spacing;
-                if (distance <= config.correlation_radius) {
-                    local_charge_sum += y_vals[j];
-                    neighbor_count++;
-                }
-            }
-            
-            if (neighbor_count > 0) {
-                double local_mean = local_charge_sum / neighbor_count;
-                for (size_t j = 0; j < y_vals.size(); ++j) {
-                    if (i == j) continue;
-                    double distance = std::abs(x_vals[j] - x_vals[i]) / pixel_spacing;
-                    if (distance <= config.correlation_radius) {
-                        double deviation = y_vals[j] - local_mean;
-                        local_charge_variance += deviation * deviation;
-                    }
-                }
-                local_charge_variance /= neighbor_count;
-                
-                // For Lorentzian: be more tolerant of variance due to wider tails
-                double variance_factor = 1.0 / (1.0 + 0.8 * local_charge_variance / (mean_charge * mean_charge));
-                correlation_weight = 0.6 + 0.4 * variance_factor; // Range [0.6, 1.0] - more tolerant
-            }
-        }
-        
-        // ---- Analytic charge-sharing base weight (Cartiglia) ----------------------
-        const double dx_distance = std::abs(x_vals[i] - estimates.center);
-        const double l_pixel     = pixel_spacing;                       // approximate pad length
-        const double num_cs      = (l_pixel * 0.5) * 1.41421356237;    // (l/2)*√2
-        const double denom_cs    = num_cs + dx_distance;
-        const double alpha_cs    = std::atan(num_cs / std::max(1e-12, denom_cs));
-        const double d0_cs       = std::max(1e-6, config.distance_scale_d0 * (pixel_spacing / 50.0));
-        double       log_term    = std::log(std::max(1e-6, dx_distance) / d0_cs);
-        if (std::abs(log_term) < 1e-6) log_term = (log_term < 0 ? -1e-6 : 1e-6);
-        const double cs_weight   = alpha_cs / std::abs(log_term);
-        // ---------------------------------------------------------------------------
-        
-        // Combine all weighting factors (analytic base + existing modifiers, omit distance_weight now)
-        weight = cs_weight * charge_weight * spatial_weight * profile_weight * 
-                edge_weight * horizontal_error_weight * spatial_error_weight * correlation_weight;
-        
-        // Ensure weight is reasonable and apply final normalization
-        weights[i] = std::max(0.01, std::min(100.0, weight));
-    }
-    
-    return weights;
-} 
+
+ 
 
 // Outlier filtering for Lorentzian fitting (adapted from Gaussian version)
 std::pair<std::vector<double>, std::vector<double>> FilterLorentzianOutliers(
@@ -783,9 +448,9 @@ bool FitLorentzianCeres(
             continue;
         }
         
-        // Calculate data weights
-        LorentzianWeightingConfig config;
-        std::vector<double> data_weights = CalculateLorentzianDataWeights(clean_x, clean_y, estimates, pixel_spacing, config);
+        // Calculate uncertainty as 5% of max charge
+        double max_charge = *std::max_element(clean_y.begin(), clean_y.end());
+        double uncertainty = CalculateLorentzianUncertainty(max_charge);
         
         // Multiple fitting configurations
         struct LorentzianFittingConfig {
@@ -807,7 +472,7 @@ bool FitLorentzianCeres(
         config1.gradient_tolerance = 1e-15;
         config1.max_iterations = 2000;
         config1.loss_function = "HUBER";
-        config1.loss_parameter = estimates.amplitude * config.robust_threshold_factor;
+        config1.loss_parameter = estimates.amplitude * 0.1;
         configs.push_back(config1);
         
         LorentzianFittingConfig config2;
@@ -817,7 +482,7 @@ bool FitLorentzianCeres(
         config2.gradient_tolerance = 1e-12;
         config2.max_iterations = 1500;
         config2.loss_function = "CAUCHY";
-        config2.loss_parameter = estimates.amplitude * config.robust_threshold_factor * 1.6;
+        config2.loss_parameter = estimates.amplitude * 0.16;
         configs.push_back(config2);
         
         LorentzianFittingConfig config3;
@@ -837,7 +502,7 @@ bool FitLorentzianCeres(
         config4.gradient_tolerance = 1e-12;
         config4.max_iterations = 1500;
         config4.loss_function = "HUBER";
-        config4.loss_parameter = estimates.amplitude * config.robust_threshold_factor * 1.3;
+        config4.loss_parameter = estimates.amplitude * 0.13;
         configs.push_back(config4);
         
         LorentzianFittingConfig config5;
@@ -847,7 +512,7 @@ bool FitLorentzianCeres(
         config5.gradient_tolerance = 1e-12;
         config5.max_iterations = 1200;
         config5.loss_function = "CAUCHY";
-        config5.loss_parameter = estimates.amplitude * config.robust_threshold_factor * 2.2;
+        config5.loss_parameter = estimates.amplitude * 0.22;
         configs.push_back(config5);
         
         for (const auto& config : configs) {
@@ -861,82 +526,13 @@ bool FitLorentzianCeres(
             // Build the problem
             ceres::Problem problem;
             
-            // Add residual blocks with enhanced horizontal error handling
-            LorentzianWeightingConfig weight_config;
+            // Add residual blocks with uncertainties
             for (size_t i = 0; i < clean_x.size(); ++i) {
-                ceres::CostFunction* cost_function;
+                ceres::CostFunction* cost_function = LorentzianCostFunction::Create(
+                    clean_x[i], clean_y[i], uncertainty);
                 
-                // Technique #4: Choose between pixel integration and point evaluation
-                if (weight_config.enable_pixel_integration) {
-                    // Calculate pixel-specific horizontal uncertainty for this pixel
-                    double horizontal_uncertainty = 0.0;
-                    if (weight_config.enable_horizontal_error_correction) {
-                        // Base horizontal error from pixel size
-                        horizontal_uncertainty = weight_config.horizontal_error_scale * pixel_spacing;
-                        
-                        // Enhanced pixel-specific horizontal error calculation for Lorentzian distributions
-                        double dx = std::abs(clean_x[i] - estimates.center);
-                        double pixel_edge_distance = pixel_spacing / 2.0;
-                        
-                        // Lorentzian has wider tails, so adjust uncertainty more gradually
-                        if (dx > pixel_edge_distance) {
-                            double edge_factor = 1.0 + 0.8 * (dx - pixel_edge_distance) / pixel_spacing;
-                            horizontal_uncertainty *= edge_factor;
-                        }
-                        
-                        // Charge-dependent horizontal uncertainty (adapted for Lorentzian)
-                        if (weight_config.enable_charge_weighted_uncertainty) {
-                            DataStatistics stats = CalculateRobustStatisticsLorentzian(clean_x, clean_y);
-                            double charge_factor = 1.0 / std::sqrt(std::max(0.1, clean_y[i] / stats.mean));
-                            horizontal_uncertainty *= charge_factor * 0.9; // Slightly less aggressive for Lorentzian
-                        }
-                        
-                        // Position-dependent horizontal error from spatial error maps (adapted for wider tails)
-                        if (weight_config.enable_spatial_error_maps) {
-                            double position_error = weight_config.position_dependent_bias_scale * 
-                                                   std::abs(dx) / pixel_spacing * pixel_spacing * 0.8; // Gentler for Lorentzian
-                            horizontal_uncertainty += position_error;
-                        }
-                    }
-                    
-                    cost_function = PixelIntegratedLorentzianCostFunction::Create(
-                        clean_x[i], clean_y[i], pixel_spacing, data_weights[i], horizontal_uncertainty);
-                } else {
-                    cost_function = LorentzianCostFunction::Create(
-                        clean_x[i], clean_y[i], data_weights[i]);
-                }
-                
-                // Technique #3: Enhanced robust loss functions with dynamic switching for Lorentzian
-                ceres::LossFunction* loss_function = nullptr;
-                if (weight_config.enable_robust_losses) {
-                    if (config.loss_function == "HUBER") {
-                        loss_function = new ceres::HuberLoss(config.loss_parameter);
-                    } else if (config.loss_function == "CAUCHY") {
-                        loss_function = new ceres::CauchyLoss(config.loss_parameter);
-                    }
-                    
-                    // Technique: Dynamic loss switching optimized for Lorentzian distributions
-                    if (weight_config.enable_dynamic_loss_switching) {
-                        // For central high-charge pixels, use robust loss but less aggressively than Gaussian
-                        size_t max_charge_idx = std::distance(clean_y.begin(), 
-                            std::max_element(clean_y.begin(), clean_y.end()));
-                        
-                        DataStatistics stats = CalculateRobustStatisticsLorentzian(clean_x, clean_y);
-                        if (i == max_charge_idx && clean_y[i] > stats.mean * weight_config.central_downweight_threshold) {
-                            // Use moderately aggressive robust loss for central pixel (Lorentzian has natural wide tails)
-                            double stronger_parameter = config.loss_parameter * 0.7; // Less aggressive than Gaussian
-                            if (config.loss_function == "HUBER") {
-                                delete loss_function;
-                                loss_function = new ceres::HuberLoss(stronger_parameter);
-                            } else if (config.loss_function == "CAUCHY") {
-                                delete loss_function;
-                                loss_function = new ceres::CauchyLoss(stronger_parameter);
-                            }
-                        }
-                    }
-                }
-                
-                problem.AddResidualBlock(cost_function, loss_function, parameters);
+                // No loss functions - simple weighted least squares
+                problem.AddResidualBlock(cost_function, nullptr, parameters);
             }
             
             // Set bounds
@@ -1260,6 +856,30 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
     
     // Set overall success status
     result.fit_successful = x_fit_success && y_fit_success;
+    
+    // Calculate and store charge uncertainties (5% of max charge for each direction) only if enabled
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        if (x_fit_success && rows_data.find(best_row_y) != rows_data.end()) {
+            auto& row_data = rows_data[best_row_y];
+            double max_charge_x = 0.0;
+            for (const auto& point : row_data) {
+                max_charge_x = std::max(max_charge_x, point.second);
+            }
+            result.x_charge_uncertainty = 0.05 * max_charge_x;
+        }
+        
+        if (y_fit_success && cols_data.find(best_col_x) != cols_data.end()) {
+            auto& col_data = cols_data[best_col_x];
+            double max_charge_y = 0.0;
+            for (const auto& point : col_data) {
+                max_charge_y = std::max(max_charge_y, point.second);
+            }
+            result.y_charge_uncertainty = 0.05 * max_charge_y;
+        }
+    } else {
+        result.x_charge_uncertainty = 0.0;
+        result.y_charge_uncertainty = 0.0;
+    }
     
     if (verbose) {
         std::cout << "2D Lorentzian fit (Ceres) " << (result.fit_successful ? "successful" : "failed") 
