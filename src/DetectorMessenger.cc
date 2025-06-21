@@ -71,7 +71,6 @@ DetectorMessenger::~DetectorMessenger()
     delete fBlockSizeCmd;
     delete fBlockSpacingCmd;
     delete fCornerOffsetCmd;
-    delete fNumBlocksCmd;
     delete fNeighborhoodRadiusCmd;
     delete fAutoRadiusEnabledCmd;
     delete fMinAutoRadiusCmd;
@@ -104,11 +103,6 @@ void DetectorMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
         // Update the offset parameter (this may cause detector size adjustment)
         G4double newOffset = fCornerOffsetCmd->GetNewDoubleValue(newValue);
         fDetector->SetPixelCornerOffset(newOffset);
-    }
-    else if (command == fNumBlocksCmd) {
-        // Number of blocks is now calculated automatically, warn user
-        G4cerr << "WARNING: Number of blocks is now calculated automatically based on pixel size, spacing, and detector size." << G4endl;
-        G4cerr << "This parameter is read-only." << G4endl;
     }
     else if (command == fNeighborhoodRadiusCmd) {
         // Update the neighborhood radius parameter

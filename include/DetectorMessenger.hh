@@ -32,7 +32,6 @@ private:
     G4UIcmdWithADoubleAndUnit* fBlockSizeCmd;
     G4UIcmdWithADoubleAndUnit* fBlockSpacingCmd;
     G4UIcmdWithADoubleAndUnit* fCornerOffsetCmd;
-    G4UIcmdWithAnInteger*      fNumBlocksCmd;
     G4UIcmdWithAnInteger* fNeighborhoodRadiusCmd;
     
     // Automatic radius selection commands

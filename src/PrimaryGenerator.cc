@@ -1,5 +1,6 @@
 #include "PrimaryGenerator.hh"
 #include "DetectorConstruction.hh"
+#include "Constants.hh"
 #include "Randomize.hh"
 #include "G4Event.hh"
 #include "G4ParticleTable.hh"
@@ -87,7 +88,7 @@ void PrimaryGenerator::GenerateRandomPosition()
     G4double y = G4UniformRand() * (fCentralRegionYmax - fCentralRegionYmin) + fCentralRegionYmin;
     
     // Fixed z position in front of the detector
-    G4double z = 2.0*cm;
+    G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
     
     // Set the particle position
     fParticleGun->SetParticlePosition(G4ThreeVector(x, y, z));

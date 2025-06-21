@@ -55,12 +55,6 @@ public:
         fMaxAutoRadius = maxRadius; 
     }
     
-    // Method to get the selected radius for the current event
-    G4int GetSelectedRadius() const { return fSelectedRadius; }
-    
-    // Method to get the fit quality for the selected radius
-    G4double GetSelectedFitQuality() const { return fSelectedFitQuality; }
-    
 private:
     RunAction* fRunAction;
     DetectorConstruction* fDetector;
@@ -102,14 +96,9 @@ private:
     G4int fSelectedRadius;
     G4double fSelectedFitQuality;
     
-    // Method to perform automatic radius selection based on fit quality
+    // Helper methods for automatic radius selection
     G4int SelectOptimalRadius(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ);
-    
-    // Method to evaluate fit quality for a given radius
     G4double EvaluateFitQuality(G4int radius, const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ);
-    
-    // Method to calculate residuals and goodness of fit metrics
-    G4double CalculateGoodnessOfFit(const std::vector<double>& observed, const std::vector<double>& fitted);
 };
 
 #endif
