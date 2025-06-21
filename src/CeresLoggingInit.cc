@@ -9,7 +9,7 @@ void CeresLoggingInitializer::InitializeOnce() {
 }
 
 void CeresLoggingInitializer::DoInitialize() {
-    google::InitGoogleLogging("epicToy");
+    google::InitGoogleLogging("epicChargeSharing");
     // Completely suppress all Ceres logging
     FLAGS_logtostderr = false;
     FLAGS_minloglevel = 4; // Suppress all messages including FATAL
