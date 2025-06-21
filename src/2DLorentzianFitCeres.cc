@@ -9,12 +9,8 @@
 #include <iostream>
 #include <mutex>
 #include <atomic>
-#include <thread>
-#include <chrono>
-#include <sstream>
 #include <limits>
 #include <numeric>
-#include <set>
 
 // Ceres Solver includes
 #include "ceres/ceres.h"
@@ -37,7 +33,7 @@ double CalculateLorentzianUncertainty(double max_charge_in_line) {
     
     // Uncertainty = 5% of max charge when enabled
     double uncertainty = 0.05 * max_charge_in_line;
-    if (uncertainty < 1e-20) uncertainty = 1e-20; // Prevent division by zero (very small for coulomb range)
+    if (uncertainty < Constants::MIN_UNCERTAINTY_VALUE) uncertainty = Constants::MIN_UNCERTAINTY_VALUE; // Prevent division by zero
     return uncertainty;
 }
 
@@ -61,8 +57,8 @@ struct LorentzianCostFunction {
         
         // Robust handling of gamma (prevent division by zero)
         T safe_gamma = ceres::abs(gamma);
-        if (safe_gamma < T(1e-12)) {
-            safe_gamma = T(1e-12);
+        if (safe_gamma < T(Constants::MIN_SAFE_PARAMETER)) {
+            safe_gamma = T(Constants::MIN_SAFE_PARAMETER);
         }
         
         // Lorentzian function: y(x) = A / (1 + ((x - m) / γ)^2) + B
@@ -536,7 +532,7 @@ bool FitLorentzianCeres(
             }
             
             // Set bounds
-            double amp_min = std::max(1e-20, estimates.amplitude * 0.01);
+            double amp_min = std::max(Constants::MIN_UNCERTAINTY_VALUE, estimates.amplitude * 0.01);
 
             double max_charge_val = *std::max_element(clean_y.begin(), clean_y.end());
             double physics_amp_max = max_charge_val * 1.5;
@@ -1190,139 +1186,4 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
     }
     
     return result;
-} 
-
-// Standalone outlier removal function with boolean control for Lorentzian fitting
-LorentzianOutlierRemovalResult RemoveLorentzianOutliers(
-    const std::vector<double>& x_coords,
-    const std::vector<double>& y_coords,
-    const std::vector<double>& charge_values,
-    bool enable_outlier_removal,
-    double sigma_threshold,
-    bool verbose) {
-    
-    LorentzianOutlierRemovalResult result;
-    result.outliers_removed = 0;
-    result.filtering_applied = enable_outlier_removal;
-    result.success = false;
-    
-    // Input validation
-    if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
-        if (verbose) {
-            std::cout << "RemoveLorentzianOutliers: Error - coordinate and charge vector sizes don't match" << std::endl;
-        }
-        return result;
-    }
-    
-    if (x_coords.empty()) {
-        if (verbose) {
-            std::cout << "RemoveLorentzianOutliers: Error - empty input vectors" << std::endl;
-        }
-        return result;
-    }
-    
-    // If outlier removal is disabled, return original data
-    if (!enable_outlier_removal) {
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.success = true;
-        
-        if (verbose) {
-            std::cout << "RemoveLorentzianOutliers: Outlier removal disabled, returning original data (" 
-                     << x_coords.size() << " points)" << std::endl;
-        }
-        return result;
-    }
-    
-    if (verbose) {
-        std::cout << "RemoveLorentzianOutliers: Starting outlier removal on " << x_coords.size() 
-                 << " points with sigma threshold " << sigma_threshold << std::endl;
-    }
-    
-    // Calculate robust statistics for charge values
-    DataStatistics stats = CalculateRobustStatisticsLorentzian(x_coords, charge_values);
-    if (!stats.valid) {
-        if (verbose) {
-            std::cout << "RemoveLorentzianOutliers: Failed to calculate statistics, returning original data" << std::endl;
-        }
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.success = true;
-        return result;
-    }
-    
-    // Use MAD-based outlier detection (more robust than standard deviation)
-    // For Lorentzian distributions, we might want to be more lenient with outlier detection
-    // since Lorentzian has wider tails than Gaussian
-    double outlier_threshold = stats.median + sigma_threshold * stats.mad;
-    double lower_threshold = stats.median - sigma_threshold * stats.mad;
-    
-    // Filter outliers
-    for (size_t i = 0; i < charge_values.size(); ++i) {
-        // Keep points that are within the robust bounds and have positive charge
-        if (charge_values[i] >= lower_threshold && 
-            charge_values[i] <= outlier_threshold && 
-            charge_values[i] > 0) {
-            result.filtered_x_coords.push_back(x_coords[i]);
-            result.filtered_y_coords.push_back(y_coords[i]);
-            result.filtered_charge_values.push_back(charge_values[i]);
-        } else {
-            result.outliers_removed++;
-        }
-    }
-    
-    // If too many outliers were removed, use more lenient filtering
-    // For Lorentzian, use even more lenient thresholds due to wider tails
-    if (result.filtered_x_coords.size() < x_coords.size() / 2) {
-        if (verbose) {
-            std::cout << "RemoveLorentzianOutliers: Too many outliers detected (" << result.outliers_removed 
-                     << "), using lenient filtering (5-sigma for Lorentzian)" << std::endl;
-        }
-        
-        result.filtered_x_coords.clear();
-        result.filtered_y_coords.clear();
-        result.filtered_charge_values.clear();
-        result.outliers_removed = 0;
-        
-        // Use 5-sigma threshold for lenient filtering (more lenient than Gaussian due to wide tails)
-        double lenient_threshold = stats.median + 5.0 * stats.mad;
-        double lenient_lower = stats.median - 5.0 * stats.mad;
-        
-        for (size_t i = 0; i < charge_values.size(); ++i) {
-            if (charge_values[i] >= lenient_lower && 
-                charge_values[i] <= lenient_threshold && 
-                charge_values[i] > 0) {
-                result.filtered_x_coords.push_back(x_coords[i]);
-                result.filtered_y_coords.push_back(y_coords[i]);
-                result.filtered_charge_values.push_back(charge_values[i]);
-            } else {
-                result.outliers_removed++;
-            }
-        }
-    }
-    
-    // Final validation - ensure we have enough points remaining
-    if (result.filtered_x_coords.size() < 3) {
-        if (verbose) {
-            std::cout << "RemoveLorentzianOutliers: Warning - only " << result.filtered_x_coords.size() 
-                     << " points remain after filtering, returning original data" << std::endl;
-        }
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.outliers_removed = 0;
-    }
-    
-    result.success = true;
-    
-    if (verbose) {
-        std::cout << "RemoveLorentzianOutliers: Successfully filtered data - removed " << result.outliers_removed 
-                 << " outliers, " << result.filtered_x_coords.size() << " points remaining" << std::endl;
-    }
-    
-    return result;
-} 
-
- 
+}
