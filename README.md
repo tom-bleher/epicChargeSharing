@@ -7,9 +7,9 @@ A GEANT4-based simulation for charge sharing studies in AC-LGAD pixel sensors wi
 ### System Requirements
 - **GEANT4** v11.0+ (with Qt and OpenGL support)
 - **ROOT** v6.20+ 
-- **CMake** v3.5+
+- **CMake** v3.9+
 - **C++17** compatible compiler
-- **Ceres Solver** (non-linear optimization library)
+- **Ceres Solver** v2.0+ (non-linear optimization library)
 
 ### Installing Ceres Solver
 
