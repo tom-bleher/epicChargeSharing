@@ -9,12 +9,8 @@
 #include <iostream>
 #include <mutex>
 #include <atomic>
-#include <thread>
-#include <chrono>
-#include <sstream>
 #include <limits>
 #include <numeric>
-#include <set>
 
 // Ceres Solver includes
 #include "ceres/ceres.h"
@@ -37,7 +33,7 @@ double CalculateUncertainty(double max_charge_in_line) {
     
     // Uncertainty = 5% of max charge when enabled
     double uncertainty = 0.05 * max_charge_in_line;
-    if (uncertainty < 1e-20) uncertainty = 1e-20; // Prevent division by zero (very small for coulomb range)
+    if (uncertainty < Constants::MIN_UNCERTAINTY_VALUE) uncertainty = Constants::MIN_UNCERTAINTY_VALUE; // Prevent division by zero
     return uncertainty;
 }
 
@@ -61,8 +57,8 @@ struct GaussianCostFunction {
         
         // Robust handling of sigma
         T safe_sigma = ceres::abs(sigma);
-        if (safe_sigma < T(1e-12)) {
-            safe_sigma = T(1e-12);
+        if (safe_sigma < T(Constants::MIN_SAFE_PARAMETER)) {
+            safe_sigma = T(Constants::MIN_SAFE_PARAMETER);
         }
         
         // Gaussian function with robust exponent calculation
@@ -558,7 +554,7 @@ bool FitGaussianCeres(
             }
             
             // Set robust bounds based on physics and estimates
-            double amp_min = std::max(1e-20, estimates.amplitude * 0.01);
+            double amp_min = std::max(Constants::MIN_UNCERTAINTY_VALUE, estimates.amplitude * 0.01);
 
             double max_charge_val = *std::max_element(clean_y.begin(), clean_y.end());
             double physics_amp_max = max_charge_val * 1.5;
@@ -1215,133 +1211,3 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     
     return result;
 }
-
-// Standalone outlier removal function with boolean control
-OutlierRemovalResult RemoveOutliers(
-    const std::vector<double>& x_coords,
-    const std::vector<double>& y_coords,
-    const std::vector<double>& charge_values,
-    bool enable_outlier_removal,
-    double sigma_threshold,
-    bool verbose) {
-    
-    OutlierRemovalResult result;
-    result.outliers_removed = 0;
-    result.filtering_applied = enable_outlier_removal;
-    result.success = false;
-    
-    // Input validation
-    if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
-        if (verbose) {
-            std::cout << "RemoveOutliers: Error - coordinate and charge vector sizes don't match" << std::endl;
-        }
-        return result;
-    }
-    
-    if (x_coords.empty()) {
-        if (verbose) {
-            std::cout << "RemoveOutliers: Error - empty input vectors" << std::endl;
-        }
-        return result;
-    }
-    
-    // If outlier removal is disabled, return original data
-    if (!enable_outlier_removal) {
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.success = true;
-        
-        if (verbose) {
-            std::cout << "RemoveOutliers: Outlier removal disabled, returning original data (" 
-                     << x_coords.size() << " points)" << std::endl;
-        }
-        return result;
-    }
-    
-    if (verbose) {
-        std::cout << "RemoveOutliers: Starting outlier removal on " << x_coords.size() 
-                 << " points with sigma threshold " << sigma_threshold << std::endl;
-    }
-    
-    // Calculate robust statistics for charge values
-    DataStatistics stats = CalculateRobustStatistics(x_coords, charge_values);
-    if (!stats.valid) {
-        if (verbose) {
-            std::cout << "RemoveOutliers: Failed to calculate statistics, returning original data" << std::endl;
-        }
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.success = true;
-        return result;
-    }
-    
-    // Use MAD-based outlier detection (more robust than standard deviation)
-    double outlier_threshold = stats.median + sigma_threshold * stats.mad;
-    double lower_threshold = stats.median - sigma_threshold * stats.mad;
-    
-    // Filter outliers
-    for (size_t i = 0; i < charge_values.size(); ++i) {
-        // Keep points that are within the robust bounds and have positive charge
-        if (charge_values[i] >= lower_threshold && 
-            charge_values[i] <= outlier_threshold && 
-            charge_values[i] > 0) {
-            result.filtered_x_coords.push_back(x_coords[i]);
-            result.filtered_y_coords.push_back(y_coords[i]);
-            result.filtered_charge_values.push_back(charge_values[i]);
-        } else {
-            result.outliers_removed++;
-        }
-    }
-    
-    // If too many outliers were removed, use more lenient filtering
-    if (result.filtered_x_coords.size() < x_coords.size() / 2) {
-        if (verbose) {
-            std::cout << "RemoveOutliers: Too many outliers detected (" << result.outliers_removed 
-                     << "), using lenient filtering (4-sigma)" << std::endl;
-        }
-        
-        result.filtered_x_coords.clear();
-        result.filtered_y_coords.clear();
-        result.filtered_charge_values.clear();
-        result.outliers_removed = 0;
-        
-        // Use 4-sigma threshold for lenient filtering
-        double lenient_threshold = stats.median + 4.0 * stats.mad;
-        double lenient_lower = stats.median - 4.0 * stats.mad;
-        
-        for (size_t i = 0; i < charge_values.size(); ++i) {
-            if (charge_values[i] >= lenient_lower && 
-                charge_values[i] <= lenient_threshold && 
-                charge_values[i] > 0) {
-                result.filtered_x_coords.push_back(x_coords[i]);
-                result.filtered_y_coords.push_back(y_coords[i]);
-                result.filtered_charge_values.push_back(charge_values[i]);
-            } else {
-                result.outliers_removed++;
-            }
-        }
-    }
-    
-    // Final validation - ensure we have enough points remaining
-    if (result.filtered_x_coords.size() < 3) {
-        if (verbose) {
-            std::cout << "RemoveOutliers: Warning - only " << result.filtered_x_coords.size() 
-                     << " points remain after filtering, returning original data" << std::endl;
-        }
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.outliers_removed = 0;
-    }
-    
-    result.success = true;
-    
-    if (verbose) {
-        std::cout << "RemoveOutliers: Successfully filtered data - removed " << result.outliers_removed 
-                 << " outliers, " << result.filtered_x_coords.size() << " points remaining" << std::endl;
-    }
-    
-    return result;
-} 
