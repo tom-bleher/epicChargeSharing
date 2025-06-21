@@ -41,6 +41,8 @@ cmake_install.cmake
 # Root files
 *.root
 
+*.venv/
+
 # Editor/IDE specific files
 .vscode/
 .idea/
