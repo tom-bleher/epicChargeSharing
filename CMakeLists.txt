@@ -250,10 +250,10 @@ endif()
 message(STATUS "ROOT Libraries: ${ROOT_LIBRARIES}")
 
 # Create the executable with enhanced performance settings
-add_executable(epicToy epicToy.cc ${sources} ${headers})
+add_executable(epicChargeSharing epicChargeSharing.cc ${sources} ${headers})
 
 # Link libraries including threading support
-target_link_libraries(epicToy 
+target_link_libraries(epicChargeSharing 
     ${Geant4_LIBRARIES} 
     ${ROOT_LIBRARIES} 
     ${CERES_LIBRARIES}
@@ -262,13 +262,13 @@ target_link_libraries(epicToy
 
 # Set target-specific properties for optimization
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set_target_properties(epicToy PROPERTIES
+    set_target_properties(epicChargeSharing PROPERTIES
         COMPILE_FLAGS "-O3 -march=native -mtune=native"
     )
     
     # Enable interprocedural optimization for this target if supported
     if(LTO_SUPPORTED)
-        set_property(TARGET epicToy PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+        set_property(TARGET epicChargeSharing PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     endif()
 endif()
 
@@ -284,7 +284,7 @@ file(GLOB DATA_FILES
 )
 file(COPY ${DATA_FILES} DESTINATION ${PROJECT_BINARY_DIR})
 
-add_custom_target(ePIC DEPENDS epicToy)
+add_custom_target(ePIC DEPENDS epicChargeSharing)
 
 # Add custom target for performance build
 add_custom_target(performance

@@ -13,17 +13,17 @@
 #include "ActionInitialization.hh"
 
 void PrintUsage() {
-    G4cout << "\nUsage: ./epicToy [options] [macro_file]\n" << G4endl;
+    G4cout << "\nUsage: ./epicChargeSharing [options] [macro_file]\n" << G4endl;
     G4cout << "Options:" << G4endl;
     G4cout << "  -m, --macro [file]     : Run in batch mode with specified macro file" << G4endl;
     G4cout << "  -t, --threads [N]      : Set number of threads (default: all available cores)" << G4endl;
     G4cout << "  --single-threaded      : Force single-threaded mode" << G4endl;
     G4cout << "  -h, --help             : Print this help message" << G4endl;
     G4cout << "\nExamples:" << G4endl;
-    G4cout << "  ./epicToy                          : Interactive mode with multithreading" << G4endl;
-    G4cout << "  ./epicToy -m macro.mac             : Batch mode with multithreading" << G4endl;
-    G4cout << "  ./epicToy -m macro.mac -t 4        : Batch mode with 4 threads" << G4endl;
-    G4cout << "  ./epicToy --single-threaded        : Interactive mode, single-threaded" << G4endl;
+    G4cout << "  ./epicChargeSharing                          : Interactive mode with multithreading" << G4endl;
+    G4cout << "  ./epicChargeSharing -m macro.mac             : Batch mode with multithreading" << G4endl;
+    G4cout << "  ./epicChargeSharing -m macro.mac -t 4        : Batch mode with 4 threads" << G4endl;
+    G4cout << "  ./epicChargeSharing --single-threaded        : Interactive mode, single-threaded" << G4endl;
     G4cout << G4endl;
 }
 
