@@ -1,171 +1,107 @@
-# epicToy: LGAD Charge Sharing Simulation
+# EpicChargeSharingAnalysis
 
-A GEANT4-based Monte Carlo simulation for studying charge sharing and position reconstruction in AC-LGAD (Alternating Current Low Gain Avalanche Detector) pixel sensors.
+A GEANT4-based simulation for charge sharing studies in AC-LGAD pixel sensors with a focus on position reconstruction.
 
-## Physics Overview
+## Prerequisites
 
-### Detector Model
-- **Geometry**: Pixelated silicon detector with aluminum readout pixels
-- **Pixel Layout**: Configurable grid with $100\mu m$ pixel size and 500 μm spacing
-- **Active Volume**: $30\times 30 \mathrm{mm}^{2}$ silicon substrate ($50\mu m$ thickness)
-
-### Charge Sharing Physics
-
-When a particle deposits energy in the detector, the simulation models the following process:
-
-1. **Electron Generation**: Number of electrons produced: $N_e = E_{dep} / E_{ion}$
-2. **Amplification**: LGAD amplification factor of 20: $N_e' = N_e \times 20$
-3. **Charge Distribution**: Total charge $Q_{tot} = N_e' \times e$ is distributed across a 9×9 pixel neighborhood
-
-#### Charge Fraction Calculation
-
-For each pixel in the neighborhood, the charge fraction is calculated using:
-
-$$
-\alpha_i = \tan^{-1}\left[\frac{\ell/2 \times \sqrt{2}}{\ell/2 \times \sqrt{2} + d_i}\right]
-$$
-
-$$
-F_i = \frac{\alpha_i \times \ln(d_i/d_0)^{-1}}{\sum_j \alpha_j \times \ln(d_j/d_0)^{-1}}
-$$
-
-Where:
-- $\ell$: pixel size
-- $d_i$: distance from hit to pixel center
-- $d_0=10\mu m$: reference distance
-
-### Position Reconstruction
-
-The simulation implements 2D Gaussian fitting for position reconstruction:
-
-#### Central Row/Column Fitting
-- **X-direction**: Fit Gaussian to charge distribution along central row
-- **Y-direction**: Fit Gaussian to charge distribution along central column
-
-#### Diagonal Fitting
-- **Main diagonal**: Fit along line with slope +1
-- **Secondary diagonal**: Fit along line with slope -1
-
-All fits use the parameterized Gaussian function: 
-
-$$
-y(x) = A \exp\left(-\frac{(x-\mu)^2}{2\sigma^2}\right) + B
-$$
-
-## Build Requirements
-
-- **GEANT4** (v11.0+) with Qt and OpenGL support
-- **ROOT** (v6.20+) for data output
-- **CMake** (v3.5+)
+### System Requirements
+- **GEANT4** v11.0+ (with Qt and OpenGL support)
+- **ROOT** v6.20+ 
+- **CMake** v3.5+
 - **C++17** compatible compiler
-- **Ceres Solver**
+- **Ceres Solver** (non-linear optimization library)
+
+### Installing Ceres Solver
+
+#### Ubuntu/Debian
+```bash
+# Install dependencies
+sudo apt-get update
+sudo apt-get install cmake libgoogle-glog-dev libgflags-dev libatlas-base-dev libeigen3-dev libsuitesparse-dev
+
+# Download and build Ceres
+git clone https://ceres-solver.googlesource.com/ceres-solver
+cd ceres-solver
+mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make -j$(nproc)
+sudo make install
+```
+
+#### CentOS/RHEL/Fedora
+```bash
+# Install dependencies
+sudo yum install cmake glog-devel gflags-devel atlas-devel eigen3-devel suitesparse-devel
+# Or for newer versions: sudo dnf install ...
+
+# Build Ceres (same as above)
+git clone https://ceres-solver.googlesource.com/ceres-solver
+cd ceres-solver
+mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make -j$(nproc)
+sudo make install
+```
+
+#### macOS
+```bash
+# Using Homebrew
+brew install ceres-solver
+
+# Or build from source (if needed)
+brew install cmake eigen glog gflags suite-sparse
+git clone https://ceres-solver.googlesource.com/ceres-solver
+cd ceres-solver
+mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+make -j$(sysctl -n hw.ncpu)
+sudo make install
+```
 
 ## Installation
 
 ### Environment Setup
 ```bash
-source ~/Geant4/geant4-v11.3.1-install/share/Geant4/geant4make/geant4make.sh
-export QT_QPA_PLATFORM=xcb
+# Source GEANT4 environment
+source /path/to/geant4-install/share/Geant4/geant4make/geant4make.sh
+export QT_QPA_PLATFORM=xcb  # For GUI mode
 ```
 
-### Build Process
+### Build
 ```bash
+git clone https://github.com/tom-bleher/EpicChargeSharingAnalysis.git
+cd EpicChargeSharingAnalysis
 mkdir build && cd build
-cmake .. && make -j5
+cmake ..
+make -j$(nproc)
 ```
 
 ## Usage
 
 ### Interactive Mode (GUI)
 ```bash
-./epicToy
+./epicChargeSharing
 ```
 
 ### Batch Mode
 ```bash
-./epicToy -m ../macros/run.mac
+./epicChargeSharing -m ../macros/run.mac
 ```
 
-## Output Data Structure
-
-The simulation generates ROOT files with the following branches:
-
-### Event Information
-| Branch | Type | Units | Description |
-|--------|------|-------|-------------|
-| `Edep` | Double | MeV | Energy deposited in detector |
-| `TrueX/Y/Z` | Double | mm | True hit position |
-| `PixelX/Y/Z` | Double | mm | Nearest pixel center |
-| `PixelI/J` | Integer | - | Pixel grid indices |
-| `PixelHit` | Boolean | - | Direct pixel hit flag |
-
-### Charge Sharing Data (Non-Pixel Hits)
-| Branch | Type | Description |
-|--------|------|-------------|
-| `GridNeighborhoodAngles` | Vector<Double> | Alpha angles for 9×9 grid |
-| `GridNeighborhoodChargeFractions` | Vector<Double> | Charge fractions per pixel |
-| `GridNeighborhoodCharge` | Vector<Double> | Actual charge values [C] |
-
-### Gaussian Fit Results
-| Branch | Type | Description |
-|--------|------|-------------|
-| `Fit2D_XCenter/YCenter` | Double | Fitted position from row/column |
-| `Fit2D_XSigma/YSigma` | Double | Fitted width parameters |
-| `Fit2D_XAmplitude/YAmplitude` | Double | Fitted amplitudes |
-| `Fit2D_X*Err/Y*Err` | Double | Parameter uncertainties |
-| `Fit2D_XChi2red/YChi2red` | Double | Reduced $$\chi^2$$ values |
-| `FitDiag_Main*/Sec*` | Double | Diagonal fit results |
-
-### Delta Variables
-| Branch | Type | Description |
-|--------|------|-------------|
-| `PixelTrueDeltaX/Y` | Double | Pixel center - true position |
-| `GaussTrueDeltaX/Y` | Double | Fitted center - true position |
-
-## Hit Classification
-
-Events are classified into two categories:
-
-1. **Pixel Hits** (`PixelHit = true`):
-   - Direct hits on pixel covered areas
-   - No charge sharing performed, all charge disposed in pixel
-
-2. **Non-Pixel Hits** (`PixelHit = false`):
-   - Hits farther than $$d_0$$ from pixel centers
-   - Subject to charge sharing and Gaussian fitting
-
-## Key Algorithms
-
-### 2D Gaussian Fitting
-- **Method**: Levenberg-Marquardt optimization
-- **Convergence**: Analytical derivatives with damping factor adjustment
-- **Error Estimation**: Curvature-based parameter uncertainties
-- **Success Criteria**: Minimum 3 data points, stable convergence
-
-### Neighborhood Construction
-- **Grid Size**: 9×9 pixels (radius = 4)
-- **Center**: Nearest pixel to true hit position
-- **Boundary**: Rectangular grid aligned with detector axes
-
-## Physics Validation
-
-The simulation includes several validation mechanisms:
-- Energy conservation checks
-- Charge fraction normalization ($\sum F_i = 1$)
-- Geometric consistency verification
-- Fit quality assessment ($\chi^2/\text{NDF}$)
-
-## Project Structure
+## Repository Structure
 
 ```
-epicToy/
-├── src/                    # Implementation files
-│   ├── DetectorConstruction.cc  # Detector geometry
-│   ├── EventAction.cc           # Event processing & charge sharing
-│   ├── RunAction.cc             # ROOT output management
-│   ├── 2DGaussianFitCeres.cc         # Fitting algorithms
+EpicChargeSharingAnalysis/
+├── src/                          # Source implementation
+│   ├── DetectorConstruction.cc   # Detector geometry
+│   ├── EventAction.cc            # Event processing & charge sharing
+│   ├── 2DGaussianFitCeres.cc     # Position reconstruction
 │   └── ...
-├── include/                # Header files
-├── macros/                 # GEANT4 macro files
-└── build/                  # Build directory
+├── include/                      # Header files
+├── macros/                       # GEANT4 macro files
+└── CMakeLists.txt               # Build configuration
 ```
+
+## Contact
+
+For questions or contributions, please open an issue on GitHub or contact me.
