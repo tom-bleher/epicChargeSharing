@@ -799,16 +799,10 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
         result.x_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
         result.x_pp = (result.x_chi2red > 0) ? 1.0 - std::min(1.0, result.x_chi2red / 10.0) : 0.0;
         
-        // Calculate 3x3 charge errors for central row
-        std::vector<double> x_row_errors = Calculate3x3ChargeErrors(
-            row_x_coords, row_y_coords, y_vals,
-            x_coords, y_coords, charge_values,
-            pixel_spacing, verbose);
-        
         // Store data for ROOT analysis
         result.x_row_pixel_coords = x_vals;
         result.x_row_charge_values = y_vals;
-        result.x_row_charge_errors = x_row_errors;
+        result.x_row_charge_errors = std::vector<double>(); // Empty vector
     }
     
     // Fit Y direction (central column)
@@ -842,16 +836,10 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
         result.y_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
         result.y_pp = (result.y_chi2red > 0) ? 1.0 - std::min(1.0, result.y_chi2red / 10.0) : 0.0;
         
-        // Calculate 3x3 charge errors for central column
-        std::vector<double> y_col_errors = Calculate3x3ChargeErrors(
-            col_x_coords, col_y_coords, y_vals,
-            x_coords, y_coords, charge_values,
-            pixel_spacing, verbose);
-        
         // Store data for ROOT analysis
         result.y_col_pixel_coords = x_vals;  // Y coordinates
         result.y_col_charge_values = y_vals;
-        result.y_col_charge_errors = y_col_errors;
+        result.y_col_charge_errors = std::vector<double>(); // Empty vector
     }
     
     // Set overall success status
@@ -1033,24 +1021,10 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
             result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
             result.main_diag_x_fit_successful = main_diag_x_success;
             
-            // Calculate 3x3 charge errors for main diagonal X
-            // Create corresponding Y coordinates for each X coordinate on the main diagonal
-            std::vector<double> main_diag_x_coords, main_diag_y_coords;
-            for (size_t i = 0; i < x_sorted.size(); ++i) {
-                main_diag_x_coords.push_back(x_sorted[i]);
-                // For main diagonal: y = x - diagonal_offset
-                main_diag_y_coords.push_back(x_sorted[i] - best_main_diag_id);
-            }
-            
-            std::vector<double> main_diag_x_errors = Calculate3x3ChargeErrors(
-                main_diag_x_coords, main_diag_y_coords, charge_x_sorted,
-                x_coords, y_coords, charge_values,
-                pixel_spacing, verbose);
-            
             // Store data for ROOT analysis
             result.main_diag_x_pixel_coords = x_sorted;
             result.main_diag_x_charge_values = charge_x_sorted;
-            result.main_diag_x_charge_errors = main_diag_x_errors;
+            result.main_diag_x_charge_errors = std::vector<double>(); // Empty vector
         }
     }
     
@@ -1097,24 +1071,10 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
             result.main_diag_y_pp = (result.main_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_y_chi2red / 10.0) : 0.0;
             result.main_diag_y_fit_successful = main_diag_y_success;
             
-            // Calculate 3x3 charge errors for main diagonal Y
-            // Create corresponding X coordinates for each Y coordinate on the main diagonal
-            std::vector<double> main_diag_x_coords_y, main_diag_y_coords_y;
-            for (size_t i = 0; i < y_sorted.size(); ++i) {
-                // For main diagonal: x = y + diagonal_offset
-                main_diag_x_coords_y.push_back(y_sorted[i] + best_main_diag_id);
-                main_diag_y_coords_y.push_back(y_sorted[i]);
-            }
-            
-            std::vector<double> main_diag_y_errors = Calculate3x3ChargeErrors(
-                main_diag_x_coords_y, main_diag_y_coords_y, charge_y_sorted,
-                x_coords, y_coords, charge_values,
-                pixel_spacing, verbose);
-            
             // Store data for ROOT analysis
             result.main_diag_y_pixel_coords = y_sorted;
             result.main_diag_y_charge_values = charge_y_sorted;
-            result.main_diag_y_charge_errors = main_diag_y_errors;
+            result.main_diag_y_charge_errors = std::vector<double>(); // Empty vector
         }
     }
     
@@ -1161,24 +1121,10 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
             result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
             result.sec_diag_x_fit_successful = sec_diag_x_success;
             
-            // Calculate 3x3 charge errors for secondary diagonal X
-            // Create corresponding Y coordinates for each X coordinate on the secondary diagonal
-            std::vector<double> sec_diag_x_coords, sec_diag_y_coords;
-            for (size_t i = 0; i < x_sorted.size(); ++i) {
-                sec_diag_x_coords.push_back(x_sorted[i]);
-                // For secondary diagonal: y = -x + diagonal_offset
-                sec_diag_y_coords.push_back(best_sec_diag_id - x_sorted[i]);
-            }
-            
-            std::vector<double> sec_diag_x_errors = Calculate3x3ChargeErrors(
-                sec_diag_x_coords, sec_diag_y_coords, charge_x_sorted,
-                x_coords, y_coords, charge_values,
-                pixel_spacing, verbose);
-            
             // Store data for ROOT analysis
             result.sec_diag_x_pixel_coords = x_sorted;
             result.sec_diag_x_charge_values = charge_x_sorted;
-            result.sec_diag_x_charge_errors = sec_diag_x_errors;
+            result.sec_diag_x_charge_errors = std::vector<double>(); // Empty vector
         }
     }
     
@@ -1225,24 +1171,10 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
             result.sec_diag_y_pp = (result.sec_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_y_chi2red / 10.0) : 0.0;
             result.sec_diag_y_fit_successful = sec_diag_y_success;
             
-            // Calculate 3x3 charge errors for secondary diagonal Y
-            // Create corresponding X coordinates for each Y coordinate on the secondary diagonal
-            std::vector<double> sec_diag_x_coords_y, sec_diag_y_coords_y;
-            for (size_t i = 0; i < y_sorted.size(); ++i) {
-                // For secondary diagonal: x = -y + diagonal_offset
-                sec_diag_x_coords_y.push_back(best_sec_diag_id - y_sorted[i]);
-                sec_diag_y_coords_y.push_back(y_sorted[i]);
-            }
-            
-            std::vector<double> sec_diag_y_errors = Calculate3x3ChargeErrors(
-                sec_diag_x_coords_y, sec_diag_y_coords_y, charge_y_sorted,
-                x_coords, y_coords, charge_values,
-                pixel_spacing, verbose);
-            
             // Store data for ROOT analysis
             result.sec_diag_y_pixel_coords = y_sorted;
             result.sec_diag_y_charge_values = charge_y_sorted;
-            result.sec_diag_y_charge_errors = sec_diag_y_errors;
+            result.sec_diag_y_charge_errors = std::vector<double>(); // Empty vector
         }
     }
     
@@ -1393,106 +1325,4 @@ LorentzianOutlierRemovalResult RemoveLorentzianOutliers(
     return result;
 } 
 
-// Function to calculate charge errors based on 3x3 neighborhood around each pixel
-std::vector<double> Calculate3x3ChargeErrors(
-    const std::vector<double>& line_x_coords,
-    const std::vector<double>& line_y_coords,
-    const std::vector<double>& line_charge_values,
-    const std::vector<double>& all_x_coords,
-    const std::vector<double>& all_y_coords,
-    const std::vector<double>& all_charge_values,
-    double pixel_spacing,
-    bool verbose) {
-    
-    std::vector<double> charge_errors;
-    
-    // Input validation
-    if (line_x_coords.size() != line_y_coords.size() || 
-        line_x_coords.size() != line_charge_values.size() ||
-        all_x_coords.size() != all_y_coords.size() ||
-        all_x_coords.size() != all_charge_values.size()) {
-        if (verbose) {
-            std::cout << "Calculate3x3ChargeErrors: Error - coordinate and charge vector sizes don't match" << std::endl;
-        }
-        return charge_errors;
-    }
-    
-    if (line_x_coords.empty() || all_x_coords.empty()) {
-        if (verbose) {
-            std::cout << "Calculate3x3ChargeErrors: Error - empty input vectors" << std::endl;
-        }
-        return charge_errors;
-    }
-    
-    if (verbose) {
-        std::cout << "Calculate3x3ChargeErrors: Calculating errors for " << line_x_coords.size() 
-                 << " pixels using " << all_x_coords.size() << " total pixels" << std::endl;
-    }
-    
-    // For each pixel on the line, find its 3x3 neighborhood and calculate error
-    for (size_t i = 0; i < line_x_coords.size(); ++i) {
-        double center_x = line_x_coords[i];
-        double center_y = line_y_coords[i];
-        
-        // Find all pixels within 3x3 neighborhood (1.5 pixel spacing radius)
-        std::vector<double> neighborhood_charges;
-        double search_radius = 1.5 * pixel_spacing;
-        
-        // Add the center pixel itself
-        neighborhood_charges.push_back(line_charge_values[i]);
-        
-        // Search for neighboring pixels in the full dataset
-        for (size_t j = 0; j < all_x_coords.size(); ++j) {
-            double dx = std::abs(all_x_coords[j] - center_x);
-            double dy = std::abs(all_y_coords[j] - center_y);
-            
-            // Skip the center pixel (already added)
-            if (dx < pixel_spacing * 0.1 && dy < pixel_spacing * 0.1) {
-                continue;
-            }
-            
-            // Check if pixel is within 3x3 neighborhood
-            if (dx <= search_radius && dy <= search_radius) {
-                neighborhood_charges.push_back(all_charge_values[j]);
-            }
-        }
-        
-        // Calculate error as (q_max - q_min) / sqrt(12)
-        double charge_error = 0.0;
-        
-        if (neighborhood_charges.size() >= 2) {
-            double q_max = *std::max_element(neighborhood_charges.begin(), neighborhood_charges.end());
-            double q_min = *std::min_element(neighborhood_charges.begin(), neighborhood_charges.end());
-            
-            // Calculate error: (q_max - q_min) / sqrt(12)
-            charge_error = (q_max - q_min) / std::sqrt(12.0);
-            
-            if (verbose) {
-                std::cout << "Pixel (" << center_x << ", " << center_y << "): " 
-                         << neighborhood_charges.size() << " neighbors, "
-                         << "q_min=" << q_min << ", q_max=" << q_max 
-                         << ", error=" << charge_error << std::endl;
-            }
-        } else {
-            // Fallback: use a fraction of the pixel's own charge as error
-            charge_error = std::max(0.1 * line_charge_values[i], 1.0);
-            
-            if (verbose) {
-                std::cout << "Pixel (" << center_x << ", " << center_y << "): insufficient neighbors (" 
-                         << neighborhood_charges.size() << "), using fallback error=" << charge_error << std::endl;
-            }
-        }
-        
-        // Ensure error is positive and reasonable
-        charge_error = std::max(charge_error, 0.01 * line_charge_values[i]);
-        charge_error = std::min(charge_error, 10.0 * line_charge_values[i]);
-        
-        charge_errors.push_back(charge_error);
-    }
-    
-    if (verbose) {
-        std::cout << "Calculate3x3ChargeErrors: Calculated " << charge_errors.size() << " charge errors" << std::endl;
-    }
-    
-    return charge_errors;
-} 
+ 
