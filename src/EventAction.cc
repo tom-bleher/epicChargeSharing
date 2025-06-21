@@ -4,7 +4,7 @@
 #include "Constants.hh"
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
-#include "2DSkewedLorentzianFitCeres.hh"
+#include "2DPowerLorentzianFitCeres.hh"
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
@@ -367,93 +367,93 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
       
       // ===============================================
-      // SKEWED LORENTZIAN FITTING (conditionally enabled)
+      // POWER-LAW LORENTZIAN FITTING (conditionally enabled)
       // ===============================================
       
-      // Perform 2D Skewed Lorentzian fitting if we have enough data points and Skewed Lorentzian fitting is enabled
-      if (x_coords.size() >= 3 && Constants::ENABLE_SKEWED_LORENTZIAN_FITTING && Constants::ENABLE_2D_FITTING) { // Need at least 3 points for Skewed Lorentzian fit
-        // Perform 2D Skewed Lorentzian fitting using the Ceres Solver implementation
-        SkewedLorentzianFit2DResultsCeres skewedLorentzFitResults = Fit2DSkewedLorentzianCeres(
+      // Perform 2D Power-Law Lorentzian fitting if we have enough data points and Power-Law Lorentzian fitting is enabled
+      if (x_coords.size() >= 3 && Constants::ENABLE_POWER_LORENTZIAN_FITTING && Constants::ENABLE_2D_FITTING) { // Need at least 3 points for Power-Law Lorentzian fit
+        // Perform 2D Power-Law Lorentzian fitting using the Ceres Solver implementation
+        PowerLorentzianFit2DResultsCeres powerLorentzFitResults = Fit2DPowerLorentzianCeres(
           x_coords, y_coords, charge_values,
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
           false, // verbose=false for production
           false); // enable_outlier_filtering
         
-        if (skewedLorentzFitResults.fit_successful) {
+        if (powerLorentzFitResults.fit_successful) {
           // Removed verbose debug output for cleaner simulation logs
         }
         
-        // Pass 2D Skewed Lorentzian fit results to RunAction
-        fRunAction->Set2DSkewedLorentzianFitResults(
-          skewedLorentzFitResults.x_center, skewedLorentzFitResults.x_beta, skewedLorentzFitResults.x_lambda, skewedLorentzFitResults.x_gamma, skewedLorentzFitResults.x_amplitude,
-          skewedLorentzFitResults.x_center_err, skewedLorentzFitResults.x_beta_err, skewedLorentzFitResults.x_lambda_err, skewedLorentzFitResults.x_gamma_err, skewedLorentzFitResults.x_amplitude_err,
-          skewedLorentzFitResults.x_vertical_offset, skewedLorentzFitResults.x_vertical_offset_err,
-          skewedLorentzFitResults.x_chi2red, skewedLorentzFitResults.x_pp, skewedLorentzFitResults.x_dof,
-          skewedLorentzFitResults.y_center, skewedLorentzFitResults.y_beta, skewedLorentzFitResults.y_lambda, skewedLorentzFitResults.y_gamma, skewedLorentzFitResults.y_amplitude,
-          skewedLorentzFitResults.y_center_err, skewedLorentzFitResults.y_beta_err, skewedLorentzFitResults.y_lambda_err, skewedLorentzFitResults.y_gamma_err, skewedLorentzFitResults.y_amplitude_err,
-          skewedLorentzFitResults.y_vertical_offset, skewedLorentzFitResults.y_vertical_offset_err,
-          skewedLorentzFitResults.y_chi2red, skewedLorentzFitResults.y_pp, skewedLorentzFitResults.y_dof,
-          skewedLorentzFitResults.fit_successful);
+        // Pass 2D Power-Law Lorentzian fit results to RunAction
+        fRunAction->Set2DPowerLorentzianFitResults(
+          powerLorentzFitResults.x_center, powerLorentzFitResults.x_gamma, powerLorentzFitResults.x_beta, powerLorentzFitResults.x_amplitude,
+          powerLorentzFitResults.x_center_err, powerLorentzFitResults.x_gamma_err, powerLorentzFitResults.x_beta_err, powerLorentzFitResults.x_amplitude_err,
+          powerLorentzFitResults.x_vertical_offset, powerLorentzFitResults.x_vertical_offset_err,
+          powerLorentzFitResults.x_chi2red, powerLorentzFitResults.x_pp, powerLorentzFitResults.x_dof,
+          powerLorentzFitResults.y_center, powerLorentzFitResults.y_gamma, powerLorentzFitResults.y_beta, powerLorentzFitResults.y_amplitude,
+          powerLorentzFitResults.y_center_err, powerLorentzFitResults.y_gamma_err, powerLorentzFitResults.y_beta_err, powerLorentzFitResults.y_amplitude_err,
+          powerLorentzFitResults.y_vertical_offset, powerLorentzFitResults.y_vertical_offset_err,
+          powerLorentzFitResults.y_chi2red, powerLorentzFitResults.y_pp, powerLorentzFitResults.y_dof,
+          powerLorentzFitResults.fit_successful);
           
-        // Perform diagonal Skewed Lorentzian fitting if 2D fitting was performed and successful and diagonal fitting is enabled
-        if (skewedLorentzFitResults.fit_successful && Constants::ENABLE_DIAGONAL_FITTING) {
-          // Perform diagonal Skewed Lorentzian fitting using the Ceres Solver implementation
-          DiagonalSkewedLorentzianFitResultsCeres skewedLorentzDiagResults = FitDiagonalSkewedLorentzianCeres(
+        // Perform diagonal Power-Law Lorentzian fitting if 2D fitting was performed and successful and diagonal fitting is enabled
+        if (powerLorentzFitResults.fit_successful && Constants::ENABLE_DIAGONAL_FITTING) {
+          // Perform diagonal Power-Law Lorentzian fitting using the Ceres Solver implementation
+          DiagonalPowerLorentzianFitResultsCeres powerLorentzDiagResults = FitDiagonalPowerLorentzianCeres(
           x_coords, y_coords, charge_values,
           nearestPixel.x(), nearestPixel.y(),
           pixelSpacing, 
           false, // verbose=false for production
           false); // enable_outlier_filtering
         
-        if (skewedLorentzDiagResults.fit_successful) {
+        if (powerLorentzDiagResults.fit_successful) {
           // Removed verbose debug output for cleaner simulation logs
         }
         
-        // Pass diagonal Skewed Lorentzian fit results to RunAction
-        fRunAction->SetDiagonalSkewedLorentzianFitResults(
-          skewedLorentzDiagResults.main_diag_x_center, skewedLorentzDiagResults.main_diag_x_beta, skewedLorentzDiagResults.main_diag_x_lambda, skewedLorentzDiagResults.main_diag_x_gamma, skewedLorentzDiagResults.main_diag_x_amplitude,
-          skewedLorentzDiagResults.main_diag_x_center_err, skewedLorentzDiagResults.main_diag_x_beta_err, skewedLorentzDiagResults.main_diag_x_lambda_err, skewedLorentzDiagResults.main_diag_x_gamma_err, skewedLorentzDiagResults.main_diag_x_amplitude_err,
-          skewedLorentzDiagResults.main_diag_x_vertical_offset, skewedLorentzDiagResults.main_diag_x_vertical_offset_err,
-          skewedLorentzDiagResults.main_diag_x_chi2red, skewedLorentzDiagResults.main_diag_x_pp, skewedLorentzDiagResults.main_diag_x_dof, skewedLorentzDiagResults.main_diag_x_fit_successful,
-          skewedLorentzDiagResults.main_diag_y_center, skewedLorentzDiagResults.main_diag_y_beta, skewedLorentzDiagResults.main_diag_y_lambda, skewedLorentzDiagResults.main_diag_y_gamma, skewedLorentzDiagResults.main_diag_y_amplitude,
-          skewedLorentzDiagResults.main_diag_y_center_err, skewedLorentzDiagResults.main_diag_y_beta_err, skewedLorentzDiagResults.main_diag_y_lambda_err, skewedLorentzDiagResults.main_diag_y_gamma_err, skewedLorentzDiagResults.main_diag_y_amplitude_err,
-          skewedLorentzDiagResults.main_diag_y_vertical_offset, skewedLorentzDiagResults.main_diag_y_vertical_offset_err,
-          skewedLorentzDiagResults.main_diag_y_chi2red, skewedLorentzDiagResults.main_diag_y_pp, skewedLorentzDiagResults.main_diag_y_dof, skewedLorentzDiagResults.main_diag_y_fit_successful,
-          skewedLorentzDiagResults.sec_diag_x_center, skewedLorentzDiagResults.sec_diag_x_beta, skewedLorentzDiagResults.sec_diag_x_lambda, skewedLorentzDiagResults.sec_diag_x_gamma, skewedLorentzDiagResults.sec_diag_x_amplitude,
-          skewedLorentzDiagResults.sec_diag_x_center_err, skewedLorentzDiagResults.sec_diag_x_beta_err, skewedLorentzDiagResults.sec_diag_x_lambda_err, skewedLorentzDiagResults.sec_diag_x_gamma_err, skewedLorentzDiagResults.sec_diag_x_amplitude_err,
-          skewedLorentzDiagResults.sec_diag_x_vertical_offset, skewedLorentzDiagResults.sec_diag_x_vertical_offset_err,
-          skewedLorentzDiagResults.sec_diag_x_chi2red, skewedLorentzDiagResults.sec_diag_x_pp, skewedLorentzDiagResults.sec_diag_x_dof, skewedLorentzDiagResults.sec_diag_x_fit_successful,
-          skewedLorentzDiagResults.sec_diag_y_center, skewedLorentzDiagResults.sec_diag_y_beta, skewedLorentzDiagResults.sec_diag_y_lambda, skewedLorentzDiagResults.sec_diag_y_gamma, skewedLorentzDiagResults.sec_diag_y_amplitude,
-          skewedLorentzDiagResults.sec_diag_y_center_err, skewedLorentzDiagResults.sec_diag_y_beta_err, skewedLorentzDiagResults.sec_diag_y_lambda_err, skewedLorentzDiagResults.sec_diag_y_gamma_err, skewedLorentzDiagResults.sec_diag_y_amplitude_err,
-          skewedLorentzDiagResults.sec_diag_y_vertical_offset, skewedLorentzDiagResults.sec_diag_y_vertical_offset_err,
-          skewedLorentzDiagResults.sec_diag_y_chi2red, skewedLorentzDiagResults.sec_diag_y_pp, skewedLorentzDiagResults.sec_diag_y_dof, skewedLorentzDiagResults.sec_diag_y_fit_successful,
-          skewedLorentzDiagResults.fit_successful);
-          
+        // Pass diagonal Power-Law Lorentzian fit results to RunAction
+        fRunAction->SetDiagonalPowerLorentzianFitResults(
+          powerLorentzDiagResults.main_diag_x_center, powerLorentzDiagResults.main_diag_x_gamma, powerLorentzDiagResults.main_diag_x_beta, powerLorentzDiagResults.main_diag_x_amplitude,
+          powerLorentzDiagResults.main_diag_x_center_err, powerLorentzDiagResults.main_diag_x_gamma_err, powerLorentzDiagResults.main_diag_x_beta_err, powerLorentzDiagResults.main_diag_x_amplitude_err,
+          powerLorentzDiagResults.main_diag_x_vertical_offset, powerLorentzDiagResults.main_diag_x_vertical_offset_err,
+          powerLorentzDiagResults.main_diag_x_chi2red, powerLorentzDiagResults.main_diag_x_pp, powerLorentzDiagResults.main_diag_x_dof, powerLorentzDiagResults.main_diag_x_fit_successful,
+          powerLorentzDiagResults.main_diag_y_center, powerLorentzDiagResults.main_diag_y_gamma, powerLorentzDiagResults.main_diag_y_beta, powerLorentzDiagResults.main_diag_y_amplitude,
+          powerLorentzDiagResults.main_diag_y_center_err, powerLorentzDiagResults.main_diag_y_gamma_err, powerLorentzDiagResults.main_diag_y_beta_err, powerLorentzDiagResults.main_diag_y_amplitude_err,
+          powerLorentzDiagResults.main_diag_y_vertical_offset, powerLorentzDiagResults.main_diag_y_vertical_offset_err,
+          powerLorentzDiagResults.main_diag_y_chi2red, powerLorentzDiagResults.main_diag_y_pp, powerLorentzDiagResults.main_diag_y_dof, powerLorentzDiagResults.main_diag_y_fit_successful,
+          powerLorentzDiagResults.sec_diag_x_center, powerLorentzDiagResults.sec_diag_x_gamma, powerLorentzDiagResults.sec_diag_x_beta, powerLorentzDiagResults.sec_diag_x_amplitude,
+          powerLorentzDiagResults.sec_diag_x_center_err, powerLorentzDiagResults.sec_diag_x_gamma_err, powerLorentzDiagResults.sec_diag_x_beta_err, powerLorentzDiagResults.sec_diag_x_amplitude_err,
+          powerLorentzDiagResults.sec_diag_x_vertical_offset, powerLorentzDiagResults.sec_diag_x_vertical_offset_err,
+          powerLorentzDiagResults.sec_diag_x_chi2red, powerLorentzDiagResults.sec_diag_x_pp, powerLorentzDiagResults.sec_diag_x_dof, powerLorentzDiagResults.sec_diag_x_fit_successful,
+          powerLorentzDiagResults.sec_diag_y_center, powerLorentzDiagResults.sec_diag_y_gamma, powerLorentzDiagResults.sec_diag_y_beta, powerLorentzDiagResults.sec_diag_y_amplitude,
+          powerLorentzDiagResults.sec_diag_y_center_err, powerLorentzDiagResults.sec_diag_y_gamma_err, powerLorentzDiagResults.sec_diag_y_beta_err, powerLorentzDiagResults.sec_diag_y_amplitude_err,
+          powerLorentzDiagResults.sec_diag_y_vertical_offset, powerLorentzDiagResults.sec_diag_y_vertical_offset_err,
+          powerLorentzDiagResults.sec_diag_y_chi2red, powerLorentzDiagResults.sec_diag_y_pp, powerLorentzDiagResults.sec_diag_y_dof, powerLorentzDiagResults.sec_diag_y_fit_successful,
+          powerLorentzDiagResults.fit_successful);
+
       } else {
-        // Set default diagonal Skewed Lorentzian fit values when 2D fitting failed
-        fRunAction->SetDiagonalSkewedLorentzianFitResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        // Set default diagonal Power-Law Lorentzian fit values when 2D fitting failed
+        fRunAction->SetDiagonalPowerLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, beta, amplitude, center_err, gamma_err, beta_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
           false); // fit_successful = false
       }
         
     } else {
-      // Not enough data points for Skewed Lorentzian fitting or Skewed Lorentzian fitting is disabled
-      if (Constants::ENABLE_SKEWED_LORENTZIAN_FITTING) {
-        fRunAction->Set2DSkewedLorentzianFitResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+      // Not enough data points for Power-Law Lorentzian fitting or Power-Law Lorentzian fitting is disabled
+      if (Constants::ENABLE_POWER_LORENTZIAN_FITTING) {
+        fRunAction->Set2DPowerLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, beta, amplitude, center_err, gamma_err, beta_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
           false); // fit_successful = false
         
-        // Set default diagonal Skewed Lorentzian fit values when not enough data points
-        fRunAction->SetDiagonalSkewedLorentzianFitResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+        // Set default diagonal Power-Law Lorentzian fit values when not enough data points
+        fRunAction->SetDiagonalPowerLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, beta, amplitude, center_err, gamma_err, beta_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
           false); // fit_successful = false
       }
     }
@@ -536,19 +536,19 @@ void EventAction::EndOfEventAction(const G4Event* event)
         false); // fit_successful = false
     }
     
-    // Set default Skewed Lorentzian values (no fitting performed or Skewed Lorentzian fitting is disabled)
-    if (Constants::ENABLE_SKEWED_LORENTZIAN_FITTING) {
-      fRunAction->Set2DSkewedLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+    // Set default Power-Law Lorentzian values (no fitting performed or Power-Law Lorentzian fitting is disabled)
+    if (Constants::ENABLE_POWER_LORENTZIAN_FITTING) {
+      fRunAction->Set2DPowerLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, beta, amplitude, center_err, gamma_err, beta_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
         false); // fit_successful = false
       
-      // Set default diagonal Skewed Lorentzian fit values when fitting is skipped
-      fRunAction->SetDiagonalSkewedLorentzianFitResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, beta, lambda, gamma, amplitude, center_err, beta_err, lambda_err, gamma_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
+      // Set default diagonal Power-Law Lorentzian fit values when fitting is skipped
+      fRunAction->SetDiagonalPowerLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, beta, amplitude, center_err, gamma_err, beta_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof, fit_successful)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
         false); // fit_successful = false
     }
 
