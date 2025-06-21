@@ -45,7 +45,11 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fMinAutoRadius(Constants::MIN_AUTO_RADIUS),
   fMaxAutoRadius(Constants::MAX_AUTO_RADIUS),
   fSelectedRadius(4),
-  fSelectedFitQuality(0.0)
+  fSelectedFitQuality(0.0),
+  fIonizationEnergy(Constants::IONIZATION_ENERGY),
+  fAmplificationFactor(Constants::AMPLIFICATION_FACTOR),
+  fD0(Constants::D0_CHARGE_SHARING),
+  fElementaryCharge(Constants::ELEMENTARY_CHARGE)
 { 
   G4cout << "EventAction: Using 2D Gaussian fitting for central row and column" << G4endl;
 }
@@ -725,8 +729,9 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
   fPixelIndexJ = j;
   
   // Calculate and store distance from hit to pixel center (2D distance in detector plane)
-  fActualPixelDistance = std::sqrt(std::pow(position.x() - pixelX, 2) + 
-                            std::pow(position.y() - pixelY, 2));
+  G4double dx = position.x() - pixelX;
+  G4double dy = position.y() - pixelY;
+  fActualPixelDistance = std::sqrt(dx*dx + dy*dy);
   
   // Calculate and store delta values (pixel center - true position)
   fPixelTrueDeltaX = pixelX - position.x();
@@ -764,8 +769,9 @@ G4double EventAction::CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4in
   G4double pixelCenterZ = detectorPosition.z();
   
   // Calculate distance from hit position to pixel center (2D distance in XY plane)
-  G4double d = std::sqrt(std::pow(hitPosition.x() - pixelCenterX, 2) + 
-                        std::pow(hitPosition.y() - pixelCenterY, 2));
+  G4double dx = hitPosition.x() - pixelCenterX;
+  G4double dy = hitPosition.y() - pixelCenterY;
+  G4double d = std::sqrt(dx*dx + dy*dy);
   
   // Use the pixel size as l (side of the pixel pad)
   G4double l = pixelSize;
@@ -864,8 +870,9 @@ G4double EventAction::CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
                                                   G4double pixelWidth, G4double pixelHeight)
 {
   // Calculate distance from hit position to pixel center (2D distance in XY plane)
-  G4double d = std::sqrt(std::pow(hitX - pixelCenterX, 2) + 
-                        std::pow(hitY - pixelCenterY, 2));
+  G4double dx = hitX - pixelCenterX;
+  G4double dy = hitY - pixelCenterY;
+  G4double d = std::sqrt(dx*dx + dy*dy);
   
   // Use the pixel size as l (side of the pixel pad)
   // For simplicity, use the average of width and height if they differ
@@ -935,17 +942,18 @@ void EventAction::CalculateNeighborhoodChargeSharing()
           fNonPixel_GridNeighborhoodChargeFractions.push_back(0.0);
           fNonPixel_GridNeighborhoodCharge.push_back(0.0);
           
-          // Calculate distance to this pixel center for completeness
-          G4double pixelSize = fDetector->GetPixelSize();
-          G4double pixelSpacing = fDetector->GetPixelSpacing();
-          G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
-          G4double detSize = fDetector->GetDetSize();
-          G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
-          
-          G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
-          G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
-          G4double distance = std::sqrt(std::pow(fPosition.x() - pixelCenterX, 2) + 
-                                       std::pow(fPosition.y() - pixelCenterY, 2));
+        // Calculate distance to this pixel center for completeness
+        G4double pixelSize = fDetector->GetPixelSize();
+        G4double pixelSpacing = fDetector->GetPixelSpacing();
+        G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
+        G4double detSize = fDetector->GetDetSize();
+        G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
+        
+        G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
+        G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
+        G4double dx = fPosition.x() - pixelCenterX;
+        G4double dy = fPosition.y() - pixelCenterY;
+        G4double distance = std::sqrt(dx*dx + dy*dy);
           fNonPixel_GridNeighborhoodDistances.push_back(distance);
         } else {
           // This pixel is outside the detector bounds
@@ -1011,8 +1019,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
       G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
       
       // Calculate the distance from the hit to the pixel center (in mm)
-      G4double distance = std::sqrt(std::pow(fPosition.x() - pixelCenterX, 2) + 
-                                   std::pow(fPosition.y() - pixelCenterY, 2));
+      G4double dx = fPosition.x() - pixelCenterX;
+      G4double dy = fPosition.y() - pixelCenterY;
+      G4double distance = std::sqrt(dx*dx + dy*dy);
       
       // Calculate the alpha angle for this pixel using the same algorithm as elsewhere
       G4double alpha = CalculatePixelAlphaSubtended(fPosition.x(), fPosition.y(), 
@@ -1029,7 +1038,12 @@ void EventAction::CalculateNeighborhoodChargeSharing()
       // Handle the case where distance might be very small or zero
       G4double weight = 0.0;
       if (distance > d0_mm) {
-        weight = alpha * (1.0 / std::log(distance / d0_mm));
+        // Clamp the logarithm to avoid infinite weights when d ≈ d0
+        G4double logArg = distance / d0_mm;
+        G4double logValue = std::log(logArg);
+        // Clamp log value to avoid division by very small numbers
+        logValue = std::max(logValue, 1e-6);
+        weight = alpha * (1.0 / logValue);
       } else if (distance > 0) {
         // For very small distances, use a large weight
         weight = alpha * Constants::ALPHA_WEIGHT_MULTIPLIER; // Large weight for very close pixels
@@ -1222,7 +1236,8 @@ G4double EventAction::CalculateGoodnessOfFit(const std::vector<double>& observed
   
   double variance = 0.0;
   for (double residual : residuals) {
-    variance += std::pow(residual - mean, 2);
+    G4double diff = residual - mean;
+    variance += diff*diff;
   }
   variance /= (residuals.size() - 1);
   double stddev = std::sqrt(variance);
