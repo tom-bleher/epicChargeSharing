@@ -825,7 +825,7 @@ if __name__ == "__main__":
     INCLUDE_EDGE_CASE = True  # Whether to include edge case where neighborhood (9x9) grid is incomplete
     
     # Default ROOT file (can be changed)
-    root_file = "epicToyOutput.root"
+    root_file = "epicChargeSharingOutput.root"
     
     # Check if file exists
     if not os.path.exists(root_file):
