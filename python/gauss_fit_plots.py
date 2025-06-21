@@ -299,6 +299,7 @@ def load_successful_fits(root_file, max_entries=None):
                 'Fit2D_XCenterErr': 'GaussFitRowCenterErr',
                 'Fit2D_XSigmaErr': 'GaussFitRowStdevErr',
                 'Fit2D_XAmplitudeErr': 'GaussFitRowAmplitudeErr',
+                'Fit2D_XVerticalOffsetErr': 'GaussFitRowVerticalOffsetErr',
                 'Fit2D_XChi2red': 'GaussFitRowChi2red',
                 'Fit2D_XNPoints': 'GaussFitRowDOF',  # DOF + parameters = NPoints
                 
@@ -310,6 +311,7 @@ def load_successful_fits(root_file, max_entries=None):
                 'Fit2D_YCenterErr': 'GaussFitColumnCenterErr',
                 'Fit2D_YSigmaErr': 'GaussFitColumnStdevErr',
                 'Fit2D_YAmplitudeErr': 'GaussFitColumnAmplitudeErr',
+                'Fit2D_YVerticalOffsetErr': 'GaussFitColumnVerticalOffsetErr',
                 'Fit2D_YChi2red': 'GaussFitColumnChi2red',
                 'Fit2D_YNPoints': 'GaussFitColumnDOF',
                 
@@ -321,6 +323,7 @@ def load_successful_fits(root_file, max_entries=None):
                 'Fit2D_Lorentz_XCenterErr': 'LorentzFitRowCenterErr',
                 'Fit2D_Lorentz_XGammaErr': 'LorentzFitRowGammaErr',
                 'Fit2D_Lorentz_XAmplitudeErr': 'LorentzFitRowAmplitudeErr',
+                'Fit2D_Lorentz_XVerticalOffsetErr': 'LorentzFitRowVerticalOffsetErr',
                 'Fit2D_Lorentz_XChi2red': 'LorentzFitRowChi2red',
                 'Fit2D_Lorentz_XNPoints': 'LorentzFitRowDOF',
                 
@@ -332,30 +335,35 @@ def load_successful_fits(root_file, max_entries=None):
                 'Fit2D_Lorentz_YCenterErr': 'LorentzFitColumnCenterErr',
                 'Fit2D_Lorentz_YGammaErr': 'LorentzFitColumnGammaErr',
                 'Fit2D_Lorentz_YAmplitudeErr': 'LorentzFitColumnAmplitudeErr',
+                'Fit2D_Lorentz_YVerticalOffsetErr': 'LorentzFitColumnVerticalOffsetErr',
                 'Fit2D_Lorentz_YChi2red': 'LorentzFitColumnChi2red',
                 'Fit2D_Lorentz_YNPoints': 'LorentzFitColumnDOF',
                 
                 # Power Lorentzian fit results - Row/X direction
                 'Fit2D_PowerLorentz_XCenter': 'PowerLorentzFitRowCenter',
-                'Fit2D_PowerLorentz_XGamma': 'PowerLorentzFitRowBeta',  # Beta is the shape parameter
+                'Fit2D_PowerLorentz_XGamma': 'PowerLorentzFitRowGamma',  # Gamma is the width parameter
                 'Fit2D_PowerLorentz_XAmplitude': 'PowerLorentzFitRowAmplitude',
-                'Fit2D_PowerLorentz_XPower': 'PowerLorentzFitRowLambda',  # Lambda is the power parameter
+                'Fit2D_PowerLorentz_XPower': 'PowerLorentzFitRowBeta',  # Beta is the power exponent parameter
+                'Fit2D_PowerLorentz_XVerticalOffset': 'PowerLorentzFitRowVerticalOffset',
                 'Fit2D_PowerLorentz_XCenterErr': 'PowerLorentzFitRowCenterErr',
-                'Fit2D_PowerLorentz_XGammaErr': 'PowerLorentzFitRowBetaErr',
+                'Fit2D_PowerLorentz_XGammaErr': 'PowerLorentzFitRowGammaErr',
                 'Fit2D_PowerLorentz_XAmplitudeErr': 'PowerLorentzFitRowAmplitudeErr',
-                'Fit2D_PowerLorentz_XPowerErr': 'PowerLorentzFitRowLambdaErr',
+                'Fit2D_PowerLorentz_XPowerErr': 'PowerLorentzFitRowBetaErr',
+                'Fit2D_PowerLorentz_XVerticalOffsetErr': 'PowerLorentzFitRowVerticalOffsetErr',
                 'Fit2D_PowerLorentz_XChi2red': 'PowerLorentzFitRowChi2red',
                 'Fit2D_PowerLorentz_XNPoints': 'PowerLorentzFitRowDOF',
                 
                 # Power Lorentzian fit results - Column/Y direction
                 'Fit2D_PowerLorentz_YCenter': 'PowerLorentzFitColumnCenter',
-                'Fit2D_PowerLorentz_YGamma': 'PowerLorentzFitColumnBeta',  # Beta is the shape parameter
+                'Fit2D_PowerLorentz_YGamma': 'PowerLorentzFitColumnGamma',  # Gamma is the width parameter
                 'Fit2D_PowerLorentz_YAmplitude': 'PowerLorentzFitColumnAmplitude',
-                'Fit2D_PowerLorentz_YPower': 'PowerLorentzFitColumnLambda',  # Lambda is the power parameter
+                'Fit2D_PowerLorentz_YPower': 'PowerLorentzFitColumnBeta',  # Beta is the power exponent parameter
+                'Fit2D_PowerLorentz_YVerticalOffset': 'PowerLorentzFitColumnVerticalOffset',
                 'Fit2D_PowerLorentz_YCenterErr': 'PowerLorentzFitColumnCenterErr',
-                'Fit2D_PowerLorentz_YGammaErr': 'PowerLorentzFitColumnBetaErr',
+                'Fit2D_PowerLorentz_YGammaErr': 'PowerLorentzFitColumnGammaErr',
                 'Fit2D_PowerLorentz_YAmplitudeErr': 'PowerLorentzFitColumnAmplitudeErr',
-                'Fit2D_PowerLorentz_YPowerErr': 'PowerLorentzFitColumnLambdaErr',
+                'Fit2D_PowerLorentz_YPowerErr': 'PowerLorentzFitColumnBetaErr',
+                'Fit2D_PowerLorentz_YVerticalOffsetErr': 'PowerLorentzFitColumnVerticalOffsetErr',
                 'Fit2D_PowerLorentz_YChi2red': 'PowerLorentzFitColumnChi2red',
                 'Fit2D_PowerLorentz_YNPoints': 'PowerLorentzFitColumnDOF',
                 
@@ -402,6 +410,110 @@ def load_successful_fits(root_file, max_entries=None):
                 'FitDiag_SecYAmplitudeErr': 'GaussFitSecondDiagYAmplitudeErr',
                 'FitDiag_SecYChi2red': 'GaussFitSecondDiagYChi2red',
                 'FitDiag_SecYNPoints': 'GaussFitSecondDiagYDOF',
+                
+                # Diagonal Lorentzian fits - Main diagonal X
+                'FitDiag_Lorentz_MainXCenter': 'LorentzFitMainDiagXCenter',
+                'FitDiag_Lorentz_MainXGamma': 'LorentzFitMainDiagXGamma',
+                'FitDiag_Lorentz_MainXAmplitude': 'LorentzFitMainDiagXAmplitude',
+                'FitDiag_Lorentz_MainXVerticalOffset': 'LorentzFitMainDiagXVerticalOffset',
+                'FitDiag_Lorentz_MainXCenterErr': 'LorentzFitMainDiagXCenterErr',
+                'FitDiag_Lorentz_MainXGammaErr': 'LorentzFitMainDiagXGammaErr',
+                'FitDiag_Lorentz_MainXAmplitudeErr': 'LorentzFitMainDiagXAmplitudeErr',
+                'FitDiag_Lorentz_MainXVerticalOffsetErr': 'LorentzFitMainDiagXVerticalOffsetErr',
+                'FitDiag_Lorentz_MainXChi2red': 'LorentzFitMainDiagXChi2red',
+                'FitDiag_Lorentz_MainXNPoints': 'LorentzFitMainDiagXDOF',
+                
+                # Diagonal Lorentzian fits - Main diagonal Y
+                'FitDiag_Lorentz_MainYCenter': 'LorentzFitMainDiagYCenter',
+                'FitDiag_Lorentz_MainYGamma': 'LorentzFitMainDiagYGamma',
+                'FitDiag_Lorentz_MainYAmplitude': 'LorentzFitMainDiagYAmplitude',
+                'FitDiag_Lorentz_MainYVerticalOffset': 'LorentzFitMainDiagYVerticalOffset',
+                'FitDiag_Lorentz_MainYCenterErr': 'LorentzFitMainDiagYCenterErr',
+                'FitDiag_Lorentz_MainYGammaErr': 'LorentzFitMainDiagYGammaErr',
+                'FitDiag_Lorentz_MainYAmplitudeErr': 'LorentzFitMainDiagYAmplitudeErr',
+                'FitDiag_Lorentz_MainYVerticalOffsetErr': 'LorentzFitMainDiagYVerticalOffsetErr',
+                'FitDiag_Lorentz_MainYChi2red': 'LorentzFitMainDiagYChi2red',
+                'FitDiag_Lorentz_MainYNPoints': 'LorentzFitMainDiagYDOF',
+                
+                # Diagonal Lorentzian fits - Secondary diagonal X
+                'FitDiag_Lorentz_SecXCenter': 'LorentzFitSecondDiagXCenter',
+                'FitDiag_Lorentz_SecXGamma': 'LorentzFitSecondDiagXGamma',
+                'FitDiag_Lorentz_SecXAmplitude': 'LorentzFitSecondDiagXAmplitude',
+                'FitDiag_Lorentz_SecXVerticalOffset': 'LorentzFitSecondDiagXVerticalOffset',
+                'FitDiag_Lorentz_SecXCenterErr': 'LorentzFitSecondDiagXCenterErr',
+                'FitDiag_Lorentz_SecXGammaErr': 'LorentzFitSecondDiagXGammaErr',
+                'FitDiag_Lorentz_SecXAmplitudeErr': 'LorentzFitSecondDiagXAmplitudeErr',
+                'FitDiag_Lorentz_SecXVerticalOffsetErr': 'LorentzFitSecondDiagXVerticalOffsetErr',
+                'FitDiag_Lorentz_SecXChi2red': 'LorentzFitSecondDiagXChi2red',
+                'FitDiag_Lorentz_SecXNPoints': 'LorentzFitSecondDiagXDOF',
+                
+                # Diagonal Lorentzian fits - Secondary diagonal Y
+                'FitDiag_Lorentz_SecYCenter': 'LorentzFitSecondDiagYCenter',
+                'FitDiag_Lorentz_SecYGamma': 'LorentzFitSecondDiagYGamma',
+                'FitDiag_Lorentz_SecYAmplitude': 'LorentzFitSecondDiagYAmplitude',
+                'FitDiag_Lorentz_SecYVerticalOffset': 'LorentzFitSecondDiagYVerticalOffset',
+                'FitDiag_Lorentz_SecYCenterErr': 'LorentzFitSecondDiagYCenterErr',
+                'FitDiag_Lorentz_SecYGammaErr': 'LorentzFitSecondDiagYGammaErr',
+                'FitDiag_Lorentz_SecYAmplitudeErr': 'LorentzFitSecondDiagYAmplitudeErr',
+                'FitDiag_Lorentz_SecYVerticalOffsetErr': 'LorentzFitSecondDiagYVerticalOffsetErr',
+                'FitDiag_Lorentz_SecYChi2red': 'LorentzFitSecondDiagYChi2red',
+                'FitDiag_Lorentz_SecYNPoints': 'LorentzFitSecondDiagYDOF',
+                
+                # Diagonal Power Lorentzian fits - Main diagonal X
+                'FitDiag_PowerLorentz_MainXCenter': 'PowerLorentzFitMainDiagXCenter',
+                'FitDiag_PowerLorentz_MainXGamma': 'PowerLorentzFitMainDiagXGamma',
+                'FitDiag_PowerLorentz_MainXBeta': 'PowerLorentzFitMainDiagXBeta',
+                'FitDiag_PowerLorentz_MainXAmplitude': 'PowerLorentzFitMainDiagXAmplitude',
+                'FitDiag_PowerLorentz_MainXVerticalOffset': 'PowerLorentzFitMainDiagXVerticalOffset',
+                'FitDiag_PowerLorentz_MainXCenterErr': 'PowerLorentzFitMainDiagXCenterErr',
+                'FitDiag_PowerLorentz_MainXGammaErr': 'PowerLorentzFitMainDiagXGammaErr',
+                'FitDiag_PowerLorentz_MainXBetaErr': 'PowerLorentzFitMainDiagXBetaErr',
+                'FitDiag_PowerLorentz_MainXAmplitudeErr': 'PowerLorentzFitMainDiagXAmplitudeErr',
+                'FitDiag_PowerLorentz_MainXVerticalOffsetErr': 'PowerLorentzFitMainDiagXVerticalOffsetErr',
+                'FitDiag_PowerLorentz_MainXChi2red': 'PowerLorentzFitMainDiagXChi2red',
+                'FitDiag_PowerLorentz_MainXNPoints': 'PowerLorentzFitMainDiagXDOF',
+                
+                # Diagonal Power Lorentzian fits - Main diagonal Y
+                'FitDiag_PowerLorentz_MainYCenter': 'PowerLorentzFitMainDiagYCenter',
+                'FitDiag_PowerLorentz_MainYGamma': 'PowerLorentzFitMainDiagYGamma',
+                'FitDiag_PowerLorentz_MainYBeta': 'PowerLorentzFitMainDiagYBeta',
+                'FitDiag_PowerLorentz_MainYAmplitude': 'PowerLorentzFitMainDiagYAmplitude',
+                'FitDiag_PowerLorentz_MainYVerticalOffset': 'PowerLorentzFitMainDiagYVerticalOffset',
+                'FitDiag_PowerLorentz_MainYCenterErr': 'PowerLorentzFitMainDiagYCenterErr',
+                'FitDiag_PowerLorentz_MainYGammaErr': 'PowerLorentzFitMainDiagYGammaErr',
+                'FitDiag_PowerLorentz_MainYBetaErr': 'PowerLorentzFitMainDiagYBetaErr',
+                'FitDiag_PowerLorentz_MainYAmplitudeErr': 'PowerLorentzFitMainDiagYAmplitudeErr',
+                'FitDiag_PowerLorentz_MainYVerticalOffsetErr': 'PowerLorentzFitMainDiagYVerticalOffsetErr',
+                'FitDiag_PowerLorentz_MainYChi2red': 'PowerLorentzFitMainDiagYChi2red',
+                'FitDiag_PowerLorentz_MainYNPoints': 'PowerLorentzFitMainDiagYDOF',
+                
+                # Diagonal Power Lorentzian fits - Secondary diagonal X
+                'FitDiag_PowerLorentz_SecXCenter': 'PowerLorentzFitSecondDiagXCenter',
+                'FitDiag_PowerLorentz_SecXGamma': 'PowerLorentzFitSecondDiagXGamma',
+                'FitDiag_PowerLorentz_SecXBeta': 'PowerLorentzFitSecondDiagXBeta',
+                'FitDiag_PowerLorentz_SecXAmplitude': 'PowerLorentzFitSecondDiagXAmplitude',
+                'FitDiag_PowerLorentz_SecXVerticalOffset': 'PowerLorentzFitSecondDiagXVerticalOffset',
+                'FitDiag_PowerLorentz_SecXCenterErr': 'PowerLorentzFitSecondDiagXCenterErr',
+                'FitDiag_PowerLorentz_SecXGammaErr': 'PowerLorentzFitSecondDiagXGammaErr',
+                'FitDiag_PowerLorentz_SecXBetaErr': 'PowerLorentzFitSecondDiagXBetaErr',
+                'FitDiag_PowerLorentz_SecXAmplitudeErr': 'PowerLorentzFitSecondDiagXAmplitudeErr',
+                'FitDiag_PowerLorentz_SecXVerticalOffsetErr': 'PowerLorentzFitSecondDiagXVerticalOffsetErr',
+                'FitDiag_PowerLorentz_SecXChi2red': 'PowerLorentzFitSecondDiagXChi2red',
+                'FitDiag_PowerLorentz_SecXNPoints': 'PowerLorentzFitSecondDiagXDOF',
+                
+                # Diagonal Power Lorentzian fits - Secondary diagonal Y
+                'FitDiag_PowerLorentz_SecYCenter': 'PowerLorentzFitSecondDiagYCenter',
+                'FitDiag_PowerLorentz_SecYGamma': 'PowerLorentzFitSecondDiagYGamma',
+                'FitDiag_PowerLorentz_SecYBeta': 'PowerLorentzFitSecondDiagYBeta',
+                'FitDiag_PowerLorentz_SecYAmplitude': 'PowerLorentzFitSecondDiagYAmplitude',
+                'FitDiag_PowerLorentz_SecYVerticalOffset': 'PowerLorentzFitSecondDiagYVerticalOffset',
+                'FitDiag_PowerLorentz_SecYCenterErr': 'PowerLorentzFitSecondDiagYCenterErr',
+                'FitDiag_PowerLorentz_SecYGammaErr': 'PowerLorentzFitSecondDiagYGammaErr',
+                'FitDiag_PowerLorentz_SecYBetaErr': 'PowerLorentzFitSecondDiagYBetaErr',
+                'FitDiag_PowerLorentz_SecYAmplitudeErr': 'PowerLorentzFitSecondDiagYAmplitudeErr',
+                'FitDiag_PowerLorentz_SecYVerticalOffsetErr': 'PowerLorentzFitSecondDiagYVerticalOffsetErr',
+                'FitDiag_PowerLorentz_SecYChi2red': 'PowerLorentzFitSecondDiagYChi2red',
+                'FitDiag_PowerLorentz_SecYNPoints': 'PowerLorentzFitSecondDiagYDOF',
                 
                 # Grid neighborhood data
                 'NonPixel_GridNeighborhoodCharge': 'GridNeighborhoodCharges',
@@ -1135,37 +1247,37 @@ def create_all_lorentzian_plot(event_idx, data, output_dir="plots"):
         # Row plot
         ax_row = fig_lor_all.add_subplot(gs_lor_all[0, 0])
         plot_lorentzian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
-                                x_lorentz_center, x_lorentz_gamma, x_lorentz_amplitude, 
+                                x_lorentz_center, x_lorentz_gamma, x_lorentz_amplitude, x_lorentz_vertical_offset,
                                 x_lorentz_chi2red, x_lorentz_dof, true_x, 'Row (X-direction)', 'x', delta_pixel_x)
         
         # Column plot
         ax_col = fig_lor_all.add_subplot(gs_lor_all[0, 1])
         plot_lorentzian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
-                                y_lorentz_center, y_lorentz_gamma, y_lorentz_amplitude, 
+                                y_lorentz_center, y_lorentz_gamma, y_lorentz_amplitude, y_lorentz_vertical_offset,
                                 y_lorentz_chi2red, y_lorentz_dof, true_y, 'Column (Y-direction)', 'y', delta_pixel_y)
         
         # Main diagonal X plot
         ax_main_x = fig_lor_all.add_subplot(gs_lor_all[1, 0])
         plot_lorentzian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
-                                main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, 
+                                main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, main_diag_x_vertical_offset,
                                 main_diag_x_chi2red, main_diag_x_dof, true_x, 'Main Diagonal X', 'x', delta_pixel_x)
         
         # Main diagonal Y plot
         ax_main_y = fig_lor_all.add_subplot(gs_lor_all[1, 1])
         plot_lorentzian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
-                                main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, 
+                                main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, main_diag_y_vertical_offset,
                                 main_diag_y_chi2red, main_diag_y_dof, true_y, 'Main Diagonal Y', 'y', delta_pixel_y)
         
         # Secondary diagonal X plot
         ax_sec_x = fig_lor_all.add_subplot(gs_lor_all[2, 0])
         plot_lorentzian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
-                                sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, 
+                                sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, sec_diag_x_vertical_offset,
                                 sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'Secondary Diagonal X', 'x', delta_pixel_x)
         
         # Secondary diagonal Y plot
         ax_sec_y = fig_lor_all.add_subplot(gs_lor_all[2, 1])
         plot_lorentzian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
-                                sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, 
+                                sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, sec_diag_y_vertical_offset,
                                 sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Secondary Diagonal Y', 'y', delta_pixel_y)
         
         
@@ -1201,15 +1313,17 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         x_power_gamma = data['Fit2D_PowerLorentz_XGamma'][event_idx]
         x_power_amplitude = data['Fit2D_PowerLorentz_XAmplitude'][event_idx]
         x_power_power = data.get('Fit2D_PowerLorentz_XPower', [1.0])[event_idx] if 'Fit2D_PowerLorentz_XPower' in data else 1.0
+        x_power_vertical_offset = data.get('Fit2D_PowerLorentz_XVerticalOffset', [0])[event_idx] if 'Fit2D_PowerLorentz_XVerticalOffset' in data else 0
         x_power_chi2red = data['Fit2D_PowerLorentz_XChi2red'][event_idx]
-        x_power_dof = data.get('Fit2D_PowerLorentz_XNPoints', [0])[event_idx] - 4  # N - K, K=4 parameters
+        x_power_dof = data.get('Fit2D_PowerLorentz_XNPoints', [0])[event_idx] - 5  # N - K, K=5 parameters (including offset)
         
         y_power_center = data['Fit2D_PowerLorentz_YCenter'][event_idx]
         y_power_gamma = data['Fit2D_PowerLorentz_YGamma'][event_idx]
         y_power_amplitude = data['Fit2D_PowerLorentz_YAmplitude'][event_idx]
         y_power_power = data.get('Fit2D_PowerLorentz_YPower', [1.0])[event_idx] if 'Fit2D_PowerLorentz_YPower' in data else 1.0
+        y_power_vertical_offset = data.get('Fit2D_PowerLorentz_YVerticalOffset', [0])[event_idx] if 'Fit2D_PowerLorentz_YVerticalOffset' in data else 0
         y_power_chi2red = data['Fit2D_PowerLorentz_YChi2red'][event_idx]
-        y_power_dof = data.get('Fit2D_PowerLorentz_YNPoints', [0])[event_idx] - 4  # N - K, K=4 parameters
+        y_power_dof = data.get('Fit2D_PowerLorentz_YNPoints', [0])[event_idx] - 5  # N - K, K=5 parameters (including offset)
         
         # True positions and pixel positions
         true_x = data['TrueX'][event_idx]
@@ -1229,7 +1343,7 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         fig_power_all = plt.figure(figsize=(20, 15))
         gs_power_all = GridSpec(3, 2, hspace=0.4, wspace=0.3)
         
-        def plot_power_lorentzian_direction(ax, positions, charges, uncertainties, center, gamma, amplitude, power, chi2red, dof, true_pos, title, direction='x', delta_pixel=0):
+        def plot_power_lorentzian_direction(ax, positions, charges, uncertainties, center, gamma, amplitude, power, vertical_offset, chi2red, dof, true_pos, title, direction='x', delta_pixel=0):
             """Helper to plot one direction with all requested features."""
             if len(positions) < 3:
                 ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
@@ -1239,9 +1353,9 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
             # Plot data with or without error bars (automatically detected)
             plot_data_points(ax, positions, charges, uncertainties, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
             
-            # Plot Power Lorentzian fit
+            # Plot Power Lorentzian fit - NOW INCLUDING THE VERTICAL OFFSET!
             pos_range = np.linspace(positions.min() - 0.1, positions.max() + 0.1, 200)
-            y_fit = power_lorentzian_1d(pos_range, amplitude, center, gamma, power)
+            y_fit = power_lorentzian_1d(pos_range, amplitude, center, gamma, power, vertical_offset)
             ax.plot(pos_range, y_fit, 'm-', linewidth=2, alpha=0.9)
             
             # Add vertical lines
@@ -1276,13 +1390,13 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         # Row plot
         ax_row = fig_power_all.add_subplot(gs_power_all[0, 0])
         plot_power_lorentzian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
-                                      x_power_center, x_power_gamma, x_power_amplitude, x_power_power,
+                                      x_power_center, x_power_gamma, x_power_amplitude, x_power_power, x_power_vertical_offset,
                                       x_power_chi2red, x_power_dof, true_x, 'Row (X-direction)', 'x', delta_pixel_x)
         
         # Column plot
         ax_col = fig_power_all.add_subplot(gs_power_all[0, 1])
         plot_power_lorentzian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
-                                      y_power_center, y_power_gamma, y_power_amplitude, y_power_power,
+                                      y_power_center, y_power_gamma, y_power_amplitude, y_power_power, y_power_vertical_offset,
                                       y_power_chi2red, y_power_dof, true_y, 'Column (Y-direction)', 'y', delta_pixel_y)
         
         # For diagonals, use Gaussian parameters (Power Lorentzian diagonals may not be implemented)
@@ -1295,7 +1409,7 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         # Main diagonal X plot (using Gaussian fit for diagonal, but labeled as approximation)
         ax_main_x = fig_power_all.add_subplot(gs_power_all[1, 0])
         plot_power_lorentzian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
-                                      main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, 1.0,
+                                      main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, 1.0, 0,
                                       main_diag_x_chi2red, main_diag_x_dof, true_x, 'Main Diagonal X (approx)', 'x', delta_pixel_x)
         
         # Similar for other diagonals...
@@ -1307,7 +1421,7 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         
         ax_main_y = fig_power_all.add_subplot(gs_power_all[1, 1])
         plot_power_lorentzian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
-                                      main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, 1.0,
+                                      main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, 1.0, 0,
                                       main_diag_y_chi2red, main_diag_y_dof, true_y, 'Main Diagonal Y (approx)', 'y', delta_pixel_y)
         
         sec_diag_x_center = data.get('FitDiag_SecXCenter', [x_power_center])[event_idx]
@@ -1318,7 +1432,7 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         
         ax_sec_x = fig_power_all.add_subplot(gs_power_all[2, 0])
         plot_power_lorentzian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
-                                      sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, 1.0,
+                                      sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, 1.0, 0,
                                       sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'Secondary Diagonal X (approx)', 'x', delta_pixel_x)
         
         sec_diag_y_center = data.get('FitDiag_SecYCenter', [y_power_center])[event_idx]
@@ -1329,7 +1443,7 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         
         ax_sec_y = fig_power_all.add_subplot(gs_power_all[2, 1])
         plot_power_lorentzian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
-                                      sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, 1.0,
+                                      sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, 1.0, 0,
                                       sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Secondary Diagonal Y (approx)', 'y', delta_pixel_y)
         
         plt.suptitle(f'Event {event_idx}: Power Lorentzian Fits (All Directions)', fontsize=16)
@@ -1569,12 +1683,14 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             x_power_gamma = data['Fit2D_PowerLorentz_XGamma'][event_idx]
             x_power_amplitude = data['Fit2D_PowerLorentz_XAmplitude'][event_idx]
             x_power_power = data.get('Fit2D_PowerLorentz_XPower', [1.0])[event_idx] if 'Fit2D_PowerLorentz_XPower' in data else 1.0
+            x_power_vertical_offset = data.get('Fit2D_PowerLorentz_XVerticalOffset', [0])[event_idx] if 'Fit2D_PowerLorentz_XVerticalOffset' in data else 0
             x_power_chi2red = data['Fit2D_PowerLorentz_XChi2red'][event_idx]
             
             y_power_center = data['Fit2D_PowerLorentz_YCenter'][event_idx]
             y_power_gamma = data['Fit2D_PowerLorentz_YGamma'][event_idx]
             y_power_amplitude = data['Fit2D_PowerLorentz_YAmplitude'][event_idx]
             y_power_power = data.get('Fit2D_PowerLorentz_YPower', [1.0])[event_idx] if 'Fit2D_PowerLorentz_YPower' in data else 1.0
+            y_power_vertical_offset = data.get('Fit2D_PowerLorentz_YVerticalOffset', [0])[event_idx] if 'Fit2D_PowerLorentz_YVerticalOffset' in data else 0
             y_power_chi2red = data['Fit2D_PowerLorentz_YChi2red'][event_idx]
         
         # Diagonal parameters (using Gaussian fits)
@@ -1601,7 +1717,7 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
         fig_combined = plt.figure(figsize=(20, 15))
         gs_combined = GridSpec(3, 2, hspace=0.4, wspace=0.3)
         
-        def plot_all_models_direction(ax, positions, charges, uncertainties, true_pos, title, direction='x', delta_pixel=0):
+        def plot_all_models_direction(ax, positions, charges, uncertainties, true_pos, title, direction='x', delta_pixel=0, diagonal_type=None):
             """Helper to plot one direction with all available fits."""
             if len(positions) < 3:
                 ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
@@ -1619,14 +1735,16 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             
             # Plot Gaussian fit if available
             if has_gaussian and direction == 'x':
-                gauss_fit = gaussian_1d(pos_range, x_gauss_amplitude, x_gauss_center, x_gauss_sigma)
+                x_gauss_vertical_offset = data.get('Fit2D_XVerticalOffset', [0])[event_idx] if 'Fit2D_XVerticalOffset' in data else 0
+                gauss_fit = gaussian_1d(pos_range, x_gauss_amplitude, x_gauss_center, x_gauss_sigma, x_gauss_vertical_offset)
                 line = ax.plot(pos_range, gauss_fit, 'b-', linewidth=2, alpha=0.9, label='Gaussian')[0]
                 legend_lines.append(line)
                 ax.axvline(x_gauss_center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
                 gauss_diff = x_gauss_center - true_pos
                 legend_text_parts.append(f'Gaussian: χ²/ν = {x_gauss_chi2red:.2f}, Δ = {gauss_diff:.3f}')
             elif has_gaussian and direction == 'y':
-                gauss_fit = gaussian_1d(pos_range, y_gauss_amplitude, y_gauss_center, y_gauss_sigma)
+                y_gauss_vertical_offset = data.get('Fit2D_YVerticalOffset', [0])[event_idx] if 'Fit2D_YVerticalOffset' in data else 0
+                gauss_fit = gaussian_1d(pos_range, y_gauss_amplitude, y_gauss_center, y_gauss_sigma, y_gauss_vertical_offset)
                 line = ax.plot(pos_range, gauss_fit, 'b-', linewidth=2, alpha=0.9, label='Gaussian')[0]
                 legend_lines.append(line)
                 ax.axvline(y_gauss_center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
@@ -1635,14 +1753,16 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             
             # Plot Lorentzian fit if available
             if has_lorentzian and direction == 'x':
-                lorentz_fit = lorentzian_1d(pos_range, x_lorentz_amplitude, x_lorentz_center, x_lorentz_gamma)
+                x_lorentz_vertical_offset = data.get('Fit2D_Lorentz_XVerticalOffset', [0])[event_idx] if 'Fit2D_Lorentz_XVerticalOffset' in data else 0
+                lorentz_fit = lorentzian_1d(pos_range, x_lorentz_amplitude, x_lorentz_center, x_lorentz_gamma, x_lorentz_vertical_offset)
                 line = ax.plot(pos_range, lorentz_fit, 'r--', linewidth=2, alpha=0.9, label='Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(x_lorentz_center, color='red', linestyle=':', linewidth=1, alpha=0.8)
                 lorentz_diff = x_lorentz_center - true_pos
                 legend_text_parts.append(f'Lorentzian: χ²/ν = {x_lorentz_chi2red:.2f}, Δ = {lorentz_diff:.3f}')
             elif has_lorentzian and direction == 'y':
-                lorentz_fit = lorentzian_1d(pos_range, y_lorentz_amplitude, y_lorentz_center, y_lorentz_gamma)
+                y_lorentz_vertical_offset = data.get('Fit2D_Lorentz_YVerticalOffset', [0])[event_idx] if 'Fit2D_Lorentz_YVerticalOffset' in data else 0
+                lorentz_fit = lorentzian_1d(pos_range, y_lorentz_amplitude, y_lorentz_center, y_lorentz_gamma, y_lorentz_vertical_offset)
                 line = ax.plot(pos_range, lorentz_fit, 'r--', linewidth=2, alpha=0.9, label='Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(y_lorentz_center, color='red', linestyle=':', linewidth=1, alpha=0.8)
@@ -1651,14 +1771,14 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             
             # Plot Power Lorentzian fit if available
             if has_power_lorentzian and direction == 'x':
-                power_fit = power_lorentzian_1d(pos_range, x_power_amplitude, x_power_center, x_power_gamma, x_power_power)
+                power_fit = power_lorentzian_1d(pos_range, x_power_amplitude, x_power_center, x_power_gamma, x_power_power, x_power_vertical_offset)
                 line = ax.plot(pos_range, power_fit, 'm:', linewidth=2, alpha=0.9, label='Power Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(x_power_center, color='magenta', linestyle=':', linewidth=1, alpha=0.8)
                 power_diff = x_power_center - true_pos
                 legend_text_parts.append(f'Power Lorentzian: χ²/ν = {x_power_chi2red:.2f}, Δ = {power_diff:.3f}')
             elif has_power_lorentzian and direction == 'y':
-                power_fit = power_lorentzian_1d(pos_range, y_power_amplitude, y_power_center, y_power_gamma, y_power_power)
+                power_fit = power_lorentzian_1d(pos_range, y_power_amplitude, y_power_center, y_power_gamma, y_power_power, y_power_vertical_offset)
                 line = ax.plot(pos_range, power_fit, 'm:', linewidth=2, alpha=0.9, label='Power Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(y_power_center, color='magenta', linestyle=':', linewidth=1, alpha=0.8)
@@ -1696,37 +1816,200 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
         ax_col = fig_combined.add_subplot(gs_combined[0, 1])
         plot_all_models_direction(ax_col, col_pos, col_charges, col_uncertainties, true_y, 'Column (Y-direction)', 'y', delta_pixel_y)
         
-        # For diagonal plots, use Gaussian parameters as approximation
-        # Main diagonal X plot
+        # Diagonal plots (all available diagonal fits)
+        def plot_diagonal_direction(ax, positions, charges, uncertainties, true_pos, title, direction='x', delta_pixel=0):
+            """Helper to plot diagonal direction with all available diagonal fits."""
+            if len(positions) < 3:
+                ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
+                ax.set_title(title)
+                return
+            
+            # Plot data with or without error bars (automatically detected)
+            plot_data_points(ax, positions, charges, uncertainties, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
+            
+            # Plot range for smooth curves
+            pos_range = np.linspace(positions.min() - 0.1, positions.max() + 0.1, 200)
+            
+            legend_lines = []
+            legend_text_parts = []
+            
+            # Helper function to get diagonal parameters
+            def get_diagonal_params(diag_type, direction, model):
+                if model == 'gaussian':
+                    if diag_type == 'main' and direction == 'x':
+                        center = data.get('FitDiag_MainXCenter', [np.nan])[event_idx] if 'FitDiag_MainXCenter' in data else np.nan
+                        width = data.get('FitDiag_MainXSigma', [np.nan])[event_idx] if 'FitDiag_MainXSigma' in data else np.nan
+                        amplitude = data.get('FitDiag_MainXAmplitude', [np.nan])[event_idx] if 'FitDiag_MainXAmplitude' in data else np.nan
+                        offset = data.get('FitDiag_MainXVerticalOffset', [0])[event_idx] if 'FitDiag_MainXVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_MainXChi2red', [np.nan])[event_idx] if 'FitDiag_MainXChi2red' in data else np.nan
+                        dof = data.get('FitDiag_MainXNPoints', [0])[event_idx] if 'FitDiag_MainXNPoints' in data else 0
+                    elif diag_type == 'main' and direction == 'y':
+                        center = data.get('FitDiag_MainYCenter', [np.nan])[event_idx] if 'FitDiag_MainYCenter' in data else np.nan
+                        width = data.get('FitDiag_MainYSigma', [np.nan])[event_idx] if 'FitDiag_MainYSigma' in data else np.nan
+                        amplitude = data.get('FitDiag_MainYAmplitude', [np.nan])[event_idx] if 'FitDiag_MainYAmplitude' in data else np.nan
+                        offset = data.get('FitDiag_MainYVerticalOffset', [0])[event_idx] if 'FitDiag_MainYVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_MainYChi2red', [np.nan])[event_idx] if 'FitDiag_MainYChi2red' in data else np.nan
+                        dof = data.get('FitDiag_MainYNPoints', [0])[event_idx] if 'FitDiag_MainYNPoints' in data else 0
+                    elif diag_type == 'sec' and direction == 'x':
+                        center = data.get('FitDiag_SecXCenter', [np.nan])[event_idx] if 'FitDiag_SecXCenter' in data else np.nan
+                        width = data.get('FitDiag_SecXSigma', [np.nan])[event_idx] if 'FitDiag_SecXSigma' in data else np.nan
+                        amplitude = data.get('FitDiag_SecXAmplitude', [np.nan])[event_idx] if 'FitDiag_SecXAmplitude' in data else np.nan
+                        offset = data.get('FitDiag_SecXVerticalOffset', [0])[event_idx] if 'FitDiag_SecXVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_SecXChi2red', [np.nan])[event_idx] if 'FitDiag_SecXChi2red' in data else np.nan
+                        dof = data.get('FitDiag_SecXNPoints', [0])[event_idx] if 'FitDiag_SecXNPoints' in data else 0
+                    else:  # sec and y
+                        center = data.get('FitDiag_SecYCenter', [np.nan])[event_idx] if 'FitDiag_SecYCenter' in data else np.nan
+                        width = data.get('FitDiag_SecYSigma', [np.nan])[event_idx] if 'FitDiag_SecYSigma' in data else np.nan
+                        amplitude = data.get('FitDiag_SecYAmplitude', [np.nan])[event_idx] if 'FitDiag_SecYAmplitude' in data else np.nan
+                        offset = data.get('FitDiag_SecYVerticalOffset', [0])[event_idx] if 'FitDiag_SecYVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_SecYChi2red', [np.nan])[event_idx] if 'FitDiag_SecYChi2red' in data else np.nan
+                        dof = data.get('FitDiag_SecYNPoints', [0])[event_idx] if 'FitDiag_SecYNPoints' in data else 0
+                elif model == 'lorentzian':
+                    if diag_type == 'main' and direction == 'x':
+                        center = data.get('FitDiag_Lorentz_MainXCenter', [np.nan])[event_idx] if 'FitDiag_Lorentz_MainXCenter' in data else np.nan
+                        width = data.get('FitDiag_Lorentz_MainXGamma', [np.nan])[event_idx] if 'FitDiag_Lorentz_MainXGamma' in data else np.nan
+                        amplitude = data.get('FitDiag_Lorentz_MainXAmplitude', [np.nan])[event_idx] if 'FitDiag_Lorentz_MainXAmplitude' in data else np.nan
+                        offset = data.get('FitDiag_Lorentz_MainXVerticalOffset', [0])[event_idx] if 'FitDiag_Lorentz_MainXVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_Lorentz_MainXChi2red', [np.nan])[event_idx] if 'FitDiag_Lorentz_MainXChi2red' in data else np.nan
+                        dof = data.get('FitDiag_Lorentz_MainXNPoints', [0])[event_idx] if 'FitDiag_Lorentz_MainXNPoints' in data else 0
+                    elif diag_type == 'main' and direction == 'y':
+                        center = data.get('FitDiag_Lorentz_MainYCenter', [np.nan])[event_idx] if 'FitDiag_Lorentz_MainYCenter' in data else np.nan
+                        width = data.get('FitDiag_Lorentz_MainYGamma', [np.nan])[event_idx] if 'FitDiag_Lorentz_MainYGamma' in data else np.nan
+                        amplitude = data.get('FitDiag_Lorentz_MainYAmplitude', [np.nan])[event_idx] if 'FitDiag_Lorentz_MainYAmplitude' in data else np.nan
+                        offset = data.get('FitDiag_Lorentz_MainYVerticalOffset', [0])[event_idx] if 'FitDiag_Lorentz_MainYVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_Lorentz_MainYChi2red', [np.nan])[event_idx] if 'FitDiag_Lorentz_MainYChi2red' in data else np.nan
+                        dof = data.get('FitDiag_Lorentz_MainYNPoints', [0])[event_idx] if 'FitDiag_Lorentz_MainYNPoints' in data else 0
+                    elif diag_type == 'sec' and direction == 'x':
+                        center = data.get('FitDiag_Lorentz_SecXCenter', [np.nan])[event_idx] if 'FitDiag_Lorentz_SecXCenter' in data else np.nan
+                        width = data.get('FitDiag_Lorentz_SecXGamma', [np.nan])[event_idx] if 'FitDiag_Lorentz_SecXGamma' in data else np.nan
+                        amplitude = data.get('FitDiag_Lorentz_SecXAmplitude', [np.nan])[event_idx] if 'FitDiag_Lorentz_SecXAmplitude' in data else np.nan
+                        offset = data.get('FitDiag_Lorentz_SecXVerticalOffset', [0])[event_idx] if 'FitDiag_Lorentz_SecXVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_Lorentz_SecXChi2red', [np.nan])[event_idx] if 'FitDiag_Lorentz_SecXChi2red' in data else np.nan
+                        dof = data.get('FitDiag_Lorentz_SecXNPoints', [0])[event_idx] if 'FitDiag_Lorentz_SecXNPoints' in data else 0
+                    else:  # sec and y
+                        center = data.get('FitDiag_Lorentz_SecYCenter', [np.nan])[event_idx] if 'FitDiag_Lorentz_SecYCenter' in data else np.nan
+                        width = data.get('FitDiag_Lorentz_SecYGamma', [np.nan])[event_idx] if 'FitDiag_Lorentz_SecYGamma' in data else np.nan
+                        amplitude = data.get('FitDiag_Lorentz_SecYAmplitude', [np.nan])[event_idx] if 'FitDiag_Lorentz_SecYAmplitude' in data else np.nan
+                        offset = data.get('FitDiag_Lorentz_SecYVerticalOffset', [0])[event_idx] if 'FitDiag_Lorentz_SecYVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_Lorentz_SecYChi2red', [np.nan])[event_idx] if 'FitDiag_Lorentz_SecYChi2red' in data else np.nan
+                        dof = data.get('FitDiag_Lorentz_SecYNPoints', [0])[event_idx] if 'FitDiag_Lorentz_SecYNPoints' in data else 0
+                elif model == 'power_lorentzian':
+                    if diag_type == 'main' and direction == 'x':
+                        center = data.get('FitDiag_PowerLorentz_MainXCenter', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_MainXCenter' in data else np.nan
+                        width = data.get('FitDiag_PowerLorentz_MainXGamma', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_MainXGamma' in data else np.nan
+                        amplitude = data.get('FitDiag_PowerLorentz_MainXAmplitude', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_MainXAmplitude' in data else np.nan
+                        power = data.get('FitDiag_PowerLorentz_MainXBeta', [1.0])[event_idx] if 'FitDiag_PowerLorentz_MainXBeta' in data else 1.0
+                        offset = data.get('FitDiag_PowerLorentz_MainXVerticalOffset', [0])[event_idx] if 'FitDiag_PowerLorentz_MainXVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_PowerLorentz_MainXChi2red', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_MainXChi2red' in data else np.nan
+                        dof = data.get('FitDiag_PowerLorentz_MainXNPoints', [0])[event_idx] if 'FitDiag_PowerLorentz_MainXNPoints' in data else 0
+                    elif diag_type == 'main' and direction == 'y':
+                        center = data.get('FitDiag_PowerLorentz_MainYCenter', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_MainYCenter' in data else np.nan
+                        width = data.get('FitDiag_PowerLorentz_MainYGamma', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_MainYGamma' in data else np.nan
+                        amplitude = data.get('FitDiag_PowerLorentz_MainYAmplitude', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_MainYAmplitude' in data else np.nan
+                        power = data.get('FitDiag_PowerLorentz_MainYBeta', [1.0])[event_idx] if 'FitDiag_PowerLorentz_MainYBeta' in data else 1.0
+                        offset = data.get('FitDiag_PowerLorentz_MainYVerticalOffset', [0])[event_idx] if 'FitDiag_PowerLorentz_MainYVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_PowerLorentz_MainYChi2red', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_MainYChi2red' in data else np.nan
+                        dof = data.get('FitDiag_PowerLorentz_MainYNPoints', [0])[event_idx] if 'FitDiag_PowerLorentz_MainYNPoints' in data else 0
+                    elif diag_type == 'sec' and direction == 'x':
+                        center = data.get('FitDiag_PowerLorentz_SecXCenter', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_SecXCenter' in data else np.nan
+                        width = data.get('FitDiag_PowerLorentz_SecXGamma', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_SecXGamma' in data else np.nan
+                        amplitude = data.get('FitDiag_PowerLorentz_SecXAmplitude', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_SecXAmplitude' in data else np.nan
+                        power = data.get('FitDiag_PowerLorentz_SecXBeta', [1.0])[event_idx] if 'FitDiag_PowerLorentz_SecXBeta' in data else 1.0
+                        offset = data.get('FitDiag_PowerLorentz_SecXVerticalOffset', [0])[event_idx] if 'FitDiag_PowerLorentz_SecXVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_PowerLorentz_SecXChi2red', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_SecXChi2red' in data else np.nan
+                        dof = data.get('FitDiag_PowerLorentz_SecXNPoints', [0])[event_idx] if 'FitDiag_PowerLorentz_SecXNPoints' in data else 0
+                    else:  # sec and y
+                        center = data.get('FitDiag_PowerLorentz_SecYCenter', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_SecYCenter' in data else np.nan
+                        width = data.get('FitDiag_PowerLorentz_SecYGamma', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_SecYGamma' in data else np.nan
+                        amplitude = data.get('FitDiag_PowerLorentz_SecYAmplitude', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_SecYAmplitude' in data else np.nan
+                        power = data.get('FitDiag_PowerLorentz_SecYBeta', [1.0])[event_idx] if 'FitDiag_PowerLorentz_SecYBeta' in data else 1.0
+                        offset = data.get('FitDiag_PowerLorentz_SecYVerticalOffset', [0])[event_idx] if 'FitDiag_PowerLorentz_SecYVerticalOffset' in data else 0
+                        chi2red = data.get('FitDiag_PowerLorentz_SecYChi2red', [np.nan])[event_idx] if 'FitDiag_PowerLorentz_SecYChi2red' in data else np.nan
+                        dof = data.get('FitDiag_PowerLorentz_SecYNPoints', [0])[event_idx] if 'FitDiag_PowerLorentz_SecYNPoints' in data else 0
+                
+                if model == 'power_lorentzian':
+                    return center, width, amplitude, offset, chi2red, dof, power
+                else:
+                    return center, width, amplitude, offset, chi2red, dof
+            
+            # Determine diagonal type from title
+            if 'Main' in title:
+                diag_type = 'main'
+            else:
+                diag_type = 'sec'
+            
+            # Plot Gaussian diagonal fit if available
+            params = get_diagonal_params(diag_type, direction, 'gaussian')
+            center, width, amplitude, offset, chi2red, dof = params
+            if not np.isnan(center) and not np.isnan(width) and not np.isnan(amplitude) and dof > 0:
+                gauss_fit = gaussian_1d(pos_range, amplitude, center, width, offset)
+                line = ax.plot(pos_range, gauss_fit, 'b-', linewidth=2, alpha=0.9, label='Gaussian')[0]
+                legend_lines.append(line)
+                ax.axvline(center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
+                gauss_diff = center - true_pos
+                legend_text_parts.append(f'Gaussian: χ²/ν = {chi2red:.2f}, Δ = {gauss_diff:.3f}')
+            
+            # Plot Lorentzian diagonal fit if available
+            params = get_diagonal_params(diag_type, direction, 'lorentzian')
+            center, width, amplitude, offset, chi2red, dof = params
+            if not np.isnan(center) and not np.isnan(width) and not np.isnan(amplitude) and dof > 0:
+                lorentz_fit = lorentzian_1d(pos_range, amplitude, center, width, offset)
+                line = ax.plot(pos_range, lorentz_fit, 'r--', linewidth=2, alpha=0.9, label='Lorentzian')[0]
+                legend_lines.append(line)
+                ax.axvline(center, color='red', linestyle=':', linewidth=1, alpha=0.8)
+                lorentz_diff = center - true_pos
+                legend_text_parts.append(f'Lorentzian: χ²/ν = {chi2red:.2f}, Δ = {lorentz_diff:.3f}')
+            
+            # Plot Power Lorentzian diagonal fit if available
+            params = get_diagonal_params(diag_type, direction, 'power_lorentzian')
+            if len(params) == 7:  # power_lorentzian returns 7 params
+                center, width, amplitude, offset, chi2red, dof, power = params
+                if not np.isnan(center) and not np.isnan(width) and not np.isnan(amplitude) and dof > 0:
+                    power_fit = power_lorentzian_1d(pos_range, amplitude, center, width, power, offset)
+                    line = ax.plot(pos_range, power_fit, 'm:', linewidth=2, alpha=0.9, label='Power Lorentzian')[0]
+                    legend_lines.append(line)
+                    ax.axvline(center, color='magenta', linestyle=':', linewidth=1, alpha=0.8)
+                    power_diff = center - true_pos
+                    legend_text_parts.append(f'Power Lorentzian: χ²/ν = {chi2red:.2f}, Δ = {power_diff:.3f}')
+            
+            # Add true position line
+            ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Position')
+            
+            # Create legend text
+            if legend_text_parts:
+                legend_text = '\n'.join(legend_text_parts)
+                legend_text += f'\nΔ pixel {direction.upper()} = {delta_pixel:.3f} mm'
+            else:
+                legend_text = f'No successful diagonal fits\nΔ pixel {direction.upper()} = {delta_pixel:.3f} mm'
+            
+            ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
+                   verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                   fontsize=9)
+            
+            ax.set_xlabel('Position [mm]')
+            ax.set_ylabel('Charge [C]')
+            ax.set_title(title)
+            ax.grid(True, alpha=0.3)
+            ax.legend(loc='upper right', fontsize=8)
+        
+        # Main diagonal X plot - use comprehensive plotting function
         ax_main_x = fig_combined.add_subplot(gs_combined[1, 0])
-        if len(main_x_pos) >= 3:
-            plot_data_points(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, fmt='ko', markersize=6, capsize=3, alpha=0.8)
-            pos_range = np.linspace(main_x_pos.min() - 0.1, main_x_pos.max() + 0.1, 200)
-            diag_fit = gaussian_1d(pos_range, main_diag_x_amplitude, main_diag_x_center, main_diag_x_sigma)
-            ax_main_x.plot(pos_range, diag_fit, 'b-', linewidth=2, alpha=0.9, label='Gaussian (diagonal)')
-            ax_main_x.axvline(true_x, color='green', linestyle='--', linewidth=2, alpha=0.8)
-            ax_main_x.axvline(main_diag_x_center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
-            ax_main_x.legend()
-        ax_main_x.set_title('Main Diagonal X')
-        ax_main_x.set_xlabel('Position [mm]')
-        ax_main_x.set_ylabel('Charge [C]')
-        ax_main_x.grid(True, alpha=0.3)
+        plot_all_models_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, true_x, 'Main Diagonal X', 'x', delta_pixel_x, diagonal_type='main')
         
-        # Similar for other diagonal plots (simplified)
+        # Main diagonal Y plot - use comprehensive plotting function
         ax_main_y = fig_combined.add_subplot(gs_combined[1, 1])
-        ax_main_y.set_title('Main Diagonal Y')
-        ax_main_y.grid(True, alpha=0.3)
+        plot_all_models_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, true_y, 'Main Diagonal Y', 'y', delta_pixel_y, diagonal_type='main')
         
+        # Secondary diagonal X plot - use comprehensive plotting function
         ax_sec_x = fig_combined.add_subplot(gs_combined[2, 0])
-        ax_sec_x.set_title('Secondary Diagonal X')
-        ax_sec_x.grid(True, alpha=0.3)
+        plot_all_models_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, true_x, 'Secondary Diagonal X', 'x', delta_pixel_x, diagonal_type='sec')
         
+        # Secondary diagonal Y plot - use comprehensive plotting function
         ax_sec_y = fig_combined.add_subplot(gs_combined[2, 1])
-        ax_sec_y.set_title('Secondary Diagonal Y')
-        ax_sec_y.grid(True, alpha=0.3)
+        plot_all_models_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, true_y, 'Secondary Diagonal Y', 'y', delta_pixel_y, diagonal_type='sec')
         
         models_str = "_".join([m.lower().replace(" ", "_") for m in available_models])
-        plt.suptitle(f'Event {event_idx}: All Available Models ({", ".join(available_models)})', fontsize=16)
+        plt.suptitle(f'Event {event_idx}: All Available Models ({", ".join(available_models)})\nAll models available for row/column and diagonal directions', fontsize=14)
         plt.tight_layout()
         plt.savefig(os.path.join(combined_dir, f'event_{event_idx:04d}_all_models_combined.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
@@ -1879,17 +2162,17 @@ def find_high_amplitude_events(data, n_events=10):
             y_gauss_chi2 = data.get('Fit2D_YChi2red', [float('inf')])[i]
             avg_chi2 = (x_gauss_chi2 + y_gauss_chi2) / 2.0 if np.isfinite(x_gauss_chi2) and np.isfinite(y_gauss_chi2) else float('inf')
             
-            amplitude_metrics.append((i, max_amplitude, avg_chi2, x_gauss_amp, y_gauss_amp, x_lorentz_amp, y_lorentz_amp))
+            amplitude_metrics.append((i, max_amplitude, avg_chi2, x_gauss_amp, y_gauss_amp, x_lorentz_amp, y_lorentz_amp, x_power_amp, y_power_amp))
             
         except Exception as e:
             print(f"Warning: Could not extract amplitude data for event {i}: {e}")
-            amplitude_metrics.append((i, 0, float('inf'), 0, 0, 0, 0))
+            amplitude_metrics.append((i, 0, float('inf'), 0, 0, 0, 0, 0, 0))
     
     # Sort by amplitude (highest first)
     amplitude_metrics.sort(key=lambda x: x[1], reverse=True)
     
     # Get events with finite amplitudes
-    valid_amps = [(idx, amp, chi2, x_g, y_g, x_l, y_l) for idx, amp, chi2, x_g, y_g, x_l, y_l in amplitude_metrics if amp > 0 and np.isfinite(amp)]
+    valid_amps = [(idx, amp, chi2, x_g, y_g, x_l, y_l, x_p, y_p) for idx, amp, chi2, x_g, y_g, x_l, y_l, x_p, y_p in amplitude_metrics if amp > 0 and np.isfinite(amp)]
     
     if len(valid_amps) == 0:
         print("Warning: No events with valid amplitudes found!")
@@ -1899,12 +2182,12 @@ def find_high_amplitude_events(data, n_events=10):
     
     # Get highest amplitude events
     high_amp_events = valid_amps[:n_events]
-    high_amp_indices = [idx for idx, amp, chi2, x_g, y_g, x_l, y_l in high_amp_events]
+    high_amp_indices = [idx for idx, amp, chi2, x_g, y_g, x_l, y_l, x_p, y_p in high_amp_events]
     
     print(f"Highest amplitude events:")
-    for i, (idx, amp, chi2, x_g, y_g, x_l, y_l) in enumerate(high_amp_events):
+    for i, (idx, amp, chi2, x_g, y_g, x_l, y_l, x_p, y_p) in enumerate(high_amp_events):
         print(f"  {i+1}. Event {idx}: Max Amp = {amp:.2e} C (χ² = {chi2:.3f})")
-        print(f"      Gauss: X={x_g:.2e}, Y={y_g:.2e} | Lorentz: X={x_l:.2e}, Y={y_l:.2e}")
+        print(f"      Gauss: X={x_g:.2e}, Y={y_g:.2e} | Lorentz: X={x_l:.2e}, Y={y_l:.2e} | Power: X={x_p:.2e}, Y={y_p:.2e}")
     
     return high_amp_indices, amplitude_metrics
 
@@ -2050,10 +2333,10 @@ def create_high_amplitude_plots(data, output_dir="plots", n_events=10):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Create Gaussian and Lorentzian fit plots for charge sharing analysis",
+        description="Create Gaussian, Lorentzian, and Power Lorentzian fit plots for charge sharing analysis",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("root_file", help="Path to ROOT file with 2D Gaussian and Lorentzian fit data")
+    parser.add_argument("root_file", help="Path to ROOT file with 2D Gaussian, Lorentzian, and Power Lorentzian fit data")
     parser.add_argument("-o", "--output", default="gauss_lorentz_plots", 
                        help="Output directory for plots")
     parser.add_argument("-n", "--num_events", type=int, default=10,

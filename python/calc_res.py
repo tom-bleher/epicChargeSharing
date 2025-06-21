@@ -14,7 +14,7 @@ Spatial resolution is quantified as the standard deviation of position residuals
 Usage:
     python calc_res.py [ROOT_FILE_PATH]
     
-If no path is provided, defaults to ../build/epicToyOutput.root
+    If no path is provided, defaults to ../build/epicChargeSharingOutput.root
 """
 
 import sys
@@ -111,6 +111,7 @@ def read_root_data(root_file_path):
                 'PixelTrueDeltaX', 'PixelTrueDeltaY',  # Digital readout deltas
                 'GaussRowDeltaX', 'GaussColumnDeltaY',  # Gaussian row/column fit deltas
                 'LorentzRowDeltaX', 'LorentzColumnDeltaY',  # Lorentzian row/column fit deltas
+                'PowerLorentzRowDeltaX', 'PowerLorentzColumnDeltaY',  # Power Lorentzian row/column fit deltas
                 
                 # Main diagonal deltas
                 'GaussMainDiagTransformedDeltaX', 'GaussMainDiagTransformedDeltaY',
@@ -120,14 +121,14 @@ def read_root_data(root_file_path):
                 'GaussSecondDiagTransformedDeltaX', 'GaussSecondDiagTransformedDeltaY',
                 'LorentzSecondDiagTransformedDeltaX', 'LorentzSecondDiagTransformedDeltaY',
                 
-                # Skewed Lorentzian deltas (check if they exist)
-                'SkewedLorentzMainDiagTransformedDeltaX', 'SkewedLorentzMainDiagTransformedDeltaY',
-                'SkewedLorentzSecondDiagTransformedDeltaX', 'SkewedLorentzSecondDiagTransformedDeltaY',
+                # Power Lorentzian deltas (check if they exist)
+                'PowerLorentzMainDiagTransformedDeltaX', 'PowerLorentzMainDiagTransformedDeltaY',
+                'PowerLorentzSecondDiagTransformedDeltaX', 'PowerLorentzSecondDiagTransformedDeltaY',
                 
                 # Mean estimators
                 'GaussMeanTrueDeltaX', 'GaussMeanTrueDeltaY',
                 'LorentzMeanTrueDeltaX', 'LorentzMeanTrueDeltaY',
-                'SkewedLorentzMeanTrueDeltaX', 'SkewedLorentzMeanTrueDeltaY',
+                'PowerLorentzMeanTrueDeltaX', 'PowerLorentzMeanTrueDeltaY',
             ]
             
             # Read all branches at once
@@ -181,6 +182,8 @@ def calculate_all_resolutions(data):
         ('Gaussian Column Fit Y', 'GaussColumnDeltaY'),
         ('Lorentzian Row Fit X', 'LorentzRowDeltaX'),
         ('Lorentzian Column Fit Y', 'LorentzColumnDeltaY'),
+        ('Power Lorentzian Row Fit X', 'PowerLorentzRowDeltaX'),
+        ('Power Lorentzian Column Fit Y', 'PowerLorentzColumnDeltaY'),
         
         # Main Diagonal Fits (slope +1: dx - dy = constant)
         ('Gaussian Main Diagonal Fit X', 'GaussMainDiagTransformedDeltaX'),
@@ -194,21 +197,21 @@ def calculate_all_resolutions(data):
         ('Lorentzian Secondary Diagonal Fit X', 'LorentzSecondDiagTransformedDeltaX'),
         ('Lorentzian Secondary Diagonal Fit Y', 'LorentzSecondDiagTransformedDeltaY'),
         
-        # Skewed Lorentzian Main Diagonal Fits (slope +1: dx - dy = constant)
-        ('Skewed Lorentzian Main Diagonal Fit X', 'SkewedLorentzMainDiagTransformedDeltaX'),
-        ('Skewed Lorentzian Main Diagonal Fit Y', 'SkewedLorentzMainDiagTransformedDeltaY'),
+        # Power Lorentzian Main Diagonal Fits (slope +1: dx - dy = constant)
+        ('Power Lorentzian Main Diagonal Fit X', 'PowerLorentzMainDiagTransformedDeltaX'),
+        ('Power Lorentzian Main Diagonal Fit Y', 'PowerLorentzMainDiagTransformedDeltaY'),
         
-        # Skewed Lorentzian Secondary Diagonal Fits (slope -1: dx + dy = constant)
-        ('Skewed Lorentzian Secondary Diagonal Fit X', 'SkewedLorentzSecondDiagTransformedDeltaX'),
-        ('Skewed Lorentzian Secondary Diagonal Fit Y', 'SkewedLorentzSecondDiagTransformedDeltaY'),
+        # Power Lorentzian Secondary Diagonal Fits (slope -1: dx + dy = constant)
+        ('Power Lorentzian Secondary Diagonal Fit X', 'PowerLorentzSecondDiagTransformedDeltaX'),
+        ('Power Lorentzian Secondary Diagonal Fit Y', 'PowerLorentzSecondDiagTransformedDeltaY'),
         
         # Mean Estimators (combined from all methods)
         ('Gaussian Mean Estimator X', 'GaussMeanTrueDeltaX'),
         ('Gaussian Mean Estimator Y', 'GaussMeanTrueDeltaY'),
         ('Lorentzian Mean Estimator X', 'LorentzMeanTrueDeltaX'),
         ('Lorentzian Mean Estimator Y', 'LorentzMeanTrueDeltaY'),
-        ('Skewed Lorentzian Mean Estimator X', 'SkewedLorentzMeanTrueDeltaX'),
-        ('Skewed Lorentzian Mean Estimator Y', 'SkewedLorentzMeanTrueDeltaY'),
+        ('Power Lorentzian Mean Estimator X', 'PowerLorentzMeanTrueDeltaX'),
+        ('Power Lorentzian Mean Estimator Y', 'PowerLorentzMeanTrueDeltaY'),
     ]
     
     print("\nCalculating spatial resolution for all methods...")
@@ -250,7 +253,9 @@ def save_results_to_file(results, output_file):
     with open(output_file, 'w') as f:
         # Group results by category for better organization
         digital_results = [r for r in results if 'Digital' in r['name']]
-        row_col_results = [r for r in results if ('Row Fit' in r['name'] or 'Column Fit' in r['name'])]
+        gauss_row_col_results = [r for r in results if ('Gaussian Row Fit' in r['name'] or 'Gaussian Column Fit' in r['name'])]
+        lorentz_row_col_results = [r for r in results if ('Lorentzian Row Fit' in r['name'] or 'Lorentzian Column Fit' in r['name'])]
+        power_lorentz_row_col_results = [r for r in results if ('Power Lorentzian Row Fit' in r['name'] or 'Power Lorentzian Column Fit' in r['name'])]
         main_diag_results = [r for r in results if 'Main Diagonal' in r['name'] and r['std_dev'] > 0]
         sec_diag_results = [r for r in results if 'Secondary Diagonal' in r['name'] and r['std_dev'] > 0]
         mean_results = [r for r in results if 'Mean Estimator' in r['name'] and r['std_dev'] > 0]
@@ -272,10 +277,32 @@ def save_results_to_file(results, output_file):
                        f"{result['rms']*1000:>12.2f}\n")
             f.write("-" * 103 + "\n")
         
-        # Row/Column fits section
-        if row_col_results:
-            f.write("ROW & COLUMN FITS:\n")
-            for result in sorted(row_col_results, key=lambda x: x['name']):
+        # Gaussian Row/Column fits section
+        if gauss_row_col_results:
+            f.write("GAUSSIAN ROW & COLUMN FITS:\n")
+            for result in sorted(gauss_row_col_results, key=lambda x: x['name']):
+                f.write(f"{result['name']:<45} "
+                       f"{result['n_events']:>10,} "
+                       f"{result['mean_bias']*1000:>14.3f} "
+                       f"{result['std_dev']*1000:>12.2f} "
+                       f"{result['rms']*1000:>12.2f}\n")
+            f.write("-" * 103 + "\n")
+        
+        # Lorentzian Row/Column fits section
+        if lorentz_row_col_results:
+            f.write("LORENTZIAN ROW & COLUMN FITS:\n")
+            for result in sorted(lorentz_row_col_results, key=lambda x: x['name']):
+                f.write(f"{result['name']:<45} "
+                       f"{result['n_events']:>10,} "
+                       f"{result['mean_bias']*1000:>14.3f} "
+                       f"{result['std_dev']*1000:>12.2f} "
+                       f"{result['rms']*1000:>12.2f}\n")
+            f.write("-" * 103 + "\n")
+        
+        # Power Lorentzian Row/Column fits section
+        if power_lorentz_row_col_results:
+            f.write("POWER LORENTZIAN ROW & COLUMN FITS:\n")
+            for result in sorted(power_lorentz_row_col_results, key=lambda x: x['name']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
                        f"{result['mean_bias']*1000:>14.3f} "
@@ -324,14 +351,14 @@ def main():
         epilog="""
 Examples:
   python calc_res.py                                    # Use default path
-  python calc_res.py /path/to/epicToyOutput.root       # Use specific file
+          python calc_res.py /path/to/epicChargeSharingOutput.root       # Use specific file
   python calc_res.py --output my_results.txt           # Custom output file
         """
     )
     
     parser.add_argument('root_file', nargs='?', 
-                       default='../build/epicToyOutput.root',
-                       help='Path to ROOT file (default: ../build/epicToyOutput.root)')
+                               default='../build/epicChargeSharingOutput.root',
+        help='Path to ROOT file (default: ../build/epicChargeSharingOutput.root)')
     
     parser.add_argument('-o', '--output', 
                        default='spatial_resolution_results.txt',
