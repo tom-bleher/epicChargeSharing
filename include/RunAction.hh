@@ -153,8 +153,25 @@ public:
                                               G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
                                               G4bool fit_successful);
 
+    // =============================================
+    // 3D FITTING RESULTS SETTER METHODS
+    // =============================================
     
-
+    // Method to set 3D Lorentzian fit results (entire neighborhood surface fitting)
+    // Model: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2) + B
+    void Set3DLorentzianFitResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double amplitude, G4double vertical_offset,
+                                   G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double amplitude_err, G4double vertical_offset_err,
+                                   G4double chi2red, G4double pp, G4int dof,
+                                   G4double charge_uncertainty,
+                                   G4bool fit_successful);
+    
+    // Method to set 3D Power-Law Lorentzian fit results (entire neighborhood surface fitting)
+    // Model: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2)^β + B
+    void Set3DPowerLorentzianFitResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double beta, G4double amplitude, G4double vertical_offset,
+                                        G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double beta_err, G4double amplitude_err, G4double vertical_offset_err,
+                                        G4double chi2red, G4double pp, G4int dof,
+                                        G4double charge_uncertainty,
+                                                                                      G4bool fit_successful);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -205,6 +222,12 @@ private:
     G4double fLorentzColumnDeltaY;
     G4double fPowerLorentzRowDeltaX;
     G4double fPowerLorentzColumnDeltaY;
+    
+    // 3D fitting delta variables
+    G4double f3DLorentzianDeltaX;          // Delta X from 3D Lorentzian fit to True Position [mm]
+    G4double f3DLorentzianDeltaY;          // Delta Y from 3D Lorentzian fit to True Position [mm]
+    G4double f3DPowerLorentzianDeltaX;     // Delta X from 3D Power-Law Lorentzian fit to True Position [mm]
+    G4double f3DPowerLorentzianDeltaY;     // Delta Y from 3D Power-Law Lorentzian fit to True Position [mm]
 
     // =============================================
     // TRANSFORMED DIAGONAL COORDINATES (ROTATION MATRIX)
@@ -527,6 +550,62 @@ private:
     G4double fPowerLorentzFitSecondDiagYChi2red;
     G4double fPowerLorentzFitSecondDiagYPp;
     G4int fPowerLorentzFitSecondDiagYDOF;
+
+    // =============================================
+    // 3D LORENTZIAN FITS VARIABLES
+    // =============================================
+    
+    // 3D Lorentzian fit parameters: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2) + B
+    G4double f3DLorentzianFitCenterX;            // mx parameter (X center)
+    G4double f3DLorentzianFitCenterY;            // my parameter (Y center)
+    G4double f3DLorentzianFitGammaX;             // γx parameter (X width/HWHM)
+    G4double f3DLorentzianFitGammaY;             // γy parameter (Y width/HWHM)
+    G4double f3DLorentzianFitAmplitude;          // A parameter (peak amplitude)
+    G4double f3DLorentzianFitVerticalOffset;     // B parameter (baseline)
+    
+    // 3D Lorentzian fit parameter errors
+    G4double f3DLorentzianFitCenterXErr;         
+    G4double f3DLorentzianFitCenterYErr;         
+    G4double f3DLorentzianFitGammaXErr;          
+    G4double f3DLorentzianFitGammaYErr;          
+    G4double f3DLorentzianFitAmplitudeErr;       
+    G4double f3DLorentzianFitVerticalOffsetErr;  
+    
+    // 3D Lorentzian fit statistics
+    G4double f3DLorentzianFitChi2red;            // Reduced Chi-squared
+    G4double f3DLorentzianFitPp;                 // P-value  
+    G4int f3DLorentzianFitDOF;                   // Degrees of Freedom
+    G4double f3DLorentzianFitChargeUncertainty;  // Charge uncertainty (5% of max charge)
+    G4bool f3DLorentzianFitSuccessful;           // Fit success flag
+
+    // =============================================
+    // 3D POWER-LAW LORENTZIAN FITS VARIABLES
+    // =============================================
+    
+    // 3D Power-Law Lorentzian fit parameters: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2)^β + B
+    G4double f3DPowerLorentzianFitCenterX;            // mx parameter (X center)
+    G4double f3DPowerLorentzianFitCenterY;            // my parameter (Y center)
+    G4double f3DPowerLorentzianFitGammaX;             // γx parameter (X width)
+    G4double f3DPowerLorentzianFitGammaY;             // γy parameter (Y width)
+    G4double f3DPowerLorentzianFitBeta;               // β parameter (power exponent)  
+    G4double f3DPowerLorentzianFitAmplitude;          // A parameter (peak amplitude)
+    G4double f3DPowerLorentzianFitVerticalOffset;     // B parameter (baseline)
+    
+    // 3D Power-Law Lorentzian fit parameter errors
+    G4double f3DPowerLorentzianFitCenterXErr;         
+    G4double f3DPowerLorentzianFitCenterYErr;         
+    G4double f3DPowerLorentzianFitGammaXErr;          
+    G4double f3DPowerLorentzianFitGammaYErr;          
+    G4double f3DPowerLorentzianFitBetaErr;            
+    G4double f3DPowerLorentzianFitAmplitudeErr;       
+    G4double f3DPowerLorentzianFitVerticalOffsetErr;  
+    
+    // 3D Power-Law Lorentzian fit statistics
+    G4double f3DPowerLorentzianFitChi2red;            // Reduced Chi-squared
+    G4double f3DPowerLorentzianFitPp;                 // P-value  
+    G4int f3DPowerLorentzianFitDOF;                   // Degrees of Freedom
+    G4double f3DPowerLorentzianFitChargeUncertainty;  // Charge uncertainty (5% of max charge)
+    G4bool f3DPowerLorentzianFitSuccessful;           // Fit success flag
 
     // Legacy variables that may still be used
     G4double fPixelZ; // Nearest to hit pixel center Z [mm]

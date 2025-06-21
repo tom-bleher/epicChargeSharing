@@ -299,6 +299,49 @@ RunAction::RunAction()
   // Initialize Power-Law Lorentzian mean estimation variables
   fPowerLorentzMeanTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
   fPowerLorentzMeanTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize 3D fitting delta variables
+  f3DLorentzianDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  f3DLorentzianDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  f3DPowerLorentzianDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  f3DPowerLorentzianDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize 3D Lorentzian fit variables
+  f3DLorentzianFitCenterX(0),
+  f3DLorentzianFitCenterY(0),
+  f3DLorentzianFitGammaX(0),
+  f3DLorentzianFitGammaY(0),
+  f3DLorentzianFitAmplitude(0),
+  f3DLorentzianFitVerticalOffset(0),
+  f3DLorentzianFitCenterXErr(0),
+  f3DLorentzianFitCenterYErr(0),
+  f3DLorentzianFitGammaXErr(0),
+  f3DLorentzianFitGammaYErr(0),
+  f3DLorentzianFitAmplitudeErr(0),
+  f3DLorentzianFitVerticalOffsetErr(0),
+  f3DLorentzianFitChi2red(0),
+  f3DLorentzianFitPp(0),
+  f3DLorentzianFitDOF(0),
+  f3DLorentzianFitChargeUncertainty(0),
+  f3DLorentzianFitSuccessful(false),
+  // Initialize 3D Power-Law Lorentzian fit variables
+  f3DPowerLorentzianFitCenterX(0),
+  f3DPowerLorentzianFitCenterY(0),
+  f3DPowerLorentzianFitGammaX(0),
+  f3DPowerLorentzianFitGammaY(0),
+  f3DPowerLorentzianFitBeta(0),
+  f3DPowerLorentzianFitAmplitude(0),
+  f3DPowerLorentzianFitVerticalOffset(0),
+  f3DPowerLorentzianFitCenterXErr(0),
+  f3DPowerLorentzianFitCenterYErr(0),
+  f3DPowerLorentzianFitGammaXErr(0),
+  f3DPowerLorentzianFitGammaYErr(0),
+  f3DPowerLorentzianFitBetaErr(0),
+  f3DPowerLorentzianFitAmplitudeErr(0),
+  f3DPowerLorentzianFitVerticalOffsetErr(0),
+  f3DPowerLorentzianFitChi2red(0),
+  f3DPowerLorentzianFitPp(0),
+  f3DPowerLorentzianFitDOF(0),
+  f3DPowerLorentzianFitChargeUncertainty(0),
+  f3DPowerLorentzianFitSuccessful(false),
   // Legacy variables
   fPixelZ(0),
   fIsPixelHit(false),
@@ -698,6 +741,82 @@ void RunAction::BeginOfRunAction(const G4Run*)
     fTree->Branch("PowerLorentzMeanTrueDeltaY", &fPowerLorentzMeanTrueDeltaY, "PowerLorentzMeanTrueDeltaY/D")->SetTitle("Mean Delta Y from all Power-Law Lorentzian estimation methods to True Position [mm]");
 
     } // End of Power-Law Lorentzian fitting branches
+
+    // =============================================
+    // 3D LORENTZIAN FITS BRANCHES (conditionally created)
+    // =============================================
+    if (Constants::ENABLE_3D_LORENTZIAN_FITTING) {
+    // 3D Lorentzian fit parameters
+    fTree->Branch("3DLorentzianFitCenterX", &f3DLorentzianFitCenterX, "3DLorentzianFitCenterX/D")->SetTitle("3D Lorentzian Fit Center X [mm]");
+    fTree->Branch("3DLorentzianFitCenterY", &f3DLorentzianFitCenterY, "3DLorentzianFitCenterY/D")->SetTitle("3D Lorentzian Fit Center Y [mm]");
+    fTree->Branch("3DLorentzianFitGammaX", &f3DLorentzianFitGammaX, "3DLorentzianFitGammaX/D")->SetTitle("3D Lorentzian Fit Gamma X Parameter");
+    fTree->Branch("3DLorentzianFitGammaY", &f3DLorentzianFitGammaY, "3DLorentzianFitGammaY/D")->SetTitle("3D Lorentzian Fit Gamma Y Parameter");
+    fTree->Branch("3DLorentzianFitAmplitude", &f3DLorentzianFitAmplitude, "3DLorentzianFitAmplitude/D")->SetTitle("3D Lorentzian Fit Amplitude");
+    fTree->Branch("3DLorentzianFitVerticalOffset", &f3DLorentzianFitVerticalOffset, "3DLorentzianFitVerticalOffset/D")->SetTitle("3D Lorentzian Fit Vertical Offset");
+    
+    // 3D Lorentzian fit parameter errors
+    fTree->Branch("3DLorentzianFitCenterXErr", &f3DLorentzianFitCenterXErr, "3DLorentzianFitCenterXErr/D")->SetTitle("3D Lorentzian Fit Center X Error [mm]");
+    fTree->Branch("3DLorentzianFitCenterYErr", &f3DLorentzianFitCenterYErr, "3DLorentzianFitCenterYErr/D")->SetTitle("3D Lorentzian Fit Center Y Error [mm]");
+    fTree->Branch("3DLorentzianFitGammaXErr", &f3DLorentzianFitGammaXErr, "3DLorentzianFitGammaXErr/D")->SetTitle("3D Lorentzian Fit Gamma X Parameter Error");
+    fTree->Branch("3DLorentzianFitGammaYErr", &f3DLorentzianFitGammaYErr, "3DLorentzianFitGammaYErr/D")->SetTitle("3D Lorentzian Fit Gamma Y Parameter Error");
+    fTree->Branch("3DLorentzianFitAmplitudeErr", &f3DLorentzianFitAmplitudeErr, "3DLorentzianFitAmplitudeErr/D")->SetTitle("3D Lorentzian Fit Amplitude Error");
+    fTree->Branch("3DLorentzianFitVerticalOffsetErr", &f3DLorentzianFitVerticalOffsetErr, "3DLorentzianFitVerticalOffsetErr/D")->SetTitle("3D Lorentzian Fit Vertical Offset Error");
+    
+    // 3D Lorentzian fit statistics
+    fTree->Branch("3DLorentzianFitChi2red", &f3DLorentzianFitChi2red, "3DLorentzianFitChi2red/D")->SetTitle("3D Lorentzian Fit Reduced Chi-squared");
+    fTree->Branch("3DLorentzianFitPp", &f3DLorentzianFitPp, "3DLorentzianFitPp/D")->SetTitle("3D Lorentzian Fit P-value");
+    fTree->Branch("3DLorentzianFitDOF", &f3DLorentzianFitDOF, "3DLorentzianFitDOF/I")->SetTitle("3D Lorentzian Fit Degrees of Freedom");
+    fTree->Branch("3DLorentzianFitSuccessful", &f3DLorentzianFitSuccessful, "3DLorentzianFitSuccessful/O")->SetTitle("3D Lorentzian Fit Success Flag");
+    
+    // Conditionally create charge uncertainty branch for 3D Lorentzian fit
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fTree->Branch("3DLorentzianFitChargeUncertainty", &f3DLorentzianFitChargeUncertainty, "3DLorentzianFitChargeUncertainty/D")->SetTitle("3D Lorentzian Fit Charge Uncertainty");
+    }
+    
+    // 3D Lorentzian delta branches
+    fTree->Branch("3DLorentzianDeltaX", &f3DLorentzianDeltaX, "3DLorentzianDeltaX/D")->SetTitle("Delta X from 3D Lorentzian Fit to True Position [mm]");
+    fTree->Branch("3DLorentzianDeltaY", &f3DLorentzianDeltaY, "3DLorentzianDeltaY/D")->SetTitle("Delta Y from 3D Lorentzian Fit to True Position [mm]");
+    
+    } // End of 3D Lorentzian fitting branches
+
+    // =============================================
+    // 3D POWER-LAW LORENTZIAN FITS BRANCHES (conditionally created)
+    // =============================================
+    if (Constants::ENABLE_3D_POWER_LORENTZIAN_FITTING) {
+    // 3D Power-Law Lorentzian fit parameters
+    fTree->Branch("3DPowerLorentzianFitCenterX", &f3DPowerLorentzianFitCenterX, "3DPowerLorentzianFitCenterX/D")->SetTitle("3D Power-Law Lorentzian Fit Center X [mm]");
+    fTree->Branch("3DPowerLorentzianFitCenterY", &f3DPowerLorentzianFitCenterY, "3DPowerLorentzianFitCenterY/D")->SetTitle("3D Power-Law Lorentzian Fit Center Y [mm]");
+    fTree->Branch("3DPowerLorentzianFitGammaX", &f3DPowerLorentzianFitGammaX, "3DPowerLorentzianFitGammaX/D")->SetTitle("3D Power-Law Lorentzian Fit Gamma X Parameter");
+    fTree->Branch("3DPowerLorentzianFitGammaY", &f3DPowerLorentzianFitGammaY, "3DPowerLorentzianFitGammaY/D")->SetTitle("3D Power-Law Lorentzian Fit Gamma Y Parameter");
+    fTree->Branch("3DPowerLorentzianFitBeta", &f3DPowerLorentzianFitBeta, "3DPowerLorentzianFitBeta/D")->SetTitle("3D Power-Law Lorentzian Fit Beta Parameter");
+    fTree->Branch("3DPowerLorentzianFitAmplitude", &f3DPowerLorentzianFitAmplitude, "3DPowerLorentzianFitAmplitude/D")->SetTitle("3D Power-Law Lorentzian Fit Amplitude");
+    fTree->Branch("3DPowerLorentzianFitVerticalOffset", &f3DPowerLorentzianFitVerticalOffset, "3DPowerLorentzianFitVerticalOffset/D")->SetTitle("3D Power-Law Lorentzian Fit Vertical Offset");
+    
+    // 3D Power-Law Lorentzian fit parameter errors
+    fTree->Branch("3DPowerLorentzianFitCenterXErr", &f3DPowerLorentzianFitCenterXErr, "3DPowerLorentzianFitCenterXErr/D")->SetTitle("3D Power-Law Lorentzian Fit Center X Error [mm]");
+    fTree->Branch("3DPowerLorentzianFitCenterYErr", &f3DPowerLorentzianFitCenterYErr, "3DPowerLorentzianFitCenterYErr/D")->SetTitle("3D Power-Law Lorentzian Fit Center Y Error [mm]");
+    fTree->Branch("3DPowerLorentzianFitGammaXErr", &f3DPowerLorentzianFitGammaXErr, "3DPowerLorentzianFitGammaXErr/D")->SetTitle("3D Power-Law Lorentzian Fit Gamma X Parameter Error");
+    fTree->Branch("3DPowerLorentzianFitGammaYErr", &f3DPowerLorentzianFitGammaYErr, "3DPowerLorentzianFitGammaYErr/D")->SetTitle("3D Power-Law Lorentzian Fit Gamma Y Parameter Error");
+    fTree->Branch("3DPowerLorentzianFitBetaErr", &f3DPowerLorentzianFitBetaErr, "3DPowerLorentzianFitBetaErr/D")->SetTitle("3D Power-Law Lorentzian Fit Beta Parameter Error");
+    fTree->Branch("3DPowerLorentzianFitAmplitudeErr", &f3DPowerLorentzianFitAmplitudeErr, "3DPowerLorentzianFitAmplitudeErr/D")->SetTitle("3D Power-Law Lorentzian Fit Amplitude Error");
+    fTree->Branch("3DPowerLorentzianFitVerticalOffsetErr", &f3DPowerLorentzianFitVerticalOffsetErr, "3DPowerLorentzianFitVerticalOffsetErr/D")->SetTitle("3D Power-Law Lorentzian Fit Vertical Offset Error");
+    
+    // 3D Power-Law Lorentzian fit statistics
+    fTree->Branch("3DPowerLorentzianFitChi2red", &f3DPowerLorentzianFitChi2red, "3DPowerLorentzianFitChi2red/D")->SetTitle("3D Power-Law Lorentzian Fit Reduced Chi-squared");
+    fTree->Branch("3DPowerLorentzianFitPp", &f3DPowerLorentzianFitPp, "3DPowerLorentzianFitPp/D")->SetTitle("3D Power-Law Lorentzian Fit P-value");
+    fTree->Branch("3DPowerLorentzianFitDOF", &f3DPowerLorentzianFitDOF, "3DPowerLorentzianFitDOF/I")->SetTitle("3D Power-Law Lorentzian Fit Degrees of Freedom");
+    fTree->Branch("3DPowerLorentzianFitSuccessful", &f3DPowerLorentzianFitSuccessful, "3DPowerLorentzianFitSuccessful/O")->SetTitle("3D Power-Law Lorentzian Fit Success Flag");
+    
+    // Conditionally create charge uncertainty branch for 3D Power-Law Lorentzian fit
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fTree->Branch("3DPowerLorentzianFitChargeUncertainty", &f3DPowerLorentzianFitChargeUncertainty, "3DPowerLorentzianFitChargeUncertainty/D")->SetTitle("3D Power-Law Lorentzian Fit Charge Uncertainty");
+    }
+    
+    // 3D Power-Law Lorentzian delta branches
+    fTree->Branch("3DPowerLorentzianDeltaX", &f3DPowerLorentzianDeltaX, "3DPowerLorentzianDeltaX/D")->SetTitle("Delta X from 3D Power-Law Lorentzian Fit to True Position [mm]");
+    fTree->Branch("3DPowerLorentzianDeltaY", &f3DPowerLorentzianDeltaY, "3DPowerLorentzianDeltaY/D")->SetTitle("Delta Y from 3D Power-Law Lorentzian Fit to True Position [mm]");
+    
+    } // End of 3D Power-Law Lorentzian fitting branches
 
     // Load vector dictionaries for ROOT to properly handle std::vector branches
     gROOT->ProcessLine("#include <vector>");
@@ -1546,6 +1665,26 @@ void RunAction::CalculateMeanEstimations()
     if (!std::isnan(fPowerLorentzSecondDiagTransformedY)) {
         power_lorentz_y_coords.push_back(fPowerLorentzSecondDiagTransformedY);
     }
+    
+    // =============================================
+    // ADD 3D FITTING RESULTS TO MEAN CALCULATIONS
+    // =============================================
+    
+    // Add 3D Lorentzian fit results to Lorentzian estimation collections
+    if (!std::isnan(f3DLorentzianFitCenterX) && f3DLorentzianFitSuccessful) {
+        lorentz_x_coords.push_back(f3DLorentzianFitCenterX);
+    }
+    if (!std::isnan(f3DLorentzianFitCenterY) && f3DLorentzianFitSuccessful) {
+        lorentz_y_coords.push_back(f3DLorentzianFitCenterY);
+    }
+    
+    // Add 3D Power-Law Lorentzian fit results to Power-Law Lorentzian estimation collections
+    if (!std::isnan(f3DPowerLorentzianFitCenterX) && f3DPowerLorentzianFitSuccessful) {
+        power_lorentz_x_coords.push_back(f3DPowerLorentzianFitCenterX);
+    }
+    if (!std::isnan(f3DPowerLorentzianFitCenterY) && f3DPowerLorentzianFitSuccessful) {
+        power_lorentz_y_coords.push_back(f3DPowerLorentzianFitCenterY);
+    }
 
     
     // Calculate mean X coordinate estimations and their deltas
@@ -1783,5 +1922,109 @@ void RunAction::SetDiagonalPowerLorentzianFitResults(G4double main_diag_x_center
     CalculateTransformedDiagonalCoordinates();
     
     // Calculate mean estimations from all fitting methods
+    CalculateMeanEstimations();
+}
+
+// =============================================
+// 3D FITTING RESULTS SETTER METHODS
+// =============================================
+
+void RunAction::Set3DLorentzianFitResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double amplitude, G4double vertical_offset,
+                                           G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double amplitude_err, G4double vertical_offset_err,
+                                           G4double chi2red, G4double pp, G4int dof,
+                                           G4double charge_uncertainty,
+                                           G4bool fit_successful)
+{
+    // Store 3D Lorentzian fit parameters
+    f3DLorentzianFitCenterX = center_x;
+    f3DLorentzianFitCenterY = center_y;
+    f3DLorentzianFitGammaX = gamma_x;
+    f3DLorentzianFitGammaY = gamma_y;
+    f3DLorentzianFitAmplitude = amplitude;
+    f3DLorentzianFitVerticalOffset = vertical_offset;
+    
+    // Store 3D Lorentzian fit parameter errors
+    f3DLorentzianFitCenterXErr = center_x_err;
+    f3DLorentzianFitCenterYErr = center_y_err;
+    f3DLorentzianFitGammaXErr = gamma_x_err;
+    f3DLorentzianFitGammaYErr = gamma_y_err;
+    f3DLorentzianFitAmplitudeErr = amplitude_err;
+    f3DLorentzianFitVerticalOffsetErr = vertical_offset_err;
+    
+    // Store 3D Lorentzian fit statistics
+    f3DLorentzianFitChi2red = chi2red;
+    f3DLorentzianFitPp = pp;
+    f3DLorentzianFitDOF = dof;
+    f3DLorentzianFitSuccessful = fit_successful;
+    
+    // Store charge uncertainty (5% of max charge) only if feature is enabled
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        f3DLorentzianFitChargeUncertainty = charge_uncertainty;
+    } else {
+        f3DLorentzianFitChargeUncertainty = 0.0;
+    }
+    
+    // Calculate delta values vs true position
+    if (fit_successful && dof > 0) {
+        f3DLorentzianDeltaX = center_x - fTrueX;      // x_3D_fit - x_true
+        f3DLorentzianDeltaY = center_y - fTrueY;      // y_3D_fit - y_true
+    } else {
+        // Set delta values to NaN for failed fits
+        f3DLorentzianDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        f3DLorentzianDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    // Calculate mean estimations from all fitting methods (including 3D)
+    CalculateMeanEstimations();
+}
+
+void RunAction::Set3DPowerLorentzianFitResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double beta, G4double amplitude, G4double vertical_offset,
+                                               G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double beta_err, G4double amplitude_err, G4double vertical_offset_err,
+                                               G4double chi2red, G4double pp, G4int dof,
+                                               G4double charge_uncertainty,
+                                               G4bool fit_successful)
+{
+    // Store 3D Power-Law Lorentzian fit parameters
+    f3DPowerLorentzianFitCenterX = center_x;
+    f3DPowerLorentzianFitCenterY = center_y;
+    f3DPowerLorentzianFitGammaX = gamma_x;
+    f3DPowerLorentzianFitGammaY = gamma_y;
+    f3DPowerLorentzianFitBeta = beta;
+    f3DPowerLorentzianFitAmplitude = amplitude;
+    f3DPowerLorentzianFitVerticalOffset = vertical_offset;
+    
+    // Store 3D Power-Law Lorentzian fit parameter errors
+    f3DPowerLorentzianFitCenterXErr = center_x_err;
+    f3DPowerLorentzianFitCenterYErr = center_y_err;
+    f3DPowerLorentzianFitGammaXErr = gamma_x_err;
+    f3DPowerLorentzianFitGammaYErr = gamma_y_err;
+    f3DPowerLorentzianFitBetaErr = beta_err;
+    f3DPowerLorentzianFitAmplitudeErr = amplitude_err;
+    f3DPowerLorentzianFitVerticalOffsetErr = vertical_offset_err;
+    
+    // Store 3D Power-Law Lorentzian fit statistics
+    f3DPowerLorentzianFitChi2red = chi2red;
+    f3DPowerLorentzianFitPp = pp;
+    f3DPowerLorentzianFitDOF = dof;
+    f3DPowerLorentzianFitSuccessful = fit_successful;
+    
+    // Store charge uncertainty (5% of max charge) only if feature is enabled
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        f3DPowerLorentzianFitChargeUncertainty = charge_uncertainty;
+    } else {
+        f3DPowerLorentzianFitChargeUncertainty = 0.0;
+    }
+    
+    // Calculate delta values vs true position
+    if (fit_successful && dof > 0) {
+        f3DPowerLorentzianDeltaX = center_x - fTrueX;      // x_3D_fit - x_true
+        f3DPowerLorentzianDeltaY = center_y - fTrueY;      // y_3D_fit - y_true
+    } else {
+        // Set delta values to NaN for failed fits
+        f3DPowerLorentzianDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        f3DPowerLorentzianDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    // Calculate mean estimations from all fitting methods (including 3D)
     CalculateMeanEstimations();
 }

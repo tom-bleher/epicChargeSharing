@@ -5,6 +5,8 @@
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
 #include "2DPowerLorentzianFitCeres.hh"
+#include "3DLorentzianFitCeres.hh"
+#include "3DPowerLorentzianFitCeres.hh"
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
@@ -457,6 +459,92 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // fit_successful = false
       }
     }
+      
+      // ===============================================
+      // 3D LORENTZIAN FITTING (conditionally enabled)
+      // ===============================================
+      
+      // Perform 3D Lorentzian fitting if we have enough data points and 3D Lorentzian fitting is enabled
+      if (x_coords.size() >= 6 && Constants::ENABLE_3D_LORENTZIAN_FITTING) { // Need at least 6 points for 3D Lorentzian fit
+        // Perform 3D Lorentzian fitting using the Ceres Solver implementation
+        LorentzianFit3DResultsCeres lorentz3DFitResults = Fit3DLorentzianCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false, // verbose=false for production
+          false); // enable_outlier_filtering
+        
+        if (lorentz3DFitResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass 3D Lorentzian fit results to RunAction
+        fRunAction->Set3DLorentzianFitResults(
+          lorentz3DFitResults.center_x, lorentz3DFitResults.center_y, 
+          lorentz3DFitResults.gamma_x, lorentz3DFitResults.gamma_y, 
+          lorentz3DFitResults.amplitude, lorentz3DFitResults.vertical_offset,
+          lorentz3DFitResults.center_x_err, lorentz3DFitResults.center_y_err,
+          lorentz3DFitResults.gamma_x_err, lorentz3DFitResults.gamma_y_err,
+          lorentz3DFitResults.amplitude_err, lorentz3DFitResults.vertical_offset_err,
+          lorentz3DFitResults.chi2red, lorentz3DFitResults.pp, lorentz3DFitResults.dof,
+          lorentz3DFitResults.charge_uncertainty,
+          lorentz3DFitResults.fit_successful);
+        
+    } else {
+      // Not enough data points for 3D Lorentzian fitting or 3D Lorentzian fitting is disabled
+      if (Constants::ENABLE_3D_LORENTZIAN_FITTING) {
+        fRunAction->Set3DLorentzianFitResults(
+          0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, amplitude, vertical_offset
+          0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, amplitude_err, vertical_offset_err
+          0, 0, 0,           // chi2red, pp, dof
+          0,                 // charge_uncertainty
+          false);            // fit_successful = false
+      }
+    }
+      
+      // ===============================================
+      // 3D POWER-LAW LORENTZIAN FITTING (conditionally enabled)
+      // ===============================================
+      
+      // Perform 3D Power-Law Lorentzian fitting if we have enough data points and 3D Power-Law Lorentzian fitting is enabled
+      if (x_coords.size() >= 7 && Constants::ENABLE_3D_POWER_LORENTZIAN_FITTING) { // Need at least 7 points for 3D Power-Law Lorentzian fit
+        // Perform 3D Power-Law Lorentzian fitting using the Ceres Solver implementation
+        PowerLorentzianFit3DResultsCeres powerLorentz3DFitResults = Fit3DPowerLorentzianCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false, // verbose=false for production
+          false); // enable_outlier_filtering
+        
+        if (powerLorentz3DFitResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass 3D Power-Law Lorentzian fit results to RunAction
+        fRunAction->Set3DPowerLorentzianFitResults(
+          powerLorentz3DFitResults.center_x, powerLorentz3DFitResults.center_y,
+          powerLorentz3DFitResults.gamma_x, powerLorentz3DFitResults.gamma_y,
+          powerLorentz3DFitResults.beta, powerLorentz3DFitResults.amplitude, 
+          powerLorentz3DFitResults.vertical_offset,
+          powerLorentz3DFitResults.center_x_err, powerLorentz3DFitResults.center_y_err,
+          powerLorentz3DFitResults.gamma_x_err, powerLorentz3DFitResults.gamma_y_err,
+          powerLorentz3DFitResults.beta_err, powerLorentz3DFitResults.amplitude_err, 
+          powerLorentz3DFitResults.vertical_offset_err,
+          powerLorentz3DFitResults.chi2red, powerLorentz3DFitResults.pp, powerLorentz3DFitResults.dof,
+          powerLorentz3DFitResults.charge_uncertainty,
+          powerLorentz3DFitResults.fit_successful);
+        
+    } else {
+      // Not enough data points for 3D Power-Law Lorentzian fitting or 3D Power-Law Lorentzian fitting is disabled
+      if (Constants::ENABLE_3D_POWER_LORENTZIAN_FITTING) {
+        fRunAction->Set3DPowerLorentzianFitResults(
+          0, 0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, beta, amplitude, vertical_offset
+          0, 0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, beta_err, amplitude_err, vertical_offset_err
+          0, 0, 0,              // chi2red, pp, dof
+          0,                    // charge_uncertainty
+          false);               // fit_successful = false
+      }
+    }
 
         
     } else {
@@ -550,6 +638,26 @@ void EventAction::EndOfEventAction(const G4Event* event)
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
         false); // fit_successful = false
+    }
+    
+    // Set default 3D Lorentzian values (no fitting performed or 3D Lorentzian fitting is disabled)
+    if (Constants::ENABLE_3D_LORENTZIAN_FITTING) {
+      fRunAction->Set3DLorentzianFitResults(
+        0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, amplitude, vertical_offset
+        0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, amplitude_err, vertical_offset_err
+        0, 0, 0,           // chi2red, pp, dof
+        0,                 // charge_uncertainty
+        false);            // fit_successful = false
+    }
+    
+    // Set default 3D Power-Law Lorentzian values (no fitting performed or 3D Power-Law Lorentzian fitting is disabled)
+    if (Constants::ENABLE_3D_POWER_LORENTZIAN_FITTING) {
+      fRunAction->Set3DPowerLorentzianFitResults(
+        0, 0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, beta, amplitude, vertical_offset
+        0, 0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, beta_err, amplitude_err, vertical_offset_err
+        0, 0, 0,              // chi2red, pp, dof
+        0,                    // charge_uncertainty
+        false);               // fit_successful = false
     }
 
   }

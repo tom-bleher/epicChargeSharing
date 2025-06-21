@@ -75,6 +75,10 @@ namespace Constants {
     const G4bool ENABLE_2D_FITTING = true;               // Enable central row/column fitting
     const G4bool ENABLE_DIAGONAL_FITTING = true;         // Enable diagonal fitting
     
+    // 3D fitting control flags (fit entire neighborhood surface directly)
+    const G4bool ENABLE_3D_LORENTZIAN_FITTING = true;    // Enable 3D Lorentzian surface fitting
+    const G4bool ENABLE_3D_POWER_LORENTZIAN_FITTING = true; // Enable 3D Power-Law Lorentzian surface fitting
+    
     // ========================
     // VERTICAL CHARGE UNCERTAINTIES CONTROL
     // ========================
@@ -90,6 +94,8 @@ namespace Constants {
     // - To enable only 2D fits (not diagonals): set ENABLE_DIAGONAL_FITTING = false  
     // - To run only Gaussian fits: set ENABLE_LORENTZIAN_FITTING and ENABLE_POWER_LORENTZIAN_FITTING to false
     // - To disable charge uncertainties: set ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = false
+    // - To enable only 3D Lorentzian: set ENABLE_3D_LORENTZIAN_FITTING = true, others to false
+    // - To enable both 2D and 3D Power-Law Lorentzian: set ENABLE_POWER_LORENTZIAN_FITTING and ENABLE_3D_POWER_LORENTZIAN_FITTING = true
     
 } // namespace Constants
 
