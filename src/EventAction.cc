@@ -722,7 +722,7 @@ G4ThreeVector EventAction::CalculateNearestPixel(const G4ThreeVector& position)
   G4double pixelX = firstPixelPos + i * pixelSpacing;
   G4double pixelY = firstPixelPos + j * pixelSpacing;
   // Pixels are on the detector front surface
-  G4double pixelZ = detectorPosition.z() + 50*um/2 + 1*um/2; // detector half-width + pixel half-width
+  G4double pixelZ = detectorPosition.z() + Constants::DEFAULT_DETECTOR_WIDTH/2 + Constants::DEFAULT_PIXEL_WIDTH/2; // detector half-width + pixel half-width
   
   // Store the pixel indices for later use
   fPixelIndexI = i;
@@ -782,7 +782,7 @@ G4double EventAction::CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4in
   
   // Handle edge case where denominator could be very small
   G4double alpha;
-  if (denominator < 1e-10) {
+  if (denominator < Constants::MIN_DENOMINATOR_VALUE) {
     alpha = CLHEP::pi/2.0;  // Maximum possible angle (90 degrees)
   } else {
     alpha = std::atan(numerator / denominator);
@@ -884,7 +884,7 @@ G4double EventAction::CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
   
   // Handle edge case where denominator could be very small
   G4double alpha;
-  if (denominator < 1e-10) {
+  if (denominator < Constants::MIN_DENOMINATOR_VALUE) {
     alpha = CLHEP::pi/2.0;  // Maximum possible angle (90 degrees)
   } else {
     alpha = std::atan(numerator / denominator);
@@ -968,8 +968,8 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   
   // Convert energy deposit to number of electrons
   // fEdep is in MeV, fIonizationEnergy is in eV
-  // Convert MeV to eV: 1 MeV = 1e6 eV
-  G4double edepInEV = fEdep * 1e6; // Convert MeV to eV
+  // Use explicit CLHEP units instead of manual conversion
+  G4double edepInEV = fEdep * MeV / eV; // Convert MeV to eV using CLHEP units
   G4double numElectrons = edepInEV / fIonizationEnergy;
   
   // Apply AC-LGAD amplification
@@ -986,8 +986,9 @@ void EventAction::CalculateNeighborhoodChargeSharing()
   // Calculate the first pixel position (corner)
   G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
   
-  // D0 constant for charge sharing formula (10 microns converted to mm)
-  G4double d0_mm = fD0 * 1e-3; // Convert microns to mm
+  // D0 constant for charge sharing formula (convert to consistent units)
+  // fD0 is in microns, distances are in mm, so convert using CLHEP units
+  G4double d0_mm = fD0 * micrometer / mm; // Convert microns to mm using CLHEP units
   
   // Proceed with charge sharing calculation for non-pixel hits
   // First pass: collect valid pixels and calculate weights
@@ -1042,7 +1043,7 @@ void EventAction::CalculateNeighborhoodChargeSharing()
         G4double logArg = distance / d0_mm;
         G4double logValue = std::log(logArg);
         // Clamp log value to avoid division by very small numbers
-        logValue = std::max(logValue, 1e-6);
+        logValue = std::max(logValue, Constants::MIN_LOG_VALUE);
         weight = alpha * (1.0 / logValue);
       } else if (distance > 0) {
         // For very small distances, use a large weight
@@ -1212,51 +1213,4 @@ G4double EventAction::EvaluateFitQuality(G4int radius, const G4ThreeVector& hitP
   fNonPixel_GridNeighborhoodCharge = tempCharge;
   
   return fitQuality;
-}
-
-// Calculate goodness of fit based on residuals
-G4double EventAction::CalculateGoodnessOfFit(const std::vector<double>& observed, const std::vector<double>& fitted)
-{
-  if (observed.size() != fitted.size() || observed.size() < 2) {
-    return 0.0;
-  }
-  
-  // Calculate residuals
-  std::vector<double> residuals;
-  for (size_t i = 0; i < observed.size(); ++i) {
-    residuals.push_back(observed[i] - fitted[i]);
-  }
-  
-  // Calculate mean and standard deviation of residuals
-  double mean = 0.0;
-  for (double residual : residuals) {
-    mean += residual;
-  }
-  mean /= residuals.size();
-  
-  double variance = 0.0;
-  for (double residual : residuals) {
-    G4double diff = residual - mean;
-    variance += diff*diff;
-  }
-  variance /= (residuals.size() - 1);
-  double stddev = std::sqrt(variance);
-  
-  // Count outliers (residuals beyond threshold standard deviations)
-  int outliers = 0;
-  for (double residual : residuals) {
-    if (std::abs(residual - mean) > Constants::RESIDUAL_OUTLIER_THRESHOLD * stddev) {
-      outliers++;
-    }
-  }
-  
-  // Calculate quality metric: lower outlier fraction = higher quality
-  double outlierFraction = static_cast<double>(outliers) / residuals.size();
-  double quality = 1.0 - outlierFraction;
-  
-  // Apply penalty for high residual variance
-  double normalizedVariance = variance / (stddev * stddev + 1e-10);
-  quality *= std::exp(-normalizedVariance);
-  
-  return std::max(0.0, std::min(1.0, quality));
 }
