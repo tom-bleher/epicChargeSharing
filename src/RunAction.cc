@@ -205,112 +205,100 @@ RunAction::RunAction()
   fLorentzFitSecondDiagYChi2red(0),
   fLorentzFitSecondDiagYPp(0),
   fLorentzFitSecondDiagYDOF(0),
-  // Initialize Skewed Lorentzian fit variables
-  fSkewedLorentzFitRowAmplitude(0),
-  fSkewedLorentzFitRowAmplitudeErr(0),
-  fSkewedLorentzFitRowBeta(0),
-  fSkewedLorentzFitRowBetaErr(0),
-  fSkewedLorentzFitRowLambda(0),
-  fSkewedLorentzFitRowLambdaErr(0),
-  fSkewedLorentzFitRowGamma(0),
-  fSkewedLorentzFitRowGammaErr(0),
-  fSkewedLorentzFitRowVerticalOffset(0),
-  fSkewedLorentzFitRowVerticalOffsetErr(0),
-  fSkewedLorentzFitRowCenter(0),
-  fSkewedLorentzFitRowCenterErr(0),
-  fSkewedLorentzFitRowChi2red(0),
-  fSkewedLorentzFitRowPp(0),
-  fSkewedLorentzFitRowDOF(0),
-  fSkewedLorentzFitColumnAmplitude(0),
-  fSkewedLorentzFitColumnAmplitudeErr(0),
-  fSkewedLorentzFitColumnBeta(0),
-  fSkewedLorentzFitColumnBetaErr(0),
-  fSkewedLorentzFitColumnLambda(0),
-  fSkewedLorentzFitColumnLambdaErr(0),
-  fSkewedLorentzFitColumnGamma(0),
-  fSkewedLorentzFitColumnGammaErr(0),
-  fSkewedLorentzFitColumnVerticalOffset(0),
-  fSkewedLorentzFitColumnVerticalOffsetErr(0),
-  fSkewedLorentzFitColumnCenter(0),
-  fSkewedLorentzFitColumnCenterErr(0),
-  fSkewedLorentzFitColumnChi2red(0),
-  fSkewedLorentzFitColumnPp(0),
-  fSkewedLorentzFitColumnDOF(0),
-  fSkewedLorentzFitMainDiagXAmplitude(0),
-  fSkewedLorentzFitMainDiagXAmplitudeErr(0),
-  fSkewedLorentzFitMainDiagXBeta(0),
-  fSkewedLorentzFitMainDiagXBetaErr(0),
-  fSkewedLorentzFitMainDiagXLambda(0),
-  fSkewedLorentzFitMainDiagXLambdaErr(0),
-  fSkewedLorentzFitMainDiagXGamma(0),
-  fSkewedLorentzFitMainDiagXGammaErr(0),
-  fSkewedLorentzFitMainDiagXVerticalOffset(0),
-  fSkewedLorentzFitMainDiagXVerticalOffsetErr(0),
-  fSkewedLorentzFitMainDiagXCenter(0),
-  fSkewedLorentzFitMainDiagXCenterErr(0),
-  fSkewedLorentzFitMainDiagXChi2red(0),
-  fSkewedLorentzFitMainDiagXPp(0),
-  fSkewedLorentzFitMainDiagXDOF(0),
-  fSkewedLorentzFitMainDiagYAmplitude(0),
-  fSkewedLorentzFitMainDiagYAmplitudeErr(0),
-  fSkewedLorentzFitMainDiagYBeta(0),
-  fSkewedLorentzFitMainDiagYBetaErr(0),
-  fSkewedLorentzFitMainDiagYLambda(0),
-  fSkewedLorentzFitMainDiagYLambdaErr(0),
-  fSkewedLorentzFitMainDiagYGamma(0),
-  fSkewedLorentzFitMainDiagYGammaErr(0),
-  fSkewedLorentzFitMainDiagYVerticalOffset(0),
-  fSkewedLorentzFitMainDiagYVerticalOffsetErr(0),
-  fSkewedLorentzFitMainDiagYCenter(0),
-  fSkewedLorentzFitMainDiagYCenterErr(0),
-  fSkewedLorentzFitMainDiagYChi2red(0),
-  fSkewedLorentzFitMainDiagYPp(0),
-  fSkewedLorentzFitMainDiagYDOF(0),
-  fSkewedLorentzFitSecondDiagXAmplitude(0),
-  fSkewedLorentzFitSecondDiagXAmplitudeErr(0),
-  fSkewedLorentzFitSecondDiagXBeta(0),
-  fSkewedLorentzFitSecondDiagXBetaErr(0),
-  fSkewedLorentzFitSecondDiagXLambda(0),
-  fSkewedLorentzFitSecondDiagXLambdaErr(0),
-  fSkewedLorentzFitSecondDiagXGamma(0),
-  fSkewedLorentzFitSecondDiagXGammaErr(0),
-  fSkewedLorentzFitSecondDiagXVerticalOffset(0),
-  fSkewedLorentzFitSecondDiagXVerticalOffsetErr(0),
-  fSkewedLorentzFitSecondDiagXCenter(0),
-  fSkewedLorentzFitSecondDiagXCenterErr(0),
-  fSkewedLorentzFitSecondDiagXChi2red(0),
-  fSkewedLorentzFitSecondDiagXPp(0),
-  fSkewedLorentzFitSecondDiagXDOF(0),
-  fSkewedLorentzFitSecondDiagYAmplitude(0),
-  fSkewedLorentzFitSecondDiagYAmplitudeErr(0),
-  fSkewedLorentzFitSecondDiagYBeta(0),
-  fSkewedLorentzFitSecondDiagYBetaErr(0),
-  fSkewedLorentzFitSecondDiagYLambda(0),
-  fSkewedLorentzFitSecondDiagYLambdaErr(0),
-  fSkewedLorentzFitSecondDiagYGamma(0),
-  fSkewedLorentzFitSecondDiagYGammaErr(0),
-  fSkewedLorentzFitSecondDiagYVerticalOffset(0),
-  fSkewedLorentzFitSecondDiagYVerticalOffsetErr(0),
-  fSkewedLorentzFitSecondDiagYCenter(0),
-  fSkewedLorentzFitSecondDiagYCenterErr(0),
-  fSkewedLorentzFitSecondDiagYChi2red(0),
-  fSkewedLorentzFitSecondDiagYPp(0),
-  fSkewedLorentzFitSecondDiagYDOF(0),
-  // Initialize skewed Lorentzian delta variables
-  fSkewedLorentzRowDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzColumnDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize skewed Lorentzian transformed diagonal coordinate variables
-  fSkewedLorentzMainDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzMainDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzSecondDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzSecondDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzMainDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzMainDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzSecondDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzSecondDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize skewed Lorentzian mean estimation variables
-  fSkewedLorentzMeanTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fSkewedLorentzMeanTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize Power-Law Lorentzian fit variables
+  fPowerLorentzFitRowAmplitude(0),
+  fPowerLorentzFitRowAmplitudeErr(0),
+  fPowerLorentzFitRowBeta(0),
+  fPowerLorentzFitRowBetaErr(0),
+  fPowerLorentzFitRowGamma(0),
+  fPowerLorentzFitRowGammaErr(0),
+  fPowerLorentzFitRowVerticalOffset(0),
+  fPowerLorentzFitRowVerticalOffsetErr(0),
+  fPowerLorentzFitRowCenter(0),
+  fPowerLorentzFitRowCenterErr(0),
+  fPowerLorentzFitRowChi2red(0),
+  fPowerLorentzFitRowPp(0),
+  fPowerLorentzFitRowDOF(0),
+  fPowerLorentzFitColumnAmplitude(0),
+  fPowerLorentzFitColumnAmplitudeErr(0),
+  fPowerLorentzFitColumnBeta(0),
+  fPowerLorentzFitColumnBetaErr(0),
+  fPowerLorentzFitColumnGamma(0),
+  fPowerLorentzFitColumnGammaErr(0),
+  fPowerLorentzFitColumnVerticalOffset(0),
+  fPowerLorentzFitColumnVerticalOffsetErr(0),
+  fPowerLorentzFitColumnCenter(0),
+  fPowerLorentzFitColumnCenterErr(0),
+  fPowerLorentzFitColumnChi2red(0),
+  fPowerLorentzFitColumnPp(0),
+  fPowerLorentzFitColumnDOF(0),
+  fPowerLorentzFitMainDiagXAmplitude(0),
+  fPowerLorentzFitMainDiagXAmplitudeErr(0),
+  fPowerLorentzFitMainDiagXBeta(0),
+  fPowerLorentzFitMainDiagXBetaErr(0),
+  fPowerLorentzFitMainDiagXGamma(0),
+  fPowerLorentzFitMainDiagXGammaErr(0),
+  fPowerLorentzFitMainDiagXVerticalOffset(0),
+  fPowerLorentzFitMainDiagXVerticalOffsetErr(0),
+  fPowerLorentzFitMainDiagXCenter(0),
+  fPowerLorentzFitMainDiagXCenterErr(0),
+  fPowerLorentzFitMainDiagXChi2red(0),
+  fPowerLorentzFitMainDiagXPp(0),
+  fPowerLorentzFitMainDiagXDOF(0),
+  fPowerLorentzFitMainDiagYAmplitude(0),
+  fPowerLorentzFitMainDiagYAmplitudeErr(0),
+  fPowerLorentzFitMainDiagYBeta(0),
+  fPowerLorentzFitMainDiagYBetaErr(0),
+  fPowerLorentzFitMainDiagYGamma(0),
+  fPowerLorentzFitMainDiagYGammaErr(0),
+  fPowerLorentzFitMainDiagYVerticalOffset(0),
+  fPowerLorentzFitMainDiagYVerticalOffsetErr(0),
+  fPowerLorentzFitMainDiagYCenter(0),
+  fPowerLorentzFitMainDiagYCenterErr(0),
+  fPowerLorentzFitMainDiagYChi2red(0),
+  fPowerLorentzFitMainDiagYPp(0),
+  fPowerLorentzFitMainDiagYDOF(0),
+  fPowerLorentzFitSecondDiagXAmplitude(0),
+  fPowerLorentzFitSecondDiagXAmplitudeErr(0),
+  fPowerLorentzFitSecondDiagXBeta(0),
+  fPowerLorentzFitSecondDiagXBetaErr(0),
+  fPowerLorentzFitSecondDiagXGamma(0),
+  fPowerLorentzFitSecondDiagXGammaErr(0),
+  fPowerLorentzFitSecondDiagXVerticalOffset(0),
+  fPowerLorentzFitSecondDiagXVerticalOffsetErr(0),
+  fPowerLorentzFitSecondDiagXCenter(0),
+  fPowerLorentzFitSecondDiagXCenterErr(0),
+  fPowerLorentzFitSecondDiagXChi2red(0),
+  fPowerLorentzFitSecondDiagXPp(0),
+  fPowerLorentzFitSecondDiagXDOF(0),
+  fPowerLorentzFitSecondDiagYAmplitude(0),
+  fPowerLorentzFitSecondDiagYAmplitudeErr(0),
+  fPowerLorentzFitSecondDiagYBeta(0),
+  fPowerLorentzFitSecondDiagYBetaErr(0),
+  fPowerLorentzFitSecondDiagYGamma(0),
+  fPowerLorentzFitSecondDiagYGammaErr(0),
+  fPowerLorentzFitSecondDiagYVerticalOffset(0),
+  fPowerLorentzFitSecondDiagYVerticalOffsetErr(0),
+  fPowerLorentzFitSecondDiagYCenter(0),
+  fPowerLorentzFitSecondDiagYCenterErr(0),
+  fPowerLorentzFitSecondDiagYChi2red(0),
+  fPowerLorentzFitSecondDiagYPp(0),
+  fPowerLorentzFitSecondDiagYDOF(0),
+  // Initialize Power-Law Lorentzian delta variables
+  fPowerLorentzRowDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzColumnDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize Power-Law Lorentzian transformed diagonal coordinate variables
+  fPowerLorentzMainDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzMainDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzSecondDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzSecondDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzMainDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzMainDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzSecondDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzSecondDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize Power-Law Lorentzian mean estimation variables
+  fPowerLorentzMeanTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  fPowerLorentzMeanTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
   // Legacy variables
   fPixelZ(0),
   fIsPixelHit(false),
@@ -339,7 +327,7 @@ void RunAction::BeginOfRunAction(const G4Run*)
   // Create ROOT file and tree with error handling
   try {
     // Create a unique filename based on the thread ID for worker threads
-    G4String fileName = "epicToyOutput";
+    G4String fileName = "epicChargeSharingOutput";
     
     // Add thread ID to filename for worker threads
     if (G4Threading::IsWorkerThread()) {
@@ -641,132 +629,75 @@ void RunAction::BeginOfRunAction(const G4Run*)
     } // End of Lorentzian fitting branches
 
     // =============================================
-    // SKEWED LORENTZIAN FITS BRANCHES (conditionally created)
+    // POWER-LAW LORENTZIAN FITS BRANCHES (conditionally created)
     // =============================================
-    if (Constants::ENABLE_SKEWED_LORENTZIAN_FITTING) {
-    // SkewedLorentzFitRow/SkewedLorentzFitRowX
-    fTree->Branch("SkewedLorentzFitRowAmplitude", &fSkewedLorentzFitRowAmplitude, "SkewedLorentzFitRowAmplitude/D")->SetTitle("Skewed Lorentzian Row Fit Amplitude");
-    fTree->Branch("SkewedLorentzFitRowAmplitudeErr", &fSkewedLorentzFitRowAmplitudeErr, "SkewedLorentzFitRowAmplitudeErr/D")->SetTitle("Skewed Lorentzian Row Fit Amplitude Error");
-    fTree->Branch("SkewedLorentzFitRowBeta", &fSkewedLorentzFitRowBeta, "SkewedLorentzFitRowBeta/D")->SetTitle("Skewed Lorentzian Row Fit Beta Parameter");
-    fTree->Branch("SkewedLorentzFitRowBetaErr", &fSkewedLorentzFitRowBetaErr, "SkewedLorentzFitRowBetaErr/D")->SetTitle("Skewed Lorentzian Row Fit Beta Parameter Error");
-    fTree->Branch("SkewedLorentzFitRowLambda", &fSkewedLorentzFitRowLambda, "SkewedLorentzFitRowLambda/D")->SetTitle("Skewed Lorentzian Row Fit Lambda Parameter");
-    fTree->Branch("SkewedLorentzFitRowLambdaErr", &fSkewedLorentzFitRowLambdaErr, "SkewedLorentzFitRowLambdaErr/D")->SetTitle("Skewed Lorentzian Row Fit Lambda Parameter Error");
-    fTree->Branch("SkewedLorentzFitRowGamma", &fSkewedLorentzFitRowGamma, "SkewedLorentzFitRowGamma/D")->SetTitle("Skewed Lorentzian Row Fit Gamma Parameter");
-    fTree->Branch("SkewedLorentzFitRowGammaErr", &fSkewedLorentzFitRowGammaErr, "SkewedLorentzFitRowGammaErr/D")->SetTitle("Skewed Lorentzian Row Fit Gamma Parameter Error");
-    fTree->Branch("SkewedLorentzFitRowVerticalOffset", &fSkewedLorentzFitRowVerticalOffset, "SkewedLorentzFitRowVerticalOffset/D")->SetTitle("Skewed Lorentzian Row Fit Vertical Offset");
-    fTree->Branch("SkewedLorentzFitRowVerticalOffsetErr", &fSkewedLorentzFitRowVerticalOffsetErr, "SkewedLorentzFitRowVerticalOffsetErr/D")->SetTitle("Skewed Lorentzian Row Fit Vertical Offset Error");
-    fTree->Branch("SkewedLorentzFitRowCenter", &fSkewedLorentzFitRowCenter, "SkewedLorentzFitRowCenter/D")->SetTitle("Skewed Lorentzian Row Fit Center [mm]");
-    fTree->Branch("SkewedLorentzFitRowCenterErr", &fSkewedLorentzFitRowCenterErr, "SkewedLorentzFitRowCenterErr/D")->SetTitle("Skewed Lorentzian Row Fit Center Error [mm]");
-    fTree->Branch("SkewedLorentzFitRowChi2red", &fSkewedLorentzFitRowChi2red, "SkewedLorentzFitRowChi2red/D")->SetTitle("Skewed Lorentzian Row Fit Reduced Chi-squared");
-    fTree->Branch("SkewedLorentzFitRowPp", &fSkewedLorentzFitRowPp, "SkewedLorentzFitRowPp/D")->SetTitle("Skewed Lorentzian Row Fit P-value");
-    fTree->Branch("SkewedLorentzFitRowDOF", &fSkewedLorentzFitRowDOF, "SkewedLorentzFitRowDOF/I")->SetTitle("Skewed Lorentzian Row Fit Degrees of Freedom");
+    if (Constants::ENABLE_POWER_LORENTZIAN_FITTING) {
+    // PowerLorentzFitRow/PowerLorentzFitRowX
+    fTree->Branch("PowerLorentzFitRowAmplitude", &fPowerLorentzFitRowAmplitude, "PowerLorentzFitRowAmplitude/D")->SetTitle("Power-Law Lorentzian Row Fit Amplitude");
+    fTree->Branch("PowerLorentzFitRowAmplitudeErr", &fPowerLorentzFitRowAmplitudeErr, "PowerLorentzFitRowAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Row Fit Amplitude Error");
+    fTree->Branch("PowerLorentzFitRowBeta", &fPowerLorentzFitRowBeta, "PowerLorentzFitRowBeta/D")->SetTitle("Power-Law Lorentzian Row Fit Beta Parameter");
+    fTree->Branch("PowerLorentzFitRowBetaErr", &fPowerLorentzFitRowBetaErr, "PowerLorentzFitRowBetaErr/D")->SetTitle("Power-Law Lorentzian Row Fit Beta Parameter Error");
+    fTree->Branch("PowerLorentzFitRowGamma", &fPowerLorentzFitRowGamma, "PowerLorentzFitRowGamma/D")->SetTitle("Power-Law Lorentzian Row Fit Gamma Parameter");
+    fTree->Branch("PowerLorentzFitRowGammaErr", &fPowerLorentzFitRowGammaErr, "PowerLorentzFitRowGammaErr/D")->SetTitle("Power-Law Lorentzian Row Fit Gamma Parameter Error");
+    fTree->Branch("PowerLorentzFitRowVerticalOffset", &fPowerLorentzFitRowVerticalOffset, "PowerLorentzFitRowVerticalOffset/D")->SetTitle("Power-Law Lorentzian Row Fit Vertical Offset");
+    fTree->Branch("PowerLorentzFitRowVerticalOffsetErr", &fPowerLorentzFitRowVerticalOffsetErr, "PowerLorentzFitRowVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Row Fit Vertical Offset Error");
+    fTree->Branch("PowerLorentzFitRowCenter", &fPowerLorentzFitRowCenter, "PowerLorentzFitRowCenter/D")->SetTitle("Power-Law Lorentzian Row Fit Center [mm]");
+    fTree->Branch("PowerLorentzFitRowCenterErr", &fPowerLorentzFitRowCenterErr, "PowerLorentzFitRowCenterErr/D")->SetTitle("Power-Law Lorentzian Row Fit Center Error [mm]");
+    fTree->Branch("PowerLorentzFitRowChi2red", &fPowerLorentzFitRowChi2red, "PowerLorentzFitRowChi2red/D")->SetTitle("Power-Law Lorentzian Row Fit Reduced Chi-squared");
+    fTree->Branch("PowerLorentzFitRowPp", &fPowerLorentzFitRowPp, "PowerLorentzFitRowPp/D")->SetTitle("Power-Law Lorentzian Row Fit P-value");
+    fTree->Branch("PowerLorentzFitRowDOF", &fPowerLorentzFitRowDOF, "PowerLorentzFitRowDOF/I")->SetTitle("Power-Law Lorentzian Row Fit Degrees of Freedom");
 
-    // SkewedLorentzFitColumn/SkewedLorentzFitColumnY
-    fTree->Branch("SkewedLorentzFitColumnAmplitude", &fSkewedLorentzFitColumnAmplitude, "SkewedLorentzFitColumnAmplitude/D")->SetTitle("Skewed Lorentzian Column Fit Amplitude");
-    fTree->Branch("SkewedLorentzFitColumnAmplitudeErr", &fSkewedLorentzFitColumnAmplitudeErr, "SkewedLorentzFitColumnAmplitudeErr/D")->SetTitle("Skewed Lorentzian Column Fit Amplitude Error");
-    fTree->Branch("SkewedLorentzFitColumnBeta", &fSkewedLorentzFitColumnBeta, "SkewedLorentzFitColumnBeta/D")->SetTitle("Skewed Lorentzian Column Fit Beta Parameter");
-    fTree->Branch("SkewedLorentzFitColumnBetaErr", &fSkewedLorentzFitColumnBetaErr, "SkewedLorentzFitColumnBetaErr/D")->SetTitle("Skewed Lorentzian Column Fit Beta Parameter Error");
-    fTree->Branch("SkewedLorentzFitColumnLambda", &fSkewedLorentzFitColumnLambda, "SkewedLorentzFitColumnLambda/D")->SetTitle("Skewed Lorentzian Column Fit Lambda Parameter");
-    fTree->Branch("SkewedLorentzFitColumnLambdaErr", &fSkewedLorentzFitColumnLambdaErr, "SkewedLorentzFitColumnLambdaErr/D")->SetTitle("Skewed Lorentzian Column Fit Lambda Parameter Error");
-    fTree->Branch("SkewedLorentzFitColumnGamma", &fSkewedLorentzFitColumnGamma, "SkewedLorentzFitColumnGamma/D")->SetTitle("Skewed Lorentzian Column Fit Gamma Parameter");
-    fTree->Branch("SkewedLorentzFitColumnGammaErr", &fSkewedLorentzFitColumnGammaErr, "SkewedLorentzFitColumnGammaErr/D")->SetTitle("Skewed Lorentzian Column Fit Gamma Parameter Error");
-    fTree->Branch("SkewedLorentzFitColumnVerticalOffset", &fSkewedLorentzFitColumnVerticalOffset, "SkewedLorentzFitColumnVerticalOffset/D")->SetTitle("Skewed Lorentzian Column Fit Vertical Offset");
-    fTree->Branch("SkewedLorentzFitColumnVerticalOffsetErr", &fSkewedLorentzFitColumnVerticalOffsetErr, "SkewedLorentzFitColumnVerticalOffsetErr/D")->SetTitle("Skewed Lorentzian Column Fit Vertical Offset Error");
-    fTree->Branch("SkewedLorentzFitColumnCenter", &fSkewedLorentzFitColumnCenter, "SkewedLorentzFitColumnCenter/D")->SetTitle("Skewed Lorentzian Column Fit Center [mm]");
-    fTree->Branch("SkewedLorentzFitColumnCenterErr", &fSkewedLorentzFitColumnCenterErr, "SkewedLorentzFitColumnCenterErr/D")->SetTitle("Skewed Lorentzian Column Fit Center Error [mm]");
-    fTree->Branch("SkewedLorentzFitColumnChi2red", &fSkewedLorentzFitColumnChi2red, "SkewedLorentzFitColumnChi2red/D")->SetTitle("Skewed Lorentzian Column Fit Reduced Chi-squared");
-    fTree->Branch("SkewedLorentzFitColumnPp", &fSkewedLorentzFitColumnPp, "SkewedLorentzFitColumnPp/D")->SetTitle("Skewed Lorentzian Column Fit P-value");
-    fTree->Branch("SkewedLorentzFitColumnDOF", &fSkewedLorentzFitColumnDOF, "SkewedLorentzFitColumnDOF/I")->SetTitle("Skewed Lorentzian Column Fit Degrees of Freedom");
+    // PowerLorentzFitColumn/PowerLorentzFitColumnY
+    fTree->Branch("PowerLorentzFitColumnAmplitude", &fPowerLorentzFitColumnAmplitude, "PowerLorentzFitColumnAmplitude/D")->SetTitle("Power-Law Lorentzian Column Fit Amplitude");
+    fTree->Branch("PowerLorentzFitColumnAmplitudeErr", &fPowerLorentzFitColumnAmplitudeErr, "PowerLorentzFitColumnAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Column Fit Amplitude Error");
+    fTree->Branch("PowerLorentzFitColumnBeta", &fPowerLorentzFitColumnBeta, "PowerLorentzFitColumnBeta/D")->SetTitle("Power-Law Lorentzian Column Fit Beta Parameter");
+    fTree->Branch("PowerLorentzFitColumnBetaErr", &fPowerLorentzFitColumnBetaErr, "PowerLorentzFitColumnBetaErr/D")->SetTitle("Power-Law Lorentzian Column Fit Beta Parameter Error");
+    fTree->Branch("PowerLorentzFitColumnGamma", &fPowerLorentzFitColumnGamma, "PowerLorentzFitColumnGamma/D")->SetTitle("Power-Law Lorentzian Column Fit Gamma Parameter");
+    fTree->Branch("PowerLorentzFitColumnGammaErr", &fPowerLorentzFitColumnGammaErr, "PowerLorentzFitColumnGammaErr/D")->SetTitle("Power-Law Lorentzian Column Fit Gamma Parameter Error");
+    fTree->Branch("PowerLorentzFitColumnVerticalOffset", &fPowerLorentzFitColumnVerticalOffset, "PowerLorentzFitColumnVerticalOffset/D")->SetTitle("Power-Law Lorentzian Column Fit Vertical Offset");
+    fTree->Branch("PowerLorentzFitColumnVerticalOffsetErr", &fPowerLorentzFitColumnVerticalOffsetErr, "PowerLorentzFitColumnVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Column Fit Vertical Offset Error");
+    fTree->Branch("PowerLorentzFitColumnCenter", &fPowerLorentzFitColumnCenter, "PowerLorentzFitColumnCenter/D")->SetTitle("Power-Law Lorentzian Column Fit Center [mm]");
+    fTree->Branch("PowerLorentzFitColumnCenterErr", &fPowerLorentzFitColumnCenterErr, "PowerLorentzFitColumnCenterErr/D")->SetTitle("Power-Law Lorentzian Column Fit Center Error [mm]");
+    fTree->Branch("PowerLorentzFitColumnChi2red", &fPowerLorentzFitColumnChi2red, "PowerLorentzFitColumnChi2red/D")->SetTitle("Power-Law Lorentzian Column Fit Reduced Chi-squared");
+    fTree->Branch("PowerLorentzFitColumnPp", &fPowerLorentzFitColumnPp, "PowerLorentzFitColumnPp/D")->SetTitle("Power-Law Lorentzian Column Fit P-value");
+    fTree->Branch("PowerLorentzFitColumnDOF", &fPowerLorentzFitColumnDOF, "PowerLorentzFitColumnDOF/I")->SetTitle("Power-Law Lorentzian Column Fit Degrees of Freedom");
 
-    // SkewedLorentzFitMainDiag/SkewedLorentzFitMainDiagX
-    fTree->Branch("SkewedLorentzFitMainDiagXAmplitude", &fSkewedLorentzFitMainDiagXAmplitude, "SkewedLorentzFitMainDiagXAmplitude/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Amplitude");
-    fTree->Branch("SkewedLorentzFitMainDiagXAmplitudeErr", &fSkewedLorentzFitMainDiagXAmplitudeErr, "SkewedLorentzFitMainDiagXAmplitudeErr/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Amplitude Error");
-    fTree->Branch("SkewedLorentzFitMainDiagXBeta", &fSkewedLorentzFitMainDiagXBeta, "SkewedLorentzFitMainDiagXBeta/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Beta Parameter");
-    fTree->Branch("SkewedLorentzFitMainDiagXBetaErr", &fSkewedLorentzFitMainDiagXBetaErr, "SkewedLorentzFitMainDiagXBetaErr/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Beta Parameter Error");
-    fTree->Branch("SkewedLorentzFitMainDiagXLambda", &fSkewedLorentzFitMainDiagXLambda, "SkewedLorentzFitMainDiagXLambda/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Lambda Parameter");
-    fTree->Branch("SkewedLorentzFitMainDiagXLambdaErr", &fSkewedLorentzFitMainDiagXLambdaErr, "SkewedLorentzFitMainDiagXLambdaErr/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Lambda Parameter Error");
-    fTree->Branch("SkewedLorentzFitMainDiagXGamma", &fSkewedLorentzFitMainDiagXGamma, "SkewedLorentzFitMainDiagXGamma/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Gamma Parameter");
-    fTree->Branch("SkewedLorentzFitMainDiagXGammaErr", &fSkewedLorentzFitMainDiagXGammaErr, "SkewedLorentzFitMainDiagXGammaErr/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Gamma Parameter Error");
-    fTree->Branch("SkewedLorentzFitMainDiagXVerticalOffset", &fSkewedLorentzFitMainDiagXVerticalOffset, "SkewedLorentzFitMainDiagXVerticalOffset/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Vertical Offset");
-    fTree->Branch("SkewedLorentzFitMainDiagXVerticalOffsetErr", &fSkewedLorentzFitMainDiagXVerticalOffsetErr, "SkewedLorentzFitMainDiagXVerticalOffsetErr/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Vertical Offset Error");
-    fTree->Branch("SkewedLorentzFitMainDiagXCenter", &fSkewedLorentzFitMainDiagXCenter, "SkewedLorentzFitMainDiagXCenter/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Center [mm]");
-    fTree->Branch("SkewedLorentzFitMainDiagXCenterErr", &fSkewedLorentzFitMainDiagXCenterErr, "SkewedLorentzFitMainDiagXCenterErr/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Center Error [mm]");
-    fTree->Branch("SkewedLorentzFitMainDiagXChi2red", &fSkewedLorentzFitMainDiagXChi2red, "SkewedLorentzFitMainDiagXChi2red/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Reduced Chi-squared");
-    fTree->Branch("SkewedLorentzFitMainDiagXPp", &fSkewedLorentzFitMainDiagXPp, "SkewedLorentzFitMainDiagXPp/D")->SetTitle("Skewed Lorentzian Main Diagonal X Fit P-value");
-    fTree->Branch("SkewedLorentzFitMainDiagXDOF", &fSkewedLorentzFitMainDiagXDOF, "SkewedLorentzFitMainDiagXDOF/I")->SetTitle("Skewed Lorentzian Main Diagonal X Fit Degrees of Freedom");
+    // PowerLorentzFitMainDiag/PowerLorentzFitMainDiagX
+    fTree->Branch("PowerLorentzFitMainDiagXAmplitude", &fPowerLorentzFitMainDiagXAmplitude, "PowerLorentzFitMainDiagXAmplitude/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Amplitude");
+    fTree->Branch("PowerLorentzFitMainDiagXAmplitudeErr", &fPowerLorentzFitMainDiagXAmplitudeErr, "PowerLorentzFitMainDiagXAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Amplitude Error");
+    fTree->Branch("PowerLorentzFitMainDiagXBeta", &fPowerLorentzFitMainDiagXBeta, "PowerLorentzFitMainDiagXBeta/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Beta Parameter");
+    fTree->Branch("PowerLorentzFitMainDiagXBetaErr", &fPowerLorentzFitMainDiagXBetaErr, "PowerLorentzFitMainDiagXBetaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Beta Parameter Error");
+    fTree->Branch("PowerLorentzFitMainDiagXGamma", &fPowerLorentzFitMainDiagXGamma, "PowerLorentzFitMainDiagXGamma/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Gamma Parameter");
+    fTree->Branch("PowerLorentzFitMainDiagXGammaErr", &fPowerLorentzFitMainDiagXGammaErr, "PowerLorentzFitMainDiagXGammaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Gamma Parameter Error");
+    fTree->Branch("PowerLorentzFitMainDiagXVerticalOffset", &fPowerLorentzFitMainDiagXVerticalOffset, "PowerLorentzFitMainDiagXVerticalOffset/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Vertical Offset");
+    fTree->Branch("PowerLorentzFitMainDiagXVerticalOffsetErr", &fPowerLorentzFitMainDiagXVerticalOffsetErr, "PowerLorentzFitMainDiagXVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Vertical Offset Error");
+    fTree->Branch("PowerLorentzFitMainDiagXCenter", &fPowerLorentzFitMainDiagXCenter, "PowerLorentzFitMainDiagXCenter/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Center [mm]");
+    fTree->Branch("PowerLorentzFitMainDiagXCenterErr", &fPowerLorentzFitMainDiagXCenterErr, "PowerLorentzFitMainDiagXCenterErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Center Error [mm]");
+    fTree->Branch("PowerLorentzFitMainDiagXChi2red", &fPowerLorentzFitMainDiagXChi2red, "PowerLorentzFitMainDiagXChi2red/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Reduced Chi-squared");
+    fTree->Branch("PowerLorentzFitMainDiagXPp", &fPowerLorentzFitMainDiagXPp, "PowerLorentzFitMainDiagXPp/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit P-value");
+    fTree->Branch("PowerLorentzFitMainDiagXDOF", &fPowerLorentzFitMainDiagXDOF, "PowerLorentzFitMainDiagXDOF/I")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Degrees of Freedom");
 
-    // SkewedLorentzFitMainDiag/SkewedLorentzFitMainDiagY
-    fTree->Branch("SkewedLorentzFitMainDiagYAmplitude", &fSkewedLorentzFitMainDiagYAmplitude, "SkewedLorentzFitMainDiagYAmplitude/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Amplitude");
-    fTree->Branch("SkewedLorentzFitMainDiagYAmplitudeErr", &fSkewedLorentzFitMainDiagYAmplitudeErr, "SkewedLorentzFitMainDiagYAmplitudeErr/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Amplitude Error");
-    fTree->Branch("SkewedLorentzFitMainDiagYBeta", &fSkewedLorentzFitMainDiagYBeta, "SkewedLorentzFitMainDiagYBeta/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Beta Parameter");
-    fTree->Branch("SkewedLorentzFitMainDiagYBetaErr", &fSkewedLorentzFitMainDiagYBetaErr, "SkewedLorentzFitMainDiagYBetaErr/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Beta Parameter Error");
-    fTree->Branch("SkewedLorentzFitMainDiagYLambda", &fSkewedLorentzFitMainDiagYLambda, "SkewedLorentzFitMainDiagYLambda/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Lambda Parameter");
-    fTree->Branch("SkewedLorentzFitMainDiagYLambdaErr", &fSkewedLorentzFitMainDiagYLambdaErr, "SkewedLorentzFitMainDiagYLambdaErr/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Lambda Parameter Error");
-    fTree->Branch("SkewedLorentzFitMainDiagYGamma", &fSkewedLorentzFitMainDiagYGamma, "SkewedLorentzFitMainDiagYGamma/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Gamma Parameter");
-    fTree->Branch("SkewedLorentzFitMainDiagYGammaErr", &fSkewedLorentzFitMainDiagYGammaErr, "SkewedLorentzFitMainDiagYGammaErr/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Gamma Parameter Error");
-    fTree->Branch("SkewedLorentzFitMainDiagYVerticalOffset", &fSkewedLorentzFitMainDiagYVerticalOffset, "SkewedLorentzFitMainDiagYVerticalOffset/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Vertical Offset");
-    fTree->Branch("SkewedLorentzFitMainDiagYVerticalOffsetErr", &fSkewedLorentzFitMainDiagYVerticalOffsetErr, "SkewedLorentzFitMainDiagYVerticalOffsetErr/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Vertical Offset Error");
-    fTree->Branch("SkewedLorentzFitMainDiagYCenter", &fSkewedLorentzFitMainDiagYCenter, "SkewedLorentzFitMainDiagYCenter/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Center [mm]");
-    fTree->Branch("SkewedLorentzFitMainDiagYCenterErr", &fSkewedLorentzFitMainDiagYCenterErr, "SkewedLorentzFitMainDiagYCenterErr/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Center Error [mm]");
-    fTree->Branch("SkewedLorentzFitMainDiagYChi2red", &fSkewedLorentzFitMainDiagYChi2red, "SkewedLorentzFitMainDiagYChi2red/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Reduced Chi-squared");
-    fTree->Branch("SkewedLorentzFitMainDiagYPp", &fSkewedLorentzFitMainDiagYPp, "SkewedLorentzFitMainDiagYPp/D")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit P-value");
-    fTree->Branch("SkewedLorentzFitMainDiagYDOF", &fSkewedLorentzFitMainDiagYDOF, "SkewedLorentzFitMainDiagYDOF/I")->SetTitle("Skewed Lorentzian Main Diagonal Y Fit Degrees of Freedom");
+    // Delta branches for power Lorentzian fitting
+    fTree->Branch("PowerLorentzRowDeltaX", &fPowerLorentzRowDeltaX, "PowerLorentzRowDeltaX/D")->SetTitle("Delta X from Power-Law Lorentzian Row Fit to True Position [mm]");
+    fTree->Branch("PowerLorentzColumnDeltaY", &fPowerLorentzColumnDeltaY, "PowerLorentzColumnDeltaY/D")->SetTitle("Delta Y from Power-Law Lorentzian Column Fit to True Position [mm]");
 
-    // SkewedLorentzFitSecondDiag/SkewedLorentzFitSecondDiagX
-    fTree->Branch("SkewedLorentzFitSecondDiagXAmplitude", &fSkewedLorentzFitSecondDiagXAmplitude, "SkewedLorentzFitSecondDiagXAmplitude/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Amplitude");
-    fTree->Branch("SkewedLorentzFitSecondDiagXAmplitudeErr", &fSkewedLorentzFitSecondDiagXAmplitudeErr, "SkewedLorentzFitSecondDiagXAmplitudeErr/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Amplitude Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagXBeta", &fSkewedLorentzFitSecondDiagXBeta, "SkewedLorentzFitSecondDiagXBeta/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Beta Parameter");
-    fTree->Branch("SkewedLorentzFitSecondDiagXBetaErr", &fSkewedLorentzFitSecondDiagXBetaErr, "SkewedLorentzFitSecondDiagXBetaErr/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Beta Parameter Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagXLambda", &fSkewedLorentzFitSecondDiagXLambda, "SkewedLorentzFitSecondDiagXLambda/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Lambda Parameter");
-    fTree->Branch("SkewedLorentzFitSecondDiagXLambdaErr", &fSkewedLorentzFitSecondDiagXLambdaErr, "SkewedLorentzFitSecondDiagXLambdaErr/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Lambda Parameter Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagXGamma", &fSkewedLorentzFitSecondDiagXGamma, "SkewedLorentzFitSecondDiagXGamma/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Gamma Parameter");
-    fTree->Branch("SkewedLorentzFitSecondDiagXGammaErr", &fSkewedLorentzFitSecondDiagXGammaErr, "SkewedLorentzFitSecondDiagXGammaErr/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Gamma Parameter Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagXVerticalOffset", &fSkewedLorentzFitSecondDiagXVerticalOffset, "SkewedLorentzFitSecondDiagXVerticalOffset/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Vertical Offset");
-    fTree->Branch("SkewedLorentzFitSecondDiagXVerticalOffsetErr", &fSkewedLorentzFitSecondDiagXVerticalOffsetErr, "SkewedLorentzFitSecondDiagXVerticalOffsetErr/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Vertical Offset Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagXCenter", &fSkewedLorentzFitSecondDiagXCenter, "SkewedLorentzFitSecondDiagXCenter/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Center [mm]");
-    fTree->Branch("SkewedLorentzFitSecondDiagXCenterErr", &fSkewedLorentzFitSecondDiagXCenterErr, "SkewedLorentzFitSecondDiagXCenterErr/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Center Error [mm]");
-    fTree->Branch("SkewedLorentzFitSecondDiagXChi2red", &fSkewedLorentzFitSecondDiagXChi2red, "SkewedLorentzFitSecondDiagXChi2red/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Reduced Chi-squared");
-    fTree->Branch("SkewedLorentzFitSecondDiagXPp", &fSkewedLorentzFitSecondDiagXPp, "SkewedLorentzFitSecondDiagXPp/D")->SetTitle("Skewed Lorentzian Second Diagonal X Fit P-value");
-    fTree->Branch("SkewedLorentzFitSecondDiagXDOF", &fSkewedLorentzFitSecondDiagXDOF, "SkewedLorentzFitSecondDiagXDOF/I")->SetTitle("Skewed Lorentzian Second Diagonal X Fit Degrees of Freedom");
+        // Transformed diagonal coordinates branches for Power-Law Lorentzian
+    fTree->Branch("PowerLorentzMainDiagTransformedX", &fPowerLorentzMainDiagTransformedX, "PowerLorentzMainDiagTransformedX/D")->SetTitle("Transformed X from Power-Law Lorentzian Main Diagonal (rotation matrix) [mm]");
+    fTree->Branch("PowerLorentzMainDiagTransformedY", &fPowerLorentzMainDiagTransformedY, "PowerLorentzMainDiagTransformedY/D")->SetTitle("Transformed Y from Power-Law Lorentzian Main Diagonal (rotation matrix) [mm]");
+    fTree->Branch("PowerLorentzSecondDiagTransformedX", &fPowerLorentzSecondDiagTransformedX, "PowerLorentzSecondDiagTransformedX/D")->SetTitle("Transformed X from Power-Law Lorentzian Secondary Diagonal (rotation matrix) [mm]");
+    fTree->Branch("PowerLorentzSecondDiagTransformedY", &fPowerLorentzSecondDiagTransformedY, "PowerLorentzSecondDiagTransformedY/D")->SetTitle("Transformed Y from Power-Law Lorentzian Secondary Diagonal (rotation matrix) [mm]");
 
-    // SkewedLorentzFitSecondDiag/SkewedLorentzFitSecondDiagY
-    fTree->Branch("SkewedLorentzFitSecondDiagYAmplitude", &fSkewedLorentzFitSecondDiagYAmplitude, "SkewedLorentzFitSecondDiagYAmplitude/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Amplitude");
-    fTree->Branch("SkewedLorentzFitSecondDiagYAmplitudeErr", &fSkewedLorentzFitSecondDiagYAmplitudeErr, "SkewedLorentzFitSecondDiagYAmplitudeErr/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Amplitude Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagYBeta", &fSkewedLorentzFitSecondDiagYBeta, "SkewedLorentzFitSecondDiagYBeta/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Beta Parameter");
-    fTree->Branch("SkewedLorentzFitSecondDiagYBetaErr", &fSkewedLorentzFitSecondDiagYBetaErr, "SkewedLorentzFitSecondDiagYBetaErr/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Beta Parameter Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagYLambda", &fSkewedLorentzFitSecondDiagYLambda, "SkewedLorentzFitSecondDiagYLambda/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Lambda Parameter");
-    fTree->Branch("SkewedLorentzFitSecondDiagYLambdaErr", &fSkewedLorentzFitSecondDiagYLambdaErr, "SkewedLorentzFitSecondDiagYLambdaErr/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Lambda Parameter Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagYGamma", &fSkewedLorentzFitSecondDiagYGamma, "SkewedLorentzFitSecondDiagYGamma/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Gamma Parameter");
-    fTree->Branch("SkewedLorentzFitSecondDiagYGammaErr", &fSkewedLorentzFitSecondDiagYGammaErr, "SkewedLorentzFitSecondDiagYGammaErr/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Gamma Parameter Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagYVerticalOffset", &fSkewedLorentzFitSecondDiagYVerticalOffset, "SkewedLorentzFitSecondDiagYVerticalOffset/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Vertical Offset");
-    fTree->Branch("SkewedLorentzFitSecondDiagYVerticalOffsetErr", &fSkewedLorentzFitSecondDiagYVerticalOffsetErr, "SkewedLorentzFitSecondDiagYVerticalOffsetErr/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Vertical Offset Error");
-    fTree->Branch("SkewedLorentzFitSecondDiagYCenter", &fSkewedLorentzFitSecondDiagYCenter, "SkewedLorentzFitSecondDiagYCenter/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Center [mm]");
-    fTree->Branch("SkewedLorentzFitSecondDiagYCenterErr", &fSkewedLorentzFitSecondDiagYCenterErr, "SkewedLorentzFitSecondDiagYCenterErr/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Center Error [mm]");
-    fTree->Branch("SkewedLorentzFitSecondDiagYChi2red", &fSkewedLorentzFitSecondDiagYChi2red, "SkewedLorentzFitSecondDiagYChi2red/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Reduced Chi-squared");
-    fTree->Branch("SkewedLorentzFitSecondDiagYPp", &fSkewedLorentzFitSecondDiagYPp, "SkewedLorentzFitSecondDiagYPp/D")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit P-value");
-    fTree->Branch("SkewedLorentzFitSecondDiagYDOF", &fSkewedLorentzFitSecondDiagYDOF, "SkewedLorentzFitSecondDiagYDOF/I")->SetTitle("Skewed Lorentzian Second Diagonal Y Fit Degrees of Freedom");
+    // Delta values for transformed coordinates vs true position for Power-Law Lorentzian
+    fTree->Branch("PowerLorentzMainDiagTransformedDeltaX", &fPowerLorentzMainDiagTransformedDeltaX, "PowerLorentzMainDiagTransformedDeltaX/D")->SetTitle("Delta X from Power-Law Lorentzian Main Diagonal Transformed to True Position [mm]");
+    fTree->Branch("PowerLorentzMainDiagTransformedDeltaY", &fPowerLorentzMainDiagTransformedDeltaY, "PowerLorentzMainDiagTransformedDeltaY/D")->SetTitle("Delta Y from Power-Law Lorentzian Main Diagonal Transformed to True Position [mm]");
+    fTree->Branch("PowerLorentzSecondDiagTransformedDeltaX", &fPowerLorentzSecondDiagTransformedDeltaX, "PowerLorentzSecondDiagTransformedDeltaX/D")->SetTitle("Delta X from Power-Law Lorentzian Secondary Diagonal Transformed to True Position [mm]");
+    fTree->Branch("PowerLorentzSecondDiagTransformedDeltaY", &fPowerLorentzSecondDiagTransformedDeltaY, "PowerLorentzSecondDiagTransformedDeltaY/D")->SetTitle("Delta Y from Power-Law Lorentzian Secondary Diagonal Transformed to True Position [mm]");
 
-    // Delta branches for skewed Lorentzian fitting
-    fTree->Branch("SkewedLorentzRowDeltaX", &fSkewedLorentzRowDeltaX, "SkewedLorentzRowDeltaX/D")->SetTitle("Delta X from Skewed Lorentzian Row Fit to True Position [mm]");
-    fTree->Branch("SkewedLorentzColumnDeltaY", &fSkewedLorentzColumnDeltaY, "SkewedLorentzColumnDeltaY/D")->SetTitle("Delta Y from Skewed Lorentzian Column Fit to True Position [mm]");
+    // Mean estimation branches for Power-Law Lorentzian
+    fTree->Branch("PowerLorentzMeanTrueDeltaX", &fPowerLorentzMeanTrueDeltaX, "PowerLorentzMeanTrueDeltaX/D")->SetTitle("Mean Delta X from all Power-Law Lorentzian estimation methods to True Position [mm]");
+    fTree->Branch("PowerLorentzMeanTrueDeltaY", &fPowerLorentzMeanTrueDeltaY, "PowerLorentzMeanTrueDeltaY/D")->SetTitle("Mean Delta Y from all Power-Law Lorentzian estimation methods to True Position [mm]");
 
-    // Transformed diagonal coordinates branches for skewed Lorentzian
-    fTree->Branch("SkewedLorentzMainDiagTransformedX", &fSkewedLorentzMainDiagTransformedX, "SkewedLorentzMainDiagTransformedX/D")->SetTitle("Transformed X from Skewed Lorentzian Main Diagonal (rotation matrix) [mm]");
-    fTree->Branch("SkewedLorentzMainDiagTransformedY", &fSkewedLorentzMainDiagTransformedY, "SkewedLorentzMainDiagTransformedY/D")->SetTitle("Transformed Y from Skewed Lorentzian Main Diagonal (rotation matrix) [mm]");
-    fTree->Branch("SkewedLorentzSecondDiagTransformedX", &fSkewedLorentzSecondDiagTransformedX, "SkewedLorentzSecondDiagTransformedX/D")->SetTitle("Transformed X from Skewed Lorentzian Secondary Diagonal (rotation matrix) [mm]");
-    fTree->Branch("SkewedLorentzSecondDiagTransformedY", &fSkewedLorentzSecondDiagTransformedY, "SkewedLorentzSecondDiagTransformedY/D")->SetTitle("Transformed Y from Skewed Lorentzian Secondary Diagonal (rotation matrix) [mm]");
-    
-    // Delta values for transformed coordinates vs true position for skewed Lorentzian
-    fTree->Branch("SkewedLorentzMainDiagTransformedDeltaX", &fSkewedLorentzMainDiagTransformedDeltaX, "SkewedLorentzMainDiagTransformedDeltaX/D")->SetTitle("Delta X from Skewed Lorentzian Main Diagonal Transformed to True Position [mm]");
-    fTree->Branch("SkewedLorentzMainDiagTransformedDeltaY", &fSkewedLorentzMainDiagTransformedDeltaY, "SkewedLorentzMainDiagTransformedDeltaY/D")->SetTitle("Delta Y from Skewed Lorentzian Main Diagonal Transformed to True Position [mm]");
-    fTree->Branch("SkewedLorentzSecondDiagTransformedDeltaX", &fSkewedLorentzSecondDiagTransformedDeltaX, "SkewedLorentzSecondDiagTransformedDeltaX/D")->SetTitle("Delta X from Skewed Lorentzian Secondary Diagonal Transformed to True Position [mm]");
-    fTree->Branch("SkewedLorentzSecondDiagTransformedDeltaY", &fSkewedLorentzSecondDiagTransformedDeltaY, "SkewedLorentzSecondDiagTransformedDeltaY/D")->SetTitle("Delta Y from Skewed Lorentzian Secondary Diagonal Transformed to True Position [mm]");
-
-    // Mean estimation branches for skewed Lorentzian
-    fTree->Branch("SkewedLorentzMeanTrueDeltaX", &fSkewedLorentzMeanTrueDeltaX, "SkewedLorentzMeanTrueDeltaX/D")->SetTitle("Mean Delta X from all Skewed Lorentzian estimation methods to True Position [mm]");
-    fTree->Branch("SkewedLorentzMeanTrueDeltaY", &fSkewedLorentzMeanTrueDeltaY, "SkewedLorentzMeanTrueDeltaY/D")->SetTitle("Mean Delta Y from all Skewed Lorentzian estimation methods to True Position [mm]");
-
-    } // End of Skewed Lorentzian fitting branches
+    } // End of Power-Law Lorentzian fitting branches
 
     // Load vector dictionaries for ROOT to properly handle std::vector branches
     gROOT->ProcessLine("#include <vector>");
@@ -895,7 +826,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             // First verify all files exist and are valid
             for (G4int i = 0; i < nThreads; i++) {
                 std::ostringstream oss;
-                oss << "epicToyOutput_t" << i << ".root";
+                oss << "epicChargeSharingOutput_t" << i << ".root";
                 G4String workerFile = oss.str();
                 workerFileNames.push_back(workerFile);
                 
@@ -922,7 +853,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             
             if (validFiles > 0) {
                 // Create the merged output file with compression
-                TFile *mergedFile = TFile::Open("epicToyOutput.root", "RECREATE", "", 1); // compression level 1
+                TFile *mergedFile = TFile::Open("epicChargeSharingOutput.root", "RECREATE", "", 1); // compression level 1
                 if (mergedFile && !mergedFile->IsZombie()) {
                     G4int totalEntries = chain.GetEntries();
                     
@@ -1515,20 +1446,20 @@ void RunAction::CalculateTransformedDiagonalCoordinates()
     }
 
     // -------------------------------
-    // S K E W E D   L O R E N T Z I A N
+    // P O W E R - L A W   L O R E N T Z I A N
     // -------------------------------
     // Centres are absolute coordinates (similar to Gaussian)
-    double skMainX = (fSkewedLorentzFitMainDiagXDOF > 0) ? fSkewedLorentzFitMainDiagXCenter : NaN;
-    double skMainY = (fSkewedLorentzFitMainDiagYDOF > 0) ? fSkewedLorentzFitMainDiagYCenter : NaN;
+    double skMainX = (fPowerLorentzFitMainDiagXDOF > 0) ? fPowerLorentzFitMainDiagXCenter : NaN;
+    double skMainY = (fPowerLorentzFitMainDiagYDOF > 0) ? fPowerLorentzFitMainDiagYCenter : NaN;
     setXY(skMainX, skMainY,
-          fSkewedLorentzMainDiagTransformedX, fSkewedLorentzMainDiagTransformedY,
-          fSkewedLorentzMainDiagTransformedDeltaX, fSkewedLorentzMainDiagTransformedDeltaY);
+          fPowerLorentzMainDiagTransformedX, fPowerLorentzMainDiagTransformedY,
+          fPowerLorentzMainDiagTransformedDeltaX, fPowerLorentzMainDiagTransformedDeltaY);
 
-    double skSecX  = (fSkewedLorentzFitSecondDiagXDOF > 0) ? fSkewedLorentzFitSecondDiagXCenter : NaN;
-    double skSecY  = (fSkewedLorentzFitSecondDiagYDOF > 0) ? fSkewedLorentzFitSecondDiagYCenter : NaN;
+    double skSecX  = (fPowerLorentzFitSecondDiagXDOF > 0) ? fPowerLorentzFitSecondDiagXCenter : NaN;
+    double skSecY  = (fPowerLorentzFitSecondDiagYDOF > 0) ? fPowerLorentzFitSecondDiagYCenter : NaN;
     setXY(skSecX, skSecY,
-          fSkewedLorentzSecondDiagTransformedX, fSkewedLorentzSecondDiagTransformedY,
-          fSkewedLorentzSecondDiagTransformedDeltaX, fSkewedLorentzSecondDiagTransformedDeltaY);
+          fPowerLorentzSecondDiagTransformedX, fPowerLorentzSecondDiagTransformedY,
+          fPowerLorentzSecondDiagTransformedDeltaX, fPowerLorentzSecondDiagTransformedDeltaY);
 }
 
 void RunAction::CalculateMeanEstimations()
@@ -1536,7 +1467,7 @@ void RunAction::CalculateMeanEstimations()
     // Vectors to collect valid coordinate estimations
     std::vector<G4double> gauss_x_coords, gauss_y_coords;
     std::vector<G4double> lorentz_x_coords, lorentz_y_coords;
-    std::vector<G4double> skewed_lorentz_x_coords, skewed_lorentz_y_coords;
+    std::vector<G4double> power_lorentz_x_coords, power_lorentz_y_coords;
     
     // For Gaussian estimations, collect X coordinates:
     // ONLY use transformed diagonal coordinates (exclude row/column fits)
@@ -1590,30 +1521,30 @@ void RunAction::CalculateMeanEstimations()
         lorentz_y_coords.push_back(fLorentzSecondDiagTransformedY);
     }
     
-    // For Skewed Lorentzian estimations, collect X coordinates:
+    // For Power-Law Lorentzian estimations, collect X coordinates:
     // ONLY use transformed diagonal coordinates (exclude row/column fits)
     
     // 1. Main diagonal transformed X
-    if (!std::isnan(fSkewedLorentzMainDiagTransformedX)) {
-        skewed_lorentz_x_coords.push_back(fSkewedLorentzMainDiagTransformedX);
+    if (!std::isnan(fPowerLorentzMainDiagTransformedX)) {
+        power_lorentz_x_coords.push_back(fPowerLorentzMainDiagTransformedX);
     }
     
     // 2. Secondary diagonal transformed X
-    if (!std::isnan(fSkewedLorentzSecondDiagTransformedX)) {
-        skewed_lorentz_x_coords.push_back(fSkewedLorentzSecondDiagTransformedX);
+    if (!std::isnan(fPowerLorentzSecondDiagTransformedX)) {
+        power_lorentz_x_coords.push_back(fPowerLorentzSecondDiagTransformedX);
     }
     
-    // For Skewed Lorentzian estimations, collect Y coordinates:
+    // For Power-Law Lorentzian estimations, collect Y coordinates:
     // ONLY use transformed diagonal coordinates (exclude row/column fits)
     
     // 1. Main diagonal transformed Y
-    if (!std::isnan(fSkewedLorentzMainDiagTransformedY)) {
-        skewed_lorentz_y_coords.push_back(fSkewedLorentzMainDiagTransformedY);
+    if (!std::isnan(fPowerLorentzMainDiagTransformedY)) {
+        power_lorentz_y_coords.push_back(fPowerLorentzMainDiagTransformedY);
     }
     
     // 2. Secondary diagonal transformed Y
-    if (!std::isnan(fSkewedLorentzSecondDiagTransformedY)) {
-        skewed_lorentz_y_coords.push_back(fSkewedLorentzSecondDiagTransformedY);
+    if (!std::isnan(fPowerLorentzSecondDiagTransformedY)) {
+        power_lorentz_y_coords.push_back(fPowerLorentzSecondDiagTransformedY);
     }
 
     
@@ -1662,27 +1593,27 @@ void RunAction::CalculateMeanEstimations()
         fLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
     
-    // Calculate skewed Lorentzian mean coordinate estimations and their deltas
-    if (!skewed_lorentz_x_coords.empty()) {
+    // Calculate Power-Law Lorentzian mean coordinate estimations and their deltas
+    if (!power_lorentz_x_coords.empty()) {
         G4double sum = 0.0;
-        for (const auto& coord : skewed_lorentz_x_coords) {
+        for (const auto& coord : power_lorentz_x_coords) {
             sum += coord;
         }
-        G4double mean_x = sum / skewed_lorentz_x_coords.size();
-        fSkewedLorentzMeanTrueDeltaX = mean_x - fTrueX;
+        G4double mean_x = sum / power_lorentz_x_coords.size();
+        fPowerLorentzMeanTrueDeltaX = mean_x - fTrueX;
     } else {
-        fSkewedLorentzMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fPowerLorentzMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
     }
     
-    if (!skewed_lorentz_y_coords.empty()) {
+    if (!power_lorentz_y_coords.empty()) {
         G4double sum = 0.0;
-        for (const auto& coord : skewed_lorentz_y_coords) {
+        for (const auto& coord : power_lorentz_y_coords) {
             sum += coord;
         }
-        G4double mean_y = sum / skewed_lorentz_y_coords.size();
-        fSkewedLorentzMeanTrueDeltaY = mean_y - fTrueY;
+        G4double mean_y = sum / power_lorentz_y_coords.size();
+        fPowerLorentzMeanTrueDeltaY = mean_y - fTrueY;
     } else {
-        fSkewedLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fPowerLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 
 }
@@ -1702,163 +1633,151 @@ void RunAction::SetAutoRadiusResults(G4int selectedRadius)
 }
 
 // =============================================
-// SKEWED LORENTZIAN FITTING RESULTS SETTER METHODS
+// POWER LORENTZIAN FITTING RESULTS SETTER METHODS
 // =============================================
 
-void RunAction::Set2DSkewedLorentzianFitResults(G4double x_center, G4double x_beta, G4double x_lambda, G4double x_gamma, G4double x_amplitude,
-                                               G4double x_center_err, G4double x_beta_err, G4double x_lambda_err, G4double x_gamma_err, G4double x_amplitude_err,
+void RunAction::Set2DPowerLorentzianFitResults(G4double x_center, G4double x_gamma, G4double x_beta, G4double x_amplitude,
+                                               G4double x_center_err, G4double x_gamma_err, G4double x_beta_err, G4double x_amplitude_err,
                                                G4double x_vertical_offset, G4double x_vertical_offset_err,
                                                G4double x_chi2red, G4double x_pp, G4int x_dof,
-                                               G4double y_center, G4double y_beta, G4double y_lambda, G4double y_gamma, G4double y_amplitude,
-                                               G4double y_center_err, G4double y_beta_err, G4double y_lambda_err, G4double y_gamma_err, G4double y_amplitude_err,
+                                               G4double y_center, G4double y_gamma, G4double y_beta, G4double y_amplitude,
+                                               G4double y_center_err, G4double y_gamma_err, G4double y_beta_err, G4double y_amplitude_err,
                                                G4double y_vertical_offset, G4double y_vertical_offset_err,
                                                G4double y_chi2red, G4double y_pp, G4int y_dof,
                                                G4bool fit_successful)
 {
-    // Store X direction (row) fit results
-    fSkewedLorentzFitRowCenter = x_center;
-    fSkewedLorentzFitRowBeta = x_beta;
-    fSkewedLorentzFitRowLambda = x_lambda;
-    fSkewedLorentzFitRowGamma = x_gamma;
-    fSkewedLorentzFitRowAmplitude = x_amplitude;
-    fSkewedLorentzFitRowCenterErr = x_center_err;
-    fSkewedLorentzFitRowBetaErr = x_beta_err;
-    fSkewedLorentzFitRowLambdaErr = x_lambda_err;
-    fSkewedLorentzFitRowGammaErr = x_gamma_err;
-    fSkewedLorentzFitRowAmplitudeErr = x_amplitude_err;
-    fSkewedLorentzFitRowVerticalOffset = x_vertical_offset;
-    fSkewedLorentzFitRowVerticalOffsetErr = x_vertical_offset_err;
-    fSkewedLorentzFitRowChi2red = x_chi2red;
-    fSkewedLorentzFitRowPp = x_pp;
-    fSkewedLorentzFitRowDOF = x_dof;
+    // Store X direction (row) fit results - Power-Law Lorentzian model
+    fPowerLorentzFitRowCenter = x_center;
+    fPowerLorentzFitRowGamma = x_gamma;
+    fPowerLorentzFitRowBeta = x_beta;
+    fPowerLorentzFitRowAmplitude = x_amplitude;
+    fPowerLorentzFitRowCenterErr = x_center_err;
+    fPowerLorentzFitRowGammaErr = x_gamma_err;
+    fPowerLorentzFitRowBetaErr = x_beta_err;
+    fPowerLorentzFitRowAmplitudeErr = x_amplitude_err;
+    fPowerLorentzFitRowVerticalOffset = x_vertical_offset;
+    fPowerLorentzFitRowVerticalOffsetErr = x_vertical_offset_err;
+    fPowerLorentzFitRowChi2red = x_chi2red;
+    fPowerLorentzFitRowPp = x_pp;
+    fPowerLorentzFitRowDOF = x_dof;
     
-    // Store Y direction (column) fit results
-    fSkewedLorentzFitColumnCenter = y_center;
-    fSkewedLorentzFitColumnBeta = y_beta;
-    fSkewedLorentzFitColumnLambda = y_lambda;
-    fSkewedLorentzFitColumnGamma = y_gamma;
-    fSkewedLorentzFitColumnAmplitude = y_amplitude;
-    fSkewedLorentzFitColumnCenterErr = y_center_err;
-    fSkewedLorentzFitColumnBetaErr = y_beta_err;
-    fSkewedLorentzFitColumnLambdaErr = y_lambda_err;
-    fSkewedLorentzFitColumnGammaErr = y_gamma_err;
-    fSkewedLorentzFitColumnAmplitudeErr = y_amplitude_err;
-    fSkewedLorentzFitColumnVerticalOffset = y_vertical_offset;
-    fSkewedLorentzFitColumnVerticalOffsetErr = y_vertical_offset_err;
-    fSkewedLorentzFitColumnChi2red = y_chi2red;
-    fSkewedLorentzFitColumnPp = y_pp;
-    fSkewedLorentzFitColumnDOF = y_dof;
+    // Store Y direction (column) fit results - Power-Law Lorentzian model
+    fPowerLorentzFitColumnCenter = y_center;
+    fPowerLorentzFitColumnGamma = y_gamma;
+    fPowerLorentzFitColumnBeta = y_beta;
+    fPowerLorentzFitColumnAmplitude = y_amplitude;
+    fPowerLorentzFitColumnCenterErr = y_center_err;
+    fPowerLorentzFitColumnGammaErr = y_gamma_err;
+    fPowerLorentzFitColumnBetaErr = y_beta_err;
+    fPowerLorentzFitColumnAmplitudeErr = y_amplitude_err;
+    fPowerLorentzFitColumnVerticalOffset = y_vertical_offset;
+    fPowerLorentzFitColumnVerticalOffsetErr = y_vertical_offset_err;
+    fPowerLorentzFitColumnChi2red = y_chi2red;
+    fPowerLorentzFitColumnPp = y_pp;
+    fPowerLorentzFitColumnDOF = y_dof;
     
     // Calculate delta values for row and column fits vs true position
     if (fit_successful) {
         // Check X fit validity (row fit) - use dof as success indicator
         if (x_dof > 0) {
-            fSkewedLorentzRowDeltaX = x_center - fTrueX;      // x_row_fit - x_true
+            fPowerLorentzRowDeltaX = x_center - fTrueX;      // x_row_fit - x_true
         } else {
-            fSkewedLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+            fPowerLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         // Check Y fit validity (column fit) - use dof as success indicator  
         if (y_dof > 0) {
-            fSkewedLorentzColumnDeltaY = y_center - fTrueY;   // y_column_fit - y_true
+            fPowerLorentzColumnDeltaY = y_center - fTrueY;   // y_column_fit - y_true
         } else {
-            fSkewedLorentzColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+            fPowerLorentzColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
     } else {
         // Set row and column delta values to NaN for failed overall fits
-        fSkewedLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fSkewedLorentzColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+        fPowerLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        fPowerLorentzColumnDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
     
     // Calculate mean estimations from all fitting methods
     CalculateMeanEstimations();
 }
 
-void RunAction::SetDiagonalSkewedLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_beta, G4double main_diag_x_lambda, G4double main_diag_x_gamma, G4double main_diag_x_amplitude,
-                                                     G4double main_diag_x_center_err, G4double main_diag_x_beta_err, G4double main_diag_x_lambda_err, G4double main_diag_x_gamma_err, G4double main_diag_x_amplitude_err,
+void RunAction::SetDiagonalPowerLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_beta, G4double main_diag_x_amplitude,
+                                                     G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_beta_err, G4double main_diag_x_amplitude_err,
                                                      G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
                                                      G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
-                                                     G4double main_diag_y_center, G4double main_diag_y_beta, G4double main_diag_y_lambda, G4double main_diag_y_gamma, G4double main_diag_y_amplitude,
-                                                     G4double main_diag_y_center_err, G4double main_diag_y_beta_err, G4double main_diag_y_lambda_err, G4double main_diag_y_gamma_err, G4double main_diag_y_amplitude_err,
+                                                     G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_beta, G4double main_diag_y_amplitude,
+                                                     G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_beta_err, G4double main_diag_y_amplitude_err,
                                                      G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
                                                      G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
-                                                     G4double sec_diag_x_center, G4double sec_diag_x_beta, G4double sec_diag_x_lambda, G4double sec_diag_x_gamma, G4double sec_diag_x_amplitude,
-                                                     G4double sec_diag_x_center_err, G4double sec_diag_x_beta_err, G4double sec_diag_x_lambda_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_amplitude_err,
+                                                     G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_beta, G4double sec_diag_x_amplitude,
+                                                     G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_beta_err, G4double sec_diag_x_amplitude_err,
                                                      G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
                                                      G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
-                                                     G4double sec_diag_y_center, G4double sec_diag_y_beta, G4double sec_diag_y_lambda, G4double sec_diag_y_gamma, G4double sec_diag_y_amplitude,
-                                                     G4double sec_diag_y_center_err, G4double sec_diag_y_beta_err, G4double sec_diag_y_lambda_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_amplitude_err,
+                                                     G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_beta, G4double sec_diag_y_amplitude,
+                                                     G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_beta_err, G4double sec_diag_y_amplitude_err,
                                                      G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
                                                      G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
                                                      G4bool fit_successful)
 {
-    // Store main diagonal X fit results
-    fSkewedLorentzFitMainDiagXCenter = main_diag_x_center;
-    fSkewedLorentzFitMainDiagXBeta = main_diag_x_beta;
-    fSkewedLorentzFitMainDiagXLambda = main_diag_x_lambda;
-    fSkewedLorentzFitMainDiagXGamma = main_diag_x_gamma;
-    fSkewedLorentzFitMainDiagXAmplitude = main_diag_x_amplitude;
-    fSkewedLorentzFitMainDiagXCenterErr = main_diag_x_center_err;
-    fSkewedLorentzFitMainDiagXBetaErr = main_diag_x_beta_err;
-    fSkewedLorentzFitMainDiagXLambdaErr = main_diag_x_lambda_err;
-    fSkewedLorentzFitMainDiagXGammaErr = main_diag_x_gamma_err;
-    fSkewedLorentzFitMainDiagXAmplitudeErr = main_diag_x_amplitude_err;
-    fSkewedLorentzFitMainDiagXVerticalOffset = main_diag_x_vertical_offset;
-    fSkewedLorentzFitMainDiagXVerticalOffsetErr = main_diag_x_vertical_offset_err;
-    fSkewedLorentzFitMainDiagXChi2red = main_diag_x_chi2red;
-    fSkewedLorentzFitMainDiagXPp = main_diag_x_pp;
-    fSkewedLorentzFitMainDiagXDOF = main_diag_x_dof;
+    // Store main diagonal X fit results - Power-Law Lorentzian model
+    fPowerLorentzFitMainDiagXCenter = main_diag_x_center;
+    fPowerLorentzFitMainDiagXGamma = main_diag_x_gamma;
+    fPowerLorentzFitMainDiagXBeta = main_diag_x_beta;
+    fPowerLorentzFitMainDiagXAmplitude = main_diag_x_amplitude;
+    fPowerLorentzFitMainDiagXCenterErr = main_diag_x_center_err;
+    fPowerLorentzFitMainDiagXGammaErr = main_diag_x_gamma_err;
+    fPowerLorentzFitMainDiagXBetaErr = main_diag_x_beta_err;
+    fPowerLorentzFitMainDiagXAmplitudeErr = main_diag_x_amplitude_err;
+    fPowerLorentzFitMainDiagXVerticalOffset = main_diag_x_vertical_offset;
+    fPowerLorentzFitMainDiagXVerticalOffsetErr = main_diag_x_vertical_offset_err;
+    fPowerLorentzFitMainDiagXChi2red = main_diag_x_chi2red;
+    fPowerLorentzFitMainDiagXPp = main_diag_x_pp;
+    fPowerLorentzFitMainDiagXDOF = main_diag_x_dof;
     
-    // Store main diagonal Y fit results
-    fSkewedLorentzFitMainDiagYCenter = main_diag_y_center;
-    fSkewedLorentzFitMainDiagYBeta = main_diag_y_beta;
-    fSkewedLorentzFitMainDiagYLambda = main_diag_y_lambda;
-    fSkewedLorentzFitMainDiagYGamma = main_diag_y_gamma;
-    fSkewedLorentzFitMainDiagYAmplitude = main_diag_y_amplitude;
-    fSkewedLorentzFitMainDiagYCenterErr = main_diag_y_center_err;
-    fSkewedLorentzFitMainDiagYBetaErr = main_diag_y_beta_err;
-    fSkewedLorentzFitMainDiagYLambdaErr = main_diag_y_lambda_err;
-    fSkewedLorentzFitMainDiagYGammaErr = main_diag_y_gamma_err;
-    fSkewedLorentzFitMainDiagYAmplitudeErr = main_diag_y_amplitude_err;
-    fSkewedLorentzFitMainDiagYVerticalOffset = main_diag_y_vertical_offset;
-    fSkewedLorentzFitMainDiagYVerticalOffsetErr = main_diag_y_vertical_offset_err;
-    fSkewedLorentzFitMainDiagYChi2red = main_diag_y_chi2red;
-    fSkewedLorentzFitMainDiagYPp = main_diag_y_pp;
-    fSkewedLorentzFitMainDiagYDOF = main_diag_y_dof;
+    // Store main diagonal Y fit results - Power-Law Lorentzian model
+    fPowerLorentzFitMainDiagYCenter = main_diag_y_center;
+    fPowerLorentzFitMainDiagYGamma = main_diag_y_gamma;
+    fPowerLorentzFitMainDiagYBeta = main_diag_y_beta;
+    fPowerLorentzFitMainDiagYAmplitude = main_diag_y_amplitude;
+    fPowerLorentzFitMainDiagYCenterErr = main_diag_y_center_err;
+    fPowerLorentzFitMainDiagYGammaErr = main_diag_y_gamma_err;
+    fPowerLorentzFitMainDiagYBetaErr = main_diag_y_beta_err;
+    fPowerLorentzFitMainDiagYAmplitudeErr = main_diag_y_amplitude_err;
+    fPowerLorentzFitMainDiagYVerticalOffset = main_diag_y_vertical_offset;
+    fPowerLorentzFitMainDiagYVerticalOffsetErr = main_diag_y_vertical_offset_err;
+    fPowerLorentzFitMainDiagYChi2red = main_diag_y_chi2red;
+    fPowerLorentzFitMainDiagYPp = main_diag_y_pp;
+    fPowerLorentzFitMainDiagYDOF = main_diag_y_dof;
     
-    // Store secondary diagonal X fit results
-    fSkewedLorentzFitSecondDiagXCenter = sec_diag_x_center;
-    fSkewedLorentzFitSecondDiagXBeta = sec_diag_x_beta;
-    fSkewedLorentzFitSecondDiagXLambda = sec_diag_x_lambda;
-    fSkewedLorentzFitSecondDiagXGamma = sec_diag_x_gamma;
-    fSkewedLorentzFitSecondDiagXAmplitude = sec_diag_x_amplitude;
-    fSkewedLorentzFitSecondDiagXCenterErr = sec_diag_x_center_err;
-    fSkewedLorentzFitSecondDiagXBetaErr = sec_diag_x_beta_err;
-    fSkewedLorentzFitSecondDiagXLambdaErr = sec_diag_x_lambda_err;
-    fSkewedLorentzFitSecondDiagXGammaErr = sec_diag_x_gamma_err;
-    fSkewedLorentzFitSecondDiagXAmplitudeErr = sec_diag_x_amplitude_err;
-    fSkewedLorentzFitSecondDiagXVerticalOffset = sec_diag_x_vertical_offset;
-    fSkewedLorentzFitSecondDiagXVerticalOffsetErr = sec_diag_x_vertical_offset_err;
-    fSkewedLorentzFitSecondDiagXChi2red = sec_diag_x_chi2red;
-    fSkewedLorentzFitSecondDiagXPp = sec_diag_x_pp;
-    fSkewedLorentzFitSecondDiagXDOF = sec_diag_x_dof;
+    // Store secondary diagonal X fit results - Power-Law Lorentzian model
+    fPowerLorentzFitSecondDiagXCenter = sec_diag_x_center;
+    fPowerLorentzFitSecondDiagXGamma = sec_diag_x_gamma;
+    fPowerLorentzFitSecondDiagXBeta = sec_diag_x_beta;
+    fPowerLorentzFitSecondDiagXAmplitude = sec_diag_x_amplitude;
+    fPowerLorentzFitSecondDiagXCenterErr = sec_diag_x_center_err;
+    fPowerLorentzFitSecondDiagXGammaErr = sec_diag_x_gamma_err;
+    fPowerLorentzFitSecondDiagXBetaErr = sec_diag_x_beta_err;
+    fPowerLorentzFitSecondDiagXAmplitudeErr = sec_diag_x_amplitude_err;
+    fPowerLorentzFitSecondDiagXVerticalOffset = sec_diag_x_vertical_offset;
+    fPowerLorentzFitSecondDiagXVerticalOffsetErr = sec_diag_x_vertical_offset_err;
+    fPowerLorentzFitSecondDiagXChi2red = sec_diag_x_chi2red;
+    fPowerLorentzFitSecondDiagXPp = sec_diag_x_pp;
+    fPowerLorentzFitSecondDiagXDOF = sec_diag_x_dof;
     
-    // Store secondary diagonal Y fit results
-    fSkewedLorentzFitSecondDiagYCenter = sec_diag_y_center;
-    fSkewedLorentzFitSecondDiagYBeta = sec_diag_y_beta;
-    fSkewedLorentzFitSecondDiagYLambda = sec_diag_y_lambda;
-    fSkewedLorentzFitSecondDiagYGamma = sec_diag_y_gamma;
-    fSkewedLorentzFitSecondDiagYAmplitude = sec_diag_y_amplitude;
-    fSkewedLorentzFitSecondDiagYCenterErr = sec_diag_y_center_err;
-    fSkewedLorentzFitSecondDiagYBetaErr = sec_diag_y_beta_err;
-    fSkewedLorentzFitSecondDiagYLambdaErr = sec_diag_y_lambda_err;
-    fSkewedLorentzFitSecondDiagYGammaErr = sec_diag_y_gamma_err;
-    fSkewedLorentzFitSecondDiagYAmplitudeErr = sec_diag_y_amplitude_err;
-    fSkewedLorentzFitSecondDiagYVerticalOffset = sec_diag_y_vertical_offset;
-    fSkewedLorentzFitSecondDiagYVerticalOffsetErr = sec_diag_y_vertical_offset_err;
-    fSkewedLorentzFitSecondDiagYChi2red = sec_diag_y_chi2red;
-    fSkewedLorentzFitSecondDiagYPp = sec_diag_y_pp;
-    fSkewedLorentzFitSecondDiagYDOF = sec_diag_y_dof;
+    // Store secondary diagonal Y fit results - Power-Law Lorentzian model
+    fPowerLorentzFitSecondDiagYCenter = sec_diag_y_center;
+    fPowerLorentzFitSecondDiagYGamma = sec_diag_y_gamma;
+    fPowerLorentzFitSecondDiagYBeta = sec_diag_y_beta;
+    fPowerLorentzFitSecondDiagYAmplitude = sec_diag_y_amplitude;
+    fPowerLorentzFitSecondDiagYCenterErr = sec_diag_y_center_err;
+    fPowerLorentzFitSecondDiagYGammaErr = sec_diag_y_gamma_err;
+    fPowerLorentzFitSecondDiagYBetaErr = sec_diag_y_beta_err;
+    fPowerLorentzFitSecondDiagYAmplitudeErr = sec_diag_y_amplitude_err;
+    fPowerLorentzFitSecondDiagYVerticalOffset = sec_diag_y_vertical_offset;
+    fPowerLorentzFitSecondDiagYVerticalOffsetErr = sec_diag_y_vertical_offset_err;
+    fPowerLorentzFitSecondDiagYChi2red = sec_diag_y_chi2red;
+    fPowerLorentzFitSecondDiagYPp = sec_diag_y_pp;
+    fPowerLorentzFitSecondDiagYDOF = sec_diag_y_dof;
 
     // Calculate transformed diagonal coordinates using rotation matrix
     CalculateTransformedDiagonalCoordinates();

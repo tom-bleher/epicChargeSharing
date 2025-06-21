@@ -69,7 +69,7 @@ namespace Constants {
     // This reduces simulation time and ROOT output file size when specific models aren't needed
     const G4bool ENABLE_GAUSSIAN_FITTING = true;         // Enable Gaussian fitting (2D and diagonal)
     const G4bool ENABLE_LORENTZIAN_FITTING = true;       // Enable Lorentzian fitting (2D and diagonal) 
-    const G4bool ENABLE_SKEWED_LORENTZIAN_FITTING = false; // Enable Skewed Lorentzian fitting (2D and diagonal)
+    const G4bool ENABLE_POWER_LORENTZIAN_FITTING = true; // Enable Power Lorentzian fitting (2D and diagonal)
     
     // Individual fitting type control (only used if main model is enabled)
     const G4bool ENABLE_2D_FITTING = true;               // Enable central row/column fitting
@@ -83,12 +83,12 @@ namespace Constants {
     // When enabled: Uses 5% of max charge as uncertainty for weighted least squares fitting
     // When disabled: Uses uniform weighting (uncertainty = 1.0) for unweighted fitting
     // Also controls whether uncertainty values are saved to ROOT file branches
-    const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = false;  // Enable charge uncertainties
+    const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = true;  // Enable charge uncertainties
     
     // USAGE EXAMPLES:
-    // - To disable all Skewed Lorentzian: set ENABLE_SKEWED_LORENTZIAN_FITTING = false
+    // - To disable all Power Lorentzian: set ENABLE_POWER_LORENTZIAN_FITTING = false
     // - To enable only 2D fits (not diagonals): set ENABLE_DIAGONAL_FITTING = false  
-    // - To run only Gaussian fits: set ENABLE_LORENTZIAN_FITTING and ENABLE_SKEWED_LORENTZIAN_FITTING to false
+    // - To run only Gaussian fits: set ENABLE_LORENTZIAN_FITTING and ENABLE_POWER_LORENTZIAN_FITTING to false
     // - To disable charge uncertainties: set ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = false
     
 } // namespace Constants
