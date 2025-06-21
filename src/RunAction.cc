@@ -15,14 +15,27 @@
 #include "TNamed.h"
 #include "TString.h"
 #include "TROOT.h"  // Added for ROOT dictionary loading
+#include "TThread.h" // Added for thread initialization
 #include <chrono>
 #include <thread>
 #include <cstdio> // For std::remove
 #include <fstream>
 #include <limits>
+#include <mutex>
+#include <memory>
 
 // Initialize the static mutex
 std::mutex RunAction::fRootMutex;
+
+// Thread-safe ROOT initialization
+static std::once_flag gRootInitFlag;
+
+static void InitializeROOTThreading() {
+    if (G4Threading::IsMultithreadedApplication()) {
+        TThread::Initialize();
+        gROOT->SetBatch(true); // Ensure batch mode for MT
+    }
+}
 
 RunAction::RunAction()
 : G4UserRunAction(),
@@ -364,6 +377,9 @@ RunAction::~RunAction()
 
 void RunAction::BeginOfRunAction(const G4Run*)
 { 
+  // Initialize ROOT threading once per application
+  std::call_once(gRootInitFlag, InitializeROOTThreading);
+  
   // Lock mutex during ROOT file creation
   std::lock_guard<std::mutex> lock(fRootMutex);
   
@@ -862,13 +878,13 @@ void RunAction::EndOfRunAction(const G4Run* run)
                 if (fGridPixelSize > 0) {  // Check if grid parameters have been set
                     fRootFile->cd();
                     
-                    // Create TNamed objects to store grid parameters as metadata
-                    TNamed *pixelSizeMeta = new TNamed("GridPixelSize_mm", Form("%.6f", fGridPixelSize));
-                    TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing_mm", Form("%.6f", fGridPixelSpacing));  
-                    TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset_mm", Form("%.6f", fGridPixelCornerOffset));
-                    TNamed *detSizeMeta = new TNamed("GridDetectorSize_mm", Form("%.6f", fGridDetSize));
-                    TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
-                    TNamed *neighborhoodRadiusMeta = new TNamed("NeighborhoodRadius", Form("%d", Constants::NEIGHBORHOOD_RADIUS));
+                    // Create TNamed objects to store grid parameters as metadata (RAII)
+                    std::unique_ptr<TNamed> pixelSizeMeta(new TNamed("GridPixelSize_mm", Form("%.6f", fGridPixelSize)));
+                    std::unique_ptr<TNamed> pixelSpacingMeta(new TNamed("GridPixelSpacing_mm", Form("%.6f", fGridPixelSpacing)));
+                    std::unique_ptr<TNamed> pixelCornerOffsetMeta(new TNamed("GridPixelCornerOffset_mm", Form("%.6f", fGridPixelCornerOffset)));
+                    std::unique_ptr<TNamed> detSizeMeta(new TNamed("GridDetectorSize_mm", Form("%.6f", fGridDetSize)));
+                    std::unique_ptr<TNamed> numBlocksMeta(new TNamed("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide)));
+                    std::unique_ptr<TNamed> neighborhoodRadiusMeta(new TNamed("NeighborhoodRadius", Form("%d", Constants::NEIGHBORHOOD_RADIUS)));
                     
                     // Write metadata to the ROOT file
                     pixelSizeMeta->Write();
@@ -878,13 +894,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                     numBlocksMeta->Write();
                     neighborhoodRadiusMeta->Write();
                     
-                    // Clean up metadata objects to prevent memory leaks
-                    delete pixelSizeMeta;
-                    delete pixelSpacingMeta;
-                    delete pixelCornerOffsetMeta;
-                    delete detSizeMeta;
-                    delete numBlocksMeta;
-                    delete neighborhoodRadiusMeta;
+                    // Objects automatically cleaned up by unique_ptr destructors
                     
                     G4cout << "Saved detector grid metadata to ROOT file" << G4endl;
                     G4cout << "  Final parameters used: " << fGridPixelSize << ", " << fGridPixelSpacing 
@@ -929,9 +939,46 @@ void RunAction::EndOfRunAction(const G4Run* run)
     if (G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread()) {
         G4cout << "Master thread: Merging ROOT files from worker threads..." << G4endl;
         
-        // Wait a moment to ensure worker threads have finished writing files
-        G4long wait_time = 1000; // milliseconds
-        std::this_thread::sleep_for(std::chrono::milliseconds(wait_time));
+        // Wait for all worker threads to finish writing files
+        // Use proper synchronization instead of fixed sleep
+        if (G4Threading::IsMultithreadedApplication()) {
+            G4int nThreads = G4Threading::GetNumberOfRunningWorkerThreads();
+            G4int maxWaitTime = 10000; // Maximum wait time in milliseconds
+            G4int waitInterval = 100;   // Check interval in milliseconds
+            G4int totalWaitTime = 0;
+            
+            // Wait for all worker files to exist and be properly closed
+            bool allFilesReady = false;
+            while (!allFilesReady && totalWaitTime < maxWaitTime) {
+                allFilesReady = true;
+                for (G4int i = 0; i < nThreads; i++) {
+                    std::ostringstream oss;
+                    oss << "epicChargeSharingOutput_t" << i << ".root";
+                    G4String workerFile = oss.str();
+                    
+                    // Check if file exists and can be opened
+                    TFile *testFile = TFile::Open(workerFile.c_str(), "READ");
+                    if (!testFile || testFile->IsZombie()) {
+                        allFilesReady = false;
+                        if (testFile) delete testFile;
+                        break;
+                    }
+                    testFile->Close();
+                    delete testFile;
+                }
+                
+                if (!allFilesReady) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(waitInterval));
+                    totalWaitTime += waitInterval;
+                }
+            }
+            
+            if (totalWaitTime >= maxWaitTime) {
+                G4cout << "Warning: Timeout waiting for worker files, proceeding with merge..." << G4endl;
+            } else {
+                G4cout << "All worker files ready after " << totalWaitTime << " ms" << G4endl;
+            }
+        }
         
         try {
             std::lock_guard<std::mutex> lock(fRootMutex);
@@ -995,12 +1042,13 @@ void RunAction::EndOfRunAction(const G4Run* run)
                             // Save detector grid parameters as metadata to merged file
                             // Use the stored grid parameters that were set by DetectorConstruction
                             if (fGridPixelSize > 0) {  // Check if grid parameters have been set
-                                TNamed *pixelSizeMeta = new TNamed("GridPixelSize_mm", Form("%.6f", fGridPixelSize));
-                                TNamed *pixelSpacingMeta = new TNamed("GridPixelSpacing_mm", Form("%.6f", fGridPixelSpacing));  
-                                TNamed *pixelCornerOffsetMeta = new TNamed("GridPixelCornerOffset_mm", Form("%.6f", fGridPixelCornerOffset));
-                                TNamed *detSizeMeta = new TNamed("GridDetectorSize_mm", Form("%.6f", fGridDetSize));
-                                TNamed *numBlocksMeta = new TNamed("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
-                                TNamed *neighborhoodRadiusMeta = new TNamed("NeighborhoodRadius_pixels", Form("%d", Constants::NEIGHBORHOOD_RADIUS));
+                                // Create TNamed objects to store grid parameters as metadata (RAII)
+                                std::unique_ptr<TNamed> pixelSizeMeta(new TNamed("GridPixelSize_mm", Form("%.6f", fGridPixelSize)));
+                                std::unique_ptr<TNamed> pixelSpacingMeta(new TNamed("GridPixelSpacing_mm", Form("%.6f", fGridPixelSpacing)));
+                                std::unique_ptr<TNamed> pixelCornerOffsetMeta(new TNamed("GridPixelCornerOffset_mm", Form("%.6f", fGridPixelCornerOffset)));
+                                std::unique_ptr<TNamed> detSizeMeta(new TNamed("GridDetectorSize_mm", Form("%.6f", fGridDetSize)));
+                                std::unique_ptr<TNamed> numBlocksMeta(new TNamed("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide)));
+                                std::unique_ptr<TNamed> neighborhoodRadiusMeta(new TNamed("NeighborhoodRadius_pixels", Form("%d", Constants::NEIGHBORHOOD_RADIUS)));
                                 
                                 // Write metadata to the merged ROOT file
                                 pixelSizeMeta->Write();
@@ -1010,13 +1058,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                                 numBlocksMeta->Write();
                                 neighborhoodRadiusMeta->Write();
                                 
-                                // Clean up metadata objects to prevent memory leaks
-                                delete pixelSizeMeta;
-                                delete pixelSpacingMeta;
-                                delete pixelCornerOffsetMeta;
-                                delete detSizeMeta;
-                                delete numBlocksMeta;
-                                delete neighborhoodRadiusMeta;
+                                // Objects automatically cleaned up by unique_ptr destructors
                                 
                                 G4cout << "Saved detector grid metadata to merged ROOT file" << G4endl;
                                 G4cout << "  Final parameters used: " << fGridPixelSize << ", " << fGridPixelSpacing 

@@ -613,19 +613,52 @@ bool FitGaussianCeres(
                 // Calculate uncertainties using robust methods
                 bool cov_success = false;
                 
-                // Try covariance calculation with multiple settings
-                std::vector<std::pair<ceres::CovarianceAlgorithmType, double>> cov_configs = {
-                    {ceres::DENSE_SVD, 1e-14},
-                    {ceres::DENSE_SVD, 1e-12},
-                    {ceres::DENSE_SVD, 1e-10},
-                    {ceres::SPARSE_QR, 1e-12}
-                };
-                
-                for (const auto& cov_config : cov_configs) {
+                // Optimized covariance calculation based on performance flag
+                if (Constants::ENABLE_MULTI_ALGORITHM_COVARIANCE) {
+                    // Try covariance calculation with multiple settings (slower but more robust)
+                    std::vector<std::pair<ceres::CovarianceAlgorithmType, double>> cov_configs = {
+                        {ceres::DENSE_SVD, 1e-14},
+                        {ceres::DENSE_SVD, 1e-12},
+                        {ceres::DENSE_SVD, 1e-10},
+                        {ceres::SPARSE_QR, 1e-12}
+                    };
+                    
+                    for (const auto& cov_config : cov_configs) {
+                        ceres::Covariance::Options cov_options;
+                        cov_options.algorithm_type = cov_config.first;
+                        cov_options.min_reciprocal_condition_number = cov_config.second;
+                        cov_options.null_space_rank = 2; // Allow for rank deficiency
+                        cov_options.apply_loss_function = true;
+                        
+                        ceres::Covariance covariance(cov_options);
+                        std::vector<std::pair<const double*, const double*>> covariance_blocks;
+                        covariance_blocks.push_back(std::make_pair(parameters, parameters));
+                        
+                        if (covariance.Compute(covariance_blocks, &problem)) {
+                            double covariance_matrix[16];
+                            if (covariance.GetCovarianceBlock(parameters, parameters, covariance_matrix)) {
+                                fit_amplitude_err = std::sqrt(std::abs(covariance_matrix[0]));
+                                fit_center_err = std::sqrt(std::abs(covariance_matrix[5]));
+                                fit_sigma_err = std::sqrt(std::abs(covariance_matrix[10]));
+                                fit_offset_err = std::sqrt(std::abs(covariance_matrix[15]));
+                                
+                                // Validate uncertainties
+                                if (!std::isnan(fit_amplitude_err) && !std::isnan(fit_center_err) &&
+                                    !std::isnan(fit_sigma_err) && !std::isnan(fit_offset_err) &&
+                                    fit_amplitude_err < 10.0 * fit_amplitude &&
+                                    fit_center_err < 5.0 * pixel_spacing) {
+                                    cov_success = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Fast single-algorithm covariance calculation (performance optimized)
                     ceres::Covariance::Options cov_options;
-                    cov_options.algorithm_type = cov_config.first;
-                    cov_options.min_reciprocal_condition_number = cov_config.second;
-                    cov_options.null_space_rank = 2; // Allow for rank deficiency
+                    cov_options.algorithm_type = ceres::DENSE_SVD;
+                    cov_options.min_reciprocal_condition_number = 1e-12;
+                    cov_options.null_space_rank = 2;
                     cov_options.apply_loss_function = true;
                     
                     ceres::Covariance covariance(cov_options);
@@ -646,7 +679,6 @@ bool FitGaussianCeres(
                                 fit_amplitude_err < 10.0 * fit_amplitude &&
                                 fit_center_err < 5.0 * pixel_spacing) {
                                 cov_success = true;
-                                break;
                             }
                         }
                     }

@@ -11,6 +11,7 @@
 #include <string>
 #include <unistd.h> // For getcwd
 #include <limits.h> // For PATH_MAX
+#include <memory>   // For std::unique_ptr
 
 // Add step limiter includes
 #include "G4UserLimits.hh"
@@ -115,9 +116,9 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4Box* detCube = new G4Box("detCube", fDetSize/2, fDetSize/2, fDetWidth/2);
     G4LogicalVolume* logicCube = new G4LogicalVolume(detCube, siliconMat, "logicCube");
     
-    // Set visualization attributes for the detector (semi-transparent)
-    G4VisAttributes* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7, 0.5)); // Grey, semi-transparent
-    logicCube->SetVisAttributes(cubeVisAtt);
+    // Set visualization attributes for the detector (semi-transparent) - RAII
+    auto cubeVisAtt = std::make_unique<G4VisAttributes>(G4Colour(0.7, 0.7, 0.7, 0.5)); // Grey, semi-transparent
+    logicCube->SetVisAttributes(cubeVisAtt.get());
     
     // Place the silicon detector at fixed position
     G4ThreeVector detectorPosition(0., 0., Constants::DETECTOR_Z_POSITION);
@@ -150,7 +151,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         detCube = new G4Box("detCube", fDetSize/2, fDetSize/2, fDetWidth/2);
         delete logicCube;
         logicCube = new G4LogicalVolume(detCube, siliconMat, "logicCube");
-        logicCube->SetVisAttributes(cubeVisAtt);
+        logicCube->SetVisAttributes(cubeVisAtt.get());
     }
     
     // Verify the corner offset calculation
@@ -193,9 +194,9 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         }
     }
     
-    // Set visualization attributes for pixels
-    G4VisAttributes* blockVisAtt = new G4VisAttributes(G4Colour(0.0, 0.0, 1.0)); // Blue color
-    logicBlock->SetVisAttributes(blockVisAtt);
+    // Set visualization attributes for pixels - RAII
+    auto blockVisAtt = std::make_unique<G4VisAttributes>(G4Colour(0.0, 0.0, 1.0)); // Blue color
+    logicBlock->SetVisAttributes(blockVisAtt.get());
     
     // Set the world volume to be invisible
     logicWorld->SetVisAttributes(G4VisAttributes::GetInvisible());

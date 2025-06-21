@@ -193,6 +193,15 @@ private:
     
     // Calculate mean estimations from all fitting methods
     void CalculateMeanEstimations();
+    
+    // Helper functions to organize branch creation
+    void CreateHitsBranches();
+    void CreateGaussianFitBranches();
+    void CreateLorentzianFitBranches();
+    void CreatePowerLorentzianFitBranches();
+    void Create3DFitBranches();
+    void CreateGridNeighborhoodBranches();
+    void CreateMetadataBranches();
 
     TFile* fRootFile;
     TTree* fTree;

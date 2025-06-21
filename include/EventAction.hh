@@ -89,11 +89,11 @@ private:
     std::vector<G4double> fNonPixel_GridNeighborhoodDistances;       // Distance from hit to each pixel center in neighborhood grid
     std::vector<G4double> fNonPixel_GridNeighborhoodCharge;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
     
-    // Constants for charge sharing calculation
-    static constexpr G4double fIonizationEnergy = 3.6; // eV - typical for silicon
-    static constexpr G4double fAmplificationFactor = 20.0; // AC-LGAD amplification factor
-    static constexpr G4double fD0 = 10.0; // microns - reference distance for charge sharing
-    static constexpr G4double fElementaryCharge = 1.602176634e-19; // Coulombs - elementary charge
+    // Physics constants for charge sharing calculation
+    G4double fIonizationEnergy;    // eV per electron-hole pair in silicon
+    G4double fAmplificationFactor; // AC-LGAD amplification factor
+    G4double fD0;                  // microns - reference distance for charge sharing
+    G4double fElementaryCharge;    // Coulombs - elementary charge
     
     // Automatic radius selection
     G4bool fAutoRadiusEnabled;
