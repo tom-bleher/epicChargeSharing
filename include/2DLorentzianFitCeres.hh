@@ -220,18 +220,6 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
     bool enable_outlier_filtering = false
 );
 
-// Function to calculate charge errors based on 3x3 neighborhood around each pixel
-// For each pixel on a line (row/column/diagonal), calculates error as (q_max - q_min)/sqrt(12)
-// where q_max and q_min are from the 3x3 neighborhood centered on that pixel
-std::vector<double> Calculate3x3ChargeErrors(
-    const std::vector<double>& line_x_coords,        // X coordinates of pixels on the line
-    const std::vector<double>& line_y_coords,        // Y coordinates of pixels on the line
-    const std::vector<double>& line_charge_values,   // Charge values for pixels on the line
-    const std::vector<double>& all_x_coords,         // All X coordinates in the dataset
-    const std::vector<double>& all_y_coords,         // All Y coordinates in the dataset
-    const std::vector<double>& all_charge_values,    // All charge values in the dataset
-    double pixel_spacing,                            // Pixel spacing for neighborhood search
-    bool verbose = false
-);
+
 
 #endif // LORENTZIANFITCERES2D_HH 
