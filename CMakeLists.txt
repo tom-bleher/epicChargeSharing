@@ -11,8 +11,9 @@ if(POLICY CMP0074)
     cmake_policy(SET CMP0074 NEW)  # find_package uses PackageName_ROOT variables
 endif()
 
-# Set C++20 standard to match ROOT configuration
-set(CMAKE_CXX_STANDARD 20)
+# Set C++17 as minimum standard for broader compatibility
+# Individual targets will use target_compile_features for explicit requirements
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -87,6 +88,14 @@ if(ROOT_CONFIG_EXECUTABLE AND NOT "${ROOT_CONFIG_EXECUTABLE}" STREQUAL "NOTFOUND
   
   if(ROOT_VERSION_RESULT EQUAL 0)
     message(STATUS "ROOT version: ${ROOT_VERSION}")
+    
+    # Check ROOT version for ABI compatibility
+    if(ROOT_VERSION VERSION_LESS "6.20.0")
+        message(WARNING "ROOT version ${ROOT_VERSION} is older than recommended (6.20+). Consider upgrading to avoid potential ABI issues.")
+    elseif(ROOT_VERSION VERSION_GREATER_EQUAL "6.30.0")
+        message(WARNING "ROOT version ${ROOT_VERSION} is very new. Monitor for potential compatibility issues.")
+    endif()
+    
     # If root-config works correctly, get configuration details
     execute_process(
       COMMAND ${ROOT_CONFIG_EXECUTABLE} --prefix
@@ -216,14 +225,21 @@ include(${Geant4_USE_FILE})
 # Set include directories
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
-# Find Ceres Solver
-find_package(Ceres REQUIRED)
+# Find Ceres Solver with version checking to prevent ABI mismatches
+find_package(Ceres 2.0 REQUIRED)
 if(Ceres_FOUND)
     message(STATUS "Found Ceres Solver version ${Ceres_VERSION}")
     message(STATUS "Ceres include dirs: ${CERES_INCLUDE_DIRS}")
     message(STATUS "Ceres libraries: ${CERES_LIBRARIES}")
+    
+    # Check for potential ABI compatibility issues
+    if(Ceres_VERSION VERSION_LESS "2.0.0")
+        message(WARNING "Ceres version ${Ceres_VERSION} is older than recommended (2.0+). Consider upgrading to avoid potential ABI issues.")
+    elseif(Ceres_VERSION VERSION_GREATER_EQUAL "3.0.0")
+        message(WARNING "Ceres version ${Ceres_VERSION} is very new. Monitor for potential compatibility issues.")
+    endif()
 else()
-    message(FATAL_ERROR "Ceres Solver not found! Please install Ceres Solver.")
+    message(FATAL_ERROR "Ceres Solver not found! Please install Ceres Solver version 2.0 or later.")
 endif()
 
 # Add Ceres include directories
@@ -251,6 +267,9 @@ message(STATUS "ROOT Libraries: ${ROOT_LIBRARIES}")
 
 # Create the executable with enhanced performance settings
 add_executable(epicChargeSharing epicChargeSharing.cc ${sources} ${headers})
+
+# Set explicit C++ standard requirements for this target
+target_compile_features(epicChargeSharing PRIVATE cxx_std_17)
 
 # Link libraries including threading support
 target_link_libraries(epicChargeSharing 
