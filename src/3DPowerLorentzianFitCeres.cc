@@ -30,7 +30,7 @@ double Calculate3DPowerLorentzianUncertainty(double max_charge_in_neighborhood) 
     }
     
     double uncertainty = 0.05 * max_charge_in_neighborhood;
-    if (uncertainty < 1e-20) uncertainty = 1e-20;
+    if (uncertainty < Constants::MIN_UNCERTAINTY_VALUE) uncertainty = Constants::MIN_UNCERTAINTY_VALUE;
     return uncertainty;
 }
 
@@ -176,7 +176,7 @@ bool Fit3DPowerLorentzianCeres(
     }
     
     // Set bounds
-    problem.SetParameterLowerBound(parameters, 0, std::max(1e-20, parameters[0] * 0.01)); // amplitude
+    problem.SetParameterLowerBound(parameters, 0, std::max(Constants::MIN_UNCERTAINTY_VALUE, parameters[0] * 0.01)); // amplitude
     problem.SetParameterUpperBound(parameters, 0, std::min(max_charge * 1.5, parameters[0] * 100.0));
     
     double center_range = pixel_spacing * 3.0;
