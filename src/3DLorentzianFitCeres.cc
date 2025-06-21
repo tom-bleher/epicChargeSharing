@@ -29,26 +29,15 @@ void InitializeCeres3DLorentzian() {
     CeresLoggingInitializer::InitializeOnce();
 }
 
-// Enhanced uncertainty calculation for 3D Lorentzian with adaptive weighting
-double Calculate3DLorentzianUncertainty(double charge_value, double max_charge_in_neighborhood, double baseline = 0.0) {
+// Calculate uncertainty as 5% of max charge in neighborhood (if enabled)
+double Calculate3DLorentzianUncertainty(double max_charge_in_neighborhood) {
     if (!Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
         return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
-    // Adaptive uncertainty model based on charge magnitude
-    double charge_above_baseline = std::max(0.0, charge_value - baseline);
-    double max_above_baseline = std::max(1e-20, max_charge_in_neighborhood - baseline);
-    
-    // Higher precision for high-charge pixels, lower precision for low-charge pixels
-    double relative_charge = charge_above_baseline / max_above_baseline;
-    
-    // Base uncertainty: 2-6% depending on charge level
-    double base_uncertainty_fraction = 0.02 + 0.04 * (1.0 - relative_charge);
-    double uncertainty = base_uncertainty_fraction * max_charge_in_neighborhood;
-    
-    // Minimum uncertainty floor
-    if (uncertainty < 1e-20) uncertainty = 1e-20;
-    
+    // Uncertainty = 5% of max charge when enabled
+    double uncertainty = 0.05 * max_charge_in_neighborhood;
+    if (uncertainty < 1e-20) uncertainty = 1e-20; // Prevent division by zero (very small for coulomb range)
     return uncertainty;
 }
 
@@ -231,7 +220,7 @@ Data3DStatistics CalculateRobust3DStatistics(const std::vector<double>& x_vals,
     return stats;
 }
 
-// Enhanced parameter estimation for 3D Lorentzian distributions
+// Parameter estimation for 3D Lorentzian distributions
 Lorentzian3DParameterEstimates Estimate3DLorentzianParameters(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
@@ -260,102 +249,52 @@ Lorentzian3DParameterEstimates Estimate3DLorentzianParameters(
                  << ", weighted_mean_y=" << stats.weighted_mean_y << std::endl;
     }
     
-    // Method 1: Enhanced multi-threshold physics-based estimation
-    double charge_threshold_high = stats.max_val * 0.7; // High charge threshold for peak center
-    double charge_threshold_med = stats.max_val * 0.3;  // Medium threshold for width estimation
-    double charge_threshold_low = stats.max_val * 0.1;  // Low threshold for noise floor
-    
-    // Peak center from highest charge pixels
-    double peak_weighted_x = 0.0, peak_weighted_y = 0.0, peak_weight_sum = 0.0;
-    for (size_t i = 0; i < x_vals.size(); ++i) {
-        if (z_vals[i] >= charge_threshold_high) {
-            double weight = z_vals[i];
-            peak_weighted_x += x_vals[i] * weight;
-            peak_weighted_y += y_vals[i] * weight;
-            peak_weight_sum += weight;
-        }
-    }
-    
-    if (peak_weight_sum > 0) {
-        estimates.center_x = peak_weighted_x / peak_weight_sum;
-        estimates.center_y = peak_weighted_y / peak_weight_sum;
-    } else {
-        estimates.center_x = stats.weighted_mean_x;
-        estimates.center_y = stats.weighted_mean_y;
-    }
-    
-    // Improved baseline estimation using robust statistics
-    std::vector<double> low_charge_vals;
-    for (size_t i = 0; i < z_vals.size(); ++i) {
-        if (z_vals[i] <= charge_threshold_low) {
-            low_charge_vals.push_back(z_vals[i]);
-        }
-    }
-    
-    if (low_charge_vals.size() > 3) {
-        std::sort(low_charge_vals.begin(), low_charge_vals.end());
-        estimates.baseline = low_charge_vals[low_charge_vals.size() / 2]; // Median of low values
-    } else {
-        estimates.baseline = std::min(stats.min_val, stats.q25);
-    }
-    
-    // Amplitude from robust peak detection
+    // Method 1: Physics-based estimation for charge distributions
+    estimates.center_x = stats.weighted_mean_x;
+    estimates.center_y = stats.weighted_mean_y;
+    estimates.baseline = std::min(stats.min_val, stats.q25);
     estimates.amplitude = stats.max_val - estimates.baseline;
     
-    // Enhanced gamma estimation using multiple charge levels
-    double distance_spread_x_high = 0.0, distance_spread_y_high = 0.0, weight_sum_high = 0.0;
-    double distance_spread_x_med = 0.0, distance_spread_y_med = 0.0, weight_sum_med = 0.0;
+    // For 3D Lorentzian: gamma estimation based on charge spread in both directions
+    double distance_spread_x = 0.0;
+    double distance_spread_y = 0.0;
+    double weight_sum = 0.0;
     
     for (size_t i = 0; i < x_vals.size(); ++i) {
-        double dx = x_vals[i] - estimates.center_x;
-        double dy = y_vals[i] - estimates.center_y;
-        double charge_above_baseline = std::max(0.0, z_vals[i] - estimates.baseline);
-        
-        // High charge pixels for tight width estimation
-        if (z_vals[i] >= charge_threshold_high) {
-            distance_spread_x_high += charge_above_baseline * dx * dx;
-            distance_spread_y_high += charge_above_baseline * dy * dy;
-            weight_sum_high += charge_above_baseline;
-        }
-        
-        // Medium charge pixels for broad width estimation
-        if (z_vals[i] >= charge_threshold_med) {
-            distance_spread_x_med += charge_above_baseline * dx * dx;
-            distance_spread_y_med += charge_above_baseline * dy * dy;
-            weight_sum_med += charge_above_baseline;
+        double weight = std::max(0.0, z_vals[i] - estimates.baseline);
+        if (weight > 0.1 * estimates.amplitude) {
+            double dx = x_vals[i] - estimates.center_x;
+            double dy = y_vals[i] - estimates.center_y;
+            distance_spread_x += weight * dx * dx;
+            distance_spread_y += weight * dy * dy;
+            weight_sum += weight;
         }
     }
     
-    // Use high-charge width if sufficient data, otherwise medium-charge width
-    if (weight_sum_high > 0 && weight_sum_high >= weight_sum_med * 0.2) {
-        // For 3D Lorentzian, gamma represents HWHM (Half Width at Half Maximum)
-        estimates.gamma_x = std::sqrt(distance_spread_x_high / weight_sum_high);
-        estimates.gamma_y = std::sqrt(distance_spread_y_high / weight_sum_high);
-    } else if (weight_sum_med > 0) {
-        estimates.gamma_x = std::sqrt(distance_spread_x_med / weight_sum_med);
-        estimates.gamma_y = std::sqrt(distance_spread_y_med / weight_sum_med);
+    if (weight_sum > 0) {
+        // For Lorentzian, gamma ≈ sqrt(2*sigma^2) where sigma is from Gaussian equivalent
+        estimates.gamma_x = std::sqrt(2.0 * distance_spread_x / weight_sum);
+        estimates.gamma_y = std::sqrt(2.0 * distance_spread_y / weight_sum);
     } else {
-        estimates.gamma_x = pixel_spacing * 0.6;
-        estimates.gamma_y = pixel_spacing * 0.6;
+        estimates.gamma_x = pixel_spacing * 0.7; // Larger default for Lorentzian
+        estimates.gamma_y = pixel_spacing * 0.7;
     }
     
-    // Physics-based bounds with improved heuristics
-    double min_gamma = pixel_spacing * 0.2; // Minimum physical width
-    double max_gamma = pixel_spacing * 2.5; // Maximum reasonable width for charge sharing
-    estimates.gamma_x = std::max(min_gamma, std::min(max_gamma, estimates.gamma_x));
-    estimates.gamma_y = std::max(min_gamma, std::min(max_gamma, estimates.gamma_y));
-    estimates.amplitude = std::max(estimates.amplitude, (stats.max_val - stats.min_val) * 0.05);
+    // Apply physics-based bounds (Lorentzian has wider tails)
+    estimates.gamma_x = std::max(pixel_spacing * 0.3, std::min(pixel_spacing * 3.0, estimates.gamma_x));
+    estimates.gamma_y = std::max(pixel_spacing * 0.3, std::min(pixel_spacing * 3.0, estimates.gamma_y));
+    estimates.amplitude = std::max(estimates.amplitude, (stats.max_val - stats.min_val) * 0.1);
     
     // Validate Method 1
     if (estimates.amplitude > 0 && estimates.gamma_x > 0 && estimates.gamma_y > 0 &&
-        std::isfinite(estimates.center_x) && std::isfinite(estimates.center_y) && 
-        std::isfinite(estimates.amplitude) && std::isfinite(estimates.gamma_x) && 
-        std::isfinite(estimates.gamma_y) && std::isfinite(estimates.baseline)) {
+        !std::isnan(estimates.center_x) && !std::isnan(estimates.center_y) && 
+        !std::isnan(estimates.amplitude) && !std::isnan(estimates.gamma_x) && 
+        !std::isnan(estimates.gamma_y) && !std::isnan(estimates.baseline)) {
         estimates.method_used = 1;
         estimates.valid = true;
         
         if (verbose) {
-            std::cout << "3D Lorentzian Method 1 (Enhanced physics-based): A=" << estimates.amplitude 
+            std::cout << "3D Lorentzian Method 1 (Physics-based): A=" << estimates.amplitude 
                      << ", mx=" << estimates.center_x << ", my=" << estimates.center_y
                      << ", gamma_x=" << estimates.gamma_x << ", gamma_y=" << estimates.gamma_y
                      << ", B=" << estimates.baseline << std::endl;
@@ -363,28 +302,20 @@ Lorentzian3DParameterEstimates Estimate3DLorentzianParameters(
         return estimates;
     }
     
-    // Method 2: Improved robust statistical estimation
+    // Method 2: Robust statistical estimation
     estimates.center_x = stats.robust_center_x;
     estimates.center_y = stats.robust_center_y;
     estimates.baseline = stats.q25;
     estimates.amplitude = stats.q75 - stats.q25;
-    
-    // Better gamma estimation using interquartile range scaling
-    double iqr_scale = (stats.q75 - stats.q25) / stats.median;
-    if (iqr_scale > 0.1) {
-        estimates.gamma_x = std::max(stats.mad * 1.5, pixel_spacing * 0.4);
-        estimates.gamma_y = std::max(stats.mad * 1.5, pixel_spacing * 0.4);
-    } else {
-        estimates.gamma_x = pixel_spacing * 0.6;
-        estimates.gamma_y = pixel_spacing * 0.6;
-    }
+    estimates.gamma_x = std::max(stats.mad, pixel_spacing * 0.5);
+    estimates.gamma_y = std::max(stats.mad, pixel_spacing * 0.5);
     
     if (estimates.amplitude > 0 && estimates.gamma_x > 0 && estimates.gamma_y > 0) {
         estimates.method_used = 2;
         estimates.valid = true;
         
         if (verbose) {
-            std::cout << "3D Lorentzian Method 2 (Improved robust statistical): A=" << estimates.amplitude 
+            std::cout << "3D Lorentzian Method 2 (Robust statistical): A=" << estimates.amplitude 
                      << ", mx=" << estimates.center_x << ", my=" << estimates.center_y
                      << ", gamma_x=" << estimates.gamma_x << ", gamma_y=" << estimates.gamma_y
                      << ", B=" << estimates.baseline << std::endl;
@@ -392,13 +323,13 @@ Lorentzian3DParameterEstimates Estimate3DLorentzianParameters(
         return estimates;
     }
     
-    // Method 3: Conservative fallback with better defaults
+    // Method 3: Conservative fallback
     estimates.center_x = center_x_estimate;
     estimates.center_y = center_y_estimate;
-    estimates.baseline = std::min(stats.min_val, 0.0);
-    estimates.amplitude = stats.max_val - estimates.baseline;
-    estimates.gamma_x = pixel_spacing * 0.5; // Smaller default for tighter fit
-    estimates.gamma_y = pixel_spacing * 0.5;
+    estimates.baseline = 0.0;
+    estimates.amplitude = stats.max_val;
+    estimates.gamma_x = pixel_spacing * 0.7;
+    estimates.gamma_y = pixel_spacing * 0.7;
     estimates.method_used = 3;
     estimates.valid = true;
     
@@ -560,10 +491,11 @@ bool Fit3DLorentzianCeres(
             continue;
         }
         
-        // Calculate enhanced adaptive uncertainty
+        // Calculate uncertainty as 5% of max charge
         double max_charge = *std::max_element(clean_z.begin(), clean_z.end());
+        double uncertainty = Calculate3DLorentzianUncertainty(max_charge);
         
-        // Enhanced multiple fitting configurations for 3D Lorentzian (6 parameters)
+        // Multiple fitting configurations (similar to 2D but for 6 parameters)
         struct Lorentzian3DFittingConfig {
             ceres::LinearSolverType linear_solver;
             ceres::TrustRegionStrategyType trust_region;
@@ -572,77 +504,39 @@ bool Fit3DLorentzianCeres(
             int max_iterations;
             std::string loss_function;
             double loss_parameter;
-            bool use_tight_bounds;
         };
         
         std::vector<Lorentzian3DFittingConfig> configs;
         
-        // Progressive solver escalation similar to successful 2D versions
         Lorentzian3DFittingConfig config1;
         config1.linear_solver = ceres::DENSE_QR;
         config1.trust_region = ceres::LEVENBERG_MARQUARDT;
         config1.function_tolerance = 1e-15;
         config1.gradient_tolerance = 1e-15;
-        config1.max_iterations = 1000;
-        config1.loss_function = "NONE";
-        config1.loss_parameter = 0.0;
-        config1.use_tight_bounds = false;
+        config1.max_iterations = 2000;
+        config1.loss_function = "HUBER";
+        config1.loss_parameter = estimates.amplitude * 0.1;
         configs.push_back(config1);
         
         Lorentzian3DFittingConfig config2;
         config2.linear_solver = ceres::DENSE_QR;
         config2.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config2.function_tolerance = 1e-15;
-        config2.gradient_tolerance = 1e-15;
-        config2.max_iterations = 2000;
-        config2.loss_function = "HUBER";
-        config2.loss_parameter = estimates.amplitude * 0.08;
-        config2.use_tight_bounds = true;
+        config2.function_tolerance = 1e-12;
+        config2.gradient_tolerance = 1e-12;
+        config2.max_iterations = 1500;
+        config2.loss_function = "CAUCHY";
+        config2.loss_parameter = estimates.amplitude * 0.16;
         configs.push_back(config2);
         
         Lorentzian3DFittingConfig config3;
         config3.linear_solver = ceres::DENSE_QR;
-        config3.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config3.function_tolerance = 1e-12;
-        config3.gradient_tolerance = 1e-12;
-        config3.max_iterations = 1800;
-        config3.loss_function = "CAUCHY";
-        config3.loss_parameter = estimates.amplitude * 0.12;
-        config3.use_tight_bounds = true;
+        config3.trust_region = ceres::DOGLEG;
+        config3.function_tolerance = 1e-10;
+        config3.gradient_tolerance = 1e-10;
+        config3.max_iterations = 1000;
+        config3.loss_function = "NONE";
+        config3.loss_parameter = 0.0;
         configs.push_back(config3);
-        
-        Lorentzian3DFittingConfig config4;
-        config4.linear_solver = ceres::DENSE_NORMAL_CHOLESKY;
-        config4.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config4.function_tolerance = 1e-12;
-        config4.gradient_tolerance = 1e-12;
-        config4.max_iterations = 1500;
-        config4.loss_function = "HUBER";
-        config4.loss_parameter = estimates.amplitude * 0.10;
-        config4.use_tight_bounds = false;
-        configs.push_back(config4);
-        
-        Lorentzian3DFittingConfig config5;
-        config5.linear_solver = ceres::DENSE_QR;
-        config5.trust_region = ceres::DOGLEG;
-        config5.function_tolerance = 1e-10;
-        config5.gradient_tolerance = 1e-10;
-        config5.max_iterations = 1200;
-        config5.loss_function = "NONE";
-        config5.loss_parameter = 0.0;
-        config5.use_tight_bounds = false;
-        configs.push_back(config5);
-        
-        Lorentzian3DFittingConfig config6;
-        config6.linear_solver = ceres::SPARSE_NORMAL_CHOLESKY;
-        config6.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config6.function_tolerance = 1e-12;
-        config6.gradient_tolerance = 1e-12;
-        config6.max_iterations = 1400;
-        config6.loss_function = "CAUCHY";
-        config6.loss_parameter = estimates.amplitude * 0.18;
-        config6.use_tight_bounds = true;
-        configs.push_back(config6);
         
         for (const auto& config : configs) {
             // Set up parameter array (6 parameters: A, mx, my, gamma_x, gamma_y, B)
@@ -657,52 +551,37 @@ bool Fit3DLorentzianCeres(
             // Build the problem
             ceres::Problem problem;
             
-            // Add residual blocks with adaptive uncertainties
+            // Add residual blocks with uncertainties
             for (size_t i = 0; i < clean_x.size(); ++i) {
-                double point_uncertainty = Calculate3DLorentzianUncertainty(clean_z[i], max_charge, estimates.baseline);
                 ceres::CostFunction* cost_function = Lorentzian3DCostFunction::Create(
-                    clean_x[i], clean_y[i], clean_z[i], point_uncertainty);
+                    clean_x[i], clean_y[i], clean_z[i], uncertainty);
                 
-                // Use loss function if specified in config
-                ceres::LossFunction* loss_function = nullptr;
-                if (config.loss_function == "HUBER") {
-                    loss_function = new ceres::HuberLoss(config.loss_parameter);
-                } else if (config.loss_function == "CAUCHY") {
-                    loss_function = new ceres::CauchyLoss(config.loss_parameter);
-                }
-                
-                problem.AddResidualBlock(cost_function, loss_function, parameters);
+                // No loss functions - simple weighted least squares
+                problem.AddResidualBlock(cost_function, nullptr, parameters);
             }
             
-            // Set adaptive bounds based on configuration
-            double amp_min = std::max(1e-20, estimates.amplitude * 0.005);
+            // Set bounds
+            double amp_min = std::max(1e-20, estimates.amplitude * 0.01);
             double max_charge_val = *std::max_element(clean_z.begin(), clean_z.end());
-            double physics_amp_max = max_charge_val * 1.3;
-            double algo_amp_max = estimates.amplitude * (config.use_tight_bounds ? 50.0 : 100.0);
+            double physics_amp_max = max_charge_val * 1.5;
+            double algo_amp_max = estimates.amplitude * 100.0;
             double amp_max = std::min(physics_amp_max, algo_amp_max);
 
             problem.SetParameterLowerBound(parameters, 0, amp_min);
             problem.SetParameterUpperBound(parameters, 0, amp_max);
             
-            // Adaptive center bounds
-            double center_range = config.use_tight_bounds ? pixel_spacing * 1.5 : pixel_spacing * 3.0;
+            double center_range = pixel_spacing * 3.0;
             problem.SetParameterLowerBound(parameters, 1, estimates.center_x - center_range);
             problem.SetParameterUpperBound(parameters, 1, estimates.center_x + center_range);
             problem.SetParameterLowerBound(parameters, 2, estimates.center_y - center_range);
             problem.SetParameterUpperBound(parameters, 2, estimates.center_y + center_range);
             
-            // Tighter gamma bounds for better convergence
-            double gamma_min = pixel_spacing * 0.1;
-            double gamma_max = config.use_tight_bounds ? pixel_spacing * 2.5 : pixel_spacing * 4.0;
-            problem.SetParameterLowerBound(parameters, 3, gamma_min);
-            problem.SetParameterUpperBound(parameters, 3, gamma_max);
-            problem.SetParameterLowerBound(parameters, 4, gamma_min);
-            problem.SetParameterUpperBound(parameters, 4, gamma_max);
+            problem.SetParameterLowerBound(parameters, 3, pixel_spacing * 0.05);
+            problem.SetParameterUpperBound(parameters, 3, pixel_spacing * 4.0);
+            problem.SetParameterLowerBound(parameters, 4, pixel_spacing * 0.05);
+            problem.SetParameterUpperBound(parameters, 4, pixel_spacing * 4.0);
             
-            // Improved baseline bounds
-            double baseline_range = config.use_tight_bounds ? 
-                std::max(estimates.amplitude * 0.3, std::abs(estimates.baseline) * 1.5) :
-                std::max(estimates.amplitude * 0.5, std::abs(estimates.baseline) * 2.0);
+            double baseline_range = std::max(estimates.amplitude * 0.5, std::abs(estimates.baseline) * 2.0);
             problem.SetParameterLowerBound(parameters, 5, estimates.baseline - baseline_range);
             problem.SetParameterUpperBound(parameters, 5, estimates.baseline + baseline_range);
             
