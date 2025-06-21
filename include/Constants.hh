@@ -59,6 +59,27 @@ namespace Constants {
     // Charge sharing calculations
     const G4double ALPHA_WEIGHT_MULTIPLIER = 1000.0;     // Weight for very close pixels
     
+    // Primary generator constants
+    const G4double PRIMARY_PARTICLE_Z_POSITION = 2.0*cm; // Z position for primary particle generation
+    
+    // ========================
+    // NUMERICAL TOLERANCE CONSTANTS
+    // ========================
+    
+    // Numerical stability and solver tolerances
+    const G4double MIN_UNCERTAINTY_VALUE = 1e-20;        // Minimum allowed uncertainty to prevent division by zero
+    const G4double MIN_SAFE_PARAMETER = 1e-12;           // Minimum safe value for denominators and parameters
+    const G4double MIN_LOG_VALUE = 1e-6;                 // Minimum allowed log value for numerical stability
+    const G4double MIN_DENOMINATOR_VALUE = 1e-10;        // Minimum allowed denominator value
+    
+    // Ceres solver default tolerances
+    const G4double DEFAULT_FUNCTION_TOLERANCE = 1e-12;   // Default function tolerance for Ceres
+    const G4double DEFAULT_GRADIENT_TOLERANCE = 1e-12;   // Default gradient tolerance for Ceres  
+    const G4double DEFAULT_PARAMETER_TOLERANCE = 1e-15;  // Default parameter tolerance for Ceres
+    const G4double HIGH_PRECISION_TOLERANCE = 1e-15;     // High precision tolerance for critical fits
+    const G4double MEDIUM_PRECISION_TOLERANCE = 1e-12;   // Medium precision tolerance
+    const G4double LOW_PRECISION_TOLERANCE = 1e-10;      // Lower precision tolerance for fallback
+    
     // ========================
     // PHYSICS CONSTANTS
     // ========================
