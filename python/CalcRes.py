@@ -125,6 +125,10 @@ def read_root_data(root_file_path):
                 'PowerLorentzMainDiagTransformedDeltaX', 'PowerLorentzMainDiagTransformedDeltaY',
                 'PowerLorentzSecondDiagTransformedDeltaX', 'PowerLorentzSecondDiagTransformedDeltaY',
                 
+                # 3D fit deltas (check if they exist)
+                '3DLorentzianDeltaX', '3DLorentzianDeltaY',  # 3D Lorentzian fit deltas
+                '3DPowerLorentzianDeltaX', '3DPowerLorentzianDeltaY',  # 3D Power-Law Lorentzian fit deltas
+                
                 # Mean estimators
                 'GaussMeanTrueDeltaX', 'GaussMeanTrueDeltaY',
                 'LorentzMeanTrueDeltaX', 'LorentzMeanTrueDeltaY',
@@ -205,6 +209,12 @@ def calculate_all_resolutions(data):
         ('Power Lorentzian Secondary Diagonal Fit X', 'PowerLorentzSecondDiagTransformedDeltaX'),
         ('Power Lorentzian Secondary Diagonal Fit Y', 'PowerLorentzSecondDiagTransformedDeltaY'),
         
+        # 3D Surface Fits
+        ('3D Lorentzian Fit X', '3DLorentzianDeltaX'),
+        ('3D Lorentzian Fit Y', '3DLorentzianDeltaY'),
+        ('3D Power Lorentzian Fit X', '3DPowerLorentzianDeltaX'),
+        ('3D Power Lorentzian Fit Y', '3DPowerLorentzianDeltaY'),
+        
         # Mean Estimators (combined from all methods)
         ('Gaussian Mean Estimator X', 'GaussMeanTrueDeltaX'),
         ('Gaussian Mean Estimator Y', 'GaussMeanTrueDeltaY'),
@@ -258,6 +268,7 @@ def save_results_to_file(results, output_file):
         power_lorentz_row_col_results = [r for r in results if ('Power Lorentzian Row Fit' in r['name'] or 'Power Lorentzian Column Fit' in r['name'])]
         main_diag_results = [r for r in results if 'Main Diagonal' in r['name'] and r['std_dev'] > 0]
         sec_diag_results = [r for r in results if 'Secondary Diagonal' in r['name'] and r['std_dev'] > 0]
+        three_d_results = [r for r in results if '3D' in r['name'] and r['std_dev'] > 0]
         mean_results = [r for r in results if 'Mean Estimator' in r['name'] and r['std_dev'] > 0]
         
         # Write detailed results table with higher precision
@@ -325,6 +336,17 @@ def save_results_to_file(results, output_file):
         if sec_diag_results:
             f.write("SECONDARY DIAGONAL FITS (slope -1, dx+dy=constant):\n")
             for result in sorted(sec_diag_results, key=lambda x: x['std_dev']):
+                f.write(f"{result['name']:<45} "
+                       f"{result['n_events']:>10,} "
+                       f"{result['mean_bias']*1000:>14.3f} "
+                       f"{result['std_dev']*1000:>12.2f} "
+                       f"{result['rms']*1000:>12.2f}\n")
+            f.write("-" * 103 + "\n")
+        
+        # 3D surface fits section
+        if three_d_results:
+            f.write("3D SURFACE FITS:\n")
+            for result in sorted(three_d_results, key=lambda x: x['std_dev']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
                        f"{result['mean_bias']*1000:>14.3f} "
