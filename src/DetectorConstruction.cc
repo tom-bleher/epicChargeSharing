@@ -9,9 +9,8 @@
 #include <ctime>
 #include <sstream>
 #include <string>
-#include <unistd.h> // For getcwd
-#include <limits.h> // For PATH_MAX
-#include <memory>   // For std::unique_ptr
+#include <filesystem>  // For portable directory creation
+#include <memory>      // For std::unique_ptr
 
 // Add step limiter includes
 #include "G4UserLimits.hh"
@@ -306,23 +305,20 @@ void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4d
     char timestamp[20];
     std::strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", std::localtime(&now));
     
-    // Get the absolute path for logs directory
-    char cwd[PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd)) == NULL) {
-        G4cerr << "ERROR: Could not get current working directory" << G4endl;
-        return;
-    }
-    
-    // Create logs directory with absolute path
-    std::string logsDir = std::string(cwd) + "/logs";
+    // Create logs directory using portable std::filesystem
+    std::filesystem::path logsDir = std::filesystem::current_path() / "logs";
     G4cout << "Creating logs directory at: " << logsDir << G4endl;
-    int result = system(("mkdir -p " + logsDir).c_str());
-    if (result != 0) {
-        G4cerr << "Warning: Could not create logs directory" << G4endl;
+    
+    std::error_code ec;
+    if (!std::filesystem::create_directories(logsDir, ec)) {
+        if (ec) {
+            G4cerr << "Warning: Could not create logs directory: " << ec.message() << G4endl;
+        }
+        // Directory may already exist, which is fine
     }
     
     // Create filename with timestamp in logs directory
-    std::string filename = logsDir + "/simulation_params_" + std::string(timestamp) + ".log";
+    std::filesystem::path filename = logsDir / ("simulation_params_" + std::string(timestamp) + ".log");
     
     // Open file for writing
     std::ofstream paramFile(filename);

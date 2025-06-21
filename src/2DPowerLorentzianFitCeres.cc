@@ -9,12 +9,8 @@
 #include <iostream>
 #include <mutex>
 #include <atomic>
-#include <thread>
-#include <chrono>
-#include <sstream>
 #include <limits>
 #include <numeric>
-#include <set>
 
 // Ceres Solver includes
 #include "ceres/ceres.h"
@@ -37,7 +33,7 @@ double CalculatePowerLorentzianUncertainty(double max_charge_in_line) {
     
     // Uncertainty = 5% of max charge when enabled
     double uncertainty = 0.05 * max_charge_in_line;
-    if (uncertainty < 1e-20) uncertainty = 1e-20; // Prevent division by zero (very small for coulomb range)
+    if (uncertainty < Constants::MIN_UNCERTAINTY_VALUE) uncertainty = Constants::MIN_UNCERTAINTY_VALUE; // Prevent division by zero
     return uncertainty;
 }
 
@@ -546,7 +542,7 @@ bool FitPowerLorentzianCeres(
             }
             
             // Set bounds (similar to Lorentzian but with extra beta parameter)
-            double amp_min = std::max(1e-20, estimates.amplitude * 0.01);
+            double amp_min = std::max(Constants::MIN_UNCERTAINTY_VALUE, estimates.amplitude * 0.01);
             double max_charge_val = *std::max_element(clean_y.begin(), clean_y.end());
             double physics_amp_max = max_charge_val * 1.5;
             double algo_amp_max = estimates.amplitude * 100.0;
