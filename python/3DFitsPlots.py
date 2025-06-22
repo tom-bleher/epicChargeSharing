@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """
-3D surface fitting visualization routine for Lorentzian and Power-Law Lorentzian fits in LGAD detectors.
+Publication-Quality 3D surface fitting visualization routine for Lorentzian and Power Lorentzian fits in LGAD detectors.
+
+ENHANCED FOR SCIENTIFIC PUBLICATION:
+- Professional LaTeX mathematical notation with proper raw strings
+- High-resolution output (300 DPI) with publication-quality fonts
+- Consistent professional color palette and styling
+- Enhanced legends with proper mathematical symbols
+- Professional grid and axis styling
+- Optimized for scientific journals and presentations
 
 This script creates comprehensive plots for:
 1. 3D Lorentzian surface fits with color-coded contour plots
-2. 3D Power-Law Lorentzian surface fits with color-coded contour plots  
+2. 3D Power Lorentzian surface fits with color-coded contour plots  
 3. 2D projections along vertical (Y=center) and horizontal (X=center) lines
 4. Residual plots showing fit quality
-5. Comparison plots between 3D Lorentzian and 3D Power-Law Lorentzian models
+5. Comparison plots between 3D Lorentzian and 3D Power Lorentzian models
 6. Best/worst fit analysis based on chi-squared values
 7. High amplitude event analysis
 
@@ -34,6 +42,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.colors as colors
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 import sys
 import argparse
@@ -43,13 +52,61 @@ from scipy.stats import norm
 
 # Set matplotlib style for publication-quality plots
 plt.style.use('seaborn-v0_8-whitegrid')
-plt.rcParams['figure.dpi'] = 150
+plt.rcParams['figure.dpi'] = 300  # Higher DPI for publication quality
 plt.rcParams['font.size'] = 12
+plt.rcParams['font.family'] = 'serif'  # More professional for publications
+plt.rcParams['font.serif'] = ['Times New Roman', 'DejaVu Serif', 'serif']
 plt.rcParams['axes.labelsize'] = 14
 plt.rcParams['axes.titlesize'] = 16
-plt.rcParams['legend.fontsize'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+plt.rcParams['legend.fontsize'] = 10
+plt.rcParams['legend.frameon'] = True
+plt.rcParams['legend.framealpha'] = 0.9
+plt.rcParams['legend.fancybox'] = True
+plt.rcParams['legend.shadow'] = True
 plt.rcParams['xtick.labelsize'] = 11
 plt.rcParams['ytick.labelsize'] = 11
+plt.rcParams['xtick.major.width'] = 1.2
+plt.rcParams['ytick.major.width'] = 1.2
+plt.rcParams['xtick.minor.visible'] = True
+plt.rcParams['ytick.minor.visible'] = True
+plt.rcParams['grid.alpha'] = 0.3
+plt.rcParams['grid.linewidth'] = 0.8
+plt.rcParams['lines.linewidth'] = 2.0
+plt.rcParams['lines.markersize'] = 6
+plt.rcParams['axes.spines.top'] = False
+plt.rcParams['axes.spines.right'] = False
+plt.rcParams['text.usetex'] = False  # Set to True if LaTeX is available on system
+plt.rcParams['mathtext.fontset'] = 'stix'  # Professional math font
+
+def configure_publication_style():
+    """
+    Configure matplotlib for publication-quality 3D plots with enhanced aesthetics.
+    """
+    # Professional color palette for 3D plots
+    colors = {
+        'lorentzian': '#1f77b4',      # Professional blue
+        'power_lorentzian': '#ff7f0e', # Professional orange
+        'true_position': '#2ca02c',   # Professional green
+        'fit_center': '#d62728',      # Professional red
+        'data_points': '#000000'      # Black for data points
+    }
+    
+    # Enhanced colormaps for contour plots
+    colormaps = {
+        'lorentzian': 'viridis',
+        'power_lorentzian': 'plasma',
+        'residuals': 'RdBu_r'
+    }
+    
+    # Enhanced line widths
+    line_widths = {
+        'fit_curves': 2.5,
+        'reference_lines': 2.0,
+        'grid_lines': 1.0
+    }
+    
+    return colors, colormaps, line_widths
 
 def lorentzian_3d(x, y, amplitude, center_x, center_y, gamma_x, gamma_y, offset=0):
     """
@@ -76,7 +133,7 @@ def lorentzian_3d(x, y, amplitude, center_x, center_y, gamma_x, gamma_y, offset=
 
 def power_lorentzian_3d(x, y, amplitude, center_x, center_y, gamma_x, gamma_y, beta, offset=0):
     """
-    3D Power-Law Lorentzian function for plotting fitted surfaces.
+    3D Power Lorentzian function for plotting fitted surfaces.
     
     Args:
         x, y: Independent variables (meshgrid)
@@ -87,7 +144,7 @@ def power_lorentzian_3d(x, y, amplitude, center_x, center_y, gamma_x, gamma_y, b
         offset: Baseline offset
     
     Returns:
-        3D Power-Law Lorentzian function values
+        3D Power Lorentzian function values
     """
     # Robust parameter validation to match C++ implementation
     safe_gamma_x = max(abs(gamma_x), 1e-12)
@@ -160,7 +217,7 @@ def detect_3d_uncertainty_branches(data):
         if len(uncertainties) > 0 and np.any(np.abs(uncertainties) > 1e-20):
             uncertainty_status['3d_lorentzian_uncertainty_available'] = True
     
-    # Check for 3D Power-Law Lorentzian uncertainty branch
+    # Check for 3D Power Lorentzian uncertainty branch
     if '3DPowerLorentzianFitChargeUncertainty' in data:
         uncertainties = data['3DPowerLorentzianFitChargeUncertainty']
         if len(uncertainties) > 0 and np.any(np.abs(uncertainties) > 1e-20):
@@ -173,6 +230,46 @@ def detect_3d_uncertainty_branches(data):
     )
     
     return uncertainty_status
+
+def plot_data_points(ax, positions, charges, uncertainties, **kwargs):
+    """
+    Plot data points with or without error bars, depending on whether uncertainties are meaningful.
+    
+    Args:
+        ax: Matplotlib axis object
+        positions: X positions
+        charges: Y values (charges)
+        uncertainties: Uncertainty values
+        **kwargs: Additional keyword arguments passed to plotting function
+    
+    Returns:
+        matplotlib artist object
+    """
+    # Check if uncertainties are meaningful (not all zeros or very small)
+    has_meaningful_uncertainties = (
+        len(uncertainties) > 0 and 
+        np.any(np.abs(uncertainties) > 1e-20) and
+        np.any(np.abs(uncertainties) > 0.001 * np.max(np.abs(charges))) if len(charges) > 0 else False
+    )
+    
+    if has_meaningful_uncertainties:
+        # Use errorbar plot with uncertainties
+        return ax.errorbar(positions, charges, yerr=uncertainties, **kwargs)
+    else:
+        # Use simple plot without error bars
+        # Convert errorbar kwargs to plot kwargs
+        plot_kwargs = dict(kwargs)
+        if 'fmt' in plot_kwargs:
+            plot_kwargs['marker'] = plot_kwargs['fmt'][1] if len(plot_kwargs['fmt']) > 1 else 'o'
+            plot_kwargs['color'] = plot_kwargs['fmt'][0] if len(plot_kwargs['fmt']) > 0 and plot_kwargs['fmt'][0] != 'k' else 'black'
+            plot_kwargs['linestyle'] = 'None'
+            del plot_kwargs['fmt']
+        if 'capsize' in plot_kwargs:
+            del plot_kwargs['capsize']
+        if 'markersize' not in plot_kwargs and 'marker' in plot_kwargs:
+            plot_kwargs['markersize'] = 6
+            
+        return ax.plot(positions, charges, **plot_kwargs)
 
 def load_3d_fit_data(root_file, max_entries=None):
     """
@@ -227,7 +324,7 @@ def load_3d_fit_data(root_file, max_entries=None):
                 '3DLorentzianDeltaX': '3DLorentzianDeltaX',
                 '3DLorentzianDeltaY': '3DLorentzianDeltaY',
                 
-                # 3D Power-Law Lorentzian fit results
+                # 3D Power Lorentzian fit results
                 '3DPowerLorentzianFitCenterX': '3DPowerLorentzianFitCenterX',
                 '3DPowerLorentzianFitCenterY': '3DPowerLorentzianFitCenterY',
                 '3DPowerLorentzianFitGammaX': '3DPowerLorentzianFitGammaX',
@@ -290,7 +387,7 @@ def load_3d_fit_data(root_file, max_entries=None):
                 if uncertainty_status['3d_lorentzian_uncertainty_available']:
                     print("  ✓ 3D Lorentzian uncertainties available")
                 if uncertainty_status['3d_power_lorentzian_uncertainty_available']:
-                    print("  ✓ 3D Power-Law Lorentzian uncertainties available")
+                    print("  ✓ 3D Power Lorentzian uncertainties available")
             else:
                 print("No 3D charge uncertainty branches detected")
             
@@ -383,9 +480,9 @@ def extract_3d_neighborhood_data(event_idx, data, neighborhood_radius=4):
         print(f"Warning: GridNeighborhoodCharges not available for event {event_idx}")
         return np.array([]), np.array([]), np.array([])
 
-def create_3d_lorentzian_plot(event_idx, data, output_dir="plots"):
+def create_3d_lorentzian_contour_plots(event_idx, data, output_dir="plots"):
     """
-    Create comprehensive 3D Lorentzian surface plot with contour visualization and 2D projections.
+    Create 3D Lorentzian contour plots (fitted surface, data, residuals).
     """
     try:
         # Check if 3D Lorentzian data is available
@@ -425,13 +522,13 @@ def create_3d_lorentzian_plot(event_idx, data, output_dir="plots"):
         lorentzian_3d_dir = os.path.join(output_dir, "3d_lorentzian")
         os.makedirs(lorentzian_3d_dir, exist_ok=True)
         
-        # Create figure with subplots
-        fig = plt.figure(figsize=(20, 15))
-        gs = GridSpec(3, 3, hspace=0.35, wspace=0.35)
+        # Create figure with subplots for contour plots  
+        fig = plt.figure(figsize=(16, 5))
+        gs = GridSpec(1, 3, hspace=0.4, wspace=0.45)
         
         # Create grid for surface plotting
-        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 50)
-        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 50)
+        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 100)
+        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 100)
         X, Y = np.meshgrid(x_range, y_range)
         
         # Calculate fitted surface
@@ -449,11 +546,23 @@ def create_3d_lorentzian_plot(event_idx, data, output_dir="plots"):
         ax1.axhline(true_y, color='red', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
         ax1.axvline(center_x, color='white', linestyle=':', linewidth=2, alpha=0.9, label='Fit Center X')
         ax1.axhline(center_y, color='white', linestyle=':', linewidth=2, alpha=0.9, label='Fit Center Y')
-        ax1.set_xlabel('X Position [mm]')
-        ax1.set_ylabel('Y Position [mm]')
-        ax1.set_title('3D Lorentzian Fit Surface')
-        plt.colorbar(contour1, ax=ax1, label='Charge [C]')
-        ax1.legend(fontsize=8)
+        ax1.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_title('Lorentzian Fit', fontsize=12)
+        ax1.set_aspect('equal', adjustable='box')
+        divider1 = make_axes_locatable(ax1)
+        cax1 = divider1.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour1, cax=cax1, label=r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        
+        # Add parameter information to legend
+        fit_params_text = (rf'Center: ({center_x:.3f}, {center_y:.3f})' + '\n'
+                          rf'$\gamma$: ({gamma_x:.3f}, {gamma_y:.3f})' + '\n'
+                          rf'Amp: {amplitude:.2e} C' + '\n' +
+                          rf'$\chi^2/\nu$: {chi2red:.3f}')
+        
+        ax1.text(0.02, 0.98, fit_params_text, transform=ax1.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
         
         # 2. Data contour plot
         ax2 = fig.add_subplot(gs[0, 1])
@@ -462,11 +571,23 @@ def create_3d_lorentzian_plot(event_idx, data, output_dir="plots"):
                    edgecolors='black', linewidth=0.5, label='Data points')
         ax2.axvline(true_x, color='red', linestyle='--', linewidth=2, alpha=0.8, label='True X')
         ax2.axhline(true_y, color='red', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
-        ax2.set_xlabel('X Position [mm]')
-        ax2.set_ylabel('Y Position [mm]')
-        ax2.set_title('Actual Data Distribution')
-        plt.colorbar(contour2, ax=ax2, label='Charge [C]')
-        ax2.legend(fontsize=8)
+        ax2.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_title('Actual Data Distribution', fontsize=12)
+        ax2.set_aspect('equal', adjustable='box')
+        divider2 = make_axes_locatable(ax2)
+        cax2 = divider2.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour2, cax=cax2, label=r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        
+        # Add data information to legend
+        data_info_text = (rf'True: ({true_x:.3f}, {true_y:.3f})' + '\n'
+                         rf'Pixel: ({pixel_x:.3f}, {pixel_y:.3f})' + '\n'
+                         rf'$\Delta$Pix $X$: {delta_pixel_x:.3f}' + '\n'
+                         rf'$\Delta$Pix $Y$: {delta_pixel_y:.3f}')
+        
+        ax2.text(0.02, 0.98, data_info_text, transform=ax2.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
         
         # 3. Residual plot
         ax3 = fig.add_subplot(gs[0, 2])
@@ -479,18 +600,95 @@ def create_3d_lorentzian_plot(event_idx, data, output_dir="plots"):
         ax3.axhline(true_y, color='red', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
         ax3.axvline(center_x, color='white', linestyle=':', linewidth=2, alpha=0.9, label='Fit Center X')
         ax3.axhline(center_y, color='white', linestyle=':', linewidth=2, alpha=0.9, label='Fit Center Y')
-        ax3.set_xlabel('X Position [mm]')
-        ax3.set_ylabel('Y Position [mm]')
-        ax3.set_title('Residuals (Data - Fit)')
-        plt.colorbar(contour3, ax=ax3, label='Charge Residual [C]')
-        ax3.legend(fontsize=8)
+        ax3.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax3.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax3.set_title('Residuals (Data - Fit)', fontsize=12)
+        ax3.set_aspect('equal', adjustable='box')
+        divider3 = make_axes_locatable(ax3)
+        cax3 = divider3.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour3, cax=cax3, label=r'$Q_{\mathrm{px}}-Q_{\mathrm{fit}}\ (\mathrm{C})$')
         
-        # 4. X projection (along Y=center_y) - Vertical zero line
-        ax4 = fig.add_subplot(gs[1, 0])
+        # Add residual information to legend
+        residual_info_text = (rf'$\Delta X$: {delta_fit_x:.3f}' + '\n'
+                             rf'$\Delta Y$: {delta_fit_y:.3f}' + '\n'
+                             rf'Max: {np.nanmax(np.abs(Z_residual_masked)):.2e}' + '\n'
+                             rf'RMS: {np.sqrt(np.nanmean(Z_residual_masked**2)):.2e}')
+        
+        ax3.text(0.02, 0.98, residual_info_text, transform=ax3.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
+        
+        plt.suptitle(rf'Event {event_idx}: 3D Lorentzian Fit Analysis' + '\n' +
+                    rf'$\chi^2/\nu$ = {chi2red:.3f}, Center = ({center_x:.3f}, {center_y:.3f})', fontsize=11)
+        plt.tight_layout()
+        plt.savefig(os.path.join(lorentzian_3d_dir, f'event_{event_idx:04d}_3d_lorentzian_contours.png'), 
+                   dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        
+        return f"Event {event_idx}: 3D Lorentzian contour plots created successfully"
+        
+    except Exception as e:
+        return f"Event {event_idx}: Error creating 3D Lorentzian contour plots - {e}"
+
+def create_3d_lorentzian_projection_plots(event_idx, data, output_dir="plots"):
+    """
+    Create 3D Lorentzian projection plots (X and Y projections).
+    """
+    try:
+        # Check if 3D Lorentzian data is available
+        if '3DLorentzianFitCenterX' not in data:
+            return f"Event {event_idx}: 3D Lorentzian fit data not available"
+        
+        # Extract 3D neighborhood data
+        x_positions, y_positions, charge_values = extract_3d_neighborhood_data(event_idx, data)
+        
+        if len(x_positions) < 5:
+            return f"Event {event_idx}: Not enough data points for 3D plotting"
+        
+        # Get 3D Lorentzian fit parameters
+        center_x = data['3DLorentzianFitCenterX'][event_idx]
+        center_y = data['3DLorentzianFitCenterY'][event_idx]
+        gamma_x = data['3DLorentzianFitGammaX'][event_idx]
+        gamma_y = data['3DLorentzianFitGammaY'][event_idx]
+        amplitude = data['3DLorentzianFitAmplitude'][event_idx]
+        offset = data.get('3DLorentzianFitVerticalOffset', [0])[event_idx] if '3DLorentzianFitVerticalOffset' in data else 0
+        chi2red = data['3DLorentzianFitChi2red'][event_idx]
+        
+        # True and pixel positions
+        true_x = data['TrueX'][event_idx]
+        true_y = data['TrueY'][event_idx]
+        pixel_x = data['PixelX'][event_idx]
+        pixel_y = data['PixelY'][event_idx]
+        
+        # Calculate deltas
+        delta_fit_x = center_x - true_x
+        delta_fit_y = center_y - true_y
+        
+        # Create output directory
+        lorentzian_3d_dir = os.path.join(output_dir, "3d_lorentzian")
+        os.makedirs(lorentzian_3d_dir, exist_ok=True)
+        
+        # Create figure with subplots for projections
+        fig = plt.figure(figsize=(13, 5))
+        gs = GridSpec(1, 2, hspace=0.4, wspace=0.45)
+        
+        # Create grid for surface plotting
+        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 200)  # Increased resolution
+        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 200)  # Increased resolution
+        X, Y = np.meshgrid(x_range, y_range)
+        
+        # Calculate fitted surface with higher resolution
+        Z_fit = lorentzian_3d(X, Y, amplitude, center_x, center_y, gamma_x, gamma_y, offset)
+        
+        # Detect uncertainty availability for 3D fits
+        uncertainty_status = data.get('_3d_uncertainty_status', {})
+        
+        # 1. X projection (along Y=center_y) - Vertical zero line
+        ax1 = fig.add_subplot(gs[0, 0])
         y_center_idx = np.argmin(np.abs(y_range - center_y))
         x_projection_fit = Z_fit[y_center_idx, :]
         
-        # Get actual data points near center_y
+        # Get actual data points near center_y with uncertainties
         y_tolerance = 0.25  # mm tolerance for projection
         mask_y = np.abs(y_positions - center_y) < y_tolerance
         if np.any(mask_y):
@@ -500,23 +698,44 @@ def create_3d_lorentzian_plot(event_idx, data, output_dir="plots"):
             sort_idx = np.argsort(x_data_proj)
             x_data_proj = x_data_proj[sort_idx]
             charge_data_proj = charge_data_proj[sort_idx]
-            ax4.plot(x_data_proj, charge_data_proj, 'ko', markersize=6, label=f'Data (|Y-{center_y:.2f}|<{y_tolerance})')
+            
+            # Get uncertainties if available
+            if uncertainty_status.get('3d_lorentzian_uncertainty_available', False):
+                uncertainty = data.get('3DLorentzianFitChargeUncertainty', [0])[event_idx] if '3DLorentzianFitChargeUncertainty' in data else 0
+                uncertainties = np.full(len(x_data_proj), uncertainty)
+            else:
+                uncertainties = np.zeros(len(x_data_proj))
+            
+            # Use the plot_data_points function for consistent error bar handling
+            plot_data_points(ax1, x_data_proj, charge_data_proj, uncertainties, 
+                           fmt='ko', markersize=6, capsize=3, label=f'Data')
         
-        ax4.plot(x_range, x_projection_fit, 'r-', linewidth=2, label='3D Lorentzian Fit')
-        ax4.axvline(true_x, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True X')
-        ax4.axvline(center_x, color='red', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center X')
-        ax4.set_xlabel('X Position [mm]')
-        ax4.set_ylabel('Charge [C]')
-        ax4.set_title('X Projection (Vertical Zero Line)')
-        ax4.legend(fontsize=8)
-        ax4.grid(True, alpha=0.3)
+        ax1.plot(x_range, x_projection_fit, 'r-', linewidth=2, label='3D Lorentzian Fit')
+        ax1.axvline(true_x, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True X')
+        ax1.axvline(center_x, color='red', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center X')
+        ax1.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        ax1.set_title(r'$X$ Projection', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(fontsize=10)
         
-        # 5. Y projection (along X=center_x) - Horizontal zero line
-        ax5 = fig.add_subplot(gs[1, 1])
+        # Add X projection parameters to legend
+        x_proj_text = (rf'Lorentz ($\chi^2/\nu$ = {chi2red:.2f})' + '\n'
+                      rf'Fit $X$ = {center_x:.3f}' + '\n'
+                      rf'True $X$ = {true_x:.3f}' + '\n'
+                      rf'$\Delta X$ = {delta_fit_x:.3f}' + '\n'
+                      rf'$\gamma$ = {gamma_x:.3f}')
+        
+        ax1.text(0.02, 0.98, x_proj_text, transform=ax1.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
+        
+        # 2. Y projection (along X=center_x) - Horizontal zero line
+        ax2 = fig.add_subplot(gs[0, 1])
         x_center_idx = np.argmin(np.abs(x_range - center_x))
         y_projection_fit = Z_fit[:, x_center_idx]
         
-        # Get actual data points near center_x
+        # Get actual data points near center_x with uncertainties
         x_tolerance = 0.25  # mm tolerance for projection
         mask_x = np.abs(x_positions - center_x) < x_tolerance
         if np.any(mask_x):
@@ -526,98 +745,78 @@ def create_3d_lorentzian_plot(event_idx, data, output_dir="plots"):
             sort_idx = np.argsort(y_data_proj)
             y_data_proj = y_data_proj[sort_idx]
             charge_data_proj = charge_data_proj[sort_idx]
-            ax5.plot(y_data_proj, charge_data_proj, 'ko', markersize=6, label=f'Data (|X-{center_x:.2f}|<{x_tolerance})')
+            
+            # Get uncertainties if available
+            if uncertainty_status.get('3d_lorentzian_uncertainty_available', False):
+                uncertainty = data.get('3DLorentzianFitChargeUncertainty', [0])[event_idx] if '3DLorentzianFitChargeUncertainty' in data else 0
+                uncertainties = np.full(len(y_data_proj), uncertainty)
+            else:
+                uncertainties = np.zeros(len(y_data_proj))
+            
+            # Use the plot_data_points function for consistent error bar handling
+            plot_data_points(ax2, y_data_proj, charge_data_proj, uncertainties, 
+                           fmt='ko', markersize=6, capsize=3, label=f'Data')
         
-        ax5.plot(y_range, y_projection_fit, 'r-', linewidth=2, label='3D Lorentzian Fit')
-        ax5.axvline(true_y, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
-        ax5.axvline(center_y, color='red', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center Y')
-        ax5.set_xlabel('Y Position [mm]')
-        ax5.set_ylabel('Charge [C]')
-        ax5.set_title('Y Projection (Horizontal Zero Line)')
-        ax5.legend(fontsize=8)
-        ax5.grid(True, alpha=0.3)
+        ax2.plot(y_range, y_projection_fit, 'r-', linewidth=2, label='3D Lorentzian Fit')
+        ax2.axvline(true_y, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
+        ax2.axvline(center_y, color='red', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center Y')
+        ax2.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        ax2.set_title(r'$Y$ Projection', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        ax2.legend(fontsize=10)
         
-        # 6. Fit parameters and statistics
-        ax6 = fig.add_subplot(gs[1, 2])
-        ax6.axis('off')
+        # Add Y projection parameters to legend
+        y_proj_text = (rf'Lorentz ($\chi^2/\nu$ = {chi2red:.2f})' + '\n'
+                      rf'Fit $Y$ = {center_y:.3f}' + '\n'
+                      rf'True $Y$ = {true_y:.3f}' + '\n'
+                      rf'$\Delta Y$ = {delta_fit_y:.3f}' + '\n'
+                      rf'$\gamma$ = {gamma_y:.3f}')
         
-        stats_text = f"""3D Lorentzian Fit Parameters:
-
-Center X: {center_x:.4f} mm
-Center Y: {center_y:.4f} mm
-Gamma X: {gamma_x:.4f} mm
-Gamma Y: {gamma_y:.4f} mm
-Amplitude: {amplitude:.3e} C
-Offset: {offset:.3e} C
-
-Fit Statistics:
-χ²/ν: {chi2red:.3f}
-DOF: {dof}
-Successful: {fit_successful}
-
-Position Differences:
-Δ Pixel X: {delta_pixel_x:.4f} mm
-Δ Pixel Y: {delta_pixel_y:.4f} mm
-Δ Fit X: {delta_fit_x:.4f} mm  
-Δ Fit Y: {delta_fit_y:.4f} mm
-
-True Position: ({true_x:.3f}, {true_y:.3f})
-Pixel Position: ({pixel_x:.3f}, {pixel_y:.3f})
-Fit Position: ({center_x:.3f}, {center_y:.3f})
-
-Data Points: {len(x_positions)}"""
+        ax2.text(0.02, 0.98, y_proj_text, transform=ax2.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
         
-        ax6.text(0.05, 0.95, stats_text, transform=ax6.transAxes, fontsize=10,
-                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
-        
-        # 7. 3D surface plot
-        ax7 = fig.add_subplot(gs[2, :], projection='3d')
-        
-        # Plot fitted surface with transparency
-        surf = ax7.plot_surface(X, Y, Z_fit, cmap='viridis', alpha=0.7, linewidth=0, antialiased=True)
-        
-        # Plot data points with color coding
-        scatter = ax7.scatter(x_positions, y_positions, charge_values, c=charge_values, 
-                            cmap='viridis', s=50, alpha=1.0, edgecolors='black', linewidth=0.5)
-        
-        # Add vertical lines for true and fit positions
-        z_min = 0
-        z_max = np.max([np.max(charge_values), np.max(Z_fit)]) * 1.1
-        ax7.plot([true_x, true_x], [true_y, true_y], [z_min, z_max], 'r--', 
-                linewidth=3, alpha=0.8, label='True Position')
-        ax7.plot([center_x, center_x], [center_y, center_y], [z_min, z_max], 'w:', 
-                linewidth=3, alpha=0.9, label='Fit Center')
-        
-        ax7.set_xlabel('X Position [mm]')
-        ax7.set_ylabel('Y Position [mm]')
-        ax7.set_zlabel('Charge [C]')
-        ax7.set_title('3D Lorentzian Surface Fit')
-        
-        # Add colorbar for 3D plot
-        cbar = plt.colorbar(surf, ax=ax7, shrink=0.8, label='Charge [C]', pad=0.1)
-        ax7.legend(loc='upper left')
-        
-        plt.suptitle(f'Event {event_idx}: 3D Lorentzian Surface Fitting Analysis\n' +
-                    f'χ²/ν = {chi2red:.3f}, Center = ({center_x:.3f}, {center_y:.3f}), ' +
-                    f'Δ = ({delta_fit_x:.3f}, {delta_fit_y:.3f})', fontsize=14)
+        plt.suptitle(rf'Event {event_idx}: 3D Lorentzian Projections' + '\n' +
+                    rf'$\chi^2/\nu$ = {chi2red:.3f}, $\Delta$ = ({delta_fit_x:.3f}, {delta_fit_y:.3f})', fontsize=11)
         plt.tight_layout()
-        plt.savefig(os.path.join(lorentzian_3d_dir, f'event_{event_idx:04d}_3d_lorentzian.png'), 
+        plt.savefig(os.path.join(lorentzian_3d_dir, f'event_{event_idx:04d}_3d_lorentzian_projections.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
         
-        return f"Event {event_idx}: 3D Lorentzian plot created successfully"
+        return f"Event {event_idx}: 3D Lorentzian projection plots created successfully"
         
     except Exception as e:
-        return f"Event {event_idx}: Error creating 3D Lorentzian plot - {e}"
+        return f"Event {event_idx}: Error creating 3D Lorentzian projection plots - {e}"
 
-def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
+def create_3d_lorentzian_plot(event_idx, data, output_dir="plots"):
     """
-    Create comprehensive 3D Power-Law Lorentzian surface plot with contour visualization and 2D projections.
+    Create comprehensive 3D Lorentzian plots split into contours and projections.
     """
     try:
-        # Check if 3D Power-Law Lorentzian data is available
+        # Create contour plots
+        contour_result = create_3d_lorentzian_contour_plots(event_idx, data, output_dir)
+        
+        # Create projection plots
+        projection_result = create_3d_lorentzian_projection_plots(event_idx, data, output_dir)
+        
+        # Return combined result
+        if "Error" in contour_result or "Error" in projection_result:
+            return f"Event {event_idx}: Partial success - {contour_result}; {projection_result}"
+        else:
+            return f"Event {event_idx}: 3D Lorentzian plots (contours + projections) created successfully"
+        
+    except Exception as e:
+        return f"Event {event_idx}: Error creating 3D Lorentzian plots - {e}"
+
+def create_3d_power_lorentzian_contour_plots(event_idx, data, output_dir="plots"):
+    """
+    Create 3D Power Lorentzian contour plots (fitted surface, data, residuals).
+    """
+    try:
+        # Check if 3D Power Lorentzian data is available
         if '3DPowerLorentzianFitCenterX' not in data:
-            return f"Event {event_idx}: 3D Power-Law Lorentzian fit data not available"
+            return f"Event {event_idx}: 3D Power Lorentzian fit data not available"
         
         # Extract 3D neighborhood data
         x_positions, y_positions, charge_values = extract_3d_neighborhood_data(event_idx, data)
@@ -625,7 +824,7 @@ def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         if len(x_positions) < 5:
             return f"Event {event_idx}: Not enough data points for 3D plotting"
         
-        # Get 3D Power-Law Lorentzian fit parameters
+        # Get 3D Power Lorentzian fit parameters
         center_x = data['3DPowerLorentzianFitCenterX'][event_idx]
         center_y = data['3DPowerLorentzianFitCenterY'][event_idx]
         gamma_x = data['3DPowerLorentzianFitGammaX'][event_idx]
@@ -653,13 +852,13 @@ def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         power_lorentzian_3d_dir = os.path.join(output_dir, "3d_power_lorentzian")
         os.makedirs(power_lorentzian_3d_dir, exist_ok=True)
         
-        # Create figure with subplots
-        fig = plt.figure(figsize=(20, 15))
-        gs = GridSpec(3, 3, hspace=0.35, wspace=0.35)
+        # Create figure with subplots for contour plots
+        fig = plt.figure(figsize=(16, 5))
+        gs = GridSpec(1, 3, hspace=0.4, wspace=0.45)
         
         # Create grid for surface plotting
-        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 50)
-        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 50)
+        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 100)
+        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 100)
         X, Y = np.meshgrid(x_range, y_range)
         
         # Calculate fitted surface
@@ -677,11 +876,24 @@ def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         ax1.axhline(true_y, color='cyan', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
         ax1.axvline(center_x, color='white', linestyle=':', linewidth=2, alpha=0.9, label='Fit Center X')
         ax1.axhline(center_y, color='white', linestyle=':', linewidth=2, alpha=0.9, label='Fit Center Y')
-        ax1.set_xlabel('X Position [mm]')
-        ax1.set_ylabel('Y Position [mm]')
-        ax1.set_title('3D Power-Law Lorentzian Fit Surface')
-        plt.colorbar(contour1, ax=ax1, label='Charge [C]')
-        ax1.legend(fontsize=8)
+        ax1.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_title('Power Lorentzian Fit', fontsize=12)
+        ax1.set_aspect('equal', adjustable='box')
+        divider1 = make_axes_locatable(ax1)
+        cax1 = divider1.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour1, cax=cax1, label=r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        
+        # Add parameter information to legend
+        fit_params_text = (rf'Center: ({center_x:.3f}, {center_y:.3f})' + '\n'
+                          rf'$\gamma$: ({gamma_x:.3f}, {gamma_y:.3f})' + '\n'
+                          rf'$\beta$: {beta:.3f}' + '\n'
+                          rf'Amp: {amplitude:.2e} C' + '\n'
+                          rf'$\chi^2/\nu$: {chi2red:.3f}')
+        
+        ax1.text(0.02, 0.98, fit_params_text, transform=ax1.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
         
         # 2. Data contour plot
         ax2 = fig.add_subplot(gs[0, 1])
@@ -690,11 +902,23 @@ def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
                    edgecolors='black', linewidth=0.5, label='Data points')
         ax2.axvline(true_x, color='cyan', linestyle='--', linewidth=2, alpha=0.8, label='True X')
         ax2.axhline(true_y, color='cyan', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
-        ax2.set_xlabel('X Position [mm]')
-        ax2.set_ylabel('Y Position [mm]')
-        ax2.set_title('Actual Data Distribution')
-        plt.colorbar(contour2, ax=ax2, label='Charge [C]')
-        ax2.legend(fontsize=8)
+        ax2.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_title('Actual Data Distribution', fontsize=12)
+        ax2.set_aspect('equal', adjustable='box')
+        divider2 = make_axes_locatable(ax2)
+        cax2 = divider2.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour2, cax=cax2, label=r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        
+        # Add data information to legend
+        data_info_text = (rf'True: ({true_x:.3f}, {true_y:.3f})' + '\n'
+                         rf'Pixel: ({pixel_x:.3f}, {pixel_y:.3f})' + '\n'
+                         rf'$\Delta$Pix $X$: {delta_pixel_x:.3f}' + '\n'
+                         rf'$\Delta$Pix $Y$: {delta_pixel_y:.3f}')
+        
+        ax2.text(0.02, 0.98, data_info_text, transform=ax2.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
         
         # 3. Residual plot
         ax3 = fig.add_subplot(gs[0, 2])
@@ -707,18 +931,96 @@ def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         ax3.axhline(true_y, color='cyan', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
         ax3.axvline(center_x, color='white', linestyle=':', linewidth=2, alpha=0.9, label='Fit Center X')
         ax3.axhline(center_y, color='white', linestyle=':', linewidth=2, alpha=0.9, label='Fit Center Y')
-        ax3.set_xlabel('X Position [mm]')
-        ax3.set_ylabel('Y Position [mm]')
-        ax3.set_title('Residuals (Data - Fit)')
-        plt.colorbar(contour3, ax=ax3, label='Charge Residual [C]')
-        ax3.legend(fontsize=8)
+        ax3.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax3.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax3.set_title('Residuals (Data - Fit)', fontsize=12)
+        ax3.set_aspect('equal', adjustable='box')
+        divider3 = make_axes_locatable(ax3)
+        cax3 = divider3.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour3, cax=cax3, label=r'$Q_{\mathrm{px}}-Q_{\mathrm{fit}}\ (\mathrm{C})$')
         
-        # 4. X projection (along Y=center_y) - Vertical zero line
-        ax4 = fig.add_subplot(gs[1, 0])
+        # Add residual information to legend
+        residual_info_text = (rf'$\Delta X$: {delta_fit_x:.3f}' + '\n'
+                             rf'$\Delta Y$: {delta_fit_y:.3f}' + '\n'
+                             rf'Max: {np.nanmax(np.abs(Z_residual_masked)):.2e}' + '\n'
+                             rf'RMS: {np.sqrt(np.nanmean(Z_residual_masked**2)):.2e}')
+        
+        ax3.text(0.02, 0.98, residual_info_text, transform=ax3.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
+        
+        plt.suptitle(rf'Event {event_idx}: 3D Power Lorentzian Fit Analysis' + '\n' +
+                    rf'$\chi^2/\nu$ = {chi2red:.3f}, $\beta$ = {beta:.3f}, Center = ({center_x:.3f}, {center_y:.3f})', fontsize=11)
+        plt.tight_layout()
+        plt.savefig(os.path.join(power_lorentzian_3d_dir, f'event_{event_idx:04d}_3d_power_lorentzian_contours.png'), 
+                   dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        
+        return f"Event {event_idx}: 3D Power Lorentzian contour plots created successfully"
+        
+    except Exception as e:
+        return f"Event {event_idx}: Error creating 3D Power Lorentzian contour plots - {e}"
+
+def create_3d_power_lorentzian_projection_plots(event_idx, data, output_dir="plots"):
+    """
+    Create 3D Power Lorentzian projection plots (X and Y projections).
+    """
+    try:
+        # Check if 3D Power Lorentzian data is available
+        if '3DPowerLorentzianFitCenterX' not in data:
+            return f"Event {event_idx}: 3D Power Lorentzian fit data not available"
+        
+        # Extract 3D neighborhood data
+        x_positions, y_positions, charge_values = extract_3d_neighborhood_data(event_idx, data)
+        
+        if len(x_positions) < 5:
+            return f"Event {event_idx}: Not enough data points for 3D plotting"
+        
+        # Get 3D Power Lorentzian fit parameters
+        center_x = data['3DPowerLorentzianFitCenterX'][event_idx]
+        center_y = data['3DPowerLorentzianFitCenterY'][event_idx]
+        gamma_x = data['3DPowerLorentzianFitGammaX'][event_idx]
+        gamma_y = data['3DPowerLorentzianFitGammaY'][event_idx]
+        beta = data['3DPowerLorentzianFitBeta'][event_idx]
+        amplitude = data['3DPowerLorentzianFitAmplitude'][event_idx]
+        offset = data.get('3DPowerLorentzianFitVerticalOffset', [0])[event_idx] if '3DPowerLorentzianFitVerticalOffset' in data else 0
+        chi2red = data['3DPowerLorentzianFitChi2red'][event_idx]
+        
+        # True and pixel positions
+        true_x = data['TrueX'][event_idx]
+        true_y = data['TrueY'][event_idx]
+        pixel_x = data['PixelX'][event_idx]
+        pixel_y = data['PixelY'][event_idx]
+        
+        # Calculate deltas
+        delta_fit_x = center_x - true_x
+        delta_fit_y = center_y - true_y
+        
+        # Create output directory
+        power_lorentzian_3d_dir = os.path.join(output_dir, "3d_power_lorentzian")
+        os.makedirs(power_lorentzian_3d_dir, exist_ok=True)
+        
+        # Create figure with subplots for projections
+        fig = plt.figure(figsize=(13, 5))
+        gs = GridSpec(1, 2, hspace=0.4, wspace=0.45)
+        
+        # Create grid for surface plotting
+        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 200)  # Increased resolution
+        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 200)  # Increased resolution
+        X, Y = np.meshgrid(x_range, y_range)
+        
+        # Calculate fitted surface with higher resolution
+        Z_fit = power_lorentzian_3d(X, Y, amplitude, center_x, center_y, gamma_x, gamma_y, beta, offset)
+        
+        # Detect uncertainty availability for 3D fits
+        uncertainty_status = data.get('_3d_uncertainty_status', {})
+        
+        # 1. X projection (along Y=center_y) - Vertical zero line
+        ax1 = fig.add_subplot(gs[0, 0])
         y_center_idx = np.argmin(np.abs(y_range - center_y))
         x_projection_fit = Z_fit[y_center_idx, :]
         
-        # Get actual data points near center_y
+        # Get actual data points near center_y with uncertainties
         y_tolerance = 0.25  # mm tolerance for projection
         mask_y = np.abs(y_positions - center_y) < y_tolerance
         if np.any(mask_y):
@@ -728,23 +1030,45 @@ def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
             sort_idx = np.argsort(x_data_proj)
             x_data_proj = x_data_proj[sort_idx]
             charge_data_proj = charge_data_proj[sort_idx]
-            ax4.plot(x_data_proj, charge_data_proj, 'ko', markersize=6, label=f'Data (|Y-{center_y:.2f}|<{y_tolerance})')
+            
+            # Get uncertainties if available
+            if uncertainty_status.get('3d_power_lorentzian_uncertainty_available', False):
+                uncertainty = data.get('3DPowerLorentzianFitChargeUncertainty', [0])[event_idx] if '3DPowerLorentzianFitChargeUncertainty' in data else 0
+                uncertainties = np.full(len(x_data_proj), uncertainty)
+            else:
+                uncertainties = np.zeros(len(x_data_proj))
+            
+            # Use the plot_data_points function for consistent error bar handling
+            plot_data_points(ax1, x_data_proj, charge_data_proj, uncertainties, 
+                           fmt='ko', markersize=6, capsize=3, label=f'Data')
         
-        ax4.plot(x_range, x_projection_fit, 'm-', linewidth=2, label='3D Power-Law Lorentzian Fit')
-        ax4.axvline(true_x, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True X')
-        ax4.axvline(center_x, color='magenta', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center X')
-        ax4.set_xlabel('X Position [mm]')
-        ax4.set_ylabel('Charge [C]')
-        ax4.set_title('X Projection (Vertical Zero Line)')
-        ax4.legend(fontsize=8)
-        ax4.grid(True, alpha=0.3)
+        ax1.plot(x_range, x_projection_fit, 'm-', linewidth=2, label='3D Power Lorentzian Fit')
+        ax1.axvline(true_x, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True X')
+        ax1.axvline(center_x, color='magenta', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center X')
+        ax1.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        ax1.set_title(r'$X$ Projection', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(fontsize=10)
         
-        # 5. Y projection (along X=center_x) - Horizontal zero line
-        ax5 = fig.add_subplot(gs[1, 1])
+        # Add X projection parameters to legend
+        x_proj_text = (rf'Power ($\chi^2/\nu$ = {chi2red:.2f})' + '\n'
+                      rf'Fit $X$ = {center_x:.3f}' + '\n'
+                      rf'True $X$ = {true_x:.3f}' + '\n'
+                      rf'$\Delta X$ = {delta_fit_x:.3f}' + '\n'
+                      rf'$\beta$ = {beta:.3f}' + '\n'
+                      rf'$\gamma$ = {gamma_x:.3f}')
+        
+        ax1.text(0.02, 0.98, x_proj_text, transform=ax1.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
+        
+        # 2. Y projection (along X=center_x) - Horizontal zero line
+        ax2 = fig.add_subplot(gs[0, 1])
         x_center_idx = np.argmin(np.abs(x_range - center_x))
         y_projection_fit = Z_fit[:, x_center_idx]
         
-        # Get actual data points near center_x
+        # Get actual data points near center_x with uncertainties
         x_tolerance = 0.25  # mm tolerance for projection
         mask_x = np.abs(x_positions - center_x) < x_tolerance
         if np.any(mask_x):
@@ -754,90 +1078,70 @@ def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
             sort_idx = np.argsort(y_data_proj)
             y_data_proj = y_data_proj[sort_idx]
             charge_data_proj = charge_data_proj[sort_idx]
-            ax5.plot(y_data_proj, charge_data_proj, 'ko', markersize=6, label=f'Data (|X-{center_x:.2f}|<{x_tolerance})')
+            
+            # Get uncertainties if available
+            if uncertainty_status.get('3d_power_lorentzian_uncertainty_available', False):
+                uncertainty = data.get('3DPowerLorentzianFitChargeUncertainty', [0])[event_idx] if '3DPowerLorentzianFitChargeUncertainty' in data else 0
+                uncertainties = np.full(len(y_data_proj), uncertainty)
+            else:
+                uncertainties = np.zeros(len(y_data_proj))
+            
+            # Use the plot_data_points function for consistent error bar handling
+            plot_data_points(ax2, y_data_proj, charge_data_proj, uncertainties, 
+                           fmt='ko', markersize=6, capsize=3, label=f'Data')
         
-        ax5.plot(y_range, y_projection_fit, 'm-', linewidth=2, label='3D Power-Law Lorentzian Fit')
-        ax5.axvline(true_y, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
-        ax5.axvline(center_y, color='magenta', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center Y')
-        ax5.set_xlabel('Y Position [mm]')
-        ax5.set_ylabel('Charge [C]')
-        ax5.set_title('Y Projection (Horizontal Zero Line)')
-        ax5.legend(fontsize=8)
-        ax5.grid(True, alpha=0.3)
+        ax2.plot(y_range, y_projection_fit, 'm-', linewidth=2, label='3D Power Lorentzian Fit')
+        ax2.axvline(true_y, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
+        ax2.axvline(center_y, color='magenta', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center Y')
+        ax2.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        ax2.set_title(r'$Y$ Projection', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        ax2.legend(fontsize=10)
         
-        # 6. Fit parameters and statistics
-        ax6 = fig.add_subplot(gs[1, 2])
-        ax6.axis('off')
+        # Add Y projection parameters to legend
+        y_proj_text = (rf'Power ($\chi^2/\nu$ = {chi2red:.2f})' + '\n'
+                      rf'Fit $Y$ = {center_y:.3f}' + '\n'
+                      rf'True $Y$ = {true_y:.3f}' + '\n'
+                      rf'$\Delta Y$ = {delta_fit_y:.3f}' + '\n'
+                      rf'$\beta$ = {beta:.3f}' + '\n'
+                      rf'$\gamma$ = {gamma_y:.3f}')
         
-        stats_text = f"""3D Power-Law Lorentzian Parameters:
-
-Center X: {center_x:.4f} mm
-Center Y: {center_y:.4f} mm
-Gamma X: {gamma_x:.4f} mm
-Gamma Y: {gamma_y:.4f} mm
-Beta: {beta:.4f}
-Amplitude: {amplitude:.3e} C
-Offset: {offset:.3e} C
-
-Fit Statistics:
-χ²/ν: {chi2red:.3f}
-DOF: {dof}
-Successful: {fit_successful}
-
-Position Differences:
-Δ Pixel X: {delta_pixel_x:.4f} mm
-Δ Pixel Y: {delta_pixel_y:.4f} mm
-Δ Fit X: {delta_fit_x:.4f} mm  
-Δ Fit Y: {delta_fit_y:.4f} mm
-
-True Position: ({true_x:.3f}, {true_y:.3f})
-Pixel Position: ({pixel_x:.3f}, {pixel_y:.3f})
-Fit Position: ({center_x:.3f}, {center_y:.3f})
-
-Data Points: {len(x_positions)}"""
+        ax2.text(0.02, 0.98, y_proj_text, transform=ax2.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
         
-        ax6.text(0.05, 0.95, stats_text, transform=ax6.transAxes, fontsize=10,
-                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
-        
-        # 7. 3D surface plot
-        ax7 = fig.add_subplot(gs[2, :], projection='3d')
-        
-        # Plot fitted surface with transparency
-        surf = ax7.plot_surface(X, Y, Z_fit, cmap='plasma', alpha=0.7, linewidth=0, antialiased=True)
-        
-        # Plot data points with color coding
-        scatter = ax7.scatter(x_positions, y_positions, charge_values, c=charge_values, 
-                            cmap='plasma', s=50, alpha=1.0, edgecolors='black', linewidth=0.5)
-        
-        # Add vertical lines for true and fit positions
-        z_min = 0
-        z_max = np.max([np.max(charge_values), np.max(Z_fit)]) * 1.1
-        ax7.plot([true_x, true_x], [true_y, true_y], [z_min, z_max], 'c--', 
-                linewidth=3, alpha=0.8, label='True Position')
-        ax7.plot([center_x, center_x], [center_y, center_y], [z_min, z_max], 'w:', 
-                linewidth=3, alpha=0.9, label='Fit Center')
-        
-        ax7.set_xlabel('X Position [mm]')
-        ax7.set_ylabel('Y Position [mm]')
-        ax7.set_zlabel('Charge [C]')
-        ax7.set_title('3D Power-Law Lorentzian Surface Fit')
-        
-        # Add colorbar for 3D plot
-        cbar = plt.colorbar(surf, ax=ax7, shrink=0.8, label='Charge [C]', pad=0.1)
-        ax7.legend(loc='upper left')
-        
-        plt.suptitle(f'Event {event_idx}: 3D Power-Law Lorentzian Surface Fitting Analysis\n' +
-                    f'χ²/ν = {chi2red:.3f}, Beta = {beta:.3f}, Center = ({center_x:.3f}, {center_y:.3f}), ' +
-                    f'Δ = ({delta_fit_x:.3f}, {delta_fit_y:.3f})', fontsize=14)
+        plt.suptitle(rf'Event {event_idx}: 3D Power Lorentzian Projections' + '\n' +
+                    rf'$\chi^2/\nu$ = {chi2red:.3f}, $\beta$ = {beta:.3f}, $\Delta$ = ({delta_fit_x:.3f}, {delta_fit_y:.3f})', fontsize=11)
         plt.tight_layout()
-        plt.savefig(os.path.join(power_lorentzian_3d_dir, f'event_{event_idx:04d}_3d_power_lorentzian.png'), 
+        plt.savefig(os.path.join(power_lorentzian_3d_dir, f'event_{event_idx:04d}_3d_power_lorentzian_projections.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
         
-        return f"Event {event_idx}: 3D Power-Law Lorentzian plot created successfully"
+        return f"Event {event_idx}: 3D Power Lorentzian projection plots created successfully"
         
     except Exception as e:
-        return f"Event {event_idx}: Error creating 3D Power-Law Lorentzian plot - {e}"
+        return f"Event {event_idx}: Error creating 3D Power Lorentzian projection plots - {e}"
+
+def create_3d_power_lorentzian_plot(event_idx, data, output_dir="plots"):
+    """
+    Create comprehensive 3D Power Lorentzian plots split into contours and projections.
+    """
+    try:
+        # Create contour plots
+        contour_result = create_3d_power_lorentzian_contour_plots(event_idx, data, output_dir)
+        
+        # Create projection plots
+        projection_result = create_3d_power_lorentzian_projection_plots(event_idx, data, output_dir)
+        
+        # Return combined result
+        if "Error" in contour_result or "Error" in projection_result:
+            return f"Event {event_idx}: Partial success - {contour_result}; {projection_result}"
+        else:
+            return f"Event {event_idx}: 3D Power Lorentzian plots (contours + projections) created successfully"
+        
+    except Exception as e:
+        return f"Event {event_idx}: Error creating 3D Power Lorentzian plots - {e}"
 
 def calculate_3d_fit_quality_metric(data, event_idx):
     """
@@ -961,9 +1265,9 @@ def find_high_amplitude_3d_events(data, n_events=10):
     
     return high_amp_indices, amplitude_metrics
 
-def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
+def create_3d_comparison_contour_plots(event_idx, data, output_dir="plots"):
     """
-    Create comparison plot between 3D Lorentzian and 3D Power-Law Lorentzian fits.
+    Create comparison contour plots between 3D Lorentzian and 3D Power Lorentzian fits.
     """
     try:
         # Check if both 3D fitting models are available
@@ -973,7 +1277,7 @@ def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
         if not has_3d_lorentzian and not has_3d_power_lorentzian:
             return f"Event {event_idx}: No 3D fitting data available"
         elif not (has_3d_lorentzian and has_3d_power_lorentzian):
-            return f"Event {event_idx}: Need both 3D Lorentzian and Power-Law Lorentzian fits for comparison"
+            return f"Event {event_idx}: Need both 3D Lorentzian and Power Lorentzian fits for comparison"
         
         # Extract 3D neighborhood data
         x_positions, y_positions, charge_values = extract_3d_neighborhood_data(event_idx, data)
@@ -991,7 +1295,7 @@ def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
         l_offset = data.get('3DLorentzianFitVerticalOffset', [0])[event_idx] if '3DLorentzianFitVerticalOffset' in data else 0
         l_chi2red = data['3DLorentzianFitChi2red'][event_idx]
         
-        # 3D Power-Law Lorentzian
+        # 3D Power Lorentzian
         p_center_x = data['3DPowerLorentzianFitCenterX'][event_idx]
         p_center_y = data['3DPowerLorentzianFitCenterY'][event_idx]
         p_gamma_x = data['3DPowerLorentzianFitGammaX'][event_idx]
@@ -1001,42 +1305,27 @@ def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
         p_offset = data.get('3DPowerLorentzianFitVerticalOffset', [0])[event_idx] if '3DPowerLorentzianFitVerticalOffset' in data else 0
         p_chi2red = data['3DPowerLorentzianFitChi2red'][event_idx]
         
-        # Validate parameters and warn about unusual values
-        max_charge = np.max(charge_values)
-        unusual_params = []
-        
-        if abs(l_gamma_x) < 1e-6 or abs(l_gamma_y) < 1e-6:
-            unusual_params.append(f"3D Lorentzian: very small gamma ({l_gamma_x:.2e}, {l_gamma_y:.2e})")
-        if abs(l_amplitude) > 100 * max_charge:
-            unusual_params.append(f"3D Lorentzian: amplitude {l_amplitude:.2e} >> max_charge {max_charge:.2e}")
-        
-        if abs(p_gamma_x) < 1e-6 or abs(p_gamma_y) < 1e-6:
-            unusual_params.append(f"3D Power: very small gamma ({p_gamma_x:.2e}, {p_gamma_y:.2e})")
-        if abs(p_amplitude) > 100 * max_charge:
-            unusual_params.append(f"3D Power: amplitude {p_amplitude:.2e} >> max_charge {max_charge:.2e}")
-        if p_beta < 0.1 or p_beta > 10:
-            unusual_params.append(f"3D Power: extreme beta = {p_beta:.3f}")
-        
-        if unusual_params:
-            print(f"Event {event_idx} unusual fit parameters detected:")
-            for param in unusual_params:
-                print(f"  - {param}")
-        
         # True positions
         true_x = data['TrueX'][event_idx]
         true_y = data['TrueY'][event_idx]
+        
+        # Calculate deltas
+        l_delta_x = l_center_x - true_x
+        l_delta_y = l_center_y - true_y
+        p_delta_x = p_center_x - true_x
+        p_delta_y = p_center_y - true_y
         
         # Create output directory
         comparison_3d_dir = os.path.join(output_dir, "3d_comparison")
         os.makedirs(comparison_3d_dir, exist_ok=True)
         
         # Create figure with subplots
-        fig = plt.figure(figsize=(20, 12))
-        gs = GridSpec(2, 3, hspace=0.3, wspace=0.3)
+        fig = plt.figure(figsize=(16, 5))
+        gs = GridSpec(1, 3, hspace=0.4, wspace=0.45)
         
         # Create grid for surface plotting
-        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 50)
-        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 50)
+        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 100)
+        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 100)
         X, Y = np.meshgrid(x_range, y_range)
         
         # Calculate fitted surfaces
@@ -1051,11 +1340,22 @@ def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
                    edgecolors='black', linewidth=0.5, label='Data')
         ax1.axvline(true_x, color='white', linestyle='--', linewidth=2, alpha=0.9, label='True Position')
         ax1.axhline(true_y, color='white', linestyle='--', linewidth=2, alpha=0.9)
-        ax1.set_xlabel('X Position [mm]')
-        ax1.set_ylabel('Y Position [mm]')
-        ax1.set_title('Actual Data Distribution')
-        plt.colorbar(contour1, ax=ax1, label='Charge [C]')
-        ax1.legend(fontsize=8)
+        ax1.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_title('Actual Data Distribution', fontsize=12)
+        ax1.set_aspect('equal', adjustable='box')
+        divider1 = make_axes_locatable(ax1)
+        cax1 = divider1.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour1, cax=cax1, label=r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        
+        # Add data information to legend
+        data_info_text = (rf'True: ({true_x:.3f}, {true_y:.3f})' + '\n'
+                         rf'Max: {np.max(charge_values):.2e} C' + '\n'
+                         rf'Total: {np.sum(charge_values):.2e} C')
+        
+        ax1.text(0.02, 0.98, data_info_text, transform=ax1.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
         
         # 2. 3D Lorentzian fit
         ax2 = fig.add_subplot(gs[0, 1])
@@ -1066,13 +1366,26 @@ def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
         ax2.axhline(l_center_y, color='red', linestyle=':', linewidth=2, alpha=0.9)
         ax2.axvline(true_x, color='white', linestyle='--', linewidth=2, alpha=0.9, label='True Position')
         ax2.axhline(true_y, color='white', linestyle='--', linewidth=2, alpha=0.9)
-        ax2.set_xlabel('X Position [mm]')
-        ax2.set_ylabel('Y Position [mm]')
-        ax2.set_title(f'3D Lorentzian Fit (χ²/ν = {l_chi2red:.3f})')
-        plt.colorbar(contour2, ax=ax2, label='Charge [C]')
-        ax2.legend(fontsize=8)
+        ax2.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_title(f'3D Lorentzian Fit', fontsize=12)
+        ax2.set_aspect('equal', adjustable='box')
+        divider2 = make_axes_locatable(ax2)
+        cax2 = divider2.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour2, cax=cax2, label=r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
         
-        # 3. 3D Power-Law Lorentzian fit
+        # Add 3D Lorentzian parameters to legend
+        lorentz_params_text = (rf'Center: ({l_center_x:.3f}, {l_center_y:.3f})' + '\n'
+                              rf'$\gamma$: ({l_gamma_x:.3f}, {l_gamma_y:.3f})' + '\n'
+                              rf'Amp: {l_amplitude:.2e} C' + '\n'
+                              rf'$\chi^2/\nu$: {l_chi2red:.3f}' + '\n'
+                              rf'$\Delta$: ({l_delta_x:.3f}, {l_delta_y:.3f})')
+        
+        ax2.text(0.02, 0.98, lorentz_params_text, transform=ax2.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
+        
+        # 3. 3D Power Lorentzian fit
         ax3 = fig.add_subplot(gs[0, 2])
         contour3 = ax3.contourf(X, Y, Z_power, levels=20, cmap='plasma', alpha=0.8)
         ax3.scatter(x_positions, y_positions, c=charge_values, s=50, cmap='plasma', 
@@ -1081,14 +1394,111 @@ def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
         ax3.axhline(p_center_y, color='magenta', linestyle=':', linewidth=2, alpha=0.9)
         ax3.axvline(true_x, color='white', linestyle='--', linewidth=2, alpha=0.9, label='True Position')
         ax3.axhline(true_y, color='white', linestyle='--', linewidth=2, alpha=0.9)
-        ax3.set_xlabel('X Position [mm]')
-        ax3.set_ylabel('Y Position [mm]')
-        ax3.set_title(f'3D Power-Law Lorentzian (χ²/ν = {p_chi2red:.3f}, β = {p_beta:.3f})')
-        plt.colorbar(contour3, ax=ax3, label='Charge [C]')
-        ax3.legend(fontsize=8)
+        ax3.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax3.set_ylabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax3.set_title(f'3D Power Lorentzian Fit', fontsize=12)
+        ax3.set_aspect('equal', adjustable='box')
+        divider3 = make_axes_locatable(ax3)
+        cax3 = divider3.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(contour3, cax=cax3, label=r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
         
-        # 4. X projections comparison
-        ax4 = fig.add_subplot(gs[1, 0])
+        # Add 3D Power Lorentzian parameters to legend
+        power_params_text = (rf'Center: ({p_center_x:.3f}, {p_center_y:.3f})' + '\n'
+                            rf'$\gamma$: ({p_gamma_x:.3f}, {p_gamma_y:.3f})' + '\n'
+                            rf'$\beta$: {p_beta:.3f}' + '\n'
+                            rf'Amp: {p_amplitude:.2e} C' + '\n'
+                            rf'$\chi^2/\nu$: {p_chi2red:.3f}' + '\n'
+                            rf'$\Delta$: ({p_delta_x:.3f}, {p_delta_y:.3f})')
+        
+        ax3.text(0.02, 0.98, power_params_text, transform=ax3.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
+        
+        # Determine best fit
+        best_fit = '3D Lorentzian' if l_chi2red < p_chi2red else '3D Power Lorentzian'
+        
+        plt.suptitle(rf'Event {event_idx}: 3D Model Comparison' + '\n' +
+                    rf'Lorentz $\chi^2/\nu$ = {l_chi2red:.3f} vs Power $\chi^2/\nu$ = {p_chi2red:.3f} | Best: {best_fit}', fontsize=11)
+        plt.tight_layout()
+        plt.savefig(os.path.join(comparison_3d_dir, f'event_{event_idx:04d}_3d_comparison_contours.png'), 
+                   dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        
+        return f"Event {event_idx}: 3D comparison contour plots created successfully"
+        
+    except Exception as e:
+        return f"Event {event_idx}: Error creating 3D comparison contour plots - {e}"
+
+def create_3d_comparison_projection_plots(event_idx, data, output_dir="plots"):
+    """
+    Create comparison projection plots between 3D Lorentzian and 3D Power Lorentzian fits.
+    """
+    try:
+        # Check if both 3D fitting models are available
+        has_3d_lorentzian = '3DLorentzianFitCenterX' in data
+        has_3d_power_lorentzian = '3DPowerLorentzianFitCenterX' in data
+        
+        if not (has_3d_lorentzian and has_3d_power_lorentzian):
+            return f"Event {event_idx}: Need both 3D Lorentzian and Power Lorentzian fits for comparison"
+        
+        # Extract 3D neighborhood data
+        x_positions, y_positions, charge_values = extract_3d_neighborhood_data(event_idx, data)
+        
+        if len(x_positions) < 5:
+            return f"Event {event_idx}: Not enough data points for 3D comparison plotting"
+        
+        # Get fit parameters for both models
+        # 3D Lorentzian
+        l_center_x = data['3DLorentzianFitCenterX'][event_idx]
+        l_center_y = data['3DLorentzianFitCenterY'][event_idx]
+        l_gamma_x = data['3DLorentzianFitGammaX'][event_idx]
+        l_gamma_y = data['3DLorentzianFitGammaY'][event_idx]
+        l_amplitude = data['3DLorentzianFitAmplitude'][event_idx]
+        l_offset = data.get('3DLorentzianFitVerticalOffset', [0])[event_idx] if '3DLorentzianFitVerticalOffset' in data else 0
+        l_chi2red = data['3DLorentzianFitChi2red'][event_idx]
+        
+        # 3D Power Lorentzian
+        p_center_x = data['3DPowerLorentzianFitCenterX'][event_idx]
+        p_center_y = data['3DPowerLorentzianFitCenterY'][event_idx]
+        p_gamma_x = data['3DPowerLorentzianFitGammaX'][event_idx]
+        p_gamma_y = data['3DPowerLorentzianFitGammaY'][event_idx]
+        p_beta = data['3DPowerLorentzianFitBeta'][event_idx]
+        p_amplitude = data['3DPowerLorentzianFitAmplitude'][event_idx]
+        p_offset = data.get('3DPowerLorentzianFitVerticalOffset', [0])[event_idx] if '3DPowerLorentzianFitVerticalOffset' in data else 0
+        p_chi2red = data['3DPowerLorentzianFitChi2red'][event_idx]
+        
+        # True positions
+        true_x = data['TrueX'][event_idx]
+        true_y = data['TrueY'][event_idx]
+        
+        # Calculate deltas
+        l_delta_x = l_center_x - true_x
+        l_delta_y = l_center_y - true_y
+        p_delta_x = p_center_x - true_x
+        p_delta_y = p_center_y - true_y
+        
+        # Create output directory
+        comparison_3d_dir = os.path.join(output_dir, "3d_comparison")
+        os.makedirs(comparison_3d_dir, exist_ok=True)
+        
+        # Create figure with subplots
+        fig = plt.figure(figsize=(13, 5))
+        gs = GridSpec(1, 2, hspace=0.4, wspace=0.45)
+        
+        # Create grid for surface plotting
+        x_range = np.linspace(x_positions.min() - 0.2, x_positions.max() + 0.2, 200)
+        y_range = np.linspace(y_positions.min() - 0.2, y_positions.max() + 0.2, 200)
+        X, Y = np.meshgrid(x_range, y_range)
+        
+        # Calculate fitted surfaces
+        Z_lorentz = lorentzian_3d(X, Y, l_amplitude, l_center_x, l_center_y, l_gamma_x, l_gamma_y, l_offset)
+        Z_power = power_lorentzian_3d(X, Y, p_amplitude, p_center_x, p_center_y, p_gamma_x, p_gamma_y, p_beta, p_offset)
+        
+        # Detect uncertainty availability for 3D fits
+        uncertainty_status = data.get('_3d_uncertainty_status', {})
+        
+        # 1. X projections comparison
+        ax1 = fig.add_subplot(gs[0, 0])
         # Use true_y position for fair comparison, not different fit centers
         true_y_center_idx = np.argmin(np.abs(y_range - true_y))
         
@@ -1104,19 +1514,41 @@ def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
             sort_idx = np.argsort(x_data_proj)
             x_data_proj = x_data_proj[sort_idx]
             charge_data_proj = charge_data_proj[sort_idx]
-            ax4.plot(x_data_proj, charge_data_proj, 'ko', markersize=6, label='Data')
+            
+            # Get uncertainties if available
+            if uncertainty_status.get('any_3d_uncertainties_available', False):
+                uncertainty = data.get('3DLorentzianFitChargeUncertainty', [0])[event_idx] if '3DLorentzianFitChargeUncertainty' in data else 0
+                uncertainties = np.full(len(x_data_proj), uncertainty)
+            else:
+                uncertainties = np.zeros(len(x_data_proj))
+            
+            plot_data_points(ax1, x_data_proj, charge_data_proj, uncertainties, 
+                           fmt='ko', markersize=6, capsize=3, label='Data')
         
-        ax4.plot(x_range, x_proj_lorentz, 'r-', linewidth=2, label=f'3D Lorentzian (χ²={l_chi2red:.2f})')
-        ax4.plot(x_range, x_proj_power, 'm--', linewidth=2, label=f'3D Power-Law (χ²={p_chi2red:.2f})')
-        ax4.axvline(true_x, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True X')
-        ax4.set_xlabel('X Position [mm]')
-        ax4.set_ylabel('Charge [C]')
-        ax4.set_title('X Projections Comparison')
-        ax4.legend(fontsize=8)
-        ax4.grid(True, alpha=0.3)
+        ax1.plot(x_range, x_proj_lorentz, 'r-', linewidth=2, label=rf'3D Lorentzian ($\chi^2$={l_chi2red:.2f})')
+        ax1.plot(x_range, x_proj_power, 'm--', linewidth=2, label=rf'3D Power Lorentzian ($\chi^2$={p_chi2red:.2f})')
+        ax1.axvline(true_x, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True X')
+        ax1.axvline(l_center_x, color='red', linestyle=':', linewidth=2, alpha=0.8, label='Lorentz Center X')
+        ax1.axvline(p_center_x, color='magenta', linestyle=':', linewidth=2, alpha=0.8, label='Power Center X')
+        ax1.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax1.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        ax1.set_title(r'$X$ Projections Comparison', fontsize=12)
+        ax1.legend(fontsize=10)
+        ax1.grid(True, alpha=0.3)
         
-        # 5. Y projections comparison
-        ax5 = fig.add_subplot(gs[1, 1])
+        # Add X projection comparison to legend
+        x_comp_text = (rf'Lorentz $X$: {l_center_x:.3f}' + '\n'
+                      rf'Power $X$: {p_center_x:.3f}' + '\n'
+                      rf'True $X$: {true_x:.3f}' + '\n'
+                      rf'L $\Delta X$: {l_delta_x:.3f}' + '\n'
+                      rf'P $\Delta X$: {p_delta_x:.3f}')
+        
+        ax1.text(0.02, 0.98, x_comp_text, transform=ax1.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
+        
+        # 2. Y projections comparison
+        ax2 = fig.add_subplot(gs[0, 1])
         # Use true_x position for fair comparison, not different fit centers
         true_x_center_idx = np.argmin(np.abs(x_range - true_x))
         
@@ -1132,63 +1564,75 @@ def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
             sort_idx = np.argsort(y_data_proj)
             y_data_proj = y_data_proj[sort_idx]
             charge_data_proj = charge_data_proj[sort_idx]
-            ax5.plot(y_data_proj, charge_data_proj, 'ko', markersize=6, label='Data')
+            
+            # Get uncertainties if available
+            if uncertainty_status.get('any_3d_uncertainties_available', False):
+                uncertainty = data.get('3DLorentzianFitChargeUncertainty', [0])[event_idx] if '3DLorentzianFitChargeUncertainty' in data else 0
+                uncertainties = np.full(len(y_data_proj), uncertainty)
+            else:
+                uncertainties = np.zeros(len(y_data_proj))
+            
+            plot_data_points(ax2, y_data_proj, charge_data_proj, uncertainties, 
+                           fmt='ko', markersize=6, capsize=3, label='Data')
         
-        ax5.plot(y_range, y_proj_lorentz, 'r-', linewidth=2, label=f'3D Lorentzian (χ²={l_chi2red:.2f})')
-        ax5.plot(y_range, y_proj_power, 'm--', linewidth=2, label=f'3D Power-Law (χ²={p_chi2red:.2f})')
-        ax5.axvline(true_y, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
-        ax5.set_xlabel('Y Position [mm]')
-        ax5.set_ylabel('Charge [C]')
-        ax5.set_title('Y Projections Comparison')
-        ax5.legend(fontsize=8)
-        ax5.grid(True, alpha=0.3)
+        ax2.plot(y_range, y_proj_lorentz, 'r-', linewidth=2, label=rf'3D Lorentzian ($\chi^2$={l_chi2red:.2f})')
+        ax2.plot(y_range, y_proj_power, 'm--', linewidth=2, label=rf'3D Power Lorentzian ($\chi^2$={p_chi2red:.2f})')
+        ax2.axvline(true_y, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Y')
+        ax2.axvline(l_center_y, color='red', linestyle=':', linewidth=2, alpha=0.8, label='Lorentz Center Y')
+        ax2.axvline(p_center_y, color='magenta', linestyle=':', linewidth=2, alpha=0.8, label='Power Center Y')
+        ax2.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+        ax2.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
+        ax2.set_title(r'$Y$ Projections Comparison', fontsize=12)
+        ax2.legend(fontsize=10)
+        ax2.grid(True, alpha=0.3)
         
-        # 6. Comparison statistics
-        ax6 = fig.add_subplot(gs[1, 2])
-        ax6.axis('off')
+        # Add Y projection comparison to legend
+        y_comp_text = (rf'Lorentz $Y$: {l_center_y:.3f}' + '\n'
+                      rf'Power $Y$: {p_center_y:.3f}' + '\n'
+                      rf'True $Y$: {true_y:.3f}' + '\n'
+                      rf'L $\Delta Y$: {l_delta_y:.3f}' + '\n'
+                      rf'P $\Delta Y$: {p_delta_y:.3f}' + '\n'
+                      rf'$\beta$: {p_beta:.3f}')
         
-        # Calculate position differences
-        l_delta_x = l_center_x - true_x
-        l_delta_y = l_center_y - true_y
-        p_delta_x = p_center_x - true_x
-        p_delta_y = p_center_y - true_y
+        ax2.text(0.02, 0.98, y_comp_text, transform=ax2.transAxes, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=5)
         
-        comparison_text = f"""3D Fit Comparison:
-
-3D Lorentzian:
-  Center: ({l_center_x:.3f}, {l_center_y:.3f})
-  Gamma: ({l_gamma_x:.3f}, {l_gamma_y:.3f})
-  Amplitude: {l_amplitude:.2e} C
-  χ²/ν: {l_chi2red:.3f}
-  Δ: ({l_delta_x:.3f}, {l_delta_y:.3f})
-
-3D Power-Law Lorentzian:
-  Center: ({p_center_x:.3f}, {p_center_y:.3f})
-  Gamma: ({p_gamma_x:.3f}, {p_gamma_y:.3f})
-  Beta: {p_beta:.3f}
-  Amplitude: {p_amplitude:.2e} C
-  χ²/ν: {p_chi2red:.3f}
-  Δ: ({p_delta_x:.3f}, {p_delta_y:.3f})
-
-True Position: ({true_x:.3f}, {true_y:.3f})
-
-Best Fit: {'3D Lorentzian' if l_chi2red < p_chi2red else '3D Power-Law Lorentzian'}
-Δχ²/ν: {abs(l_chi2red - p_chi2red):.3f}"""
+        # Determine best fit
+        best_fit = '3D Lorentzian' if l_chi2red < p_chi2red else '3D Power Lorentzian'
+        delta_chi2 = abs(l_chi2red - p_chi2red)
         
-        ax6.text(0.05, 0.95, comparison_text, transform=ax6.transAxes, fontsize=10,
-                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-        
-        plt.suptitle(f'Event {event_idx}: 3D Surface Fitting Models Comparison\n' +
-                    f'Lorentzian χ²/ν = {l_chi2red:.3f} vs Power-Law χ²/ν = {p_chi2red:.3f}', fontsize=14)
+        plt.suptitle(rf'Event {event_idx}: 3D Projection Comparison' + '\n' +
+                    rf'Lorentz $\chi^2/\nu$ = {l_chi2red:.3f} vs Power $\chi^2/\nu$ = {p_chi2red:.3f} | Best: {best_fit} | $\Delta\chi^2/\nu$ = {delta_chi2:.3f}', fontsize=11)
         plt.tight_layout()
-        plt.savefig(os.path.join(comparison_3d_dir, f'event_{event_idx:04d}_3d_comparison.png'), 
+        plt.savefig(os.path.join(comparison_3d_dir, f'event_{event_idx:04d}_3d_comparison_projections.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
         
-        return f"Event {event_idx}: 3D comparison plot created successfully"
+        return f"Event {event_idx}: 3D comparison projection plots created successfully"
         
     except Exception as e:
-        return f"Event {event_idx}: Error creating 3D comparison plot - {e}"
+        return f"Event {event_idx}: Error creating 3D comparison projection plots - {e}"
+
+def create_3d_comparison_plot(event_idx, data, output_dir="plots"):
+    """
+    Create comprehensive 3D comparison plots split into contours and projections.
+    """
+    try:
+        # Create contour comparison plots
+        contour_result = create_3d_comparison_contour_plots(event_idx, data, output_dir)
+        
+        # Create projection comparison plots
+        projection_result = create_3d_comparison_projection_plots(event_idx, data, output_dir)
+        
+        # Return combined result
+        if "Error" in contour_result or "Error" in projection_result:
+            return f"Event {event_idx}: Partial success - {contour_result}; {projection_result}"
+        else:
+            return f"Event {event_idx}: 3D comparison plots (contours + projections) created successfully"
+        
+    except Exception as e:
+        return f"Event {event_idx}: Error creating 3D comparison plots - {e}"
 
 def main():
     """Main function for command line execution."""
@@ -1248,7 +1692,7 @@ def main():
     if has_3d_lorentzian:
         available_3d_models.append('3D Lorentzian')
     if has_3d_power_lorentzian:
-        available_3d_models.append('3D Power-Law Lorentzian')
+        available_3d_models.append('3D Power Lorentzian')
     
     print(f"Available 3D fits: {', '.join(available_3d_models)}")
     
@@ -1378,7 +1822,7 @@ def main():
         if has_3d_lorentzian:
             print(f"  Successfully created {lorentzian_3d_success}/{n_events} 3D Lorentzian surface plots")
         if has_3d_power_lorentzian:
-            print(f"  Successfully created {power_lorentzian_3d_success}/{n_events} 3D Power-Law Lorentzian surface plots")
+            print(f"  Successfully created {power_lorentzian_3d_success}/{n_events} 3D Power Lorentzian surface plots")
         if has_3d_lorentzian and has_3d_power_lorentzian:
             print(f"  Successfully created {comparison_3d_success}/{n_events} 3D comparison plots")
         
@@ -1386,7 +1830,7 @@ def main():
         if has_3d_lorentzian:
             print(f"  - 3D Lorentzian surfaces: {args.output}/3d_lorentzian/")
         if has_3d_power_lorentzian:
-            print(f"  - 3D Power-Law Lorentzian surfaces: {args.output}/3d_power_lorentzian/")
+            print(f"  - 3D Power Lorentzian surfaces: {args.output}/3d_power_lorentzian/")
         if has_3d_lorentzian and has_3d_power_lorentzian:
             print(f"  - 3D model comparisons: {args.output}/3d_comparison/")
     
