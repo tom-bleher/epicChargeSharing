@@ -1082,160 +1082,263 @@ DiagonalPowerLorentzianFitResultsCeres FitDiagonalPowerLorentzianCeres(
         std::cout << "Starting diagonal Power Lorentzian fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
-    // Apply outlier filtering if requested
-    std::vector<double> filtered_x_coords = x_coords;
-    std::vector<double> filtered_y_coords = y_coords;
-    std::vector<double> filtered_charge_values = charge_values;
+    // Tolerance for grouping pixels into diagonals
+    double tolerance = pixel_spacing * 0.1;
     
-    if (enable_outlier_filtering) {
-        PowerLorentzianOutlierRemovalResult filter_result = RemovePowerLorentzianOutliers(
-            x_coords, y_coords, charge_values, true, 2.5, verbose);
-        
-        if (filter_result.success && filter_result.filtering_applied) {
-            filtered_x_coords = filter_result.filtered_x_coords;
-            filtered_y_coords = filter_result.filtered_y_coords;
-            filtered_charge_values = filter_result.filtered_charge_values;
-        }
-    }
+    // Effective centre-to-centre pitch along a ±45° diagonal is √2 times the horizontal pitch.
+    const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // ≈ √2
     
-    // Effective centre-to-centre pitch along diagonal
-    const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // √2 × pitch
+    // ------------------------------------------------------------------------------------
+    // FIXED: Use proper diagonal grouping using true coordinate along the ±45° axis.
+    // We project each hit onto the diagonal direction so that the abscissa that the
+    // 1-D fitter sees is spaced by pitch·√2 exactly as in the real geometry.
+    // Define the diagonal coordinate s as (dx ± dy)/√2, where dx = x-cx, dy = y-cy.
+    // ------------------------------------------------------------------------------------
+    const double inv_sqrt2 = 1.0 / std::sqrt(2.0);
 
-    // Create diagonal data arrays
-    // Main diagonal: points where (x-center_x) ≈ (y-center_y)
-    // Secondary diagonal: points where (x-center_x) ≈ -(y-center_y)
-    std::vector<std::pair<double, double>> main_diag_x_data, main_diag_y_data;
-    std::vector<std::pair<double, double>> sec_diag_x_data, sec_diag_y_data;
-    
-    const double diagonal_tolerance = pixel_spacing * 0.5; // Tolerance for diagonal selection
-    
-    for (size_t i = 0; i < filtered_x_coords.size(); ++i) {
-        double x = filtered_x_coords[i];
-        double y = filtered_y_coords[i];
-        double charge = filtered_charge_values[i];
-        
-        if (charge <= 0) continue;
-        
+    // Maps: diagonal identifier → vector of (s, charge)
+    std::map<double, std::vector<std::pair<double, double>>> main_diagonal_data; // slope +1
+    std::map<double, std::vector<std::pair<double, double>>> sec_diagonal_data;  // slope −1
+
+    for (size_t i = 0; i < x_coords.size(); ++i) {
+        double x = x_coords[i];
+        double y = y_coords[i];
+        double charge = charge_values[i];
+
+        if (charge <= 0) continue; // ignore empty / negative pixels
+
+        // Coordinates relative to centre estimates (for robust diagonal id)
         double dx = x - center_x_estimate;
         double dy = y - center_y_estimate;
-        
-        // Check if point is on main diagonal (dx ≈ dy)
-        if (std::abs(dx - dy) < diagonal_tolerance) {
-            double diag_coord = (dx + dy) / 2.0; // Average coordinate along diagonal
-            main_diag_x_data.push_back(std::make_pair(diag_coord, charge));
-            main_diag_y_data.push_back(std::make_pair(diag_coord, charge));
+
+        // Indicators for membership to the two sets of diagonals
+        double diff = dx - dy;   // main diagonal (slope +1)
+        double sum  = dx + dy;   // secondary diagonal (slope −1)
+
+        // Main diagonal
+        if (std::abs(diff) < tolerance) {
+            double s = (dx + dy) * inv_sqrt2;          // coordinate along +45° direction
+            main_diagonal_data[diff].emplace_back(s, charge);
         }
-        
-        // Check if point is on secondary diagonal (dx ≈ -dy)
-        if (std::abs(dx + dy) < diagonal_tolerance) {
-            double diag_coord = (dx - dy) / 2.0; // Coordinate along secondary diagonal
-            sec_diag_x_data.push_back(std::make_pair(diag_coord, charge));
-            sec_diag_y_data.push_back(std::make_pair(diag_coord, charge));
+
+        // Secondary diagonal
+        if (std::abs(sum) < tolerance) {
+            double s = (dx - dy) * inv_sqrt2;          // coordinate along −45° direction
+            sec_diagonal_data[sum].emplace_back(s, charge);
         }
     }
+    
+    // Find the main diagonal closest to the center estimates
+    double center_main_diag_id = center_x_estimate - center_y_estimate;
+    double best_main_diag_id = center_main_diag_id;
+    double min_main_diag_dist = std::numeric_limits<double>::max();
+    for (const auto& diag_pair : main_diagonal_data) {
+        double dist = std::abs(diag_pair.first - center_main_diag_id);
+        if (dist < min_main_diag_dist && diag_pair.second.size() >= 5) {
+            min_main_diag_dist = dist;
+            best_main_diag_id = diag_pair.first;
+        }
+    }
+    
+    // Find the secondary diagonal closest to the center estimates
+    double center_sec_diag_id = center_x_estimate + center_y_estimate;
+    double best_sec_diag_id = center_sec_diag_id;
+    double min_sec_diag_dist = std::numeric_limits<double>::max();
+    for (const auto& diag_pair : sec_diagonal_data) {
+        double dist = std::abs(diag_pair.first - center_sec_diag_id);
+        if (dist < min_sec_diag_dist && diag_pair.second.size() >= 5) {
+            min_sec_diag_dist = dist;
+            best_sec_diag_id = diag_pair.first;
+        }
+    }
+    
+    bool main_diag_x_success = false;
+    bool main_diag_y_success = false;
+    bool sec_diag_x_success = false;
+    bool sec_diag_y_success = false;
     
     // Fit main diagonal X direction
-    if (main_diag_x_data.size() >= 5) {
-        std::sort(main_diag_x_data.begin(), main_diag_x_data.end());
+    if (main_diagonal_data.find(best_main_diag_id) != main_diagonal_data.end() && 
+        main_diagonal_data[best_main_diag_id].size() >= 5) {
         
-        std::vector<double> x_vals, y_vals;
-        for (const auto& point : main_diag_x_data) {
-            x_vals.push_back(point.first);
-            y_vals.push_back(point.second);
+        auto& main_diag_data = main_diagonal_data[best_main_diag_id];
+        
+        // Extract diagonal coordinate (s) and charge values for +45° direction
+        std::vector<double> x_vals, charge_vals;
+        for (const auto& p : main_diag_data) {
+            x_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
-        if (verbose) {
-            std::cout << "Fitting main diagonal X with " << x_vals.size() << " points" << std::endl;
+        // Sort by coordinate
+        std::vector<std::pair<double, double>> x_charge_pairs;
+        for (size_t i = 0; i < x_vals.size(); ++i) {
+            x_charge_pairs.push_back(std::make_pair(x_vals[i], charge_vals[i]));
+        }
+        std::sort(x_charge_pairs.begin(), x_charge_pairs.end());
+        
+        // Create sorted vectors
+        std::vector<double> x_sorted, charge_x_sorted;
+        for (const auto& pair : x_charge_pairs) {
+            x_sorted.push_back(pair.first);
+            charge_x_sorted.push_back(pair.second);
         }
         
-        result.main_diag_x_fit_successful = FitPowerLorentzianCeres(
-            x_vals, y_vals, 0.0, diag_pixel_spacing,
-            result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_gamma, 
-            result.main_diag_x_beta, result.main_diag_x_vertical_offset,
-            result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err,
-            result.main_diag_x_beta_err, result.main_diag_x_vertical_offset_err,
-            result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
-        
-        result.main_diag_x_dof = std::max(1, static_cast<int>(x_vals.size()) - 5);
-        result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
+        if (x_sorted.size() >= 5) {
+            if (verbose) {
+                std::cout << "Fitting main diagonal X with " << x_sorted.size() << " points" << std::endl;
+            }
+            
+            main_diag_x_success = FitPowerLorentzianCeres(
+                x_sorted, charge_x_sorted, 0.0, diag_pixel_spacing,
+                result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_gamma, 
+                result.main_diag_x_beta, result.main_diag_x_vertical_offset,
+                result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err,
+                result.main_diag_x_beta_err, result.main_diag_x_vertical_offset_err,
+                result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
+            
+            result.main_diag_x_dof = std::max(1, static_cast<int>(x_sorted.size()) - 5);
+            result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
+            result.main_diag_x_fit_successful = main_diag_x_success;
+        }
     }
     
-    // Fit main diagonal Y direction (same data as X)
-    if (main_diag_y_data.size() >= 5) {
-        std::sort(main_diag_y_data.begin(), main_diag_y_data.end());
+    // Fit main diagonal Y direction
+    if (main_diagonal_data.find(best_main_diag_id) != main_diagonal_data.end() && 
+        main_diagonal_data[best_main_diag_id].size() >= 5) {
         
-        std::vector<double> x_vals, y_vals;
-        for (const auto& point : main_diag_y_data) {
-            x_vals.push_back(point.first);
-            y_vals.push_back(point.second);
+        auto& main_diag_data = main_diagonal_data[best_main_diag_id];
+        
+        // Re-use same dataset for the complementary fit (naming kept for backward compatibility)
+        std::vector<double> y_vals, charge_vals;
+        for (const auto& p : main_diag_data) {
+            y_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
-        if (verbose) {
-            std::cout << "Fitting main diagonal Y with " << x_vals.size() << " points" << std::endl;
+        // Sort by coordinate
+        std::vector<std::pair<double, double>> y_charge_pairs;
+        for (size_t i = 0; i < y_vals.size(); ++i) {
+            y_charge_pairs.push_back(std::make_pair(y_vals[i], charge_vals[i]));
+        }
+        std::sort(y_charge_pairs.begin(), y_charge_pairs.end());
+        
+        // Create sorted vectors
+        std::vector<double> y_sorted, charge_y_sorted;
+        for (const auto& pair : y_charge_pairs) {
+            y_sorted.push_back(pair.first);
+            charge_y_sorted.push_back(pair.second);
         }
         
-        result.main_diag_y_fit_successful = FitPowerLorentzianCeres(
-            x_vals, y_vals, 0.0, diag_pixel_spacing,
-            result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_gamma,
-            result.main_diag_y_beta, result.main_diag_y_vertical_offset,
-            result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_gamma_err,
-            result.main_diag_y_beta_err, result.main_diag_y_vertical_offset_err,
-            result.main_diag_y_chi2red, verbose, enable_outlier_filtering);
-        
-        result.main_diag_y_dof = std::max(1, static_cast<int>(x_vals.size()) - 5);
-        result.main_diag_y_pp = (result.main_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_y_chi2red / 10.0) : 0.0;
+        if (y_sorted.size() >= 5) {
+            if (verbose) {
+                std::cout << "Fitting main diagonal Y with " << y_sorted.size() << " points" << std::endl;
+            }
+            
+            main_diag_y_success = FitPowerLorentzianCeres(
+                y_sorted, charge_y_sorted, 0.0, diag_pixel_spacing,
+                result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_gamma,
+                result.main_diag_y_beta, result.main_diag_y_vertical_offset,
+                result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_gamma_err,
+                result.main_diag_y_beta_err, result.main_diag_y_vertical_offset_err,
+                result.main_diag_y_chi2red, verbose, enable_outlier_filtering);
+            
+            result.main_diag_y_dof = std::max(1, static_cast<int>(y_sorted.size()) - 5);
+            result.main_diag_y_pp = (result.main_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_y_chi2red / 10.0) : 0.0;
+            result.main_diag_y_fit_successful = main_diag_y_success;
+        }
     }
     
     // Fit secondary diagonal X direction
-    if (sec_diag_x_data.size() >= 5) {
-        std::sort(sec_diag_x_data.begin(), sec_diag_x_data.end());
+    if (sec_diagonal_data.find(best_sec_diag_id) != sec_diagonal_data.end() && 
+        sec_diagonal_data[best_sec_diag_id].size() >= 5) {
         
-        std::vector<double> x_vals, y_vals;
-        for (const auto& point : sec_diag_x_data) {
-            x_vals.push_back(point.first);
-            y_vals.push_back(point.second);
+        auto& sec_diag_data = sec_diagonal_data[best_sec_diag_id];
+        
+        // Extract diagonal coordinate (s) and charge values for −45° direction
+        std::vector<double> x_vals, charge_vals;
+        for (const auto& p : sec_diag_data) {
+            x_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
-        if (verbose) {
-            std::cout << "Fitting secondary diagonal X with " << x_vals.size() << " points" << std::endl;
+        // Sort by coordinate
+        std::vector<std::pair<double, double>> x_charge_pairs;
+        for (size_t i = 0; i < x_vals.size(); ++i) {
+            x_charge_pairs.push_back(std::make_pair(x_vals[i], charge_vals[i]));
+        }
+        std::sort(x_charge_pairs.begin(), x_charge_pairs.end());
+        
+        // Create sorted vectors
+        std::vector<double> x_sorted, charge_x_sorted;
+        for (const auto& pair : x_charge_pairs) {
+            x_sorted.push_back(pair.first);
+            charge_x_sorted.push_back(pair.second);
         }
         
-        result.sec_diag_x_fit_successful = FitPowerLorentzianCeres(
-            x_vals, y_vals, 0.0, diag_pixel_spacing,
-            result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_gamma,
-            result.sec_diag_x_beta, result.sec_diag_x_vertical_offset,
-            result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err,
-            result.sec_diag_x_beta_err, result.sec_diag_x_vertical_offset_err,
-            result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
-        
-        result.sec_diag_x_dof = std::max(1, static_cast<int>(x_vals.size()) - 5);
-        result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
+        if (x_sorted.size() >= 5) {
+            if (verbose) {
+                std::cout << "Fitting secondary diagonal X with " << x_sorted.size() << " points" << std::endl;
+            }
+            
+            sec_diag_x_success = FitPowerLorentzianCeres(
+                x_sorted, charge_x_sorted, 0.0, diag_pixel_spacing,
+                result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_gamma,
+                result.sec_diag_x_beta, result.sec_diag_x_vertical_offset,
+                result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err,
+                result.sec_diag_x_beta_err, result.sec_diag_x_vertical_offset_err,
+                result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
+            
+            result.sec_diag_x_dof = std::max(1, static_cast<int>(x_sorted.size()) - 5);
+            result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
+            result.sec_diag_x_fit_successful = sec_diag_x_success;
+        }
     }
     
     // Fit secondary diagonal Y direction
-    if (sec_diag_y_data.size() >= 5) {
-        std::sort(sec_diag_y_data.begin(), sec_diag_y_data.end());
+    if (sec_diagonal_data.find(best_sec_diag_id) != sec_diagonal_data.end() && 
+        sec_diagonal_data[best_sec_diag_id].size() >= 5) {
         
-        std::vector<double> x_vals, y_vals;
-        for (const auto& point : sec_diag_y_data) {
-            x_vals.push_back(point.first);
-            y_vals.push_back(point.second);
+        auto& sec_diag_data = sec_diagonal_data[best_sec_diag_id];
+        
+        // Same dataset re-used for complementary fit
+        std::vector<double> y_vals, charge_vals;
+        for (const auto& p : sec_diag_data) {
+            y_vals.push_back(p.first);
+            charge_vals.push_back(p.second);
         }
         
-        if (verbose) {
-            std::cout << "Fitting secondary diagonal Y with " << x_vals.size() << " points" << std::endl;
+        // Sort by coordinate
+        std::vector<std::pair<double, double>> y_charge_pairs;
+        for (size_t i = 0; i < y_vals.size(); ++i) {
+            y_charge_pairs.push_back(std::make_pair(y_vals[i], charge_vals[i]));
+        }
+        std::sort(y_charge_pairs.begin(), y_charge_pairs.end());
+        
+        // Create sorted vectors
+        std::vector<double> y_sorted, charge_y_sorted;
+        for (const auto& pair : y_charge_pairs) {
+            y_sorted.push_back(pair.first);
+            charge_y_sorted.push_back(pair.second);
         }
         
-        result.sec_diag_y_fit_successful = FitPowerLorentzianCeres(
-            x_vals, y_vals, 0.0, diag_pixel_spacing,
-            result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_gamma,
-            result.sec_diag_y_beta, result.sec_diag_y_vertical_offset,
-            result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_gamma_err,
-            result.sec_diag_y_beta_err, result.sec_diag_y_vertical_offset_err,
-            result.sec_diag_y_chi2red, verbose, enable_outlier_filtering);
-        
-        result.sec_diag_y_dof = std::max(1, static_cast<int>(x_vals.size()) - 5);
-        result.sec_diag_y_pp = (result.sec_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_y_chi2red / 10.0) : 0.0;
+        if (y_sorted.size() >= 5) {
+            if (verbose) {
+                std::cout << "Fitting secondary diagonal Y with " << y_sorted.size() << " points" << std::endl;
+            }
+            
+            sec_diag_y_success = FitPowerLorentzianCeres(
+                y_sorted, charge_y_sorted, 0.0, diag_pixel_spacing,
+                result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_gamma,
+                result.sec_diag_y_beta, result.sec_diag_y_vertical_offset,
+                result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_gamma_err,
+                result.sec_diag_y_beta_err, result.sec_diag_y_vertical_offset_err,
+                result.sec_diag_y_chi2red, verbose, enable_outlier_filtering);
+            
+            result.sec_diag_y_dof = std::max(1, static_cast<int>(y_sorted.size()) - 5);
+            result.sec_diag_y_pp = (result.sec_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_y_chi2red / 10.0) : 0.0;
+            result.sec_diag_y_fit_successful = sec_diag_y_success;
+        }
     }
     
     // Set overall success status

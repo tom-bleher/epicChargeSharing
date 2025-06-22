@@ -1609,18 +1609,37 @@ void RunAction::CalculateTransformedDiagonalCoordinates()
     // -------------------------------
     // P O W E R - L A W   L O R E N T Z I A N
     // -------------------------------
-    // Centres are absolute coordinates (similar to Gaussian)
-    double skMainX = (fPowerLorentzFitMainDiagXDOF > 0) ? fPowerLorentzFitMainDiagXCenter : NaN;
-    double skMainY = (fPowerLorentzFitMainDiagYDOF > 0) ? fPowerLorentzFitMainDiagYCenter : NaN;
-    setXY(skMainX, skMainY,
-          fPowerLorentzMainDiagTransformedX, fPowerLorentzMainDiagTransformedY,
-          fPowerLorentzMainDiagTransformedDeltaX, fPowerLorentzMainDiagTransformedDeltaY);
+    // FIX: Power Lorentzian diagonal fits also return diagonal coordinates that need transformation
+    
+    // Main diagonal
+    double sMainPowerLorentz = NaN;
+    if (fPowerLorentzFitMainDiagXDOF > 0)       sMainPowerLorentz = fPowerLorentzFitMainDiagXCenter;
+    else if (fPowerLorentzFitMainDiagYDOF > 0)  sMainPowerLorentz = fPowerLorentzFitMainDiagYCenter;
+    if (!std::isnan(sMainPowerLorentz)) {
+        auto [dx,dy] = sToDxDyMain(sMainPowerLorentz);
+        setXY(fPixelX+dx, fPixelY+dy,
+              fPowerLorentzMainDiagTransformedX, fPowerLorentzMainDiagTransformedY,
+              fPowerLorentzMainDiagTransformedDeltaX, fPowerLorentzMainDiagTransformedDeltaY);
+    } else {
+        setXY(NaN,NaN,
+              fPowerLorentzMainDiagTransformedX, fPowerLorentzMainDiagTransformedY,
+              fPowerLorentzMainDiagTransformedDeltaX, fPowerLorentzMainDiagTransformedDeltaY);
+    }
 
-    double skSecX  = (fPowerLorentzFitSecondDiagXDOF > 0) ? fPowerLorentzFitSecondDiagXCenter : NaN;
-    double skSecY  = (fPowerLorentzFitSecondDiagYDOF > 0) ? fPowerLorentzFitSecondDiagYCenter : NaN;
-    setXY(skSecX, skSecY,
-          fPowerLorentzSecondDiagTransformedX, fPowerLorentzSecondDiagTransformedY,
-          fPowerLorentzSecondDiagTransformedDeltaX, fPowerLorentzSecondDiagTransformedDeltaY);
+    // Secondary diagonal
+    double sSecPowerLorentz = NaN;
+    if (fPowerLorentzFitSecondDiagXDOF > 0)       sSecPowerLorentz = fPowerLorentzFitSecondDiagXCenter;
+    else if (fPowerLorentzFitSecondDiagYDOF > 0)  sSecPowerLorentz = fPowerLorentzFitSecondDiagYCenter;
+    if (!std::isnan(sSecPowerLorentz)) {
+        auto [dx,dy] = sToDxDySec(sSecPowerLorentz);
+        setXY(fPixelX+dx, fPixelY+dy,
+              fPowerLorentzSecondDiagTransformedX, fPowerLorentzSecondDiagTransformedY,
+              fPowerLorentzSecondDiagTransformedDeltaX, fPowerLorentzSecondDiagTransformedDeltaY);
+    } else {
+        setXY(NaN,NaN,
+              fPowerLorentzSecondDiagTransformedX, fPowerLorentzSecondDiagTransformedY,
+              fPowerLorentzSecondDiagTransformedDeltaX, fPowerLorentzSecondDiagTransformedDeltaY);
+    }
 }
 
 void RunAction::CalculateMeanEstimations()
