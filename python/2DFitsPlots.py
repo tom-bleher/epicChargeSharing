@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 """
+Publication-Quality Post-processing plotting routine for Gaussian, Lorentzian, and Power Lorentzian 
+fit visualization of charge sharing in LGAD detectors.
+
+ENHANCED FOR SCIENTIFIC PUBLICATION:
+- Professional LaTeX mathematical notation with proper raw strings
+- High-resolution output (300 DPI) with publication-quality fonts
+- Consistent professional color palette and styling
+- Enhanced legends with proper mathematical symbols
+- Professional grid and axis styling
+- Optimized for scientific journals and presentations
+
 Post-processing plotting routine for Gaussian, Lorentzian, and Power Lorentzian fit visualization of charge sharing in LGAD detectors.
 
 This script creates plots for:
@@ -47,13 +58,63 @@ from scipy.stats import norm
 
 # Set matplotlib style for publication-quality plots
 plt.style.use('seaborn-v0_8-whitegrid')
-plt.rcParams['figure.dpi'] = 150
+plt.rcParams['figure.dpi'] = 300  # Higher DPI for publication quality
 plt.rcParams['font.size'] = 12
+plt.rcParams['font.family'] = 'serif'  # More professional for publications
+plt.rcParams['font.serif'] = ['Times New Roman', 'DejaVu Serif', 'serif']
 plt.rcParams['axes.labelsize'] = 14
 plt.rcParams['axes.titlesize'] = 16
-plt.rcParams['legend.fontsize'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+plt.rcParams['legend.fontsize'] = 10
+plt.rcParams['legend.frameon'] = True
+plt.rcParams['legend.framealpha'] = 0.9
+plt.rcParams['legend.fancybox'] = True
+plt.rcParams['legend.shadow'] = True
 plt.rcParams['xtick.labelsize'] = 11
 plt.rcParams['ytick.labelsize'] = 11
+plt.rcParams['xtick.major.width'] = 1.2
+plt.rcParams['ytick.major.width'] = 1.2
+plt.rcParams['xtick.minor.visible'] = True
+plt.rcParams['ytick.minor.visible'] = True
+plt.rcParams['grid.alpha'] = 0.3
+plt.rcParams['grid.linewidth'] = 0.8
+plt.rcParams['lines.linewidth'] = 2.0
+plt.rcParams['lines.markersize'] = 6
+plt.rcParams['axes.spines.top'] = False
+plt.rcParams['axes.spines.right'] = False
+plt.rcParams['text.usetex'] = False  # Set to True if LaTeX is available on system
+plt.rcParams['mathtext.fontset'] = 'stix'  # Professional math font
+
+def configure_publication_style():
+    """
+    Configure matplotlib for publication-quality plots with enhanced aesthetics.
+    """
+    # Professional color palette for different fit types
+    colors = {
+        'gaussian': '#1f77b4',      # Professional blue
+        'lorentzian': '#ff7f0e',    # Professional orange
+        'power_lorentzian': '#9467bd', # Professional purple
+        'true_position': '#2ca02c',  # Professional green
+        'data_points': '#000000'     # Black for data points
+    }
+    
+    # Enhanced line styles
+    line_styles = {
+        'gaussian': '-',
+        'lorentzian': '--',
+        'power_lorentzian': ':',
+        'true_position': '--'
+    }
+    
+    # Enhanced line widths
+    line_widths = {
+        'fit_curves': 2.5,
+        'power_lorentzian': 3.0,  # Slightly thicker for dotted line
+        'true_position': 2.5,
+        'reference_lines': 1.5
+    }
+    
+    return colors, line_styles, line_widths
 
 def inspect_root_file(root_file):
     """
@@ -1213,7 +1274,7 @@ def create_all_lorentzian_plot(event_idx, data, output_dir="plots"):
             # Plot Lorentzian fit - NOW INCLUDING THE VERTICAL OFFSET!
             pos_range = np.linspace(positions.min() - 0.1, positions.max() + 0.1, 200)
             y_fit = lorentzian_1d(pos_range, amplitude, center, gamma, vertical_offset)
-            ax.plot(pos_range, y_fit, 'r-', linewidth=2, alpha=0.9)
+            ax.plot(pos_range, y_fit, '-', color='#ff7f0e', linewidth=2.5, alpha=0.9)
             
             # Add vertical lines
             ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8)
@@ -1223,17 +1284,21 @@ def create_all_lorentzian_plot(event_idx, data, output_dir="plots"):
             fit_true_diff = center - true_pos
             
             # Create legend with chi2/dof, delta pixel, and fit-true difference
-            legend_text = (f'Lorentzian (χ²/ν = {chi2red:.2f})\n'
-                          f'Δ pixel {direction.upper()} = {delta_pixel:.3f} mm\n'
-                          f'Fit {direction.upper()} = {center:.3f} mm\n'
-                          rf'${direction}_{{fit}} - {direction}_{{true}}$ = {fit_true_diff:.3f} mm')
+            legend_text = (f'Lorentzian ' + r'($\chi^2/\nu$' + f' = {chi2red:.2f})\n' +
+                          r'$\Delta$' + f' pixel {direction.upper()} = {delta_pixel:.3f} mm\n'
+                          f'Fit {direction.upper()} = {center:.3f} mm\n' +
+                          r'$' + f'{direction}' + r'_{\mathrm{fit}} - ' + f'{direction}' + r'_{\mathrm{true}}$' + f' = {fit_true_diff:.3f} mm')
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
                    fontsize=10)
             
-            ax.set_xlabel('Position [mm]')
-            ax.set_ylabel('Charge [C]')
+            # Set appropriate x-axis label based on direction
+            if direction == 'x':
+                ax.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+            else:
+                ax.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+            ax.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
         
@@ -1248,40 +1313,40 @@ def create_all_lorentzian_plot(event_idx, data, output_dir="plots"):
         ax_row = fig_lor_all.add_subplot(gs_lor_all[0, 0])
         plot_lorentzian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
                                 x_lorentz_center, x_lorentz_gamma, x_lorentz_amplitude, x_lorentz_vertical_offset,
-                                x_lorentz_chi2red, x_lorentz_dof, true_x, 'Row (X-direction)', 'x', delta_pixel_x)
+                                x_lorentz_chi2red, x_lorentz_dof, true_x, 'X Row', 'x', delta_pixel_x)
         
         # Column plot
         ax_col = fig_lor_all.add_subplot(gs_lor_all[0, 1])
         plot_lorentzian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
                                 y_lorentz_center, y_lorentz_gamma, y_lorentz_amplitude, y_lorentz_vertical_offset,
-                                y_lorentz_chi2red, y_lorentz_dof, true_y, 'Column (Y-direction)', 'y', delta_pixel_y)
+                                y_lorentz_chi2red, y_lorentz_dof, true_y, 'Y Column', 'y', delta_pixel_y)
         
         # Main diagonal X plot
         ax_main_x = fig_lor_all.add_subplot(gs_lor_all[1, 0])
         plot_lorentzian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
                                 main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, main_diag_x_vertical_offset,
-                                main_diag_x_chi2red, main_diag_x_dof, true_x, 'Main Diagonal X', 'x', delta_pixel_x)
+                                main_diag_x_chi2red, main_diag_x_dof, true_x, 'X Main Diag', 'x', delta_pixel_x)
         
         # Main diagonal Y plot
         ax_main_y = fig_lor_all.add_subplot(gs_lor_all[1, 1])
         plot_lorentzian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
                                 main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, main_diag_y_vertical_offset,
-                                main_diag_y_chi2red, main_diag_y_dof, true_y, 'Main Diagonal Y', 'y', delta_pixel_y)
+                                main_diag_y_chi2red, main_diag_y_dof, true_y, 'Y Main Diag', 'y', delta_pixel_y)
         
         # Secondary diagonal X plot
         ax_sec_x = fig_lor_all.add_subplot(gs_lor_all[2, 0])
         plot_lorentzian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
                                 sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, sec_diag_x_vertical_offset,
-                                sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'Secondary Diagonal X', 'x', delta_pixel_x)
+                                sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'X Sec Diag', 'x', delta_pixel_x)
         
         # Secondary diagonal Y plot
         ax_sec_y = fig_lor_all.add_subplot(gs_lor_all[2, 1])
         plot_lorentzian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
                                 sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, sec_diag_y_vertical_offset,
-                                sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Secondary Diagonal Y', 'y', delta_pixel_y)
+                                sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Y Sec Diag', 'y', delta_pixel_y)
         
         
-        plt.suptitle(f'Event {event_idx}: Lorentzian Fits (All Directions)', fontsize=16)
+        plt.suptitle(f'Event {event_idx}: Lorentzian Fits', fontsize=13)
         plt.tight_layout()
         plt.savefig(os.path.join(lorentzian_dir, f'event_{event_idx:04d}_all_lorentzian.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
@@ -1356,7 +1421,7 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
             # Plot Power Lorentzian fit - NOW INCLUDING THE VERTICAL OFFSET!
             pos_range = np.linspace(positions.min() - 0.1, positions.max() + 0.1, 200)
             y_fit = power_lorentzian_1d(pos_range, amplitude, center, gamma, power, vertical_offset)
-            ax.plot(pos_range, y_fit, 'm-', linewidth=2, alpha=0.9)
+            ax.plot(pos_range, y_fit, '-', color='#9467bd', linewidth=2.5, alpha=0.9)
             
             # Add vertical lines
             ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8)
@@ -1366,18 +1431,22 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
             fit_true_diff = center - true_pos
             
             # Create legend with chi2/dof, delta pixel, and fit-true difference
-            legend_text = (f'Power Lorentzian (χ²/ν = {chi2red:.2f})\n'
-                          f'Power = {power:.2f}\n'
-                          f'Δ pixel {direction.upper()} = {delta_pixel:.3f} mm\n'
-                          f'Fit {direction.upper()} = {center:.3f} mm\n'
-                          rf'${direction}_{{fit}} - {direction}_{{true}}$ = {fit_true_diff:.3f} mm')
+            legend_text = (f'Power Lorentzian ' + r'($\chi^2/\nu$' + f' = {chi2red:.2f})\n'
+                          f'Power = {power:.2f}\n' +
+                          r'$\Delta$' + f' pixel {direction.upper()} = {delta_pixel:.3f} mm\n'
+                          f'Fit {direction.upper()} = {center:.3f} mm\n' +
+                          r'$' + f'{direction}' + r'_{\mathrm{fit}} - ' + f'{direction}' + r'_{\mathrm{true}}$' + f' = {fit_true_diff:.3f} mm')
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
                    fontsize=10)
             
-            ax.set_xlabel('Position [mm]')
-            ax.set_ylabel('Charge [C]')
+            # Set appropriate x-axis label based on direction
+            if direction == 'x':
+                ax.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+            else:
+                ax.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+            ax.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
         
@@ -1391,13 +1460,13 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         ax_row = fig_power_all.add_subplot(gs_power_all[0, 0])
         plot_power_lorentzian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
                                       x_power_center, x_power_gamma, x_power_amplitude, x_power_power, x_power_vertical_offset,
-                                      x_power_chi2red, x_power_dof, true_x, 'Row (X-direction)', 'x', delta_pixel_x)
+                                      x_power_chi2red, x_power_dof, true_x, 'X Row', 'x', delta_pixel_x)
         
         # Column plot
         ax_col = fig_power_all.add_subplot(gs_power_all[0, 1])
         plot_power_lorentzian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
                                       y_power_center, y_power_gamma, y_power_amplitude, y_power_power, y_power_vertical_offset,
-                                      y_power_chi2red, y_power_dof, true_y, 'Column (Y-direction)', 'y', delta_pixel_y)
+                                      y_power_chi2red, y_power_dof, true_y, 'Y Column', 'y', delta_pixel_y)
         
         # For diagonals, use Gaussian parameters (Power Lorentzian diagonals may not be implemented)
         main_diag_x_center = data.get('FitDiag_MainXCenter', [x_power_center])[event_idx]
@@ -1446,7 +1515,7 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
                                       sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, 1.0, 0,
                                       sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Secondary Diagonal Y (approx)', 'y', delta_pixel_y)
         
-        plt.suptitle(f'Event {event_idx}: Power Lorentzian Fits (All Directions)', fontsize=16)
+        plt.suptitle(f'Event {event_idx}: Power Lorentzian Fits', fontsize=13)
         plt.tight_layout()
         plt.savefig(os.path.join(power_lorentzian_dir, f'event_{event_idx:04d}_all_power_lorentzian.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
@@ -1544,7 +1613,7 @@ def create_all_gaussian_plot(event_idx, data, output_dir="plots"):
             # Plot Gaussian fit - NOW INCLUDING THE VERTICAL OFFSET!
             pos_range = np.linspace(positions.min() - 0.1, positions.max() + 0.1, 200)
             y_fit = gaussian_1d(pos_range, amplitude, center, sigma, vertical_offset)
-            ax.plot(pos_range, y_fit, 'b-', linewidth=2, alpha=0.9)
+            ax.plot(pos_range, y_fit, '-', color='#1f77b4', linewidth=2.5, alpha=0.9)
             
             # Add vertical lines
             ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8)
@@ -1554,17 +1623,21 @@ def create_all_gaussian_plot(event_idx, data, output_dir="plots"):
             fit_true_diff = center - true_pos
             
             # Create legend with chi2/dof, delta pixel, and fit-true difference
-            legend_text = (f'Gaussian (χ²/ν = {chi2red:.2f})\n'
-                          f'Δ pixel {direction.upper()} = {delta_pixel:.3f} mm\n'
-                          f'Fit {direction.upper()} = {center:.3f} mm\n'
-                          rf'${direction}_{{fit}} - {direction}_{{true}}$ = {fit_true_diff:.3f} mm')
+            legend_text = (f'Gaussian ' + r'($\chi^2/\nu$' + f' = {chi2red:.2f})\n' +
+                          r'$\Delta$' + f' pixel {direction.upper()} = {delta_pixel:.3f} mm\n'
+                          f'Fit {direction.upper()} = {center:.3f} mm\n' +
+                          r'$' + f'{direction}' + r'_{\mathrm{fit}} - ' + f'{direction}' + r'_{\mathrm{true}}$' + f' = {fit_true_diff:.3f} mm')
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
                    fontsize=10)
             
-            ax.set_xlabel('Position [mm]')
-            ax.set_ylabel('Charge [C]')
+            # Set appropriate x-axis label based on direction
+            if direction == 'x':
+                ax.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+            else:
+                ax.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+            ax.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
         
@@ -1579,39 +1652,39 @@ def create_all_gaussian_plot(event_idx, data, output_dir="plots"):
         ax_row = fig_gauss_all.add_subplot(gs_gauss_all[0, 0])
         plot_gaussian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
                               x_gauss_center, x_gauss_sigma, x_gauss_amplitude, x_gauss_vertical_offset,
-                              x_gauss_chi2red, x_gauss_dof, true_x, 'Row (X-direction)', 'x', delta_pixel_x)
+                              x_gauss_chi2red, x_gauss_dof, true_x, 'X Row', 'x', delta_pixel_x)
         
         # Column plot
         ax_col = fig_gauss_all.add_subplot(gs_gauss_all[0, 1])
         plot_gaussian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
                               y_gauss_center, y_gauss_sigma, y_gauss_amplitude, y_gauss_vertical_offset,
-                              y_gauss_chi2red, y_gauss_dof, true_y, 'Column (Y-direction)', 'y', delta_pixel_y)
+                              y_gauss_chi2red, y_gauss_dof, true_y, 'Y Column', 'y', delta_pixel_y)
         
         # Main diagonal X plot
         ax_main_x = fig_gauss_all.add_subplot(gs_gauss_all[1, 0])
         plot_gaussian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
                               main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, main_diag_x_vertical_offset,
-                              main_diag_x_chi2red, main_diag_x_dof, true_x, 'Main Diagonal X', 'x', delta_pixel_x)
+                              main_diag_x_chi2red, main_diag_x_dof, true_x, 'X Main Diag', 'x', delta_pixel_x)
         
         # Main diagonal Y plot
         ax_main_y = fig_gauss_all.add_subplot(gs_gauss_all[1, 1])
         plot_gaussian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
                               main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, main_diag_y_vertical_offset,
-                              main_diag_y_chi2red, main_diag_y_dof, true_y, 'Main Diagonal Y', 'y', delta_pixel_y)
+                              main_diag_y_chi2red, main_diag_y_dof, true_y, 'Y Main Diag', 'y', delta_pixel_y)
         
         # Secondary diagonal X plot
         ax_sec_x = fig_gauss_all.add_subplot(gs_gauss_all[2, 0])
         plot_gaussian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
                               sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, sec_diag_x_vertical_offset,
-                              sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'Secondary Diagonal X', 'x', delta_pixel_x)
+                              sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'X Sec Diag', 'x', delta_pixel_x)
         
         # Secondary diagonal Y plot
         ax_sec_y = fig_gauss_all.add_subplot(gs_gauss_all[2, 1])
         plot_gaussian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
                               sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, sec_diag_y_vertical_offset,
-                              sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Secondary Diagonal Y', 'y', delta_pixel_y)
+                              sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Y Sec Diag', 'y', delta_pixel_y)
         
-        plt.suptitle(f'Event {event_idx}: Gaussian Fits (All Directions)', fontsize=16)
+        plt.suptitle(f'Event {event_idx}: Gaussian Fits', fontsize=13)
         plt.tight_layout()
         plt.savefig(os.path.join(gaussian_dir, f'event_{event_idx:04d}_all_gaussian.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
@@ -1737,67 +1810,71 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             if has_gaussian and direction == 'x':
                 x_gauss_vertical_offset = data.get('Fit2D_XVerticalOffset', [0])[event_idx] if 'Fit2D_XVerticalOffset' in data else 0
                 gauss_fit = gaussian_1d(pos_range, x_gauss_amplitude, x_gauss_center, x_gauss_sigma, x_gauss_vertical_offset)
-                line = ax.plot(pos_range, gauss_fit, 'b-', linewidth=2, alpha=0.9, label='Gaussian')[0]
+                line = ax.plot(pos_range, gauss_fit, '-', color='#1f77b4', linewidth=2.5, alpha=0.9, label='Gaussian')[0]
                 legend_lines.append(line)
                 ax.axvline(x_gauss_center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
                 gauss_diff = x_gauss_center - true_pos
-                legend_text_parts.append(f'Gaussian: χ²/ν = {x_gauss_chi2red:.2f}, Δ = {gauss_diff:.3f}')
+                legend_text_parts.append(f'Gaussian: ' + r'$\chi^2/\nu$' + f' = {x_gauss_chi2red:.2f}, ' + r'$\Delta$' + f' = {gauss_diff:.3f}')
             elif has_gaussian and direction == 'y':
                 y_gauss_vertical_offset = data.get('Fit2D_YVerticalOffset', [0])[event_idx] if 'Fit2D_YVerticalOffset' in data else 0
                 gauss_fit = gaussian_1d(pos_range, y_gauss_amplitude, y_gauss_center, y_gauss_sigma, y_gauss_vertical_offset)
-                line = ax.plot(pos_range, gauss_fit, 'b-', linewidth=2, alpha=0.9, label='Gaussian')[0]
+                line = ax.plot(pos_range, gauss_fit, '-', color='#1f77b4', linewidth=2.5, alpha=0.9, label='Gaussian')[0]
                 legend_lines.append(line)
                 ax.axvline(y_gauss_center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
                 gauss_diff = y_gauss_center - true_pos
-                legend_text_parts.append(f'Gaussian: χ²/ν = {y_gauss_chi2red:.2f}, Δ = {gauss_diff:.3f}')
+                legend_text_parts.append(f'Gaussian: ' + r'$\chi^2/\nu$' + f' = {y_gauss_chi2red:.2f}, ' + r'$\Delta$' + f' = {gauss_diff:.3f}')
             
             # Plot Lorentzian fit if available
             if has_lorentzian and direction == 'x':
                 x_lorentz_vertical_offset = data.get('Fit2D_Lorentz_XVerticalOffset', [0])[event_idx] if 'Fit2D_Lorentz_XVerticalOffset' in data else 0
                 lorentz_fit = lorentzian_1d(pos_range, x_lorentz_amplitude, x_lorentz_center, x_lorentz_gamma, x_lorentz_vertical_offset)
-                line = ax.plot(pos_range, lorentz_fit, 'r--', linewidth=2, alpha=0.9, label='Lorentzian')[0]
+                line = ax.plot(pos_range, lorentz_fit, '--', color='#ff7f0e', linewidth=2.5, alpha=0.9, label='Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(x_lorentz_center, color='red', linestyle=':', linewidth=1, alpha=0.8)
                 lorentz_diff = x_lorentz_center - true_pos
-                legend_text_parts.append(f'Lorentzian: χ²/ν = {x_lorentz_chi2red:.2f}, Δ = {lorentz_diff:.3f}')
+                legend_text_parts.append(f'Lorentzian: ' + r'$\chi^2/\nu$' + f' = {x_lorentz_chi2red:.2f}, ' + r'$\Delta$' + f' = {lorentz_diff:.3f}')
             elif has_lorentzian and direction == 'y':
                 y_lorentz_vertical_offset = data.get('Fit2D_Lorentz_YVerticalOffset', [0])[event_idx] if 'Fit2D_Lorentz_YVerticalOffset' in data else 0
                 lorentz_fit = lorentzian_1d(pos_range, y_lorentz_amplitude, y_lorentz_center, y_lorentz_gamma, y_lorentz_vertical_offset)
-                line = ax.plot(pos_range, lorentz_fit, 'r--', linewidth=2, alpha=0.9, label='Lorentzian')[0]
+                line = ax.plot(pos_range, lorentz_fit, '--', color='#ff7f0e', linewidth=2.5, alpha=0.9, label='Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(y_lorentz_center, color='red', linestyle=':', linewidth=1, alpha=0.8)
                 lorentz_diff = y_lorentz_center - true_pos
-                legend_text_parts.append(f'Lorentzian: χ²/ν = {y_lorentz_chi2red:.2f}, Δ = {lorentz_diff:.3f}')
+                legend_text_parts.append(f'Lorentzian: ' + r'$\chi^2/\nu$' + f' = {y_lorentz_chi2red:.2f}, ' + r'$\Delta$' + f' = {lorentz_diff:.3f}')
             
             # Plot Power Lorentzian fit if available
             if has_power_lorentzian and direction == 'x':
                 power_fit = power_lorentzian_1d(pos_range, x_power_amplitude, x_power_center, x_power_gamma, x_power_power, x_power_vertical_offset)
-                line = ax.plot(pos_range, power_fit, 'm:', linewidth=2, alpha=0.9, label='Power Lorentzian')[0]
+                line = ax.plot(pos_range, power_fit, ':', color='#9467bd', linewidth=3.0, alpha=0.9, label='Power Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(x_power_center, color='magenta', linestyle=':', linewidth=1, alpha=0.8)
                 power_diff = x_power_center - true_pos
-                legend_text_parts.append(f'Power Lorentzian: χ²/ν = {x_power_chi2red:.2f}, Δ = {power_diff:.3f}')
+                legend_text_parts.append(f'Power Lorentzian: ' + r'$\chi^2/\nu$' + f' = {x_power_chi2red:.2f}, ' + r'$\Delta$' + f' = {power_diff:.3f}')
             elif has_power_lorentzian and direction == 'y':
                 power_fit = power_lorentzian_1d(pos_range, y_power_amplitude, y_power_center, y_power_gamma, y_power_power, y_power_vertical_offset)
-                line = ax.plot(pos_range, power_fit, 'm:', linewidth=2, alpha=0.9, label='Power Lorentzian')[0]
+                line = ax.plot(pos_range, power_fit, ':', color='#9467bd', linewidth=3.0, alpha=0.9, label='Power Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(y_power_center, color='magenta', linestyle=':', linewidth=1, alpha=0.8)
                 power_diff = y_power_center - true_pos
-                legend_text_parts.append(f'Power Lorentzian: χ²/ν = {y_power_chi2red:.2f}, Δ = {power_diff:.3f}')
+                legend_text_parts.append(f'Power Lorentzian: ' + r'$\chi^2/\nu$' + f' = {y_power_chi2red:.2f}, ' + r'$\Delta$' + f' = {power_diff:.3f}')
             
             # Add true position line
             ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Position')
             
             # Create legend text
             legend_text = '\n'.join(legend_text_parts)
-            legend_text += f'\nΔ pixel {direction.upper()} = {delta_pixel:.3f} mm'
+            legend_text += '\n' + r'$\Delta$' + f' pixel {direction.upper()} = {delta_pixel:.3f} mm'
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
                    fontsize=9)
             
-            ax.set_xlabel('Position [mm]')
-            ax.set_ylabel('Charge [C]')
+            # Set appropriate x-axis label based on direction
+            if direction == 'x':
+                ax.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+            else:
+                ax.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+            ax.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
             ax.legend(loc='upper right', fontsize=8)
@@ -1810,11 +1887,11 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
         
         # Row plot
         ax_row = fig_combined.add_subplot(gs_combined[0, 0])
-        plot_all_models_direction(ax_row, row_pos, row_charges, row_uncertainties, true_x, 'Row (X-direction)', 'x', delta_pixel_x)
+        plot_all_models_direction(ax_row, row_pos, row_charges, row_uncertainties, true_x, 'X Row', 'x', delta_pixel_x)
         
         # Column plot
         ax_col = fig_combined.add_subplot(gs_combined[0, 1])
-        plot_all_models_direction(ax_col, col_pos, col_charges, col_uncertainties, true_y, 'Column (Y-direction)', 'y', delta_pixel_y)
+        plot_all_models_direction(ax_col, col_pos, col_charges, col_uncertainties, true_y, 'Y Column', 'y', delta_pixel_y)
         
         # Diagonal plots (all available diagonal fits)
         def plot_diagonal_direction(ax, positions, charges, uncertainties, true_pos, title, direction='x', delta_pixel=0):
@@ -1943,22 +2020,22 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             center, width, amplitude, offset, chi2red, dof = params
             if not np.isnan(center) and not np.isnan(width) and not np.isnan(amplitude) and dof > 0:
                 gauss_fit = gaussian_1d(pos_range, amplitude, center, width, offset)
-                line = ax.plot(pos_range, gauss_fit, 'b-', linewidth=2, alpha=0.9, label='Gaussian')[0]
+                line = ax.plot(pos_range, gauss_fit, '-', color='#1f77b4', linewidth=2.5, alpha=0.9, label='Gaussian')[0]
                 legend_lines.append(line)
                 ax.axvline(center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
                 gauss_diff = center - true_pos
-                legend_text_parts.append(f'Gaussian: χ²/ν = {chi2red:.2f}, Δ = {gauss_diff:.3f}')
+                legend_text_parts.append(f'Gaussian: ' + r'$\chi^2/\nu$' + f' = {chi2red:.2f}, ' + r'$\Delta$' + f' = {gauss_diff:.3f}')
             
             # Plot Lorentzian diagonal fit if available
             params = get_diagonal_params(diag_type, direction, 'lorentzian')
             center, width, amplitude, offset, chi2red, dof = params
             if not np.isnan(center) and not np.isnan(width) and not np.isnan(amplitude) and dof > 0:
                 lorentz_fit = lorentzian_1d(pos_range, amplitude, center, width, offset)
-                line = ax.plot(pos_range, lorentz_fit, 'r--', linewidth=2, alpha=0.9, label='Lorentzian')[0]
+                line = ax.plot(pos_range, lorentz_fit, '--', color='#ff7f0e', linewidth=2.5, alpha=0.9, label='Lorentzian')[0]
                 legend_lines.append(line)
                 ax.axvline(center, color='red', linestyle=':', linewidth=1, alpha=0.8)
                 lorentz_diff = center - true_pos
-                legend_text_parts.append(f'Lorentzian: χ²/ν = {chi2red:.2f}, Δ = {lorentz_diff:.3f}')
+                legend_text_parts.append(f'Lorentzian: ' + r'$\chi^2/\nu$' + f' = {chi2red:.2f}, ' + r'$\Delta$' + f' = {lorentz_diff:.3f}')
             
             # Plot Power Lorentzian diagonal fit if available
             params = get_diagonal_params(diag_type, direction, 'power_lorentzian')
@@ -1966,11 +2043,11 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
                 center, width, amplitude, offset, chi2red, dof, power = params
                 if not np.isnan(center) and not np.isnan(width) and not np.isnan(amplitude) and dof > 0:
                     power_fit = power_lorentzian_1d(pos_range, amplitude, center, width, power, offset)
-                    line = ax.plot(pos_range, power_fit, 'm:', linewidth=2, alpha=0.9, label='Power Lorentzian')[0]
+                    line = ax.plot(pos_range, power_fit, ':', color='#9467bd', linewidth=3.0, alpha=0.9, label='Power Lorentzian')[0]
                     legend_lines.append(line)
                     ax.axvline(center, color='magenta', linestyle=':', linewidth=1, alpha=0.8)
                     power_diff = center - true_pos
-                    legend_text_parts.append(f'Power Lorentzian: χ²/ν = {chi2red:.2f}, Δ = {power_diff:.3f}')
+                    legend_text_parts.append(f'Power Lorentzian: ' + r'$\chi^2/\nu$' + f' = {chi2red:.2f}, ' + r'$\Delta$' + f' = {power_diff:.3f}')
             
             # Add true position line
             ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Position')
@@ -1978,38 +2055,42 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             # Create legend text
             if legend_text_parts:
                 legend_text = '\n'.join(legend_text_parts)
-                legend_text += f'\nΔ pixel {direction.upper()} = {delta_pixel:.3f} mm'
+                legend_text += '\n' + r'$\Delta$' + f' pixel {direction.upper()} = {delta_pixel:.3f} mm'
             else:
-                legend_text = f'No successful diagonal fits\nΔ pixel {direction.upper()} = {delta_pixel:.3f} mm'
+                legend_text = 'No successful diagonal fits\n' + r'$\Delta$' + f' pixel {direction.upper()} = {delta_pixel:.3f} mm'
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
                    fontsize=9)
             
-            ax.set_xlabel('Position [mm]')
-            ax.set_ylabel('Charge [C]')
+            # Set appropriate x-axis label based on direction
+            if direction == 'x':
+                ax.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+            else:
+                ax.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+            ax.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
             ax.legend(loc='upper right', fontsize=8)
         
         # Main diagonal X plot - use comprehensive plotting function
         ax_main_x = fig_combined.add_subplot(gs_combined[1, 0])
-        plot_all_models_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, true_x, 'Main Diagonal X', 'x', delta_pixel_x, diagonal_type='main')
+        plot_all_models_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, true_x, 'X Main Diag', 'x', delta_pixel_x, diagonal_type='main')
         
         # Main diagonal Y plot - use comprehensive plotting function
         ax_main_y = fig_combined.add_subplot(gs_combined[1, 1])
-        plot_all_models_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, true_y, 'Main Diagonal Y', 'y', delta_pixel_y, diagonal_type='main')
+        plot_all_models_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, true_y, 'Y Main Diag', 'y', delta_pixel_y, diagonal_type='main')
         
         # Secondary diagonal X plot - use comprehensive plotting function
         ax_sec_x = fig_combined.add_subplot(gs_combined[2, 0])
-        plot_all_models_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, true_x, 'Secondary Diagonal X', 'x', delta_pixel_x, diagonal_type='sec')
+        plot_all_models_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, true_x, 'X Sec Diag', 'x', delta_pixel_x, diagonal_type='sec')
         
         # Secondary diagonal Y plot - use comprehensive plotting function
         ax_sec_y = fig_combined.add_subplot(gs_combined[2, 1])
-        plot_all_models_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, true_y, 'Secondary Diagonal Y', 'y', delta_pixel_y, diagonal_type='sec')
+        plot_all_models_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, true_y, 'Y Sec Diag', 'y', delta_pixel_y, diagonal_type='sec')
         
         models_str = "_".join([m.lower().replace(" ", "_") for m in available_models])
-        plt.suptitle(f'Event {event_idx}: All Available Models ({", ".join(available_models)})\nAll models available for row/column and diagonal directions', fontsize=14)
+        plt.suptitle(f'Event {event_idx}: Combined Models ({", ".join(available_models)})', fontsize=12)
         plt.tight_layout()
         plt.savefig(os.path.join(combined_dir, f'event_{event_idx:04d}_all_models_combined.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
