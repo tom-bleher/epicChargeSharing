@@ -1,5 +1,6 @@
 #include "RunAction.hh"
 #include "Constants.hh"
+#include "SimulationLogger.hh"
 #include "G4RunManager.hh"
 #include "G4Run.hh"
 #include "G4SystemOfUnits.hh"
@@ -375,10 +376,16 @@ RunAction::~RunAction()
   // No need to delete here as it could cause double deletion
 }
 
-void RunAction::BeginOfRunAction(const G4Run*)
+void RunAction::BeginOfRunAction(const G4Run* run)
 { 
   // Initialize ROOT threading once per application
   std::call_once(gRootInitFlag, InitializeROOTThreading);
+  
+  // Log run start information
+  SimulationLogger* logger = SimulationLogger::GetInstance();
+  if (logger) {
+    logger->LogRunStart(run->GetRunID(), run->GetNumberOfEventToBeProcessed());
+  }
   
   // Lock mutex during ROOT file creation
   std::lock_guard<std::mutex> lock(fRootMutex);
@@ -855,6 +862,12 @@ void RunAction::EndOfRunAction(const G4Run* run)
     G4int nofEvents = run->GetNumberOfEvent();
     G4String fileName = "";
     G4int nEntries = 0;
+    
+    // Log run end information
+    SimulationLogger* logger = SimulationLogger::GetInstance();
+    if (logger) {
+        logger->LogRunEnd(run->GetRunID());
+    }
     
     // Lock mutex during ROOT file operations
     {

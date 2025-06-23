@@ -2,6 +2,8 @@
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
 #include "Constants.hh"
+#include "CrashHandler.hh"
+#include "SimulationLogger.hh"
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
 #include "2DPowerLorentzianFitCeres.hh"
@@ -61,6 +63,12 @@ EventAction::~EventAction()
 
 void EventAction::BeginOfEventAction(const G4Event* event)
 {
+  // Log event start
+  SimulationLogger* logger = SimulationLogger::GetInstance();
+  if (logger) {
+    logger->LogEventStart(event->GetEventID());
+  }
+  
   // Reset per-event variables
   fEdep = 0.;
   fPosition = G4ThreeVector(0.,0.,0.);
@@ -667,6 +675,16 @@ void EventAction::EndOfEventAction(const G4Event* event)
   }
   
   fRunAction->FillTree();
+  
+  // Log event end
+  G4int eventID = event->GetEventID();
+  SimulationLogger* logger = SimulationLogger::GetInstance();
+  if (logger) {
+    logger->LogEventEnd(eventID);
+  }
+  
+  // Update crash recovery progress tracking
+  CrashHandler::GetInstance().UpdateProgress(eventID);
 }
 
 void EventAction::AddEdep(G4double edep, G4ThreeVector position)
