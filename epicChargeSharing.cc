@@ -247,8 +247,7 @@ int main(int argc, char** argv)
     }
     
     // Finalize logging and crash recovery systems before cleanup
-    logger->LogSimulationEnd();
-    logger->Finalize();
+    logger->Finalize();  // This internally calls LogSimulationEnd(), so no need for explicit call
     
     CrashHandler::GetInstance().Finalize();
     

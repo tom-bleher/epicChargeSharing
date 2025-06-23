@@ -381,9 +381,9 @@ void RunAction::BeginOfRunAction(const G4Run* run)
   // Initialize ROOT threading once per application
   std::call_once(gRootInitFlag, InitializeROOTThreading);
   
-  // Log run start information
+  // Log run start information only for master thread to avoid duplicates
   SimulationLogger* logger = SimulationLogger::GetInstance();
-  if (logger) {
+  if (logger && !G4Threading::IsWorkerThread()) {
     logger->LogRunStart(run->GetRunID(), run->GetNumberOfEventToBeProcessed());
   }
   

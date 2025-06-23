@@ -239,6 +239,12 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fitResults.y_chi2red, fitResults.y_pp, fitResults.y_dof,
         fitResults.x_charge_uncertainty, fitResults.y_charge_uncertainty,
         fitResults.fit_successful);
+      
+      // Log Gaussian fitting results to SimulationLogger
+      SimulationLogger* logger = SimulationLogger::GetInstance();
+      if (logger) {
+        logger->LogGaussianFitResults(event->GetEventID(), fitResults);
+      }
         
         // Perform diagonal fitting if 2D fitting was performed and successful and diagonal fitting is enabled
         if (fitResults.fit_successful && Constants::ENABLE_DIAGONAL_FITTING) {
@@ -313,6 +319,12 @@ void EventAction::EndOfEventAction(const G4Event* event)
           lorentzFitResults.y_chi2red, lorentzFitResults.y_pp, lorentzFitResults.y_dof,
           lorentzFitResults.x_charge_uncertainty, lorentzFitResults.y_charge_uncertainty,
           lorentzFitResults.fit_successful);
+        
+        // Log Lorentzian fitting results to SimulationLogger
+        SimulationLogger* logger = SimulationLogger::GetInstance();
+        if (logger) {
+          logger->LogLorentzianFitResults(event->GetEventID(), lorentzFitResults);
+        }
           
         // Note: Lorentzian charge error data was removed as per user request
           
@@ -409,6 +421,12 @@ void EventAction::EndOfEventAction(const G4Event* event)
           powerLorentzFitResults.y_vertical_offset, powerLorentzFitResults.y_vertical_offset_err,
           powerLorentzFitResults.y_chi2red, powerLorentzFitResults.y_pp, powerLorentzFitResults.y_dof,
           powerLorentzFitResults.fit_successful);
+        
+        // Log Power Lorentzian fitting results to SimulationLogger
+        SimulationLogger* logger = SimulationLogger::GetInstance();
+        if (logger) {
+          logger->LogPowerLorentzianFitResults(event->GetEventID(), powerLorentzFitResults);
+        }
           
         // Perform diagonal Power-Law Lorentzian fitting if 2D fitting was performed and successful and diagonal fitting is enabled
         if (powerLorentzFitResults.fit_successful && Constants::ENABLE_DIAGONAL_FITTING) {
@@ -502,6 +520,12 @@ void EventAction::EndOfEventAction(const G4Event* event)
           lorentz3DFitResults.charge_uncertainty,
           lorentz3DFitResults.fit_successful);
         
+        // Log 3D Lorentzian fitting results to SimulationLogger
+        SimulationLogger* logger = SimulationLogger::GetInstance();
+        if (logger) {
+          logger->Log3DLorentzianFitResults(event->GetEventID(), lorentz3DFitResults);
+        }
+        
     } else {
       // Not enough data points for 3D Lorentzian fitting or 3D Lorentzian fitting is disabled
       if (Constants::ENABLE_3D_LORENTZIAN_FITTING) {
@@ -545,6 +569,12 @@ void EventAction::EndOfEventAction(const G4Event* event)
           powerLorentz3DFitResults.chi2red, powerLorentz3DFitResults.pp, powerLorentz3DFitResults.dof,
           powerLorentz3DFitResults.charge_uncertainty,
           powerLorentz3DFitResults.fit_successful);
+        
+        // Log 3D Power Lorentzian fitting results to SimulationLogger
+        SimulationLogger* logger = SimulationLogger::GetInstance();
+        if (logger) {
+          logger->Log3DPowerLorentzianFitResults(event->GetEventID(), powerLorentz3DFitResults);
+        }
         
     } else {
       // Not enough data points for 3D Power-Law Lorentzian fitting or 3D Power-Law Lorentzian fitting is disabled
