@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <map>
 #include <iostream>
-#include <mutex>
+// Removed mutex include - no longer needed for parallelization
 #include <atomic>
 #include <limits>
 #include <numeric>
@@ -16,8 +16,7 @@
 #include "ceres/ceres.h"
 #include "glog/logging.h"
 
-// Thread-safe mutex for Ceres operations
-static std::mutex gCeresPowerLorentzianFitMutex;
+// Thread counter for debugging (removed mutex for better parallelization)
 static std::atomic<int> gGlobalCeresPowerLorentzianFitCounter{0};
 
 // Use shared Google logging initialization
@@ -457,7 +456,7 @@ bool FitPowerLorentzianCeres(
         double max_charge = *std::max_element(clean_y.begin(), clean_y.end());
         double uncertainty = CalculatePowerLorentzianUncertainty(max_charge);
         
-        // Multiple fitting configurations (similar to Lorentzian)
+        // OPTIMIZED: Cheap config first with early exit based on quality (Step 1 from optimize.md)
         struct PowerLorentzianFittingConfig {
             ceres::LinearSolverType linear_solver;
             ceres::TrustRegionStrategyType trust_region;
@@ -468,246 +467,357 @@ bool FitPowerLorentzianCeres(
             double loss_parameter;
         };
         
-        std::vector<PowerLorentzianFittingConfig> configs;
+        // Stage 1: Cheap configuration
+        PowerLorentzianFittingConfig cheap_config = {
+            ceres::DENSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 
+            1e-10, 1e-10, 400, "NONE", 0.0
+        };
         
-        PowerLorentzianFittingConfig config1;
-        config1.linear_solver = ceres::DENSE_QR;
-        config1.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config1.function_tolerance = 1e-15;
-        config1.gradient_tolerance = 1e-15;
-        config1.max_iterations = 2000;
-        config1.loss_function = "HUBER";
-        config1.loss_parameter = estimates.amplitude * 0.1;
-        configs.push_back(config1);
+        // Stage 2: Expensive fallback configurations
+        const std::vector<PowerLorentzianFittingConfig> expensive_configs = {
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amplitude * 0.1},
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amplitude * 0.16},
+            {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amplitude * 0.22}
+        };
         
-        PowerLorentzianFittingConfig config2;
-        config2.linear_solver = ceres::DENSE_QR;
-        config2.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config2.function_tolerance = 1e-12;
-        config2.gradient_tolerance = 1e-12;
-        config2.max_iterations = 1500;
-        config2.loss_function = "CAUCHY";
-        config2.loss_parameter = estimates.amplitude * 0.16;
-        configs.push_back(config2);
-        
-        PowerLorentzianFittingConfig config3;
-        config3.linear_solver = ceres::DENSE_QR;
-        config3.trust_region = ceres::DOGLEG;
-        config3.function_tolerance = 1e-10;
-        config3.gradient_tolerance = 1e-10;
-        config3.max_iterations = 1000;
-        config3.loss_function = "NONE";
-        config3.loss_parameter = 0.0;
-        configs.push_back(config3);
-        
-        PowerLorentzianFittingConfig config4;
-        config4.linear_solver = ceres::DENSE_NORMAL_CHOLESKY;
-        config4.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config4.function_tolerance = 1e-12;
-        config4.gradient_tolerance = 1e-12;
-        config4.max_iterations = 1500;
-        config4.loss_function = "HUBER";
-        config4.loss_parameter = estimates.amplitude * 0.13;
-        configs.push_back(config4);
-        
-        PowerLorentzianFittingConfig config5;
-        config5.linear_solver = ceres::SPARSE_NORMAL_CHOLESKY;
-        config5.trust_region = ceres::LEVENBERG_MARQUARDT;
-        config5.function_tolerance = 1e-12;
-        config5.gradient_tolerance = 1e-12;
-        config5.max_iterations = 1200;
-        config5.loss_function = "CAUCHY";
-        config5.loss_parameter = estimates.amplitude * 0.22;
-        configs.push_back(config5);
-        
-        for (const auto& config : configs) {
-            // Set up parameter array (5 parameters: A, m, gamma, beta, B)
-            double parameters[5];
-            parameters[0] = estimates.amplitude;
-            parameters[1] = estimates.center;
-            parameters[2] = estimates.gamma;
-            parameters[3] = estimates.beta;
-            parameters[4] = estimates.baseline;
-            
-            // Build the problem
-            ceres::Problem problem;
-            
-            // Add residual blocks with uncertainties
-            for (size_t i = 0; i < clean_x.size(); ++i) {
-                ceres::CostFunction* cost_function = PowerLorentzianCostFunction::Create(
-                    clean_x[i], clean_y[i], uncertainty);
-                
-                // No loss functions - simple weighted least squares
-                problem.AddResidualBlock(cost_function, nullptr, parameters);
-            }
-            
-            // Set bounds (similar to Lorentzian but with extra beta parameter)
-            double amp_min = std::max(Constants::MIN_UNCERTAINTY_VALUE, estimates.amplitude * 0.01);
-            double max_charge_val = *std::max_element(clean_y.begin(), clean_y.end());
-            double physics_amp_max = max_charge_val * 1.5;
-            double algo_amp_max = estimates.amplitude * 100.0;
-            double amp_max = std::min(physics_amp_max, algo_amp_max);
-
-            problem.SetParameterLowerBound(parameters, 0, amp_min);
-            problem.SetParameterUpperBound(parameters, 0, amp_max);
-            
-            double center_range = pixel_spacing * 3.0;
-            problem.SetParameterLowerBound(parameters, 1, estimates.center - center_range);
-            problem.SetParameterUpperBound(parameters, 1, estimates.center + center_range);
-            
-            problem.SetParameterLowerBound(parameters, 2, pixel_spacing * 0.05);
-            problem.SetParameterUpperBound(parameters, 2, pixel_spacing * 4.0);
-            
-            // Beta parameter bounds (power exponent): [0.2, 4.0]
-            problem.SetParameterLowerBound(parameters, 3, 0.2);
-            problem.SetParameterUpperBound(parameters, 3, 4.0);
-            
-            double baseline_range = std::max(estimates.amplitude * 0.5, std::abs(estimates.baseline) * 2.0);
-            problem.SetParameterLowerBound(parameters, 4, estimates.baseline - baseline_range);
-            problem.SetParameterUpperBound(parameters, 4, estimates.baseline + baseline_range);
-            
-            // Configure solver
-            ceres::Solver::Options options;
-            options.linear_solver_type = config.linear_solver;
-            options.minimizer_type = ceres::TRUST_REGION;
-            options.trust_region_strategy_type = config.trust_region;
-            options.function_tolerance = config.function_tolerance;
-            options.gradient_tolerance = config.gradient_tolerance;
-            options.parameter_tolerance = 1e-15;
-            options.max_num_iterations = config.max_iterations;
-            options.max_num_consecutive_invalid_steps = 50;
-            options.use_nonmonotonic_steps = true;
-            options.minimizer_progress_to_stdout = false;
-            
-            // Two-stage fitting approach to ensure consistent center with Lorentzian
-            
-            // Stage 1: Constrain beta close to 1.0 (standard Lorentzian) to stabilize center
-            problem.SetParameterLowerBound(parameters, 3, 0.9);
-            problem.SetParameterUpperBound(parameters, 3, 1.1);
-            
+        // Try cheap config first
+        auto try_config = [&](const PowerLorentzianFittingConfig& config, const std::string& stage_name) -> bool {
             if (verbose) {
-                std::cout << "Stage 1: Fitting with beta constrained to ~1.0 (Lorentzian-like)..." << std::endl;
+                std::cout << "Trying Power Lorentzian " << stage_name << " configuration..." << std::endl;
+            }
+            // STEP 2 OPTIMIZATION: Hierarchical multi-start budget for Power Lorentzian
+            // Start with base estimate, only add 2 perturbations if χ²ᵣ > 2.0
+            // Expected: ×4-5 speed-up, average #Ceres solves/fit ≤10
+            
+            struct ParameterSet {
+                double params[5];
+                std::string description;
+            };
+            
+            std::vector<ParameterSet> initial_guesses;
+            
+            // ALWAYS start with base estimate first
+            ParameterSet base_set;
+            base_set.params[0] = estimates.amplitude;
+            base_set.params[1] = estimates.center;
+            base_set.params[2] = estimates.gamma;
+            base_set.params[3] = estimates.beta;
+            base_set.params[4] = estimates.baseline;
+            base_set.description = "base_estimate";
+            initial_guesses.push_back(base_set);
+            
+            double best_cost = std::numeric_limits<double>::max();
+            double best_parameters[5];
+            bool any_success = false;
+            std::string best_description;
+            double best_chi2_reduced = std::numeric_limits<double>::max();
+            
+            // Data characteristics for adaptive bounds
+            DataStatistics data_stats = CalculateRobustStatisticsPowerLorentzian(clean_x, clean_y);
+            double data_spread = *std::max_element(clean_x.begin(), clean_x.end()) - 
+                               *std::min_element(clean_x.begin(), clean_x.end());
+            double outlier_ratio = 0.0;
+            if (clean_x.size() > 0) {
+                int outlier_count = 0;
+                double outlier_threshold = data_stats.median + 2.0 * data_stats.mad;
+                for (double val : clean_y) {
+                    if (val > outlier_threshold) outlier_count++;
+                }
+                outlier_ratio = static_cast<double>(outlier_count) / clean_x.size();
             }
             
-            ceres::Solver::Summary summary_stage1;
-            ceres::Solve(options, &problem, &summary_stage1);
+            // Try base estimate first
+            for (const auto& guess : initial_guesses) {
+                double parameters[5];
+                parameters[0] = guess.params[0];
+                parameters[1] = guess.params[1];
+                parameters[2] = guess.params[2];
+                parameters[3] = guess.params[3];
+                parameters[4] = guess.params[4];
             
-            // Check if stage 1 was successful
-            bool stage1_successful = (summary_stage1.termination_type == ceres::CONVERGENCE ||
-                                    summary_stage1.termination_type == ceres::USER_SUCCESS) &&
-                                   parameters[0] > 0 && parameters[2] > 0 &&
-                                   !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
-                                   !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
-                                   !std::isnan(parameters[4]);
-            
-            ceres::Solver::Summary summary;
-            if (stage1_successful) {
-                // Stage 2: Allow beta to vary more freely while keeping the stabilized center
-                problem.SetParameterLowerBound(parameters, 3, 0.2);
-                problem.SetParameterUpperBound(parameters, 3, 4.0);
+                ceres::Problem problem;
                 
-                // Tighten center bounds around the Stage 1 result to prevent drift
-                double stage1_center = parameters[1];
-                double tight_center_range = pixel_spacing * 0.5; // Much tighter than original
-                problem.SetParameterLowerBound(parameters, 1, stage1_center - tight_center_range);
-                problem.SetParameterUpperBound(parameters, 1, stage1_center + tight_center_range);
-                
-                if (verbose) {
-                    std::cout << "Stage 2: Refining fit with beta free to vary (center stabilized at " 
-                             << stage1_center << ")..." << std::endl;
+                for (size_t i = 0; i < clean_x.size(); ++i) {
+                    ceres::CostFunction* cost_function = PowerLorentzianCostFunction::Create(
+                        clean_x[i], clean_y[i], uncertainty);
+                    problem.AddResidualBlock(cost_function, nullptr, parameters);
                 }
                 
-                ceres::Solve(options, &problem, &summary);
-            } else {
-                // If stage 1 failed, use the original single-stage approach
-                problem.SetParameterLowerBound(parameters, 3, 0.2);
-                problem.SetParameterUpperBound(parameters, 3, 4.0);
+                // Set adaptive bounds
+                double max_charge_val = *std::max_element(clean_y.begin(), clean_y.end());
+                double min_charge_val = *std::min_element(clean_y.begin(), clean_y.end());
                 
-                if (verbose) {
-                    std::cout << "Stage 1 failed, falling back to single-stage fit..." << std::endl;
+                double amp_min = std::max(Constants::MIN_UNCERTAINTY_VALUE, 
+                                        std::max(parameters[0] * 0.01, std::abs(min_charge_val) * 0.1));
+                double physics_amp_max = std::max(max_charge_val * 1.5, std::abs(parameters[0]) * 2.0);
+                double algo_amp_max = std::max(parameters[0] * 100.0, 1e-10);
+                double amp_max = std::max(physics_amp_max, algo_amp_max);
+
+                problem.SetParameterLowerBound(parameters, 0, amp_min);
+                problem.SetParameterUpperBound(parameters, 0, amp_max);
+                
+                double adaptive_center_range = (outlier_ratio > 0.15) ? 
+                    std::min(pixel_spacing * 3.0, data_spread * 0.4) : pixel_spacing * 3.0;
+                problem.SetParameterLowerBound(parameters, 1, parameters[1] - adaptive_center_range);
+                problem.SetParameterUpperBound(parameters, 1, parameters[1] + adaptive_center_range);
+                
+                double gamma_min = std::max(pixel_spacing * 0.05, data_spread * 0.01);
+                double gamma_max = std::min(pixel_spacing * 4.0, data_spread * 0.8);
+                problem.SetParameterLowerBound(parameters, 2, gamma_min);
+                problem.SetParameterUpperBound(parameters, 2, gamma_max);
+                
+                double beta_min = (outlier_ratio > 0.2) ? 0.5 : 0.2;
+                double beta_max = (outlier_ratio > 0.2) ? 2.5 : 4.0;
+                problem.SetParameterLowerBound(parameters, 3, beta_min);
+                problem.SetParameterUpperBound(parameters, 3, beta_max);
+                
+                double charge_range = std::abs(max_charge_val - min_charge_val);
+                double baseline_range = std::max(charge_range * 0.5, 
+                                               std::max(std::abs(parameters[4]) * 2.0, 1e-12));
+                problem.SetParameterLowerBound(parameters, 4, parameters[4] - baseline_range);
+                problem.SetParameterUpperBound(parameters, 4, parameters[4] + baseline_range);
+            
+                // Two-stage fitting approach to ensure consistent center
+                // Stage 1: Constrain beta close to 1.0 to stabilize center
+                problem.SetParameterLowerBound(parameters, 3, 0.9);
+                problem.SetParameterUpperBound(parameters, 3, 1.1);
+                
+                ceres::Solver::Options options;
+                options.linear_solver_type = config.linear_solver;
+                options.minimizer_type = ceres::TRUST_REGION;
+                options.trust_region_strategy_type = config.trust_region;
+                options.function_tolerance = config.function_tolerance;
+                options.gradient_tolerance = config.gradient_tolerance;
+                options.parameter_tolerance = 1e-15;
+                options.max_num_iterations = config.max_iterations;
+                options.max_num_consecutive_invalid_steps = 50;
+                options.use_nonmonotonic_steps = true;
+                options.minimizer_progress_to_stdout = false;
+                
+                ceres::Solver::Summary summary_stage1;
+                ceres::Solve(options, &problem, &summary_stage1);
+                
+                bool stage1_successful = (summary_stage1.termination_type == ceres::CONVERGENCE ||
+                                        summary_stage1.termination_type == ceres::USER_SUCCESS) &&
+                                       parameters[0] > 0 && parameters[2] > 0 &&
+                                       !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
+                                       !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
+                                       !std::isnan(parameters[4]);
+                
+                ceres::Solver::Summary summary;
+                if (stage1_successful) {
+                    // Stage 2: Allow beta to vary more freely
+                    problem.SetParameterLowerBound(parameters, 3, 0.2);
+                    problem.SetParameterUpperBound(parameters, 3, 4.0);
+                    
+                    double stage1_center = parameters[1];
+                    double tight_center_range = pixel_spacing * 1.0;
+                    problem.SetParameterLowerBound(parameters, 1, stage1_center - tight_center_range);
+                    problem.SetParameterUpperBound(parameters, 1, stage1_center + tight_center_range);
+                    
+                    ceres::Solve(options, &problem, &summary);
+                } else {
+                    problem.SetParameterLowerBound(parameters, 3, 0.2);
+                    problem.SetParameterUpperBound(parameters, 3, 4.0);
+                    ceres::Solve(options, &problem, &summary);
                 }
                 
-                ceres::Solve(options, &problem, &summary);
+                bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
+                                      summary.termination_type == ceres::USER_SUCCESS) &&
+                                     parameters[0] > 0 && parameters[2] > 0 && parameters[3] > 0.1 &&
+                                     parameters[3] < 5.0 &&
+                                     !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
+                                     !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
+                                     !std::isnan(parameters[4]);
+                
+                if (fit_successful) {
+                    double cost = summary.final_cost;
+                    double chi2 = cost * 2.0;
+                    int dof = std::max(1, static_cast<int>(clean_x.size()) - 5);
+                    double chi2_red = chi2 / dof;
+                    
+                    if (cost < best_cost) {
+                        best_cost = cost;
+                        best_chi2_reduced = chi2_red;
+                        std::copy(parameters, parameters + 5, best_parameters);
+                        best_description = guess.description;
+                        any_success = true;
+                        
+                        if (verbose) {
+                            std::cout << "New best Power Lorentzian result from " << guess.description 
+                                     << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
+                        }
+                    }
+                }
             }
             
-            // Validate results (including beta parameter validation)
-            bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
-                                  summary.termination_type == ceres::USER_SUCCESS) &&
-                                 parameters[0] > 0 && parameters[2] > 0 && parameters[3] > 0.1 &&
-                                 parameters[3] < 5.0 && // Beta constraint
-                                 !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
-                                 !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
-                                 !std::isnan(parameters[4]);
-            
-            if (fit_successful) {
-                // Extract results
-                fit_amplitude = parameters[0];
-                fit_center = parameters[1];
-                fit_gamma = std::abs(parameters[2]);
-                fit_beta = parameters[3];
-                fit_vertical_offset = parameters[4];
+            // HIERARCHICAL DECISION: Only add perturbations if χ²ᵣ > 0.5
+            // Updated threshold based on actual data: χ²ᵣ > 0.5 (around median-to-P75 range)
+            if (any_success && best_chi2_reduced > 0.5) {
+                if (verbose) {
+                    std::cout << "Base Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << " > 0.5, trying 2 perturbations..." << std::endl;
+                }
                 
-                // Calculate uncertainties (similar to Lorentzian approach)
-                bool cov_success = false;
+                // Add exactly 2 perturbations with beta variations
+                const std::vector<double> perturbation_factors = {0.7, 1.3};
+                const std::vector<double> beta_variations = {0.8, 1.2};
                 
-                std::vector<std::pair<ceres::CovarianceAlgorithmType, double>> cov_configs = {
-                    {ceres::DENSE_SVD, 1e-14},
-                    {ceres::DENSE_SVD, 1e-12},
-                    {ceres::DENSE_SVD, 1e-10},
-                    {ceres::SPARSE_QR, 1e-12}
-                };
-                
-                for (const auto& cov_config : cov_configs) {
-                    ceres::Covariance::Options cov_options;
-                    cov_options.algorithm_type = cov_config.first;
-                    cov_options.min_reciprocal_condition_number = cov_config.second;
-                    cov_options.null_space_rank = 2;
-                    cov_options.apply_loss_function = true;
+                for (size_t i = 0; i < perturbation_factors.size(); ++i) {
+                    double factor = perturbation_factors[i];
+                    double beta_factor = beta_variations[i];
                     
-                    ceres::Covariance covariance(cov_options);
-                    std::vector<std::pair<const double*, const double*>> covariance_blocks;
-                    covariance_blocks.push_back(std::make_pair(parameters, parameters));
+                    ParameterSet perturbed_set;
+                    perturbed_set.params[0] = estimates.amplitude * factor;
+                    perturbed_set.params[1] = estimates.center + (factor - 1.0) * pixel_spacing * 0.3;
+                    perturbed_set.params[2] = estimates.gamma * std::sqrt(factor);
+                    perturbed_set.params[3] = std::max(0.3, std::min(3.5, estimates.beta * beta_factor));
+                    perturbed_set.params[4] = estimates.baseline * (0.8 + 0.4 * factor);
+                    perturbed_set.description = "power_perturbation_" + std::to_string(factor) + "_beta_" + std::to_string(beta_factor);
                     
-                    if (covariance.Compute(covariance_blocks, &problem)) {
-                        double covariance_matrix[25]; // 5x5 matrix for 5 parameters
-                        if (covariance.GetCovarianceBlock(parameters, parameters, covariance_matrix)) {
-                            fit_amplitude_err = std::sqrt(std::abs(covariance_matrix[0]));
-                            fit_center_err = std::sqrt(std::abs(covariance_matrix[6]));
-                            fit_gamma_err = std::sqrt(std::abs(covariance_matrix[12]));
-                            fit_beta_err = std::sqrt(std::abs(covariance_matrix[18]));
-                            fit_vertical_offset_err = std::sqrt(std::abs(covariance_matrix[24]));
+                    // Try this perturbation (same two-stage logic as above)
+                    double parameters[5];
+                    parameters[0] = perturbed_set.params[0];
+                    parameters[1] = perturbed_set.params[1];
+                    parameters[2] = perturbed_set.params[2];
+                    parameters[3] = perturbed_set.params[3];
+                    parameters[4] = perturbed_set.params[4];
+                    
+                    ceres::Problem problem;
+                    
+                    for (size_t j = 0; j < clean_x.size(); ++j) {
+                        ceres::CostFunction* cost_function = PowerLorentzianCostFunction::Create(
+                            clean_x[j], clean_y[j], uncertainty);
+                        problem.AddResidualBlock(cost_function, nullptr, parameters);
+                    }
+                    
+                    // Apply same bounds as before
+                    double max_charge_val = *std::max_element(clean_y.begin(), clean_y.end());
+                    double min_charge_val = *std::min_element(clean_y.begin(), clean_y.end());
+                    
+                    double amp_min = std::max(Constants::MIN_UNCERTAINTY_VALUE, 
+                                            std::max(parameters[0] * 0.01, std::abs(min_charge_val) * 0.1));
+                    double physics_amp_max = std::max(max_charge_val * 1.5, std::abs(parameters[0]) * 2.0);
+                    double algo_amp_max = std::max(parameters[0] * 100.0, 1e-10);
+                    double amp_max = std::max(physics_amp_max, algo_amp_max);
+
+                    problem.SetParameterLowerBound(parameters, 0, amp_min);
+                    problem.SetParameterUpperBound(parameters, 0, amp_max);
+                    
+                    double adaptive_center_range = (outlier_ratio > 0.15) ? 
+                        std::min(pixel_spacing * 3.0, data_spread * 0.4) : pixel_spacing * 3.0;
+                    problem.SetParameterLowerBound(parameters, 1, parameters[1] - adaptive_center_range);
+                    problem.SetParameterUpperBound(parameters, 1, parameters[1] + adaptive_center_range);
+                    
+                    double gamma_min = std::max(pixel_spacing * 0.05, data_spread * 0.01);
+                    double gamma_max = std::min(pixel_spacing * 4.0, data_spread * 0.8);
+                    problem.SetParameterLowerBound(parameters, 2, gamma_min);
+                    problem.SetParameterUpperBound(parameters, 2, gamma_max);
+                    
+                    double beta_min = (outlier_ratio > 0.2) ? 0.5 : 0.2;
+                    double beta_max = (outlier_ratio > 0.2) ? 2.5 : 4.0;
+                    problem.SetParameterLowerBound(parameters, 3, beta_min);
+                    problem.SetParameterUpperBound(parameters, 3, beta_max);
+                    
+                    double charge_range = std::abs(max_charge_val - min_charge_val);
+                    double baseline_range = std::max(charge_range * 0.5, 
+                                                   std::max(std::abs(parameters[4]) * 2.0, 1e-12));
+                    problem.SetParameterLowerBound(parameters, 4, parameters[4] - baseline_range);
+                    problem.SetParameterUpperBound(parameters, 4, parameters[4] + baseline_range);
+                    
+                    // Two-stage approach for perturbations too
+                    problem.SetParameterLowerBound(parameters, 3, 0.9);
+                    problem.SetParameterUpperBound(parameters, 3, 1.1);
+                    
+                    ceres::Solver::Options options;
+                    options.linear_solver_type = config.linear_solver;
+                    options.minimizer_type = ceres::TRUST_REGION;
+                    options.trust_region_strategy_type = config.trust_region;
+                    options.function_tolerance = config.function_tolerance;
+                    options.gradient_tolerance = config.gradient_tolerance;
+                    options.parameter_tolerance = 1e-15;
+                    options.max_num_iterations = config.max_iterations;
+                    options.max_num_consecutive_invalid_steps = 50;
+                    options.use_nonmonotonic_steps = true;
+                    options.minimizer_progress_to_stdout = false;
+                    
+                    ceres::Solver::Summary summary_stage1;
+                    ceres::Solve(options, &problem, &summary_stage1);
+                    
+                    bool stage1_successful = (summary_stage1.termination_type == ceres::CONVERGENCE ||
+                                            summary_stage1.termination_type == ceres::USER_SUCCESS) &&
+                                           parameters[0] > 0 && parameters[2] > 0 &&
+                                           !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
+                                           !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
+                                           !std::isnan(parameters[4]);
+                    
+                    ceres::Solver::Summary summary;
+                    if (stage1_successful) {
+                        problem.SetParameterLowerBound(parameters, 3, 0.2);
+                        problem.SetParameterUpperBound(parameters, 3, 4.0);
+                        
+                        double stage1_center = parameters[1];
+                        double tight_center_range = pixel_spacing * 1.0;
+                        problem.SetParameterLowerBound(parameters, 1, stage1_center - tight_center_range);
+                        problem.SetParameterUpperBound(parameters, 1, stage1_center + tight_center_range);
+                        
+                        ceres::Solve(options, &problem, &summary);
+                    } else {
+                        problem.SetParameterLowerBound(parameters, 3, 0.2);
+                        problem.SetParameterUpperBound(parameters, 3, 4.0);
+                        ceres::Solve(options, &problem, &summary);
+                    }
+                    
+                    bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
+                                          summary.termination_type == ceres::USER_SUCCESS) &&
+                                         parameters[0] > 0 && parameters[2] > 0 && parameters[3] > 0.1 &&
+                                         parameters[3] < 5.0 &&
+                                         !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
+                                         !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
+                                         !std::isnan(parameters[4]);
+                    
+                    if (fit_successful) {
+                        double cost = summary.final_cost;
+                        double chi2 = cost * 2.0;
+                        int dof = std::max(1, static_cast<int>(clean_x.size()) - 5);
+                        double chi2_red = chi2 / dof;
+                        
+                        if (cost < best_cost) {
+                            best_cost = cost;
+                            best_chi2_reduced = chi2_red;
+                            std::copy(parameters, parameters + 5, best_parameters);
+                            best_description = perturbed_set.description;
                             
-                            if (!std::isnan(fit_amplitude_err) && !std::isnan(fit_center_err) &&
-                                !std::isnan(fit_gamma_err) && !std::isnan(fit_beta_err) && 
-                                !std::isnan(fit_vertical_offset_err) &&
-                                fit_amplitude_err < 10.0 * fit_amplitude &&
-                                fit_center_err < 5.0 * pixel_spacing) {
-                                cov_success = true;
-                                break;
+                            if (verbose) {
+                                std::cout << "New best result from " << perturbed_set.description 
+                                         << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
                             }
                         }
                     }
                 }
+            } else if (verbose && any_success) {
+                std::cout << "Base Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << " ≤ 0.5, skipping perturbations (hierarchical multi-start)" << std::endl;
+            }
+            
+            if (any_success) {
+                // Extract results from best attempt
+                fit_amplitude = best_parameters[0];
+                fit_center = best_parameters[1];
+                fit_gamma = std::abs(best_parameters[2]);
+                fit_beta = best_parameters[3];
+                fit_vertical_offset = best_parameters[4];
                 
-                // Fallback uncertainty estimation
-                if (!cov_success) {
-                    DataStatistics data_stats = CalculateRobustStatisticsPowerLorentzian(clean_x, clean_y);
-                    fit_amplitude_err = std::max(0.02 * fit_amplitude, 0.1 * data_stats.mad);
-                    fit_center_err = std::max(0.02 * pixel_spacing, fit_gamma / 10.0);
-                    fit_gamma_err = std::max(0.05 * fit_gamma, 0.01 * pixel_spacing);
-                    fit_beta_err = std::max(0.1 * fit_beta, 0.05);
-                    fit_vertical_offset_err = std::max(0.1 * std::abs(fit_vertical_offset), 0.05 * data_stats.mad);
-                }
+                // Simple fallback uncertainty estimation
+                fit_amplitude_err = std::max(0.02 * fit_amplitude, 0.1 * data_stats.mad);
+                fit_center_err = std::max(0.02 * pixel_spacing, fit_gamma / 10.0);
+                fit_gamma_err = std::max(0.05 * fit_gamma, 0.01 * pixel_spacing);
+                fit_beta_err = std::max(0.1 * fit_beta, 0.05);
+                fit_vertical_offset_err = std::max(0.1 * std::abs(fit_vertical_offset), 0.05 * data_stats.mad);
                 
-                // Calculate reduced chi-squared
-                // Ceres returns 0.5 * Σ r_i^2, multiply by 2 to get χ².
-                double chi2 = summary.final_cost * 2.0;
-                int dof = std::max(1, static_cast<int>(clean_x.size()) - 5); // DOF for 5 parameters
-                chi2_reduced = chi2 / dof;
+                chi2_reduced = best_chi2_reduced;
                 
                 if (verbose) {
-                    std::cout << "Successful Power Lorentzian fit with config " << &config - &configs[0] 
-                             << ", dataset " << dataset_idx 
+                    std::cout << "Successful Power Lorentzian fit with " << stage_name 
+                             << ", dataset " << dataset_idx << ", best init: " << best_description
                              << ": A=" << fit_amplitude << "±" << fit_amplitude_err
                              << ", m=" << fit_center << "±" << fit_center_err
                              << ", gamma=" << fit_gamma << "±" << fit_gamma_err
@@ -717,10 +827,37 @@ bool FitPowerLorentzianCeres(
                 }
                 
                 return true;
-            } else if (verbose) {
-                std::cout << "Power Lorentzian fit failed with config " << &config - &configs[0] 
-                         << ": " << summary.BriefReport() << std::endl;
             }
+            return false;
+        };
+        
+        // OPTIMIZED SOLVER ESCALATION: Try cheap config first, escalate only if needed
+        bool success = try_config(cheap_config, "cheap");
+        
+        // Early exit quality check (as per optimize.md section 4.1)
+        // Updated threshold based on actual data: χ²ᵣ ≤ 0.7 (around P75 of real distribution)
+        if (success && chi2_reduced <= 0.7) {
+            if (verbose) {
+                std::cout << "Early exit: cheap Power Lorentzian config succeeded with χ²ᵣ=" << chi2_reduced << " ≤ 0.7" << std::endl;
+            }
+            return true;
+        }
+        
+        // Escalate to expensive configs only if cheap failed or quality poor
+        if (!success || chi2_reduced > 0.7) {
+            if (verbose) {
+                std::cout << "Escalating to expensive Power Lorentzian configurations (χ²ᵣ=" << chi2_reduced 
+                         << ", success=" << success << ")" << std::endl;
+            }
+            
+            for (size_t i = 0; i < expensive_configs.size(); ++i) {
+                success = try_config(expensive_configs[i], "expensive_" + std::to_string(i+1));
+                if (success && chi2_reduced <= 3.0) {
+                    return true;
+                }
+            }
+        } else {
+            return true; // cheap config succeeded with good quality
         }
     }
     
@@ -742,10 +879,7 @@ PowerLorentzianFit2DResultsCeres Fit2DPowerLorentzianCeres(
 {
     PowerLorentzianFit2DResultsCeres result;
     
-    // Thread-safe Ceres operations
-    std::lock_guard<std::mutex> lock(gCeresPowerLorentzianFitMutex);
-    
-    // Initialize Ceres logging
+    // Initialize Ceres logging (removed mutex for better parallelization)
     InitializeCeresPowerLorentzian();
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
@@ -1058,10 +1192,7 @@ DiagonalPowerLorentzianFitResultsCeres FitDiagonalPowerLorentzianCeres(
 {
     DiagonalPowerLorentzianFitResultsCeres result;
     
-    // Thread-safe Ceres operations
-    std::lock_guard<std::mutex> lock(gCeresPowerLorentzianFitMutex);
-    
-    // Initialize Ceres logging
+    // Initialize Ceres logging (removed mutex for better parallelization)
     InitializeCeresPowerLorentzian();
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
@@ -1082,275 +1213,185 @@ DiagonalPowerLorentzianFitResultsCeres FitDiagonalPowerLorentzianCeres(
         std::cout << "Starting diagonal Power Lorentzian fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
-    // Tolerance for grouping pixels into diagonals
-    double tolerance = pixel_spacing * 0.1;
+    // FIXED DIAGONAL APPROACH:
+    // 1. Use spatial binning instead of exact coordinate matching
+    // 2. Correct coordinate transformations for ±45° rotations
+    // 3. Proper pixel spacing for diagonal geometry
     
-    // Effective centre-to-centre pitch along a ±45° diagonal is √2 times the horizontal pitch.
-    const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // ≈ √2
+    // Diagonal bin width - wider than row/column to capture more pixels
+    const double bin_width = pixel_spacing * 0.5; // 50% of pixel spacing for better coverage
     
-    // ------------------------------------------------------------------------------------
-    // FIXED: Use proper diagonal grouping using true coordinate along the ±45° axis.
-    // We project each hit onto the diagonal direction so that the abscissa that the
-    // 1-D fitter sees is spaced by pitch·√2 exactly as in the real geometry.
-    // Define the diagonal coordinate s as (dx ± dy)/√2, where dx = x-cx, dy = y-cy.
-    // ------------------------------------------------------------------------------------
-    const double inv_sqrt2 = 1.0 / std::sqrt(2.0);
-
-    // Maps: diagonal identifier → vector of (s, charge)
-    std::map<double, std::vector<std::pair<double, double>>> main_diagonal_data; // slope +1
-    std::map<double, std::vector<std::pair<double, double>>> sec_diagonal_data;  // slope −1
-
+    // Correct diagonal pixel spacing (actual distance between diagonal neighbors)
+    const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // √2, no calibration factor
+    
+    // Maps: binned diagonal coordinate → [(distance_along_diagonal, charge), ...]
+    std::map<int, std::vector<std::pair<double, double>>> main_diagonal_bins; // +45° direction
+    std::map<int, std::vector<std::pair<double, double>>> sec_diagonal_bins;  // -45° direction
+    
     for (size_t i = 0; i < x_coords.size(); ++i) {
         double x = x_coords[i];
         double y = y_coords[i];
         double charge = charge_values[i];
-
-        if (charge <= 0) continue; // ignore empty / negative pixels
-
-        // Coordinates relative to centre estimates (for robust diagonal id)
+        
+        if (charge <= 0) continue;
+        
         double dx = x - center_x_estimate;
         double dy = y - center_y_estimate;
-
-        // Indicators for membership to the two sets of diagonals
-        double diff = dx - dy;   // main diagonal (slope +1)
-        double sum  = dx + dy;   // secondary diagonal (slope −1)
-
-        // Main diagonal
-        if (std::abs(diff) < tolerance) {
-            double s = (dx + dy) * inv_sqrt2;          // coordinate along +45° direction
-            main_diagonal_data[diff].emplace_back(s, charge);
-        }
-
-        // Secondary diagonal
-        if (std::abs(sum) < tolerance) {
-            double s = (dx - dy) * inv_sqrt2;          // coordinate along −45° direction
-            sec_diagonal_data[sum].emplace_back(s, charge);
-        }
+        
+        // CORRECTED COORDINATE TRANSFORMATIONS:
+        // Main diagonal (+45°): pixels where x-coordinate increases as y-coordinate increases
+        // We rotate by -45° to align with X-axis: (x',y') = ((dx+dy)/√2, (dy-dx)/√2)
+        // The diagonal runs along constant (dy-dx), and position along diagonal is (dx+dy)/√2
+        double main_diag_id = dy - dx;                    // Perpendicular distance to +45° line
+        double main_diag_pos = (dx + dy) / 1.41421356237; // Position along +45° diagonal
+        
+        // Secondary diagonal (-45°): pixels where x-coordinate increases as y-coordinate decreases  
+        // We rotate by +45° to align with X-axis: (x',y') = ((dx-dy)/√2, (dx+dy)/√2)
+        // The diagonal runs along constant (dx+dy), and position along diagonal is (dx-dy)/√2
+        double sec_diag_id = dx + dy;                     // Perpendicular distance to -45° line
+        double sec_diag_pos = (dx - dy) / 1.41421356237; // Position along -45° diagonal
+        
+        // Bin the diagonal identifiers for spatial grouping
+        int main_bin = static_cast<int>(std::round(main_diag_id / bin_width));
+        int sec_bin = static_cast<int>(std::round(sec_diag_id / bin_width));
+        
+        main_diagonal_bins[main_bin].emplace_back(main_diag_pos, charge);
+        sec_diagonal_bins[sec_bin].emplace_back(sec_diag_pos, charge);
     }
     
-    // Find the main diagonal closest to the center estimates
-    double center_main_diag_id = center_x_estimate - center_y_estimate;
-    double best_main_diag_id = center_main_diag_id;
-    double min_main_diag_dist = std::numeric_limits<double>::max();
-    for (const auto& diag_pair : main_diagonal_data) {
-        double dist = std::abs(diag_pair.first - center_main_diag_id);
-        if (dist < min_main_diag_dist && diag_pair.second.size() >= 5) {
-            min_main_diag_dist = dist;
-            best_main_diag_id = diag_pair.first;
-        }
+    if (verbose) {
+        std::cout << "Found " << main_diagonal_bins.size() << " main diagonal bins and " 
+                 << sec_diagonal_bins.size() << " secondary diagonal bins" << std::endl;
     }
     
-    // Find the secondary diagonal closest to the center estimates
-    double center_sec_diag_id = center_x_estimate + center_y_estimate;
-    double best_sec_diag_id = center_sec_diag_id;
-    double min_sec_diag_dist = std::numeric_limits<double>::max();
-    for (const auto& diag_pair : sec_diagonal_data) {
-        double dist = std::abs(diag_pair.first - center_sec_diag_id);
-        if (dist < min_sec_diag_dist && diag_pair.second.size() >= 5) {
-            min_sec_diag_dist = dist;
-            best_sec_diag_id = diag_pair.first;
-        }
-    }
-    
-    bool main_diag_x_success = false;
-    bool main_diag_y_success = false;
-    bool sec_diag_x_success = false;
-    bool sec_diag_y_success = false;
-    
-    // Fit main diagonal X direction
-    if (main_diagonal_data.find(best_main_diag_id) != main_diagonal_data.end() && 
-        main_diagonal_data[best_main_diag_id].size() >= 5) {
-        
-        auto& main_diag_data = main_diagonal_data[best_main_diag_id];
-        
-        // Extract diagonal coordinate (s) and charge values for +45° direction
-        std::vector<double> x_vals, charge_vals;
-        for (const auto& p : main_diag_data) {
-            x_vals.push_back(p.first);
-            charge_vals.push_back(p.second);
-        }
-        
-        // Sort by coordinate
-        std::vector<std::pair<double, double>> x_charge_pairs;
-        for (size_t i = 0; i < x_vals.size(); ++i) {
-            x_charge_pairs.push_back(std::make_pair(x_vals[i], charge_vals[i]));
-        }
-        std::sort(x_charge_pairs.begin(), x_charge_pairs.end());
-        
-        // Create sorted vectors
-        std::vector<double> x_sorted, charge_x_sorted;
-        for (const auto& pair : x_charge_pairs) {
-            x_sorted.push_back(pair.first);
-            charge_x_sorted.push_back(pair.second);
-        }
-        
-        if (x_sorted.size() >= 5) {
-            if (verbose) {
-                std::cout << "Fitting main diagonal X with " << x_sorted.size() << " points" << std::endl;
+    // Find the best bins (those with most pixels near the center)
+    auto find_best_bin = [&](const std::map<int, std::vector<std::pair<double, double>>>& bins, 
+                             const std::string& direction) -> int {
+        int best_bin = 0;
+        int max_pixels = 0;
+        for (const auto& bin_pair : bins) {
+            int pixel_count = bin_pair.second.size();
+            if (pixel_count >= 5 && pixel_count > max_pixels) { // Need at least 5 for Power Lorentzian
+                max_pixels = pixel_count;
+                best_bin = bin_pair.first;
             }
-            
-            main_diag_x_success = FitPowerLorentzianCeres(
-                x_sorted, charge_x_sorted, 0.0, diag_pixel_spacing,
-                result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_gamma, 
-                result.main_diag_x_beta, result.main_diag_x_vertical_offset,
-                result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err,
-                result.main_diag_x_beta_err, result.main_diag_x_vertical_offset_err,
-                result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
-            
-            result.main_diag_x_dof = std::max(1, static_cast<int>(x_sorted.size()) - 5);
-            result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
-            result.main_diag_x_fit_successful = main_diag_x_success;
         }
+        if (verbose && max_pixels > 0) {
+            std::cout << "Best " << direction << " diagonal bin: " << best_bin 
+                     << " with " << max_pixels << " pixels" << std::endl;
+        }
+        return best_bin;
+    };
+    
+    int best_main_bin = find_best_bin(main_diagonal_bins, "main");
+    int best_sec_bin = find_best_bin(sec_diagonal_bins, "secondary");
+    
+    bool main_diag_success = false;
+    bool sec_diag_success = false;
+    
+    // Fit main diagonal (+45° direction)
+    if (main_diagonal_bins.find(best_main_bin) != main_diagonal_bins.end() && 
+        main_diagonal_bins[best_main_bin].size() >= 5) {
+        
+        auto& main_data = main_diagonal_bins[best_main_bin];
+        
+        // Sort by position along diagonal
+        std::sort(main_data.begin(), main_data.end());
+        
+        std::vector<double> positions, charges;
+        for (const auto& point : main_data) {
+            positions.push_back(point.first);
+            charges.push_back(point.second);
+        }
+        
+        if (verbose) {
+            std::cout << "Fitting main diagonal (+45°) with " << positions.size() << " points" << std::endl;
+        }
+        
+        main_diag_success = FitPowerLorentzianCeres(
+            positions, charges, 0.0, diag_pixel_spacing,
+            result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_gamma, 
+            result.main_diag_x_beta, result.main_diag_x_vertical_offset,
+            result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err,
+            result.main_diag_x_beta_err, result.main_diag_x_vertical_offset_err,
+            result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
+        
+        result.main_diag_x_dof = std::max(1, static_cast<int>(positions.size()) - 5);
+        result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
+        result.main_diag_x_fit_successful = main_diag_success;
+        
+        // For symmetry, copy results to Y (since we only have one diagonal measurement)
+        result.main_diag_y_amplitude = result.main_diag_x_amplitude;
+        result.main_diag_y_center = result.main_diag_x_center;
+        result.main_diag_y_gamma = result.main_diag_x_gamma;
+        result.main_diag_y_beta = result.main_diag_x_beta;
+        result.main_diag_y_vertical_offset = result.main_diag_x_vertical_offset;
+        result.main_diag_y_amplitude_err = result.main_diag_x_amplitude_err;
+        result.main_diag_y_center_err = result.main_diag_x_center_err;
+        result.main_diag_y_gamma_err = result.main_diag_x_gamma_err;
+        result.main_diag_y_beta_err = result.main_diag_x_beta_err;
+        result.main_diag_y_vertical_offset_err = result.main_diag_x_vertical_offset_err;
+        result.main_diag_y_chi2red = result.main_diag_x_chi2red;
+        result.main_diag_y_dof = result.main_diag_x_dof;
+        result.main_diag_y_pp = result.main_diag_x_pp;
+        result.main_diag_y_fit_successful = main_diag_success;
     }
     
-    // Fit main diagonal Y direction
-    if (main_diagonal_data.find(best_main_diag_id) != main_diagonal_data.end() && 
-        main_diagonal_data[best_main_diag_id].size() >= 5) {
+    // Fit secondary diagonal (-45° direction)
+    if (sec_diagonal_bins.find(best_sec_bin) != sec_diagonal_bins.end() && 
+        sec_diagonal_bins[best_sec_bin].size() >= 5) {
         
-        auto& main_diag_data = main_diagonal_data[best_main_diag_id];
+        auto& sec_data = sec_diagonal_bins[best_sec_bin];
         
-        // Re-use same dataset for the complementary fit (naming kept for backward compatibility)
-        std::vector<double> y_vals, charge_vals;
-        for (const auto& p : main_diag_data) {
-            y_vals.push_back(p.first);
-            charge_vals.push_back(p.second);
+        // Sort by position along diagonal
+        std::sort(sec_data.begin(), sec_data.end());
+        
+        std::vector<double> positions, charges;
+        for (const auto& point : sec_data) {
+            positions.push_back(point.first);
+            charges.push_back(point.second);
         }
         
-        // Sort by coordinate
-        std::vector<std::pair<double, double>> y_charge_pairs;
-        for (size_t i = 0; i < y_vals.size(); ++i) {
-            y_charge_pairs.push_back(std::make_pair(y_vals[i], charge_vals[i]));
-        }
-        std::sort(y_charge_pairs.begin(), y_charge_pairs.end());
-        
-        // Create sorted vectors
-        std::vector<double> y_sorted, charge_y_sorted;
-        for (const auto& pair : y_charge_pairs) {
-            y_sorted.push_back(pair.first);
-            charge_y_sorted.push_back(pair.second);
+        if (verbose) {
+            std::cout << "Fitting secondary diagonal (-45°) with " << positions.size() << " points" << std::endl;
         }
         
-        if (y_sorted.size() >= 5) {
-            if (verbose) {
-                std::cout << "Fitting main diagonal Y with " << y_sorted.size() << " points" << std::endl;
-            }
-            
-            main_diag_y_success = FitPowerLorentzianCeres(
-                y_sorted, charge_y_sorted, 0.0, diag_pixel_spacing,
-                result.main_diag_y_amplitude, result.main_diag_y_center, result.main_diag_y_gamma,
-                result.main_diag_y_beta, result.main_diag_y_vertical_offset,
-                result.main_diag_y_amplitude_err, result.main_diag_y_center_err, result.main_diag_y_gamma_err,
-                result.main_diag_y_beta_err, result.main_diag_y_vertical_offset_err,
-                result.main_diag_y_chi2red, verbose, enable_outlier_filtering);
-            
-            result.main_diag_y_dof = std::max(1, static_cast<int>(y_sorted.size()) - 5);
-            result.main_diag_y_pp = (result.main_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_y_chi2red / 10.0) : 0.0;
-            result.main_diag_y_fit_successful = main_diag_y_success;
-        }
-    }
-    
-    // Fit secondary diagonal X direction
-    if (sec_diagonal_data.find(best_sec_diag_id) != sec_diagonal_data.end() && 
-        sec_diagonal_data[best_sec_diag_id].size() >= 5) {
+        sec_diag_success = FitPowerLorentzianCeres(
+            positions, charges, 0.0, diag_pixel_spacing,
+            result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_gamma,
+            result.sec_diag_x_beta, result.sec_diag_x_vertical_offset,
+            result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err,
+            result.sec_diag_x_beta_err, result.sec_diag_x_vertical_offset_err,
+            result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
         
-        auto& sec_diag_data = sec_diagonal_data[best_sec_diag_id];
+        result.sec_diag_x_dof = std::max(1, static_cast<int>(positions.size()) - 5);
+        result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
+        result.sec_diag_x_fit_successful = sec_diag_success;
         
-        // Extract diagonal coordinate (s) and charge values for −45° direction
-        std::vector<double> x_vals, charge_vals;
-        for (const auto& p : sec_diag_data) {
-            x_vals.push_back(p.first);
-            charge_vals.push_back(p.second);
-        }
-        
-        // Sort by coordinate
-        std::vector<std::pair<double, double>> x_charge_pairs;
-        for (size_t i = 0; i < x_vals.size(); ++i) {
-            x_charge_pairs.push_back(std::make_pair(x_vals[i], charge_vals[i]));
-        }
-        std::sort(x_charge_pairs.begin(), x_charge_pairs.end());
-        
-        // Create sorted vectors
-        std::vector<double> x_sorted, charge_x_sorted;
-        for (const auto& pair : x_charge_pairs) {
-            x_sorted.push_back(pair.first);
-            charge_x_sorted.push_back(pair.second);
-        }
-        
-        if (x_sorted.size() >= 5) {
-            if (verbose) {
-                std::cout << "Fitting secondary diagonal X with " << x_sorted.size() << " points" << std::endl;
-            }
-            
-            sec_diag_x_success = FitPowerLorentzianCeres(
-                x_sorted, charge_x_sorted, 0.0, diag_pixel_spacing,
-                result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_gamma,
-                result.sec_diag_x_beta, result.sec_diag_x_vertical_offset,
-                result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err,
-                result.sec_diag_x_beta_err, result.sec_diag_x_vertical_offset_err,
-                result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
-            
-            result.sec_diag_x_dof = std::max(1, static_cast<int>(x_sorted.size()) - 5);
-            result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
-            result.sec_diag_x_fit_successful = sec_diag_x_success;
-        }
-    }
-    
-    // Fit secondary diagonal Y direction
-    if (sec_diagonal_data.find(best_sec_diag_id) != sec_diagonal_data.end() && 
-        sec_diagonal_data[best_sec_diag_id].size() >= 5) {
-        
-        auto& sec_diag_data = sec_diagonal_data[best_sec_diag_id];
-        
-        // Same dataset re-used for complementary fit
-        std::vector<double> y_vals, charge_vals;
-        for (const auto& p : sec_diag_data) {
-            y_vals.push_back(p.first);
-            charge_vals.push_back(p.second);
-        }
-        
-        // Sort by coordinate
-        std::vector<std::pair<double, double>> y_charge_pairs;
-        for (size_t i = 0; i < y_vals.size(); ++i) {
-            y_charge_pairs.push_back(std::make_pair(y_vals[i], charge_vals[i]));
-        }
-        std::sort(y_charge_pairs.begin(), y_charge_pairs.end());
-        
-        // Create sorted vectors
-        std::vector<double> y_sorted, charge_y_sorted;
-        for (const auto& pair : y_charge_pairs) {
-            y_sorted.push_back(pair.first);
-            charge_y_sorted.push_back(pair.second);
-        }
-        
-        if (y_sorted.size() >= 5) {
-            if (verbose) {
-                std::cout << "Fitting secondary diagonal Y with " << y_sorted.size() << " points" << std::endl;
-            }
-            
-            sec_diag_y_success = FitPowerLorentzianCeres(
-                y_sorted, charge_y_sorted, 0.0, diag_pixel_spacing,
-                result.sec_diag_y_amplitude, result.sec_diag_y_center, result.sec_diag_y_gamma,
-                result.sec_diag_y_beta, result.sec_diag_y_vertical_offset,
-                result.sec_diag_y_amplitude_err, result.sec_diag_y_center_err, result.sec_diag_y_gamma_err,
-                result.sec_diag_y_beta_err, result.sec_diag_y_vertical_offset_err,
-                result.sec_diag_y_chi2red, verbose, enable_outlier_filtering);
-            
-            result.sec_diag_y_dof = std::max(1, static_cast<int>(y_sorted.size()) - 5);
-            result.sec_diag_y_pp = (result.sec_diag_y_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_y_chi2red / 10.0) : 0.0;
-            result.sec_diag_y_fit_successful = sec_diag_y_success;
-        }
+        // For symmetry, copy results to Y
+        result.sec_diag_y_amplitude = result.sec_diag_x_amplitude;
+        result.sec_diag_y_center = result.sec_diag_x_center;
+        result.sec_diag_y_gamma = result.sec_diag_x_gamma;
+        result.sec_diag_y_beta = result.sec_diag_x_beta;
+        result.sec_diag_y_vertical_offset = result.sec_diag_x_vertical_offset;
+        result.sec_diag_y_amplitude_err = result.sec_diag_x_amplitude_err;
+        result.sec_diag_y_center_err = result.sec_diag_x_center_err;
+        result.sec_diag_y_gamma_err = result.sec_diag_x_gamma_err;
+        result.sec_diag_y_beta_err = result.sec_diag_x_beta_err;
+        result.sec_diag_y_vertical_offset_err = result.sec_diag_x_vertical_offset_err;
+        result.sec_diag_y_chi2red = result.sec_diag_x_chi2red;
+        result.sec_diag_y_dof = result.sec_diag_x_dof;
+        result.sec_diag_y_pp = result.sec_diag_x_pp;
+        result.sec_diag_y_fit_successful = sec_diag_success;
     }
     
     // Set overall success status
-    result.fit_successful = result.main_diag_x_fit_successful && result.main_diag_y_fit_successful &&
-                           result.sec_diag_x_fit_successful && result.sec_diag_y_fit_successful;
+    result.fit_successful = main_diag_success && sec_diag_success;
     
     if (verbose) {
-        std::cout << "Diagonal Power Lorentzian fit (Ceres) " << (result.fit_successful ? "successful" : "partial/failed") 
-                 << " (Main X: " << (result.main_diag_x_fit_successful ? "OK" : "FAIL")
-                 << ", Main Y: " << (result.main_diag_y_fit_successful ? "OK" : "FAIL")
-                 << ", Sec X: " << (result.sec_diag_x_fit_successful ? "OK" : "FAIL")
-                 << ", Sec Y: " << (result.sec_diag_y_fit_successful ? "OK" : "FAIL") << ")" << std::endl;
+        std::cout << "Diagonal Power Lorentzian fit (Ceres) " << (result.fit_successful ? "successful" : "failed") 
+                 << " (Main +45°: " << (main_diag_success ? "OK" : "FAIL") 
+                 << ", Secondary -45°: " << (sec_diag_success ? "OK" : "FAIL") << ")" << std::endl;
     }
     
     return result;
