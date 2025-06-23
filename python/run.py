@@ -12,9 +12,34 @@ from pathlib import Path
 import time
 from datetime import datetime
 
+def get_project_root():
+    """Get the project root directory, handling different execution contexts."""
+    current_dir = Path(os.getcwd())
+    
+    # If we're in the python directory, go up one level
+    if current_dir.name == "python":
+        return current_dir.parent
+    
+    # If we're in the project root, return current directory
+    if (current_dir / "include" / "Constants.hh").exists():
+        return current_dir
+    
+    # If we're in build directory, go up one level
+    if current_dir.name == "build":
+        return current_dir.parent
+    
+    # Otherwise, assume we're in project root
+    return current_dir
+
 def modify_constants_file(enable_uncertainties=True):
     """Modify the Constants.hh file to enable/disable charge uncertainties."""
-    constants_file = Path("include/Constants.hh")
+    project_root = get_project_root()
+    constants_file = project_root / "include" / "Constants.hh"
+    
+    print(f"Debug: Current working directory: {os.getcwd()}")
+    print(f"Debug: Project root: {project_root}")
+    print(f"Debug: Looking for constants file at: {constants_file}")
+    print(f"Debug: Constants file exists: {constants_file.exists()}")
     
     if not constants_file.exists():
         print(f"Error: {constants_file} not found!")
@@ -50,12 +75,15 @@ def build_project():
     """Build the project with cmake."""
     print("Building project...")
     
-    # Create build directory if it doesn't exist
-    build_dir = Path("build")
+    project_root = get_project_root()
+    build_dir = project_root / "build"
     build_dir.mkdir(exist_ok=True)
     
+    print(f"Debug: Build directory: {build_dir}")
+    
     # Run cmake and make
-    os.chdir("build")
+    original_cwd = Path(os.getcwd())
+    os.chdir(build_dir)
     
     try:
         # Configure with cmake
@@ -77,18 +105,35 @@ def build_project():
         print(f"Build error: {e}")
         return False
     finally:
-        os.chdir("..")
+        os.chdir(original_cwd)
 
-def run_simulation(output_dir, macro_file="macros/run.mac"):
+def run_simulation(output_dir, macro_file=None):
     """Run the simulation."""
-    executable = Path("build/epicChargeSharing")
+    project_root = get_project_root()
+    executable = project_root / "build" / "epicChargeSharing"
+    
+    if macro_file is None:
+        macro_file = project_root / "macros" / "run.mac"
+    else:
+        macro_file = project_root / macro_file
+    
+    print(f"Debug: Executable path: {executable}")
+    print(f"Debug: Executable exists: {executable.exists()}")
+    print(f"Debug: Macro file: {macro_file}")
+    print(f"Debug: Macro file exists: {macro_file.exists()}")
     
     if not executable.exists():
         print(f"Error: Executable {executable} not found!")
         return False
     
+    if not macro_file.exists():
+        print(f"Error: Macro file {macro_file} not found!")
+        return False
+    
     # Create output directory
     output_dir = Path(output_dir)
+    if not output_dir.is_absolute():
+        output_dir = project_root / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Change to output directory
@@ -97,7 +142,7 @@ def run_simulation(output_dir, macro_file="macros/run.mac"):
     
     try:
         # Run simulation
-        cmd = [str(original_cwd / executable), str(original_cwd / macro_file)]
+        cmd = [str(executable), str(macro_file)]
         print(f"Running: {' '.join(cmd)}")
         
         start_time = time.time()
@@ -125,7 +170,8 @@ def main():
     print("PixelChargeSharingToy Batch Simulation Runner")
     print("=" * 50)
     
-    base_dir = Path("results")
+    project_root = get_project_root()
+    base_dir = project_root / "results"
     
     with_uncertainties_dir = base_dir / "with_uncertainties"
     without_uncertainties_dir = base_dir / "without_uncertainties"
