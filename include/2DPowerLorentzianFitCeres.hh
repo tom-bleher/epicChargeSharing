@@ -171,15 +171,7 @@ struct DiagonalPowerLorentzianFitResultsCeres {
         fit_successful(false) {}
 };
 
-// Function to remove outliers
-PowerLorentzianOutlierRemovalResult RemovePowerLorentzianOutliers(
-    const std::vector<double>& x_coords,
-    const std::vector<double>& y_coords,
-    const std::vector<double>& charge_values,
-    bool enable_outlier_removal,
-    double sigma_threshold = 2.5,
-    bool verbose = false
-);
+// Legacy outlier removal function removed - now using shared FilterOutliersMad1D from StatsUtils
 
 // Function to perform 2D Power-Law Lorentzian fitting
 // Function form: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
