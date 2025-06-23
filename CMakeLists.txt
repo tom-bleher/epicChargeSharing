@@ -253,10 +253,12 @@ file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh)
 list(APPEND sources 
     ${PROJECT_SOURCE_DIR}/src/StatsUtils.cc
     ${PROJECT_SOURCE_DIR}/src/CeresUtils.cc
+    ${PROJECT_SOURCE_DIR}/src/SimulationLogger.cc
 )
 list(APPEND headers 
     ${PROJECT_SOURCE_DIR}/include/StatsUtils.hh
     ${PROJECT_SOURCE_DIR}/include/CeresUtils.hh
+    ${PROJECT_SOURCE_DIR}/include/SimulationLogger.hh
 )
 
 # Define ROOT libraries needed - only if ROOT was found properly
