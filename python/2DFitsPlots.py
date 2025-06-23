@@ -1257,16 +1257,16 @@ def create_all_lorentzian_plot(event_idx, data, output_dir="plots"):
         lorentzian_dir = os.path.join(output_dir, "lorentzian")
         os.makedirs(lorentzian_dir, exist_ok=True)
         
-        # Create all Lorentzian collage plot
-        fig_lor_all = plt.figure(figsize=(20, 15))
-        gs_lor_all = GridSpec(3, 2, hspace=0.4, wspace=0.3)
+        # Create all Lorentzian collage plot with residuals
+        fig_lor_all = plt.figure(figsize=(24, 15))
+        gs_lor_all = GridSpec(3, 4, hspace=0.4, wspace=0.3)
         
         def plot_lorentzian_direction(ax, positions, charges, uncertainties, center, gamma, amplitude, vertical_offset, chi2red, dof, true_pos, title, direction='x', delta_pixel=0):
             """Helper to plot one direction with all requested features."""
             if len(positions) < 3:
                 ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
                 ax.set_title(title)
-                return
+                return None
             
             # Plot data with or without error bars (automatically detected)
             plot_data_points(ax, positions, charges, uncertainties, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
@@ -1291,7 +1291,7 @@ def create_all_lorentzian_plot(event_idx, data, output_dir="plots"):
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-                   fontsize=10)
+                   fontsize=8)
             
             # Set appropriate x-axis label based on direction
             if direction == 'x':
@@ -1301,6 +1301,44 @@ def create_all_lorentzian_plot(event_idx, data, output_dir="plots"):
             ax.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
+            
+            # Calculate residuals for residual plot
+            fitted_values = lorentzian_1d(positions, amplitude, center, gamma, vertical_offset)
+            residuals = charges - fitted_values
+            
+            return residuals
+        
+        def plot_residuals(ax, positions, residuals, true_pos, center, title, direction='x'):
+            """Helper to plot residuals."""
+            if len(positions) < 3 or residuals is None:
+                ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
+                ax.set_title(title)
+                return
+                
+            # Plot residuals
+            ax.scatter(positions, residuals, c='black', s=20, alpha=0.7, marker='s')
+            ax.axhline(0, color='red', linestyle='-', linewidth=1, alpha=0.8, label='Zero line')
+            ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Position')
+            ax.axvline(center, color='red', linestyle=':', linewidth=2, alpha=0.8, label='Fit Center')
+            
+            # Calculate RMS of residuals
+            rms = np.sqrt(np.mean(residuals**2)) if len(residuals) > 0 else 0
+            max_res = np.max(np.abs(residuals)) if len(residuals) > 0 else 0
+            
+            # Set appropriate x-axis label based on direction
+            if direction == 'x':
+                ax.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+            else:
+                ax.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+            ax.set_ylabel(r'Residuals (C)')
+            ax.set_title(title)
+            ax.grid(True, alpha=0.3)
+            
+            # Add residual stats
+            residual_text = (rf'RMS: {rms:.2e}' + '\n' + rf'Max: {max_res:.2e}')
+            ax.text(0.02, 0.98, residual_text, transform=ax.transAxes, 
+                   verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                   fontsize=8)
         
         # Plot all directions using the helper function
         # Create dummy uncertainties for diagonal data
@@ -1309,44 +1347,62 @@ def create_all_lorentzian_plot(event_idx, data, output_dir="plots"):
         sec_x_uncertainties = np.full(len(sec_x_pos), row_uncertainties[0] if len(row_uncertainties) > 0 else 0)
         sec_y_uncertainties = np.full(len(sec_y_pos), col_uncertainties[0] if len(col_uncertainties) > 0 else 0)
         
-        # Row plot
+        # Row plot and residuals
         ax_row = fig_lor_all.add_subplot(gs_lor_all[0, 0])
-        plot_lorentzian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
+        row_residuals = plot_lorentzian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
                                 x_lorentz_center, x_lorentz_gamma, x_lorentz_amplitude, x_lorentz_vertical_offset,
                                 x_lorentz_chi2red, x_lorentz_dof, true_x, 'X Row', 'x', delta_pixel_x)
         
-        # Column plot
-        ax_col = fig_lor_all.add_subplot(gs_lor_all[0, 1])
-        plot_lorentzian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
+        ax_row_res = fig_lor_all.add_subplot(gs_lor_all[0, 1])
+        plot_residuals(ax_row_res, row_pos, row_residuals, true_x, x_lorentz_center, 'X Row Residuals', 'x')
+        
+        # Column plot and residuals
+        ax_col = fig_lor_all.add_subplot(gs_lor_all[0, 2])
+        col_residuals = plot_lorentzian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
                                 y_lorentz_center, y_lorentz_gamma, y_lorentz_amplitude, y_lorentz_vertical_offset,
                                 y_lorentz_chi2red, y_lorentz_dof, true_y, 'Y Column', 'y', delta_pixel_y)
         
-        # Main diagonal X plot
+        ax_col_res = fig_lor_all.add_subplot(gs_lor_all[0, 3])
+        plot_residuals(ax_col_res, col_pos, col_residuals, true_y, y_lorentz_center, 'Y Column Residuals', 'y')
+        
+        # Main diagonal X plot and residuals
         ax_main_x = fig_lor_all.add_subplot(gs_lor_all[1, 0])
-        plot_lorentzian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
+        main_x_residuals = plot_lorentzian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
                                 main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, main_diag_x_vertical_offset,
                                 main_diag_x_chi2red, main_diag_x_dof, true_x, 'X Main Diag', 'x', delta_pixel_x)
         
-        # Main diagonal Y plot
-        ax_main_y = fig_lor_all.add_subplot(gs_lor_all[1, 1])
-        plot_lorentzian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
+        ax_main_x_res = fig_lor_all.add_subplot(gs_lor_all[1, 1])
+        plot_residuals(ax_main_x_res, main_x_pos, main_x_residuals, true_x, main_diag_x_center, 'X Main Diag Residuals', 'x')
+        
+        # Main diagonal Y plot and residuals
+        ax_main_y = fig_lor_all.add_subplot(gs_lor_all[1, 2])
+        main_y_residuals = plot_lorentzian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
                                 main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, main_diag_y_vertical_offset,
                                 main_diag_y_chi2red, main_diag_y_dof, true_y, 'Y Main Diag', 'y', delta_pixel_y)
         
-        # Secondary diagonal X plot
+        ax_main_y_res = fig_lor_all.add_subplot(gs_lor_all[1, 3])
+        plot_residuals(ax_main_y_res, main_y_pos, main_y_residuals, true_y, main_diag_y_center, 'Y Main Diag Residuals', 'y')
+        
+        # Secondary diagonal X plot and residuals
         ax_sec_x = fig_lor_all.add_subplot(gs_lor_all[2, 0])
-        plot_lorentzian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
+        sec_x_residuals = plot_lorentzian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
                                 sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, sec_diag_x_vertical_offset,
                                 sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'X Sec Diag', 'x', delta_pixel_x)
         
-        # Secondary diagonal Y plot
-        ax_sec_y = fig_lor_all.add_subplot(gs_lor_all[2, 1])
-        plot_lorentzian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
+        ax_sec_x_res = fig_lor_all.add_subplot(gs_lor_all[2, 1])
+        plot_residuals(ax_sec_x_res, sec_x_pos, sec_x_residuals, true_x, sec_diag_x_center, 'X Sec Diag Residuals', 'x')
+        
+        # Secondary diagonal Y plot and residuals
+        ax_sec_y = fig_lor_all.add_subplot(gs_lor_all[2, 2])
+        sec_y_residuals = plot_lorentzian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
                                 sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, sec_diag_y_vertical_offset,
                                 sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Y Sec Diag', 'y', delta_pixel_y)
         
+        ax_sec_y_res = fig_lor_all.add_subplot(gs_lor_all[2, 3])
+        plot_residuals(ax_sec_y_res, sec_y_pos, sec_y_residuals, true_y, sec_diag_y_center, 'Y Sec Diag Residuals', 'y')
         
-        plt.suptitle(f'Event {event_idx}: Lorentzian Fits', fontsize=13)
+        
+        plt.suptitle(f'Event {event_idx}: Lorentzian Fits & Residuals', fontsize=13)
         plt.tight_layout()
         plt.savefig(os.path.join(lorentzian_dir, f'event_{event_idx:04d}_all_lorentzian.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
@@ -1404,16 +1460,16 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         power_lorentzian_dir = os.path.join(output_dir, "power_lorentzian")
         os.makedirs(power_lorentzian_dir, exist_ok=True)
         
-        # Create all Power Lorentzian collage plot
-        fig_power_all = plt.figure(figsize=(20, 15))
-        gs_power_all = GridSpec(3, 2, hspace=0.4, wspace=0.3)
+        # Create all Power Lorentzian collage plot with residuals
+        fig_power_all = plt.figure(figsize=(24, 15))
+        gs_power_all = GridSpec(3, 4, hspace=0.4, wspace=0.3)
         
         def plot_power_lorentzian_direction(ax, positions, charges, uncertainties, center, gamma, amplitude, power, vertical_offset, chi2red, dof, true_pos, title, direction='x', delta_pixel=0):
             """Helper to plot one direction with all requested features."""
             if len(positions) < 3:
                 ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
                 ax.set_title(title)
-                return
+                return None
             
             # Plot data with or without error bars (automatically detected)
             plot_data_points(ax, positions, charges, uncertainties, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
@@ -1439,7 +1495,7 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-                   fontsize=10)
+                   fontsize=8)
             
             # Set appropriate x-axis label based on direction
             if direction == 'x':
@@ -1449,6 +1505,12 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
             ax.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
+            
+            # Calculate residuals for residual plot
+            fitted_values = power_lorentzian_1d(positions, amplitude, center, gamma, power, vertical_offset)
+            residuals = charges - fitted_values
+            
+            return residuals
         
         # Create dummy uncertainties for diagonal data
         main_x_uncertainties = np.full(len(main_x_pos), row_uncertainties[0] if len(row_uncertainties) > 0 else 0)
@@ -1456,17 +1518,23 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         sec_x_uncertainties = np.full(len(sec_x_pos), row_uncertainties[0] if len(row_uncertainties) > 0 else 0)
         sec_y_uncertainties = np.full(len(sec_y_pos), col_uncertainties[0] if len(col_uncertainties) > 0 else 0)
         
-        # Row plot
+        # Row plot and residuals
         ax_row = fig_power_all.add_subplot(gs_power_all[0, 0])
-        plot_power_lorentzian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
+        row_residuals = plot_power_lorentzian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
                                       x_power_center, x_power_gamma, x_power_amplitude, x_power_power, x_power_vertical_offset,
                                       x_power_chi2red, x_power_dof, true_x, 'X Row', 'x', delta_pixel_x)
         
-        # Column plot
-        ax_col = fig_power_all.add_subplot(gs_power_all[0, 1])
-        plot_power_lorentzian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
+        ax_row_res = fig_power_all.add_subplot(gs_power_all[0, 1])
+        plot_residuals(ax_row_res, row_pos, row_residuals, true_x, x_power_center, 'X Row Residuals', 'x')
+        
+        # Column plot and residuals
+        ax_col = fig_power_all.add_subplot(gs_power_all[0, 2])
+        col_residuals = plot_power_lorentzian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
                                       y_power_center, y_power_gamma, y_power_amplitude, y_power_power, y_power_vertical_offset,
                                       y_power_chi2red, y_power_dof, true_y, 'Y Column', 'y', delta_pixel_y)
+        
+        ax_col_res = fig_power_all.add_subplot(gs_power_all[0, 3])
+        plot_residuals(ax_col_res, col_pos, col_residuals, true_y, y_power_center, 'Y Column Residuals', 'y')
         
         # For diagonals, use Gaussian parameters (Power Lorentzian diagonals may not be implemented)
         main_diag_x_center = data.get('FitDiag_MainXCenter', [x_power_center])[event_idx]
@@ -1477,9 +1545,12 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         
         # Main diagonal X plot (using Gaussian fit for diagonal, but labeled as approximation)
         ax_main_x = fig_power_all.add_subplot(gs_power_all[1, 0])
-        plot_power_lorentzian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
+        main_x_residuals = plot_power_lorentzian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
                                       main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, 1.0, 0,
                                       main_diag_x_chi2red, main_diag_x_dof, true_x, 'Main Diagonal X (approx)', 'x', delta_pixel_x)
+        
+        ax_main_x_res = fig_power_all.add_subplot(gs_power_all[1, 1])
+        plot_residuals(ax_main_x_res, main_x_pos, main_x_residuals, true_x, main_diag_x_center, 'Main Diagonal X Residuals', 'x')
         
         # Similar for other diagonals...
         main_diag_y_center = data.get('FitDiag_MainYCenter', [y_power_center])[event_idx]
@@ -1488,10 +1559,13 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         main_diag_y_chi2red = data.get('FitDiag_MainYChi2red', [1.0])[event_idx]
         main_diag_y_dof = data.get('FitDiag_MainYNPoints', [4])[event_idx] - 4
         
-        ax_main_y = fig_power_all.add_subplot(gs_power_all[1, 1])
-        plot_power_lorentzian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
+        ax_main_y = fig_power_all.add_subplot(gs_power_all[1, 2])
+        main_y_residuals = plot_power_lorentzian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
                                       main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, 1.0, 0,
                                       main_diag_y_chi2red, main_diag_y_dof, true_y, 'Main Diagonal Y (approx)', 'y', delta_pixel_y)
+        
+        ax_main_y_res = fig_power_all.add_subplot(gs_power_all[1, 3])
+        plot_residuals(ax_main_y_res, main_y_pos, main_y_residuals, true_y, main_diag_y_center, 'Main Diagonal Y Residuals', 'y')
         
         sec_diag_x_center = data.get('FitDiag_SecXCenter', [x_power_center])[event_idx]
         sec_diag_x_sigma = data.get('FitDiag_SecXSigma', [x_power_gamma])[event_idx]
@@ -1500,9 +1574,12 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         sec_diag_x_dof = data.get('FitDiag_SecXNPoints', [4])[event_idx] - 4
         
         ax_sec_x = fig_power_all.add_subplot(gs_power_all[2, 0])
-        plot_power_lorentzian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
+        sec_x_residuals = plot_power_lorentzian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
                                       sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, 1.0, 0,
                                       sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'Secondary Diagonal X (approx)', 'x', delta_pixel_x)
+        
+        ax_sec_x_res = fig_power_all.add_subplot(gs_power_all[2, 1])
+        plot_residuals(ax_sec_x_res, sec_x_pos, sec_x_residuals, true_x, sec_diag_x_center, 'Secondary Diagonal X Residuals', 'x')
         
         sec_diag_y_center = data.get('FitDiag_SecYCenter', [y_power_center])[event_idx]
         sec_diag_y_sigma = data.get('FitDiag_SecYSigma', [y_power_gamma])[event_idx]
@@ -1510,12 +1587,15 @@ def create_all_power_lorentzian_plot(event_idx, data, output_dir="plots"):
         sec_diag_y_chi2red = data.get('FitDiag_SecYChi2red', [1.0])[event_idx]
         sec_diag_y_dof = data.get('FitDiag_SecYNPoints', [4])[event_idx] - 4
         
-        ax_sec_y = fig_power_all.add_subplot(gs_power_all[2, 1])
-        plot_power_lorentzian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
+        ax_sec_y = fig_power_all.add_subplot(gs_power_all[2, 2])
+        sec_y_residuals = plot_power_lorentzian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
                                       sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, 1.0, 0,
                                       sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Secondary Diagonal Y (approx)', 'y', delta_pixel_y)
         
-        plt.suptitle(f'Event {event_idx}: Power Lorentzian Fits', fontsize=13)
+        ax_sec_y_res = fig_power_all.add_subplot(gs_power_all[2, 3])
+        plot_residuals(ax_sec_y_res, sec_y_pos, sec_y_residuals, true_y, sec_diag_y_center, 'Secondary Diagonal Y Residuals', 'y')
+        
+        plt.suptitle(f'Event {event_idx}: Power Lorentzian Fits & Residuals', fontsize=13)
         plt.tight_layout()
         plt.savefig(os.path.join(power_lorentzian_dir, f'event_{event_idx:04d}_all_power_lorentzian.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
@@ -1596,16 +1676,16 @@ def create_all_gaussian_plot(event_idx, data, output_dir="plots"):
         gaussian_dir = os.path.join(output_dir, "gaussian")
         os.makedirs(gaussian_dir, exist_ok=True)
         
-        # Create all Gaussian collage plot
-        fig_gauss_all = plt.figure(figsize=(20, 15))
-        gs_gauss_all = GridSpec(3, 2, hspace=0.4, wspace=0.3)
+        # Create all Gaussian collage plot with residuals
+        fig_gauss_all = plt.figure(figsize=(24, 15))
+        gs_gauss_all = GridSpec(3, 4, hspace=0.4, wspace=0.3)
         
         def plot_gaussian_direction(ax, positions, charges, uncertainties, center, sigma, amplitude, vertical_offset, chi2red, dof, true_pos, title, direction='x', delta_pixel=0):
             """Helper to plot one direction with all requested features."""
             if len(positions) < 3:
                 ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
                 ax.set_title(title)
-                return
+                return None
             
             # Plot data with or without error bars (automatically detected)
             plot_data_points(ax, positions, charges, uncertainties, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
@@ -1630,7 +1710,7 @@ def create_all_gaussian_plot(event_idx, data, output_dir="plots"):
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-                   fontsize=10)
+                   fontsize=8)
             
             # Set appropriate x-axis label based on direction
             if direction == 'x':
@@ -1640,6 +1720,12 @@ def create_all_gaussian_plot(event_idx, data, output_dir="plots"):
             ax.set_ylabel(r'$Q_{\mathrm{px}}\ (\mathrm{C})$')
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
+            
+            # Calculate residuals for residual plot
+            fitted_values = gaussian_1d(positions, amplitude, center, sigma, vertical_offset)
+            residuals = charges - fitted_values
+            
+            return residuals
         
         # Plot all directions using the helper function
         # Create dummy uncertainties for diagonal data
@@ -1648,43 +1734,61 @@ def create_all_gaussian_plot(event_idx, data, output_dir="plots"):
         sec_x_uncertainties = np.full(len(sec_x_pos), row_uncertainties[0] if len(row_uncertainties) > 0 else 0)
         sec_y_uncertainties = np.full(len(sec_y_pos), col_uncertainties[0] if len(col_uncertainties) > 0 else 0)
         
-        # Row plot
+        # Row plot and residuals
         ax_row = fig_gauss_all.add_subplot(gs_gauss_all[0, 0])
-        plot_gaussian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
+        row_residuals = plot_gaussian_direction(ax_row, row_pos, row_charges, row_uncertainties, 
                               x_gauss_center, x_gauss_sigma, x_gauss_amplitude, x_gauss_vertical_offset,
                               x_gauss_chi2red, x_gauss_dof, true_x, 'X Row', 'x', delta_pixel_x)
         
-        # Column plot
-        ax_col = fig_gauss_all.add_subplot(gs_gauss_all[0, 1])
-        plot_gaussian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
+        ax_row_res = fig_gauss_all.add_subplot(gs_gauss_all[0, 1])
+        plot_residuals(ax_row_res, row_pos, row_residuals, true_x, x_gauss_center, 'X Row Residuals', 'x')
+        
+        # Column plot and residuals
+        ax_col = fig_gauss_all.add_subplot(gs_gauss_all[0, 2])
+        col_residuals = plot_gaussian_direction(ax_col, col_pos, col_charges, col_uncertainties, 
                               y_gauss_center, y_gauss_sigma, y_gauss_amplitude, y_gauss_vertical_offset,
                               y_gauss_chi2red, y_gauss_dof, true_y, 'Y Column', 'y', delta_pixel_y)
         
-        # Main diagonal X plot
+        ax_col_res = fig_gauss_all.add_subplot(gs_gauss_all[0, 3])
+        plot_residuals(ax_col_res, col_pos, col_residuals, true_y, y_gauss_center, 'Y Column Residuals', 'y')
+        
+        # Main diagonal X plot and residuals
         ax_main_x = fig_gauss_all.add_subplot(gs_gauss_all[1, 0])
-        plot_gaussian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
+        main_x_residuals = plot_gaussian_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, 
                               main_diag_x_center, main_diag_x_sigma, main_diag_x_amplitude, main_diag_x_vertical_offset,
                               main_diag_x_chi2red, main_diag_x_dof, true_x, 'X Main Diag', 'x', delta_pixel_x)
         
-        # Main diagonal Y plot
-        ax_main_y = fig_gauss_all.add_subplot(gs_gauss_all[1, 1])
-        plot_gaussian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
+        ax_main_x_res = fig_gauss_all.add_subplot(gs_gauss_all[1, 1])
+        plot_residuals(ax_main_x_res, main_x_pos, main_x_residuals, true_x, main_diag_x_center, 'X Main Diag Residuals', 'x')
+        
+        # Main diagonal Y plot and residuals
+        ax_main_y = fig_gauss_all.add_subplot(gs_gauss_all[1, 2])
+        main_y_residuals = plot_gaussian_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, 
                               main_diag_y_center, main_diag_y_sigma, main_diag_y_amplitude, main_diag_y_vertical_offset,
                               main_diag_y_chi2red, main_diag_y_dof, true_y, 'Y Main Diag', 'y', delta_pixel_y)
         
-        # Secondary diagonal X plot
+        ax_main_y_res = fig_gauss_all.add_subplot(gs_gauss_all[1, 3])
+        plot_residuals(ax_main_y_res, main_y_pos, main_y_residuals, true_y, main_diag_y_center, 'Y Main Diag Residuals', 'y')
+        
+        # Secondary diagonal X plot and residuals
         ax_sec_x = fig_gauss_all.add_subplot(gs_gauss_all[2, 0])
-        plot_gaussian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
+        sec_x_residuals = plot_gaussian_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, 
                               sec_diag_x_center, sec_diag_x_sigma, sec_diag_x_amplitude, sec_diag_x_vertical_offset,
                               sec_diag_x_chi2red, sec_diag_x_dof, true_x, 'X Sec Diag', 'x', delta_pixel_x)
         
-        # Secondary diagonal Y plot
-        ax_sec_y = fig_gauss_all.add_subplot(gs_gauss_all[2, 1])
-        plot_gaussian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
+        ax_sec_x_res = fig_gauss_all.add_subplot(gs_gauss_all[2, 1])
+        plot_residuals(ax_sec_x_res, sec_x_pos, sec_x_residuals, true_x, sec_diag_x_center, 'X Sec Diag Residuals', 'x')
+        
+        # Secondary diagonal Y plot and residuals
+        ax_sec_y = fig_gauss_all.add_subplot(gs_gauss_all[2, 2])
+        sec_y_residuals = plot_gaussian_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, 
                               sec_diag_y_center, sec_diag_y_sigma, sec_diag_y_amplitude, sec_diag_y_vertical_offset,
                               sec_diag_y_chi2red, sec_diag_y_dof, true_y, 'Y Sec Diag', 'y', delta_pixel_y)
         
-        plt.suptitle(f'Event {event_idx}: Gaussian Fits', fontsize=13)
+        ax_sec_y_res = fig_gauss_all.add_subplot(gs_gauss_all[2, 3])
+        plot_residuals(ax_sec_y_res, sec_y_pos, sec_y_residuals, true_y, sec_diag_y_center, 'Y Sec Diag Residuals', 'y')
+        
+        plt.suptitle(f'Event {event_idx}: Gaussian Fits & Residuals', fontsize=13)
         plt.tight_layout()
         plt.savefig(os.path.join(gaussian_dir, f'event_{event_idx:04d}_all_gaussian.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
@@ -1786,16 +1890,16 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
         combined_dir = os.path.join(output_dir, "all_models_combined")
         os.makedirs(combined_dir, exist_ok=True)
         
-        # Create combined plot
-        fig_combined = plt.figure(figsize=(20, 15))
-        gs_combined = GridSpec(3, 2, hspace=0.4, wspace=0.3)
+        # Create combined plot with residuals
+        fig_combined = plt.figure(figsize=(24, 15))
+        gs_combined = GridSpec(3, 4, hspace=0.4, wspace=0.3)
         
         def plot_all_models_direction(ax, positions, charges, uncertainties, true_pos, title, direction='x', delta_pixel=0, diagonal_type=None):
             """Helper to plot one direction with all available fits."""
             if len(positions) < 3:
                 ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
                 ax.set_title(title)
-                return
+                return None
             
             # Plot data with or without error bars (automatically detected)
             plot_data_points(ax, positions, charges, uncertainties, fmt='ko', markersize=6, capsize=3, label='Data', alpha=0.8)
@@ -1805,6 +1909,7 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             
             legend_lines = []
             legend_text_parts = []
+            residuals_dict = {}
             
             # Plot Gaussian fit if available
             if has_gaussian and direction == 'x':
@@ -1815,6 +1920,9 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
                 ax.axvline(x_gauss_center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
                 gauss_diff = x_gauss_center - true_pos
                 legend_text_parts.append(f'Gaussian: ' + r'$\chi^2/\nu$' + f' = {x_gauss_chi2red:.2f}, ' + r'$\Delta$' + f' = {gauss_diff:.3f}')
+                # Calculate residuals
+                gauss_fitted = gaussian_1d(positions, x_gauss_amplitude, x_gauss_center, x_gauss_sigma, x_gauss_vertical_offset)
+                residuals_dict['gaussian'] = charges - gauss_fitted
             elif has_gaussian and direction == 'y':
                 y_gauss_vertical_offset = data.get('Fit2D_YVerticalOffset', [0])[event_idx] if 'Fit2D_YVerticalOffset' in data else 0
                 gauss_fit = gaussian_1d(pos_range, y_gauss_amplitude, y_gauss_center, y_gauss_sigma, y_gauss_vertical_offset)
@@ -1823,6 +1931,9 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
                 ax.axvline(y_gauss_center, color='blue', linestyle=':', linewidth=1, alpha=0.8)
                 gauss_diff = y_gauss_center - true_pos
                 legend_text_parts.append(f'Gaussian: ' + r'$\chi^2/\nu$' + f' = {y_gauss_chi2red:.2f}, ' + r'$\Delta$' + f' = {gauss_diff:.3f}')
+                # Calculate residuals
+                gauss_fitted = gaussian_1d(positions, y_gauss_amplitude, y_gauss_center, y_gauss_sigma, y_gauss_vertical_offset)
+                residuals_dict['gaussian'] = charges - gauss_fitted
             
             # Plot Lorentzian fit if available
             if has_lorentzian and direction == 'x':
@@ -1833,6 +1944,9 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
                 ax.axvline(x_lorentz_center, color='red', linestyle=':', linewidth=1, alpha=0.8)
                 lorentz_diff = x_lorentz_center - true_pos
                 legend_text_parts.append(f'Lorentzian: ' + r'$\chi^2/\nu$' + f' = {x_lorentz_chi2red:.2f}, ' + r'$\Delta$' + f' = {lorentz_diff:.3f}')
+                # Calculate residuals
+                lorentz_fitted = lorentzian_1d(positions, x_lorentz_amplitude, x_lorentz_center, x_lorentz_gamma, x_lorentz_vertical_offset)
+                residuals_dict['lorentzian'] = charges - lorentz_fitted
             elif has_lorentzian and direction == 'y':
                 y_lorentz_vertical_offset = data.get('Fit2D_Lorentz_YVerticalOffset', [0])[event_idx] if 'Fit2D_Lorentz_YVerticalOffset' in data else 0
                 lorentz_fit = lorentzian_1d(pos_range, y_lorentz_amplitude, y_lorentz_center, y_lorentz_gamma, y_lorentz_vertical_offset)
@@ -1841,6 +1955,9 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
                 ax.axvline(y_lorentz_center, color='red', linestyle=':', linewidth=1, alpha=0.8)
                 lorentz_diff = y_lorentz_center - true_pos
                 legend_text_parts.append(f'Lorentzian: ' + r'$\chi^2/\nu$' + f' = {y_lorentz_chi2red:.2f}, ' + r'$\Delta$' + f' = {lorentz_diff:.3f}')
+                # Calculate residuals
+                lorentz_fitted = lorentzian_1d(positions, y_lorentz_amplitude, y_lorentz_center, y_lorentz_gamma, y_lorentz_vertical_offset)
+                residuals_dict['lorentzian'] = charges - lorentz_fitted
             
             # Plot Power Lorentzian fit if available
             if has_power_lorentzian and direction == 'x':
@@ -1850,6 +1967,9 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
                 ax.axvline(x_power_center, color='magenta', linestyle=':', linewidth=1, alpha=0.8)
                 power_diff = x_power_center - true_pos
                 legend_text_parts.append(f'Power Lorentzian: ' + r'$\chi^2/\nu$' + f' = {x_power_chi2red:.2f}, ' + r'$\Delta$' + f' = {power_diff:.3f}')
+                # Calculate residuals
+                power_fitted = power_lorentzian_1d(positions, x_power_amplitude, x_power_center, x_power_gamma, x_power_power, x_power_vertical_offset)
+                residuals_dict['power_lorentzian'] = charges - power_fitted
             elif has_power_lorentzian and direction == 'y':
                 power_fit = power_lorentzian_1d(pos_range, y_power_amplitude, y_power_center, y_power_gamma, y_power_power, y_power_vertical_offset)
                 line = ax.plot(pos_range, power_fit, ':', color='#9467bd', linewidth=3.0, alpha=0.9, label='Power Lorentzian')[0]
@@ -1857,6 +1977,9 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
                 ax.axvline(y_power_center, color='magenta', linestyle=':', linewidth=1, alpha=0.8)
                 power_diff = y_power_center - true_pos
                 legend_text_parts.append(f'Power Lorentzian: ' + r'$\chi^2/\nu$' + f' = {y_power_chi2red:.2f}, ' + r'$\Delta$' + f' = {power_diff:.3f}')
+                # Calculate residuals
+                power_fitted = power_lorentzian_1d(positions, y_power_amplitude, y_power_center, y_power_gamma, y_power_power, y_power_vertical_offset)
+                residuals_dict['power_lorentzian'] = charges - power_fitted
             
             # Add true position line
             ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8, label='True Position')
@@ -1867,7 +1990,7 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-                   fontsize=9)
+                   fontsize=8)
             
             # Set appropriate x-axis label based on direction
             if direction == 'x':
@@ -1878,6 +2001,39 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             ax.set_title(title)
             ax.grid(True, alpha=0.3)
             ax.legend(loc='upper right', fontsize=8)
+            
+            return residuals_dict
+        
+        def plot_combined_residuals(ax, positions, residuals_dict, true_pos, title, direction='x'):
+            """Helper to plot residuals from all available models."""
+            if len(positions) < 3 or not residuals_dict:
+                ax.text(0.5, 0.5, 'Insufficient data', transform=ax.transAxes, ha='center', va='center')
+                ax.set_title(title)
+                return
+                
+            # Plot residuals for each model
+            colors = {'gaussian': '#1f77b4', 'lorentzian': '#ff7f0e', 'power_lorentzian': '#9467bd'}
+            markers = {'gaussian': 'o', 'lorentzian': 's', 'power_lorentzian': '^'}
+            
+            for model, residuals in residuals_dict.items():
+                if residuals is not None and len(residuals) > 0:
+                    label = model.replace('_', ' ').title()
+                    ax.scatter(positions, residuals, c=colors[model], s=20, alpha=0.7, 
+                             marker=markers[model], label=f'{label} residuals')
+            
+            # Add reference lines
+            ax.axhline(0, color='red', linestyle='-', linewidth=1, alpha=0.8)
+            ax.axvline(true_pos, color='green', linestyle='--', linewidth=2, alpha=0.8)
+            
+            # Set appropriate x-axis label based on direction
+            if direction == 'x':
+                ax.set_xlabel(r'$x_{\mathrm{px}}\ (\mathrm{mm})$')
+            else:
+                ax.set_xlabel(r'$y_{\mathrm{px}}\ (\mathrm{mm})$')
+            ax.set_ylabel(r'Residuals (C)')
+            ax.set_title(title)
+            ax.grid(True, alpha=0.3)
+            ax.legend(loc='upper right', fontsize=8)
         
         # Create dummy uncertainties for diagonal data
         main_x_uncertainties = np.full(len(main_x_pos), row_uncertainties[0] if len(row_uncertainties) > 0 else 0)
@@ -1885,13 +2041,19 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
         sec_x_uncertainties = np.full(len(sec_x_pos), row_uncertainties[0] if len(row_uncertainties) > 0 else 0)
         sec_y_uncertainties = np.full(len(sec_y_pos), col_uncertainties[0] if len(col_uncertainties) > 0 else 0)
         
-        # Row plot
+        # Row plot and residuals
         ax_row = fig_combined.add_subplot(gs_combined[0, 0])
-        plot_all_models_direction(ax_row, row_pos, row_charges, row_uncertainties, true_x, 'X Row', 'x', delta_pixel_x)
+        row_residuals_dict = plot_all_models_direction(ax_row, row_pos, row_charges, row_uncertainties, true_x, 'X Row', 'x', delta_pixel_x)
         
-        # Column plot
-        ax_col = fig_combined.add_subplot(gs_combined[0, 1])
-        plot_all_models_direction(ax_col, col_pos, col_charges, col_uncertainties, true_y, 'Y Column', 'y', delta_pixel_y)
+        ax_row_res = fig_combined.add_subplot(gs_combined[0, 1])
+        plot_combined_residuals(ax_row_res, row_pos, row_residuals_dict, true_x, 'X Row Residuals', 'x')
+        
+        # Column plot and residuals
+        ax_col = fig_combined.add_subplot(gs_combined[0, 2])
+        col_residuals_dict = plot_all_models_direction(ax_col, col_pos, col_charges, col_uncertainties, true_y, 'Y Column', 'y', delta_pixel_y)
+        
+        ax_col_res = fig_combined.add_subplot(gs_combined[0, 3])
+        plot_combined_residuals(ax_col_res, col_pos, col_residuals_dict, true_y, 'Y Column Residuals', 'y')
         
         # Diagonal plots (all available diagonal fits)
         def plot_diagonal_direction(ax, positions, charges, uncertainties, true_pos, title, direction='x', delta_pixel=0):
@@ -2061,7 +2223,7 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             
             ax.text(0.02, 0.98, legend_text, transform=ax.transAxes, 
                    verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-                   fontsize=9)
+                   fontsize=8)
             
             # Set appropriate x-axis label based on direction
             if direction == 'x':
@@ -2073,24 +2235,36 @@ def create_all_models_combined_plot(event_idx, data, output_dir="plots"):
             ax.grid(True, alpha=0.3)
             ax.legend(loc='upper right', fontsize=8)
         
-        # Main diagonal X plot - use comprehensive plotting function
+        # Main diagonal X plot and residuals
         ax_main_x = fig_combined.add_subplot(gs_combined[1, 0])
-        plot_all_models_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, true_x, 'X Main Diag', 'x', delta_pixel_x, diagonal_type='main')
+        main_x_residuals_dict = plot_all_models_direction(ax_main_x, main_x_pos, main_x_charges, main_x_uncertainties, true_x, 'X Main Diag', 'x', delta_pixel_x, diagonal_type='main')
         
-        # Main diagonal Y plot - use comprehensive plotting function
-        ax_main_y = fig_combined.add_subplot(gs_combined[1, 1])
-        plot_all_models_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, true_y, 'Y Main Diag', 'y', delta_pixel_y, diagonal_type='main')
+        ax_main_x_res = fig_combined.add_subplot(gs_combined[1, 1])
+        plot_combined_residuals(ax_main_x_res, main_x_pos, main_x_residuals_dict, true_x, 'X Main Diag Residuals', 'x')
         
-        # Secondary diagonal X plot - use comprehensive plotting function
+        # Main diagonal Y plot and residuals
+        ax_main_y = fig_combined.add_subplot(gs_combined[1, 2])
+        main_y_residuals_dict = plot_all_models_direction(ax_main_y, main_y_pos, main_y_charges, main_y_uncertainties, true_y, 'Y Main Diag', 'y', delta_pixel_y, diagonal_type='main')
+        
+        ax_main_y_res = fig_combined.add_subplot(gs_combined[1, 3])
+        plot_combined_residuals(ax_main_y_res, main_y_pos, main_y_residuals_dict, true_y, 'Y Main Diag Residuals', 'y')
+        
+        # Secondary diagonal X plot and residuals
         ax_sec_x = fig_combined.add_subplot(gs_combined[2, 0])
-        plot_all_models_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, true_x, 'X Sec Diag', 'x', delta_pixel_x, diagonal_type='sec')
+        sec_x_residuals_dict = plot_all_models_direction(ax_sec_x, sec_x_pos, sec_x_charges, sec_x_uncertainties, true_x, 'X Sec Diag', 'x', delta_pixel_x, diagonal_type='sec')
         
-        # Secondary diagonal Y plot - use comprehensive plotting function
-        ax_sec_y = fig_combined.add_subplot(gs_combined[2, 1])
-        plot_all_models_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, true_y, 'Y Sec Diag', 'y', delta_pixel_y, diagonal_type='sec')
+        ax_sec_x_res = fig_combined.add_subplot(gs_combined[2, 1])
+        plot_combined_residuals(ax_sec_x_res, sec_x_pos, sec_x_residuals_dict, true_x, 'X Sec Diag Residuals', 'x')
+        
+        # Secondary diagonal Y plot and residuals
+        ax_sec_y = fig_combined.add_subplot(gs_combined[2, 2])
+        sec_y_residuals_dict = plot_all_models_direction(ax_sec_y, sec_y_pos, sec_y_charges, sec_y_uncertainties, true_y, 'Y Sec Diag', 'y', delta_pixel_y, diagonal_type='sec')
+        
+        ax_sec_y_res = fig_combined.add_subplot(gs_combined[2, 3])
+        plot_combined_residuals(ax_sec_y_res, sec_y_pos, sec_y_residuals_dict, true_y, 'Y Sec Diag Residuals', 'y')
         
         models_str = "_".join([m.lower().replace(" ", "_") for m in available_models])
-        plt.suptitle(f'Event {event_idx}: Combined Models ({", ".join(available_models)})', fontsize=12)
+        plt.suptitle(f'Event {event_idx}: Combined Models & Residuals ({", ".join(available_models)})', fontsize=12)
         plt.tight_layout()
         plt.savefig(os.path.join(combined_dir, f'event_{event_idx:04d}_all_models_combined.png'), 
                    dpi=300, bbox_inches='tight', facecolor='white')
