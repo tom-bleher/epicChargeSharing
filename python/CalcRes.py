@@ -264,7 +264,7 @@ def save_results_to_file(results, output_file):
         # Group results by category for better organization
         digital_results = [r for r in results if 'Digital' in r['name']]
         gauss_row_col_results = [r for r in results if ('Gaussian Row Fit' in r['name'] or 'Gaussian Column Fit' in r['name'])]
-        lorentz_row_col_results = [r for r in results if ('Lorentzian Row Fit' in r['name'] or 'Lorentzian Column Fit' in r['name'])]
+        lorentz_row_col_results = [r for r in results if ('Lorentzian Row Fit' in r['name'] or 'Lorentzian Column Fit' in r['name']) and 'Power' not in r['name']]
         power_lorentz_row_col_results = [r for r in results if ('Power Lorentzian Row Fit' in r['name'] or 'Power Lorentzian Column Fit' in r['name'])]
         main_diag_results = [r for r in results if 'Main Diagonal' in r['name'] and r['std_dev'] > 0]
         sec_diag_results = [r for r in results if 'Secondary Diagonal' in r['name'] and r['std_dev'] > 0]
