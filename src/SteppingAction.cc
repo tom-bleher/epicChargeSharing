@@ -1,10 +1,13 @@
 #include "SteppingAction.hh"
 #include "EventAction.hh"
+#include "SimulationLogger.hh"
 #include "G4Step.hh"
 #include "G4VTouchable.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4StepPoint.hh"
 #include "G4LogicalVolume.hh"
+#include "G4Event.hh"
+#include "G4RunManager.hh"
 
 SteppingAction::SteppingAction(EventAction* eventAction)
 : G4UserSteppingAction(),
@@ -45,6 +48,25 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
       // Energy deposited inside detector volume - accumulate in EventAction
       // Only energy deposited while particle travels through detector is counted
       fEventAction->AddEdep(edep, stepPosition);
+      
+      // Log pixel hit information to SimulationLogger
+      SimulationLogger* logger = SimulationLogger::GetInstance();
+      if (logger) {
+        // Get current event ID
+        const G4Event* currentEvent = G4RunManager::GetRunManager()->GetCurrentEvent();
+        G4int eventID = currentEvent ? currentEvent->GetEventID() : -1;
+        
+        // Calculate step length
+        G4double stepLength = step->GetStepLength();
+        
+        // For now, use placeholder pixel indices (they will be calculated properly in EventAction)
+        // The real pixel hit determination happens in EventAction::EndOfEventAction
+        G4int pixelI = -1;  // Will be determined later
+        G4int pixelJ = -1;  // Will be determined later
+        
+        // Log this step as a hit (individual energy deposition)
+        logger->LogPixelHit(eventID, pixelI, pixelJ, edep, stepPosition, stepLength);
+      }
     }
     // Note: Removed excessive debug output for "outside detector" cases
   }

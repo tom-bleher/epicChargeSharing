@@ -546,10 +546,15 @@ void SimulationLogger::LogEventStatistics(G4int totalEvents, G4int successfulFit
                                         G4double averageChi2, G4double averageFitTime) {
     if (fStatsLog) {
         *fStatsLog << "\n=== EVENT STATISTICS ===\n";
-        *fStatsLog << "Total Events: " << totalEvents << "\n";
-        *fStatsLog << "Successful Fits: " << successfulFits << "\n";
-        *fStatsLog << "Failed Fits: " << failedFits << "\n";
-        *fStatsLog << "Success Rate: " << (totalEvents > 0 ? 100.0 * successfulFits / totalEvents : 0.0) << "%\n";
+        *fStatsLog << "Total Events Processed: " << totalEvents << "\n";
+        *fStatsLog << "Total Fitting Algorithm Runs: " << (successfulFits + failedFits) << "\n";
+        *fStatsLog << "  - Successful Algorithm Fits: " << successfulFits << "\n";
+        *fStatsLog << "  - Failed Algorithm Fits: " << failedFits << "\n";
+        G4int totalFitAttempts = successfulFits + failedFits;
+        *fStatsLog << "Algorithm Success Rate: " << (totalFitAttempts > 0 ? 100.0 * successfulFits / totalFitAttempts : 0.0) << "%\n";
+        if (totalEvents > 0) {
+            *fStatsLog << "Average Fits per Event: " << std::fixed << std::setprecision(1) << (G4double)totalFitAttempts / totalEvents << "\n";
+        }
         *fStatsLog << "Average Chi2: " << averageChi2 << "\n";
         *fStatsLog << "Average Fit Time: " << averageFitTime << " ms\n";
         *fStatsLog << "========================\n\n";
