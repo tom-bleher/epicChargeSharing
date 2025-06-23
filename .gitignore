@@ -20,6 +20,8 @@ geant4_env/
 # Executables
 *.exe
 *.out
+*.txt
+*.log
 
 # Images
 *.png
