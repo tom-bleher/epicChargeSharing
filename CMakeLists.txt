@@ -249,6 +249,16 @@ include_directories(${CERES_INCLUDE_DIRS})
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cc)
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh)
 
+# Ensure our new utility files are included
+list(APPEND sources 
+    ${PROJECT_SOURCE_DIR}/src/StatsUtils.cc
+    ${PROJECT_SOURCE_DIR}/src/CeresUtils.cc
+)
+list(APPEND headers 
+    ${PROJECT_SOURCE_DIR}/include/StatsUtils.hh
+    ${PROJECT_SOURCE_DIR}/include/CeresUtils.hh
+)
+
 # Define ROOT libraries needed - only if ROOT was found properly
 if(ROOT_FOUND AND NOT "${ROOT_LIBS}" STREQUAL "")
   # Use the libraries returned by root-config if available, and add Minuit
