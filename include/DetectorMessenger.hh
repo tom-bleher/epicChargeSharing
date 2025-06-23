@@ -6,6 +6,8 @@
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "G4UIcmdWithAnInteger.hh"
 #include "G4UIcmdWithABool.hh"
+#include "G4UIcmdWithAString.hh"
+#include "G4UIcommand.hh"
 
 class DetectorConstruction;
 class G4UIdirectory;
@@ -38,6 +40,13 @@ private:
     G4UIcmdWithABool* fAutoRadiusEnabledCmd;
     G4UIcmdWithAnInteger* fMinAutoRadiusCmd;
     G4UIcmdWithAnInteger* fMaxAutoRadiusCmd;
+    
+    // Crash recovery commands
+    G4UIdirectory* fCrashDirectory;
+    G4UIcmdWithABool* fCrashAutoSaveEnabledCmd;
+    G4UIcmdWithAnInteger* fCrashAutoSaveIntervalCmd;
+    G4UIcmdWithAString* fCrashBackupDirectoryCmd;
+    G4UIcommand* fCrashForceSaveCmd;
 };
 
 #endif

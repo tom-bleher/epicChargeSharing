@@ -1,5 +1,6 @@
 #include "ActionInitialization.hh"
 #include "DetectorMessenger.hh"
+#include "CrashHandler.hh"
 
 ActionInitialization::ActionInitialization(DetectorConstruction* detector)
 : fDetector(detector)
@@ -15,6 +16,9 @@ void ActionInitialization::BuildForMaster() const
     // Create RunAction for the master thread
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
+    
+    // Register RunAction with crash recovery system (master thread)
+    CrashHandler::GetInstance().RegisterRunAction(runAction);
     
     // Set detector grid parameters in RunAction for saving to ROOT metadata
     runAction->SetDetectorGridParameters(
@@ -35,6 +39,9 @@ void ActionInitialization::Build() const
     // Create and register RunAction
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
+    
+    // Register RunAction with crash recovery system
+    CrashHandler::GetInstance().RegisterRunAction(runAction);
     
     // Set detector grid parameters in RunAction for saving to ROOT metadata
     runAction->SetDetectorGridParameters(

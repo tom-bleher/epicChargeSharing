@@ -1,10 +1,14 @@
 #include "DetectorMessenger.hh"
 #include "DetectorConstruction.hh"
 #include "EventAction.hh"
+#include "CrashHandler.hh"
 
 #include "G4UIdirectory.hh"
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "G4UIcmdWithAnInteger.hh"
+#include "G4UIcmdWithABool.hh"
+#include "G4UIcmdWithAString.hh"
+#include "G4UIcommand.hh"
 #include "G4SystemOfUnits.hh"
 
 DetectorMessenger::DetectorMessenger(DetectorConstruction* detector)
@@ -64,6 +68,31 @@ DetectorMessenger::DetectorMessenger(DetectorConstruction* detector)
     fMaxAutoRadiusCmd->SetParameterName("MaxRadius", false);
     fMaxAutoRadiusCmd->SetRange("MaxRadius>=1");
     fMaxAutoRadiusCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+    
+    // Create crash recovery commands directory
+    fCrashDirectory = new G4UIdirectory("/epicChargeSharing/crash/");
+    fCrashDirectory->SetGuidance("Crash recovery and auto-save commands");
+    
+    // Create crash recovery commands
+    fCrashAutoSaveEnabledCmd = new G4UIcmdWithABool("/epicChargeSharing/crash/setAutoSaveEnabled", this);
+    fCrashAutoSaveEnabledCmd->SetGuidance("Enable/disable automatic saving during simulation");
+    fCrashAutoSaveEnabledCmd->SetParameterName("Enabled", false);
+    fCrashAutoSaveEnabledCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+    
+    fCrashAutoSaveIntervalCmd = new G4UIcmdWithAnInteger("/epicChargeSharing/crash/setAutoSaveInterval", this);
+    fCrashAutoSaveIntervalCmd->SetGuidance("Set auto-save interval in number of events");
+    fCrashAutoSaveIntervalCmd->SetParameterName("Interval", false);
+    fCrashAutoSaveIntervalCmd->SetRange("Interval>=100");
+    fCrashAutoSaveIntervalCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+    
+    fCrashBackupDirectoryCmd = new G4UIcmdWithAString("/epicChargeSharing/crash/setBackupDirectory", this);
+    fCrashBackupDirectoryCmd->SetGuidance("Set directory for crash recovery backups");
+    fCrashBackupDirectoryCmd->SetParameterName("Directory", false);
+    fCrashBackupDirectoryCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+    
+    fCrashForceSaveCmd = new G4UIcommand("/epicChargeSharing/crash/forceSave", this);
+    fCrashForceSaveCmd->SetGuidance("Force immediate save of current simulation data");
+    fCrashForceSaveCmd->AvailableForStates(G4State_Idle);
 }
 
 DetectorMessenger::~DetectorMessenger()
