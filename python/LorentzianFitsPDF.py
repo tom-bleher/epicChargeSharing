@@ -1,13 +1,13 @@
 """
-ROOT File Gaussian Fits Visualization Tool
+ROOT File Lorentzian Fits Visualization Tool
 
 This tool reads ROOT output files from the GEANT4 charge sharing simulation
-and creates PDF visualizations of the pre-computed Gaussian fits for row and column projections.
+and creates PDF visualizations of the pre-computed Lorentzian fits for row and column projections.
 
 Key features:
 1. Reads actual simulation data from ROOT files using uproot
-2. Extracts neighborhood charge distributions and fitted Gaussian parameters  
-3. Plots data points with fitted Gaussian curves and residuals
+2. Extracts neighborhood charge distributions and fitted Lorentzian parameters  
+3. Plots data points with fitted Lorentzian curves and residuals
 4. Creates comprehensive PDF reports for analysis verification
 5. NO synthetic data or fitting - only visualization of existing results
 6. OPTIMIZED for parallel processing with multithreading support
@@ -131,29 +131,29 @@ def load_root_data(root_file, max_entries=None):
         # Neighborhood grid data
         data['GridNeighborhoodCharges'] = tree['GridNeighborhoodCharges'].array(library="np", entry_stop=max_entries)
         
-        # Row Gaussian fit results
-        data['GaussFitRowCenter'] = tree['GaussFitRowCenter'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowStdev'] = tree['GaussFitRowStdev'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowAmplitude'] = tree['GaussFitRowAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowVerticalOffset'] = tree['GaussFitRowVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowCenterErr'] = tree['GaussFitRowCenterErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowStdevErr'] = tree['GaussFitRowStdevErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowAmplitudeErr'] = tree['GaussFitRowAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowChi2red'] = tree['GaussFitRowChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowDOF'] = tree['GaussFitRowDOF'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowChargeUncertainty'] = tree['GaussFitRowChargeUncertainty'].array(library="np", entry_stop=max_entries)
+        # Row Lorentzian fit results
+        data['LorentzFitRowCenter'] = tree['LorentzFitRowCenter'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowGamma'] = tree['LorentzFitRowGamma'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowAmplitude'] = tree['LorentzFitRowAmplitude'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowVerticalOffset'] = tree['LorentzFitRowVerticalOffset'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowCenterErr'] = tree['LorentzFitRowCenterErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowGammaErr'] = tree['LorentzFitRowGammaErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowAmplitudeErr'] = tree['LorentzFitRowAmplitudeErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowChi2red'] = tree['LorentzFitRowChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowDOF'] = tree['LorentzFitRowDOF'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitRowChargeUncertainty'] = tree['LorentzFitRowChargeUncertainty'].array(library="np", entry_stop=max_entries)
         
-        # Column Gaussian fit results
-        data['GaussFitColumnCenter'] = tree['GaussFitColumnCenter'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnStdev'] = tree['GaussFitColumnStdev'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnAmplitude'] = tree['GaussFitColumnAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnVerticalOffset'] = tree['GaussFitColumnVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnCenterErr'] = tree['GaussFitColumnCenterErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnStdevErr'] = tree['GaussFitColumnStdevErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnAmplitudeErr'] = tree['GaussFitColumnAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnChi2red'] = tree['GaussFitColumnChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnDOF'] = tree['GaussFitColumnDOF'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnChargeUncertainty'] = tree['GaussFitColumnChargeUncertainty'].array(library="np", entry_stop=max_entries)
+        # Column Lorentzian fit results
+        data['LorentzFitColumnCenter'] = tree['LorentzFitColumnCenter'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnGamma'] = tree['LorentzFitColumnGamma'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnAmplitude'] = tree['LorentzFitColumnAmplitude'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnVerticalOffset'] = tree['LorentzFitColumnVerticalOffset'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnCenterErr'] = tree['LorentzFitColumnCenterErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnGammaErr'] = tree['LorentzFitColumnGammaErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnAmplitudeErr'] = tree['LorentzFitColumnAmplitudeErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnChi2red'] = tree['LorentzFitColumnChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnDOF'] = tree['LorentzFitColumnDOF'].array(library="np", entry_stop=max_entries)
+        data['LorentzFitColumnChargeUncertainty'] = tree['LorentzFitColumnChargeUncertainty'].array(library="np", entry_stop=max_entries)
         
         # Try to load detector grid parameters from metadata
         try:
@@ -327,15 +327,16 @@ def extract_column_data(event_idx, data, grid_size=None):
         charges = central_charges[sort_indices]
         
         return y_positions, charges, True
-        
+            
     except Exception as e:
         return None, None, False
 
-def gaussian_1d(x, amplitude, center, sigma, offset):
+def lorentzian_1d(x, amplitude, center, gamma, offset):
     """
-    1D Gaussian function for plotting fitted curves.
+    1D Lorentzian function for plotting fitted curves.
     """
-    return amplitude * np.exp(-0.5 * ((x - center) / sigma)**2) + offset
+    safe_gamma = max(abs(gamma), 1e-12)
+    return amplitude / (1 + ((x - center) / safe_gamma)**2) + offset
 
 def get_stored_charge_uncertainties(event_idx, data, direction):
     """
@@ -350,9 +351,9 @@ def get_stored_charge_uncertainties(event_idx, data, direction):
         uncertainty: Single uncertainty value (5% of max charge for this event)
     """
     if direction.lower() == 'row':
-        uncertainty_data = data['GaussFitRowChargeUncertainty']
+        uncertainty_data = data['LorentzFitRowChargeUncertainty']
     elif direction.lower() == 'column':
-        uncertainty_data = data['GaussFitColumnChargeUncertainty']
+        uncertainty_data = data['LorentzFitColumnChargeUncertainty']
     else:
         raise ValueError(f"Invalid direction: {direction}. Must be 'row' or 'column'")
     
@@ -375,9 +376,9 @@ def calculate_charge_uncertainties(charges):
     """
     raise RuntimeError("calculate_charge_uncertainties() is deprecated. Use get_stored_charge_uncertainties() to read from ROOT file.")
 
-def create_row_gaussian_plot(event_idx, data):
+def create_row_lorentzian_plot(event_idx, data):
     """
-    Create a plot showing the row Gaussian fit for a specific event.
+    Create a plot showing the row Lorentzian fit for a specific event.
 
     Returns:
         fig, success_flag
@@ -398,14 +399,14 @@ def create_row_gaussian_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['GaussFitRowCenter'], event_idx)
-        fit_sigma = get_param_value(data['GaussFitRowStdev'], event_idx)
-        fit_amplitude = get_param_value(data['GaussFitRowAmplitude'], event_idx)
-        fit_offset = get_param_value(data['GaussFitRowVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['GaussFitRowCenterErr'], event_idx)
-        fit_sigma_err = get_param_value(data['GaussFitRowStdevErr'], event_idx)
-        chi2_red = get_param_value(data['GaussFitRowChi2red'], event_idx)
-        dof = get_param_value(data['GaussFitRowDOF'], event_idx)
+        fit_center = get_param_value(data['LorentzFitRowCenter'], event_idx)
+        fit_gamma = get_param_value(data['LorentzFitRowGamma'], event_idx)
+        fit_amplitude = get_param_value(data['LorentzFitRowAmplitude'], event_idx)
+        fit_offset = get_param_value(data['LorentzFitRowVerticalOffset'], event_idx)
+        fit_center_err = get_param_value(data['LorentzFitRowCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['LorentzFitRowGammaErr'], event_idx)
+        chi2_red = get_param_value(data['LorentzFitRowChi2red'], event_idx)
+        dof = get_param_value(data['LorentzFitRowDOF'], event_idx)
         
         # Check if fit was successful (DOF > 0 indicates successful fit)
         if dof <= 0:
@@ -420,7 +421,7 @@ def create_row_gaussian_plot(event_idx, data):
         uncertainties = np.full_like(charges, uncertainties)
         
         # Calculate fitted curve and residuals
-        fitted_charges = gaussian_1d(x_positions, fit_amplitude, fit_center, fit_sigma, fit_offset)
+        fitted_charges = lorentzian_1d(x_positions, fit_amplitude, fit_center, fit_gamma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
@@ -437,7 +438,7 @@ def create_row_gaussian_plot(event_idx, data):
         ax_left.set_xlim(x_min, x_max)
         ax_left.set_xlabel('x_pixel (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Row Gaussian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Row Lorentzian Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
@@ -445,10 +446,10 @@ def create_row_gaussian_plot(event_idx, data):
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Gaussian curve
+        # Plot fitted Lorentzian curve
         x_fit_range = np.linspace(x_min, x_max, 200)
-        y_fit = gaussian_1d(x_fit_range, fit_amplitude, fit_center, fit_sigma, fit_offset)
-        ax_right.plot(x_fit_range, y_fit, 'r-', linewidth=3, label='Gaussian Fit')
+        y_fit = lorentzian_1d(x_fit_range, fit_amplitude, fit_center, fit_gamma, fit_offset)
+        ax_right.plot(x_fit_range, y_fit, 'r-', linewidth=3, label='Lorentzian Fit')
         
         # Mark true and fitted positions
         ax_right.axvline(true_x, color='green', linestyle='--', linewidth=3, alpha=0.8, label='x_true')
@@ -457,7 +458,7 @@ def create_row_gaussian_plot(event_idx, data):
         ax_right.set_xlim(x_min, x_max)
         ax_right.set_xlabel('x_pixel (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Row Gaussian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Row Lorentzian Fit', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -465,7 +466,7 @@ def create_row_gaussian_plot(event_idx, data):
         info_text = (f'x_true = {true_x:.3f} mm\n'
                     f'x_fit = {fit_center:.3f} ± {fit_center_err:.3f} mm\n'
                     f'Δx = x_fit - x_true = {delta_x:.3f} mm\n'
-                    f'σ = {fit_sigma:.3f} ± {fit_sigma_err:.3f} mm\n'
+                    f'γ = {fit_gamma:.3f} ± {fit_gamma_err:.3f} mm\n'
                     f'χ²/DOF = {chi2_red:.3f}\n'
                     f'DOF = {dof}')
         
@@ -482,9 +483,9 @@ def create_row_gaussian_plot(event_idx, data):
         print(f"Error creating row plot for event {event_idx}: {e}")
         return None, False
 
-def create_column_gaussian_plot(event_idx, data):
+def create_column_lorentzian_plot(event_idx, data):
     """
-    Create a plot showing the column Gaussian fit for a specific event.
+    Create a plot showing the column Lorentzian fit for a specific event.
     
     Returns:
         fig, success_flag
@@ -505,14 +506,14 @@ def create_column_gaussian_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['GaussFitColumnCenter'], event_idx)
-        fit_sigma = get_param_value(data['GaussFitColumnStdev'], event_idx)
-        fit_amplitude = get_param_value(data['GaussFitColumnAmplitude'], event_idx)
-        fit_offset = get_param_value(data['GaussFitColumnVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['GaussFitColumnCenterErr'], event_idx)
-        fit_sigma_err = get_param_value(data['GaussFitColumnStdevErr'], event_idx)
-        chi2_red = get_param_value(data['GaussFitColumnChi2red'], event_idx)
-        dof = get_param_value(data['GaussFitColumnDOF'], event_idx)
+        fit_center = get_param_value(data['LorentzFitColumnCenter'], event_idx)
+        fit_gamma = get_param_value(data['LorentzFitColumnGamma'], event_idx)
+        fit_amplitude = get_param_value(data['LorentzFitColumnAmplitude'], event_idx)
+        fit_offset = get_param_value(data['LorentzFitColumnVerticalOffset'], event_idx)
+        fit_center_err = get_param_value(data['LorentzFitColumnCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['LorentzFitColumnGammaErr'], event_idx)
+        chi2_red = get_param_value(data['LorentzFitColumnChi2red'], event_idx)
+        dof = get_param_value(data['LorentzFitColumnDOF'], event_idx)
         
         # Check if fit was successful (DOF > 0 indicates successful fit)
         if dof <= 0:
@@ -527,7 +528,7 @@ def create_column_gaussian_plot(event_idx, data):
         uncertainties = np.full_like(charges, uncertainties)
         
         # Calculate fitted curve and residuals
-        fitted_charges = gaussian_1d(y_positions, fit_amplitude, fit_center, fit_sigma, fit_offset)
+        fitted_charges = lorentzian_1d(y_positions, fit_amplitude, fit_center, fit_gamma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
@@ -544,7 +545,7 @@ def create_column_gaussian_plot(event_idx, data):
         ax_left.set_xlim(y_min, y_max)
         ax_left.set_xlabel('y_pixel (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Column Gaussian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Column Lorentzian Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
@@ -552,10 +553,10 @@ def create_column_gaussian_plot(event_idx, data):
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Gaussian curve
+        # Plot fitted Lorentzian curve
         y_fit_range = np.linspace(y_min, y_max, 200)
-        y_fit = gaussian_1d(y_fit_range, fit_amplitude, fit_center, fit_sigma, fit_offset)
-        ax_right.plot(y_fit_range, y_fit, 'b-', linewidth=3, label='Gaussian Fit')
+        y_fit = lorentzian_1d(y_fit_range, fit_amplitude, fit_center, fit_gamma, fit_offset)
+        ax_right.plot(y_fit_range, y_fit, 'b-', linewidth=3, label='Lorentzian Fit')
         
         # Mark true and fitted positions
         ax_right.axvline(true_y, color='green', linestyle='--', linewidth=3, alpha=0.8, label='y_true')
@@ -564,7 +565,7 @@ def create_column_gaussian_plot(event_idx, data):
         ax_right.set_xlim(y_min, y_max)
         ax_right.set_xlabel('y_pixel (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Column Gaussian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Column Lorentzian Fit', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -572,7 +573,7 @@ def create_column_gaussian_plot(event_idx, data):
         info_text = (f'y_true = {true_y:.3f} mm\n'
                     f'y_fit = {fit_center:.3f} ± {fit_center_err:.3f} mm\n'
                     f'Δy = y_fit - y_true = {delta_y:.3f} mm\n'
-                    f'σ = {fit_sigma:.3f} ± {fit_sigma_err:.3f} mm\n'
+                    f'γ = {fit_gamma:.3f} ± {fit_gamma_err:.3f} mm\n'
                     f'χ²/DOF = {chi2_red:.3f}\n'
                     f'DOF = {dof}')
         
@@ -595,7 +596,7 @@ def _create_plot_worker(args):
     
     Args:
         args: Tuple of (event_idx, data_subset, plot_type)
-        
+    
     Returns:
         tuple: (event_idx, figure_object, success)
     """
@@ -613,9 +614,9 @@ def _create_plot_worker(args):
             data[key] = value
         
         if plot_type == 'row':
-            fig, success = create_row_gaussian_plot(event_idx, data)
+            fig, success = create_row_lorentzian_plot(event_idx, data)
         elif plot_type == 'column':
-            fig, success = create_column_gaussian_plot(event_idx, data)
+            fig, success = create_column_lorentzian_plot(event_idx, data)
         else:
             return event_idx, None, False
         
@@ -647,14 +648,14 @@ def _prepare_data_subset(data, event_idx):
     keys_needed = [
         'TrueX', 'TrueY', 'PixelX', 'PixelY', 'IsPixelHit',
         'GridNeighborhoodCharges', 'PixelSpacing',
-        'GaussFitRowCenter', 'GaussFitRowStdev', 'GaussFitRowAmplitude', 
-        'GaussFitRowVerticalOffset', 'GaussFitRowCenterErr', 'GaussFitRowStdevErr',
-        'GaussFitRowAmplitudeErr', 'GaussFitRowChi2red', 'GaussFitRowDOF',
-        'GaussFitRowChargeUncertainty',
-        'GaussFitColumnCenter', 'GaussFitColumnStdev', 'GaussFitColumnAmplitude',
-        'GaussFitColumnVerticalOffset', 'GaussFitColumnCenterErr', 'GaussFitColumnStdevErr',
-        'GaussFitColumnAmplitudeErr', 'GaussFitColumnChi2red', 'GaussFitColumnDOF',
-        'GaussFitColumnChargeUncertainty'
+        'LorentzFitRowCenter', 'LorentzFitRowGamma', 'LorentzFitRowAmplitude', 
+        'LorentzFitRowVerticalOffset', 'LorentzFitRowCenterErr', 'LorentzFitRowGammaErr',
+        'LorentzFitRowAmplitudeErr', 'LorentzFitRowChi2red', 'LorentzFitRowDOF',
+        'LorentzFitRowChargeUncertainty',
+        'LorentzFitColumnCenter', 'LorentzFitColumnGamma', 'LorentzFitColumnAmplitude',
+        'LorentzFitColumnVerticalOffset', 'LorentzFitColumnCenterErr', 'LorentzFitColumnGammaErr',
+        'LorentzFitColumnAmplitudeErr', 'LorentzFitColumnChi2red', 'LorentzFitColumnDOF',
+        'LorentzFitColumnChargeUncertainty'
     ]
     
     for key in keys_needed:
@@ -666,7 +667,7 @@ def _prepare_data_subset(data, event_idx):
     
     return subset
 
-def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
+def create_lorentzian_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
     """
     Create PDF files with Gaussian fits visualization using parallel processing.
     
@@ -693,20 +694,20 @@ def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_worker
     # Set batch size for processing
     batch_size = max(50, n_workers * 10)  # Process in batches to manage memory
     
-    print(f"Creating Gaussian fit visualizations for {n_events} events using {n_workers} workers")
+    print(f"Creating Lorentzian fit visualizations for {n_events} events using {n_workers} workers")
     
     # Create output paths
-    x_pdf_path = os.path.join(output_dir, "gaussian_fits_row.pdf")
-    y_pdf_path = os.path.join(output_dir, "gaussian_fits_column.pdf")
+    x_pdf_path = os.path.join(output_dir, "lorentzian_fits_row.pdf")
+    y_pdf_path = os.path.join(output_dir, "lorentzian_fits_column.pdf")
     
     # Pre-filter events with successful fits to avoid processing invalid events
     row_valid_events = []
     col_valid_events = []
     
     for event_idx in range(n_events):
-        if data['GaussFitRowDOF'][event_idx] > 0:
+        if data['LorentzFitRowDOF'][event_idx] > 0:
             row_valid_events.append(event_idx)
-        if data['GaussFitColumnDOF'][event_idx] > 0:
+        if data['LorentzFitColumnDOF'][event_idx] > 0:
             col_valid_events.append(event_idx)
     
     print(f"Found {len(row_valid_events)} valid row fits and {len(col_valid_events)} valid column fits")
@@ -725,7 +726,7 @@ def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_worker
     
     # Process row fits
     if row_valid_events:
-        print("Creating row Gaussian fits PDF...")
+        print("Creating row Lorentzian fits PDF...")
         
         # Prepare arguments for parallel processing
         row_args = []
@@ -771,7 +772,7 @@ def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_worker
     
     # Process column fits
     if col_valid_events:
-        print("Creating column Gaussian fits PDF...")
+        print("Creating column Lorentzian fits PDF...")
         
         # Prepare arguments for parallel processing
         col_args = []
@@ -861,13 +862,13 @@ def inspect_root_file(root_file):
         print(f"  Pixel hits: {n_events - n_non_pixel} ({100*(n_events - n_non_pixel)/n_events:.1f}%)")
         
         # Check for successful fits
-        if 'GaussFitRowDOF' in branches:
-            row_dof = tree['GaussFitRowDOF'].array(library="np")
+        if 'LorentzFitRowDOF' in branches:
+            row_dof = tree['LorentzFitRowDOF'].array(library="np")
             successful_row_fits = np.sum(row_dof > 0)
             print(f"  Successful row fits: {successful_row_fits} ({100*successful_row_fits/n_events:.1f}%)")
         
-        if 'GaussFitColumnDOF' in branches:
-            col_dof = tree['GaussFitColumnDOF'].array(library="np")
+        if 'LorentzFitColumnDOF' in branches:
+            col_dof = tree['LorentzFitColumnDOF'].array(library="np")
             successful_col_fits = np.sum(col_dof > 0)
             print(f"  Successful column fits: {successful_col_fits} ({100*successful_col_fits/n_events:.1f}%)")
         
@@ -877,11 +878,11 @@ def inspect_root_file(root_file):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Visualize Gaussian fits from GEANT4 charge sharing simulation ROOT files",
+        description="Visualize Lorentzian fits from GEANT4 charge sharing simulation ROOT files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("root_file", help="Path to ROOT file from GEANT4 simulation")
-    parser.add_argument("-o", "--output", default="gaussian_fits", 
+    parser.add_argument("-o", "--output", default="lorentzian_fits", 
                        help="Output directory for PDF files")
     parser.add_argument("-n", "--num_events", type=int, default=None,
                        help="Maximum number of events to process (default: all events)")
@@ -910,20 +911,20 @@ def main():
         print("Failed to load data. Exiting.")
         return 1
     
-    # Check if we have Gaussian fitting data
+    # Check if we have Lorentzian fitting data
     n_events = len(data['TrueX'])
     if n_events == 0:
         print("No events found in the data!")
         return 1
     
     # Count successful fits
-    row_successful = np.sum(data['GaussFitRowDOF'] > 0)
-    col_successful = np.sum(data['GaussFitColumnDOF'] > 0)
+    row_successful = np.sum(data['LorentzFitRowDOF'] > 0)
+    col_successful = np.sum(data['LorentzFitColumnDOF'] > 0)
     
     print(f"Found {row_successful} successful row fits and {col_successful} successful column fits")
     
     if row_successful == 0 and col_successful == 0:
-        print("No successful Gaussian fits found in the data!")
+        print("No successful Lorentzian fits found in the data!")
         return 1
     
     # Create output directory
@@ -931,7 +932,7 @@ def main():
     print(f"Output directory: {args.output}")
     
     # Create PDF visualizations
-    x_success, y_success = create_gaussian_fit_pdfs(
+    x_success, y_success = create_lorentzian_fit_pdfs(
         data, args.output, args.num_events, args.workers
     )
     
