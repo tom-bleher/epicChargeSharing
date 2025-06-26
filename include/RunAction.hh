@@ -35,8 +35,9 @@ public:
     // Method to set nearest pixel position [mm]
     void SetNearestPixelPosition(G4double x, G4double y, G4double z);
     
-
-
+    // Method to set initial particle energy [MeV]
+    void SetInitialEnergy(G4double energy);
+    
     // Method to set pixel hit status
     void SetPixelHitStatus(G4bool isPixelHit);
     
@@ -131,6 +132,7 @@ public:
                                         G4double y_center_err, G4double y_gamma_err, G4double y_beta_err, G4double y_amplitude_err,
                                         G4double y_vertical_offset, G4double y_vertical_offset_err,
                                         G4double y_chi2red, G4double y_pp, G4int y_dof,
+                                        G4double x_charge_uncertainty, G4double y_charge_uncertainty,
                                         G4bool fit_successful);
     
     // Method to set diagonal Power-Law Lorentzian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
@@ -509,6 +511,10 @@ private:
     G4double fPowerLorentzFitColumnChi2red;
     G4double fPowerLorentzFitColumnPp;
     G4int fPowerLorentzFitColumnDOF;
+    
+    // Charge uncertainties for Power-Law Lorentzian fits (5% of max charge)
+    G4double fPowerLorentzFitRowChargeUncertainty;    // Row charge uncertainty (5% of max charge)
+    G4double fPowerLorentzFitColumnChargeUncertainty; // Column charge uncertainty (5% of max charge)
     
     // PowerLorentzFitMainDiag/PowerLorentzFitMainDiagX
     G4double fPowerLorentzFitMainDiagXAmplitude;
