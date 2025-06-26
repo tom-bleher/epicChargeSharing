@@ -97,11 +97,20 @@ void EventAction::BeginOfEventAction(const G4Event* event)
 
 void EventAction::EndOfEventAction(const G4Event* event)
 {
-  // Get the primary vertex position from the event
+  // Get the primary vertex position and energy from the event
   if (event->GetPrimaryVertex()) {
     G4ThreeVector primaryPos = event->GetPrimaryVertex()->GetPosition();
     // Update the initial position
     fInitialPosition = primaryPos;
+    
+    // Get the initial particle energy (kinetic energy)
+    G4PrimaryParticle* primaryParticle = event->GetPrimaryVertex()->GetPrimary();
+    if (primaryParticle) {
+      G4double initialKineticEnergy = primaryParticle->GetKineticEnergy();
+      // Store the initial energy in the RunAction for ROOT output
+      // Convert from Geant4 internal units (MeV) to MeV for storage
+      fRunAction->SetInitialEnergy(initialKineticEnergy);
+    }
   }
   
   // Calculate and store nearest pixel position FIRST (this calculates fActualPixelDistance)
@@ -421,6 +430,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
           powerLorentzFitResults.y_center_err, powerLorentzFitResults.y_gamma_err, powerLorentzFitResults.y_beta_err, powerLorentzFitResults.y_amplitude_err,
           powerLorentzFitResults.y_vertical_offset, powerLorentzFitResults.y_vertical_offset_err,
           powerLorentzFitResults.y_chi2red, powerLorentzFitResults.y_pp, powerLorentzFitResults.y_dof,
+          powerLorentzFitResults.x_charge_uncertainty, powerLorentzFitResults.y_charge_uncertainty,
           powerLorentzFitResults.fit_successful);
         
         // Log Power Lorentzian fitting results to SimulationLogger
@@ -479,6 +489,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fRunAction->Set2DPowerLorentzianFitResults(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, beta, amplitude, center_err, gamma_err, beta_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+          0, 0,  // charge uncertainties (x_charge_uncertainty, y_charge_uncertainty)
           false); // fit_successful = false
         
         // Set default diagonal Power-Law Lorentzian fit values when not enough data points
@@ -720,6 +731,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       fRunAction->Set2DPowerLorentzianFitResults(
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, beta, amplitude, center_err, gamma_err, beta_err, amplitude_err, vertical_offset, vertical_offset_err, chi2red, pp, dof)
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
+        0, 0,  // charge uncertainties (x_charge_uncertainty, y_charge_uncertainty)
         false); // fit_successful = false
       
       // Set default diagonal Power-Law Lorentzian fit values when fitting is skipped

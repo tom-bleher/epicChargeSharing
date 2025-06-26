@@ -385,7 +385,14 @@ RunAction::RunAction()
   fGridPixelSpacing(0),
   fGridPixelCornerOffset(0),
   fGridDetSize(0),
-  fGridNumBlocksPerSide(0)
+  fGridNumBlocksPerSide(0),
+  
+  // Charge uncertainties for Power-Law Lorentzian fits (5% of max charge)
+  fPowerLorentzFitRowChargeUncertainty(0),
+  fPowerLorentzFitColumnChargeUncertainty(0),
+  
+  // Set automatic radius selection variables
+  fSelectedRadius(4)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize step energy deposition vectors (they are automatically initialized empty)
@@ -748,6 +755,12 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     fTree->Branch("PowerLorentzFitColumnChi2red", &fPowerLorentzFitColumnChi2red, "PowerLorentzFitColumnChi2red/D")->SetTitle("Power-Law Lorentzian Column Fit Reduced Chi-squared");
     fTree->Branch("PowerLorentzFitColumnPp", &fPowerLorentzFitColumnPp, "PowerLorentzFitColumnPp/D")->SetTitle("Power-Law Lorentzian Column Fit P-value");
     fTree->Branch("PowerLorentzFitColumnDOF", &fPowerLorentzFitColumnDOF, "PowerLorentzFitColumnDOF/I")->SetTitle("Power-Law Lorentzian Column Fit Degrees of Freedom");
+    
+    // Conditionally create charge uncertainty branches for Power-Law Lorentzian fits
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fTree->Branch("PowerLorentzFitRowChargeUncertainty", &fPowerLorentzFitRowChargeUncertainty, "PowerLorentzFitRowChargeUncertainty/D")->SetTitle("Power-Law Lorentzian Row Fit Charge Uncertainty (5% of max charge)");
+        fTree->Branch("PowerLorentzFitColumnChargeUncertainty", &fPowerLorentzFitColumnChargeUncertainty, "PowerLorentzFitColumnChargeUncertainty/D")->SetTitle("Power-Law Lorentzian Column Fit Charge Uncertainty (5% of max charge)");
+    }
 
     // PowerLorentzFitMainDiag/PowerLorentzFitMainDiagX
     fTree->Branch("PowerLorentzFitMainDiagXAmplitude", &fPowerLorentzFitMainDiagXAmplitude, "PowerLorentzFitMainDiagXAmplitude/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Amplitude");
@@ -763,6 +776,51 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     fTree->Branch("PowerLorentzFitMainDiagXChi2red", &fPowerLorentzFitMainDiagXChi2red, "PowerLorentzFitMainDiagXChi2red/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Reduced Chi-squared");
     fTree->Branch("PowerLorentzFitMainDiagXPp", &fPowerLorentzFitMainDiagXPp, "PowerLorentzFitMainDiagXPp/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit P-value");
     fTree->Branch("PowerLorentzFitMainDiagXDOF", &fPowerLorentzFitMainDiagXDOF, "PowerLorentzFitMainDiagXDOF/I")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Degrees of Freedom");
+
+    // PowerLorentzFitMainDiag/PowerLorentzFitMainDiagY
+    fTree->Branch("PowerLorentzFitMainDiagYAmplitude", &fPowerLorentzFitMainDiagYAmplitude, "PowerLorentzFitMainDiagYAmplitude/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Amplitude");
+    fTree->Branch("PowerLorentzFitMainDiagYAmplitudeErr", &fPowerLorentzFitMainDiagYAmplitudeErr, "PowerLorentzFitMainDiagYAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Amplitude Error");
+    fTree->Branch("PowerLorentzFitMainDiagYBeta", &fPowerLorentzFitMainDiagYBeta, "PowerLorentzFitMainDiagYBeta/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Beta Parameter");
+    fTree->Branch("PowerLorentzFitMainDiagYBetaErr", &fPowerLorentzFitMainDiagYBetaErr, "PowerLorentzFitMainDiagYBetaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Beta Parameter Error");
+    fTree->Branch("PowerLorentzFitMainDiagYGamma", &fPowerLorentzFitMainDiagYGamma, "PowerLorentzFitMainDiagYGamma/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Gamma Parameter");
+    fTree->Branch("PowerLorentzFitMainDiagYGammaErr", &fPowerLorentzFitMainDiagYGammaErr, "PowerLorentzFitMainDiagYGammaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Gamma Parameter Error");
+    fTree->Branch("PowerLorentzFitMainDiagYVerticalOffset", &fPowerLorentzFitMainDiagYVerticalOffset, "PowerLorentzFitMainDiagYVerticalOffset/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Vertical Offset");
+    fTree->Branch("PowerLorentzFitMainDiagYVerticalOffsetErr", &fPowerLorentzFitMainDiagYVerticalOffsetErr, "PowerLorentzFitMainDiagYVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Vertical Offset Error");
+    fTree->Branch("PowerLorentzFitMainDiagYCenter", &fPowerLorentzFitMainDiagYCenter, "PowerLorentzFitMainDiagYCenter/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Center [mm]");
+    fTree->Branch("PowerLorentzFitMainDiagYCenterErr", &fPowerLorentzFitMainDiagYCenterErr, "PowerLorentzFitMainDiagYCenterErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Center Error [mm]");
+    fTree->Branch("PowerLorentzFitMainDiagYChi2red", &fPowerLorentzFitMainDiagYChi2red, "PowerLorentzFitMainDiagYChi2red/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Reduced Chi-squared");
+    fTree->Branch("PowerLorentzFitMainDiagYPp", &fPowerLorentzFitMainDiagYPp, "PowerLorentzFitMainDiagYPp/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit P-value");
+    fTree->Branch("PowerLorentzFitMainDiagYDOF", &fPowerLorentzFitMainDiagYDOF, "PowerLorentzFitMainDiagYDOF/I")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Degrees of Freedom");
+
+    // PowerLorentzFitSecondDiag/PowerLorentzFitSecondDiagX
+    fTree->Branch("PowerLorentzFitSecondDiagXAmplitude", &fPowerLorentzFitSecondDiagXAmplitude, "PowerLorentzFitSecondDiagXAmplitude/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Amplitude");
+    fTree->Branch("PowerLorentzFitSecondDiagXAmplitudeErr", &fPowerLorentzFitSecondDiagXAmplitudeErr, "PowerLorentzFitSecondDiagXAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Amplitude Error");
+    fTree->Branch("PowerLorentzFitSecondDiagXBeta", &fPowerLorentzFitSecondDiagXBeta, "PowerLorentzFitSecondDiagXBeta/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Beta Parameter");
+    fTree->Branch("PowerLorentzFitSecondDiagXBetaErr", &fPowerLorentzFitSecondDiagXBetaErr, "PowerLorentzFitSecondDiagXBetaErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Beta Parameter Error");
+    fTree->Branch("PowerLorentzFitSecondDiagXGamma", &fPowerLorentzFitSecondDiagXGamma, "PowerLorentzFitSecondDiagXGamma/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Gamma Parameter");
+    fTree->Branch("PowerLorentzFitSecondDiagXGammaErr", &fPowerLorentzFitSecondDiagXGammaErr, "PowerLorentzFitSecondDiagXGammaErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Gamma Parameter Error");
+    fTree->Branch("PowerLorentzFitSecondDiagXVerticalOffset", &fPowerLorentzFitSecondDiagXVerticalOffset, "PowerLorentzFitSecondDiagXVerticalOffset/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Vertical Offset");
+    fTree->Branch("PowerLorentzFitSecondDiagXVerticalOffsetErr", &fPowerLorentzFitSecondDiagXVerticalOffsetErr, "PowerLorentzFitSecondDiagXVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Vertical Offset Error");
+    fTree->Branch("PowerLorentzFitSecondDiagXCenter", &fPowerLorentzFitSecondDiagXCenter, "PowerLorentzFitSecondDiagXCenter/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Center [mm]");
+    fTree->Branch("PowerLorentzFitSecondDiagXCenterErr", &fPowerLorentzFitSecondDiagXCenterErr, "PowerLorentzFitSecondDiagXCenterErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Center Error [mm]");
+    fTree->Branch("PowerLorentzFitSecondDiagXChi2red", &fPowerLorentzFitSecondDiagXChi2red, "PowerLorentzFitSecondDiagXChi2red/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Reduced Chi-squared");
+    fTree->Branch("PowerLorentzFitSecondDiagXPp", &fPowerLorentzFitSecondDiagXPp, "PowerLorentzFitSecondDiagXPp/D")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit P-value");
+    fTree->Branch("PowerLorentzFitSecondDiagXDOF", &fPowerLorentzFitSecondDiagXDOF, "PowerLorentzFitSecondDiagXDOF/I")->SetTitle("Power-Law Lorentzian Second Diagonal X Fit Degrees of Freedom");
+
+    // PowerLorentzFitSecondDiag/PowerLorentzFitSecondDiagY
+    fTree->Branch("PowerLorentzFitSecondDiagYAmplitude", &fPowerLorentzFitSecondDiagYAmplitude, "PowerLorentzFitSecondDiagYAmplitude/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Amplitude");
+    fTree->Branch("PowerLorentzFitSecondDiagYAmplitudeErr", &fPowerLorentzFitSecondDiagYAmplitudeErr, "PowerLorentzFitSecondDiagYAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Amplitude Error");
+    fTree->Branch("PowerLorentzFitSecondDiagYBeta", &fPowerLorentzFitSecondDiagYBeta, "PowerLorentzFitSecondDiagYBeta/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Beta Parameter");
+    fTree->Branch("PowerLorentzFitSecondDiagYBetaErr", &fPowerLorentzFitSecondDiagYBetaErr, "PowerLorentzFitSecondDiagYBetaErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Beta Parameter Error");
+    fTree->Branch("PowerLorentzFitSecondDiagYGamma", &fPowerLorentzFitSecondDiagYGamma, "PowerLorentzFitSecondDiagYGamma/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Gamma Parameter");
+    fTree->Branch("PowerLorentzFitSecondDiagYGammaErr", &fPowerLorentzFitSecondDiagYGammaErr, "PowerLorentzFitSecondDiagYGammaErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Gamma Parameter Error");
+    fTree->Branch("PowerLorentzFitSecondDiagYVerticalOffset", &fPowerLorentzFitSecondDiagYVerticalOffset, "PowerLorentzFitSecondDiagYVerticalOffset/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Vertical Offset");
+    fTree->Branch("PowerLorentzFitSecondDiagYVerticalOffsetErr", &fPowerLorentzFitSecondDiagYVerticalOffsetErr, "PowerLorentzFitSecondDiagYVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Vertical Offset Error");
+    fTree->Branch("PowerLorentzFitSecondDiagYCenter", &fPowerLorentzFitSecondDiagYCenter, "PowerLorentzFitSecondDiagYCenter/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Center [mm]");
+    fTree->Branch("PowerLorentzFitSecondDiagYCenterErr", &fPowerLorentzFitSecondDiagYCenterErr, "PowerLorentzFitSecondDiagYCenterErr/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Center Error [mm]");
+    fTree->Branch("PowerLorentzFitSecondDiagYChi2red", &fPowerLorentzFitSecondDiagYChi2red, "PowerLorentzFitSecondDiagYChi2red/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Reduced Chi-squared");
+    fTree->Branch("PowerLorentzFitSecondDiagYPp", &fPowerLorentzFitSecondDiagYPp, "PowerLorentzFitSecondDiagYPp/D")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit P-value");
+    fTree->Branch("PowerLorentzFitSecondDiagYDOF", &fPowerLorentzFitSecondDiagYDOF, "PowerLorentzFitSecondDiagYDOF/I")->SetTitle("Power-Law Lorentzian Second Diagonal Y Fit Degrees of Freedom");
 
     // Delta branches for power Lorentzian fitting
     fTree->Branch("PowerLorentzRowDeltaX", &fPowerLorentzRowDeltaX, "PowerLorentzRowDeltaX/D")->SetTitle("Delta X from Power-Law Lorentzian Row Fit to True Position [mm]");
@@ -1196,6 +1254,12 @@ void RunAction::SetNearestPixelPosition(G4double x, G4double y, G4double z)
     fPixelX = x;
     fPixelY = y;
     fPixelZ = z;
+}
+
+void RunAction::SetInitialEnergy(G4double energy) 
+{
+    // Store initial particle energy in MeV (Geant4 internal energy unit is MeV)
+    fInitialEnergy = energy;
 }
 
 
@@ -1923,6 +1987,7 @@ void RunAction::Set2DPowerLorentzianFitResults(G4double x_center, G4double x_gam
                                                G4double y_center_err, G4double y_gamma_err, G4double y_beta_err, G4double y_amplitude_err,
                                                G4double y_vertical_offset, G4double y_vertical_offset_err,
                                                G4double y_chi2red, G4double y_pp, G4int y_dof,
+                                               G4double x_charge_uncertainty, G4double y_charge_uncertainty,
                                                G4bool fit_successful)
 {
     // Store X direction (row) fit results - Power-Law Lorentzian model
@@ -1954,6 +2019,15 @@ void RunAction::Set2DPowerLorentzianFitResults(G4double x_center, G4double x_gam
     fPowerLorentzFitColumnChi2red = y_chi2red;
     fPowerLorentzFitColumnPp = y_pp;
     fPowerLorentzFitColumnDOF = y_dof;
+    
+    // Store charge uncertainties (5% of max charge) only if feature is enabled
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fPowerLorentzFitRowChargeUncertainty = x_charge_uncertainty;
+        fPowerLorentzFitColumnChargeUncertainty = y_charge_uncertainty;
+    } else {
+        fPowerLorentzFitRowChargeUncertainty = 0.0;
+        fPowerLorentzFitColumnChargeUncertainty = 0.0;
+    }
     
     // Calculate delta values for row and column fits vs true position
     if (fit_successful) {

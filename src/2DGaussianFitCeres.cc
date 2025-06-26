@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <map>
 #include <iostream>
-// Removed mutex include - no longer needed for parallelization
 #include <atomic>
 #include <limits>
 #include <numeric>
