@@ -165,13 +165,21 @@ public:
                                    G4double charge_uncertainty,
                                    G4bool fit_successful);
     
+    // Method to set 3D Gaussian fit results (entire neighborhood surface fitting)
+    // Model: z(x,y) = A * exp(-((x-mx)^2/(2*σx^2) + (y-my)^2/(2*σy^2))) + B
+    void Set3DGaussianFitResults(G4double center_x, G4double center_y, G4double sigma_x, G4double sigma_y, G4double amplitude, G4double vertical_offset,
+                                 G4double center_x_err, G4double center_y_err, G4double sigma_x_err, G4double sigma_y_err, G4double amplitude_err, G4double vertical_offset_err,
+                                 G4double chi2red, G4double pp, G4int dof,
+                                 G4double charge_uncertainty,
+                                 G4bool fit_successful);
+    
     // Method to set 3D Power-Law Lorentzian fit results (entire neighborhood surface fitting)
     // Model: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2)^β + B
     void Set3DPowerLorentzianFitResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double beta, G4double amplitude, G4double vertical_offset,
                                         G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double beta_err, G4double amplitude_err, G4double vertical_offset_err,
                                         G4double chi2red, G4double pp, G4int dof,
                                         G4double charge_uncertainty,
-                                                                                      G4bool fit_successful);
+                                        G4bool fit_successful);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -235,6 +243,8 @@ private:
     // 3D fitting delta variables
     G4double f3DLorentzianDeltaX;          // Delta X from 3D Lorentzian fit to True Position [mm]
     G4double f3DLorentzianDeltaY;          // Delta Y from 3D Lorentzian fit to True Position [mm]
+    G4double f3DGaussianDeltaX;            // Delta X from 3D Gaussian fit to True Position [mm]
+    G4double f3DGaussianDeltaY;            // Delta Y from 3D Gaussian fit to True Position [mm]
     G4double f3DPowerLorentzianDeltaX;     // Delta X from 3D Power-Law Lorentzian fit to True Position [mm]
     G4double f3DPowerLorentzianDeltaY;     // Delta Y from 3D Power-Law Lorentzian fit to True Position [mm]
 
@@ -586,6 +596,33 @@ private:
     G4int f3DLorentzianFitDOF;                   // Degrees of Freedom
     G4double f3DLorentzianFitChargeUncertainty;  // Charge uncertainty (5% of max charge)
     G4bool f3DLorentzianFitSuccessful;           // Fit success flag
+
+    // =============================================
+    // 3D GAUSSIAN FITS VARIABLES
+    // =============================================
+    
+    // 3D Gaussian fit parameters: z(x,y) = A * exp(-((x-mx)^2/(2*σx^2) + (y-my)^2/(2*σy^2))) + B
+    G4double f3DGaussianFitCenterX;            // mx parameter (X center)
+    G4double f3DGaussianFitCenterY;            // my parameter (Y center)
+    G4double f3DGaussianFitSigmaX;             // σx parameter (X standard deviation)
+    G4double f3DGaussianFitSigmaY;             // σy parameter (Y standard deviation)
+    G4double f3DGaussianFitAmplitude;          // A parameter (peak amplitude)
+    G4double f3DGaussianFitVerticalOffset;     // B parameter (baseline)
+    
+    // 3D Gaussian fit parameter errors
+    G4double f3DGaussianFitCenterXErr;         
+    G4double f3DGaussianFitCenterYErr;         
+    G4double f3DGaussianFitSigmaXErr;          
+    G4double f3DGaussianFitSigmaYErr;          
+    G4double f3DGaussianFitAmplitudeErr;       
+    G4double f3DGaussianFitVerticalOffsetErr;  
+    
+    // 3D Gaussian fit statistics
+    G4double f3DGaussianFitChi2red;            // Reduced Chi-squared
+    G4double f3DGaussianFitPp;                 // P-value  
+    G4int f3DGaussianFitDOF;                   // Degrees of Freedom
+    G4double f3DGaussianFitChargeUncertainty;  // Charge uncertainty (5% of max charge)
+    G4bool f3DGaussianFitSuccessful;           // Fit success flag
 
     // =============================================
     // 3D POWER-LAW LORENTZIAN FITS VARIABLES

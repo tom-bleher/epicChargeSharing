@@ -16,6 +16,7 @@
 struct GaussianFit2DResultsCeres;
 struct LorentzianFit2DResultsCeres;
 struct PowerLorentzianFit2DResultsCeres;
+struct GaussianFit3DResultsCeres;
 struct LorentzianFit3DResultsCeres;
 struct PowerLorentzianFit3DResultsCeres;
 
@@ -54,6 +55,7 @@ public:
     void LogLorentzianFitResults(G4int eventID, const LorentzianFit2DResultsCeres& results);
     void LogPowerLorentzianFitResults(G4int eventID, const PowerLorentzianFit2DResultsCeres& results);
     void Log3DLorentzianFitResults(G4int eventID, const LorentzianFit3DResultsCeres& results);
+    void Log3DGaussianFitResults(G4int eventID, const GaussianFit3DResultsCeres& results);
     void Log3DPowerLorentzianFitResults(G4int eventID, const PowerLorentzianFit3DResultsCeres& results);
     
     // Performance and statistics logging
