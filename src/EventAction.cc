@@ -7,6 +7,7 @@
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
 #include "2DPowerLorentzianFitCeres.hh"
+#include "3DGaussianFitCeres.hh"
 #include "3DLorentzianFitCeres.hh"
 #include "3DPowerLorentzianFitCeres.hh"
 
@@ -539,6 +540,54 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
       
       // ===============================================
+      // 3D GAUSSIAN FITTING (conditionally enabled)
+      // ===============================================
+      
+      // Perform 3D Gaussian fitting if we have enough data points and 3D Gaussian fitting is enabled
+      if (x_coords.size() >= 6 && Constants::ENABLE_3D_GAUSSIAN_FITTING) { // Need at least 6 points for 3D Gaussian fit
+        // Perform 3D Gaussian fitting using the Ceres Solver implementation
+        GaussianFit3DResultsCeres gauss3DFitResults = Fit3DGaussianCeres(
+          x_coords, y_coords, charge_values,
+          nearestPixel.x(), nearestPixel.y(),
+          pixelSpacing, 
+          false, // verbose=false for production
+          false); // enable_outlier_filtering
+        
+        if (gauss3DFitResults.fit_successful) {
+          // Removed verbose debug output for cleaner simulation logs
+        }
+        
+        // Pass 3D Gaussian fit results to RunAction
+        fRunAction->Set3DGaussianFitResults(
+          gauss3DFitResults.center_x, gauss3DFitResults.center_y, 
+          gauss3DFitResults.sigma_x, gauss3DFitResults.sigma_y, 
+          gauss3DFitResults.amplitude, gauss3DFitResults.vertical_offset,
+          gauss3DFitResults.center_x_err, gauss3DFitResults.center_y_err,
+          gauss3DFitResults.sigma_x_err, gauss3DFitResults.sigma_y_err,
+          gauss3DFitResults.amplitude_err, gauss3DFitResults.vertical_offset_err,
+          gauss3DFitResults.chi2red, gauss3DFitResults.pp, gauss3DFitResults.dof,
+          gauss3DFitResults.charge_uncertainty,
+          gauss3DFitResults.fit_successful);
+        
+        // Log 3D Gaussian fitting results to SimulationLogger
+        SimulationLogger* logger = SimulationLogger::GetInstance();
+        if (logger) {
+          logger->Log3DGaussianFitResults(event->GetEventID(), gauss3DFitResults);
+        }
+        
+    } else {
+      // Not enough data points for 3D Gaussian fitting or 3D Gaussian fitting is disabled
+      if (Constants::ENABLE_3D_GAUSSIAN_FITTING) {
+        fRunAction->Set3DGaussianFitResults(
+          0, 0, 0, 0, 0, 0,  // center_x, center_y, sigma_x, sigma_y, amplitude, vertical_offset
+          0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, sigma_x_err, sigma_y_err, amplitude_err, vertical_offset_err
+          0, 0, 0,           // chi2red, pp, dof
+          0,                 // charge_uncertainty
+          false);            // fit_successful = false
+      }
+    }
+      
+      // ===============================================
       // 3D POWER-LAW LORENTZIAN FITTING (conditionally enabled)
       // ===============================================
       
@@ -687,6 +736,16 @@ void EventAction::EndOfEventAction(const G4Event* event)
       fRunAction->Set3DLorentzianFitResults(
         0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, amplitude, vertical_offset
         0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, amplitude_err, vertical_offset_err
+        0, 0, 0,           // chi2red, pp, dof
+        0,                 // charge_uncertainty
+        false);            // fit_successful = false
+    }
+    
+    // Set default 3D Gaussian values (no fitting performed or 3D Gaussian fitting is disabled)
+    if (Constants::ENABLE_3D_GAUSSIAN_FITTING) {
+      fRunAction->Set3DGaussianFitResults(
+        0, 0, 0, 0, 0, 0,  // center_x, center_y, sigma_x, sigma_y, amplitude, vertical_offset
+        0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, sigma_x_err, sigma_y_err, amplitude_err, vertical_offset_err
         0, 0, 0,           // chi2red, pp, dof
         0,                 // charge_uncertainty
         false);            // fit_successful = false

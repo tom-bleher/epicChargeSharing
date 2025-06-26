@@ -2,6 +2,7 @@
 #include "2DGaussianFitCeres.hh"
 #include "2DLorentzianFitCeres.hh"
 #include "2DPowerLorentzianFitCeres.hh"
+#include "3DGaussianFitCeres.hh"
 #include "3DLorentzianFitCeres.hh"
 #include "3DPowerLorentzianFitCeres.hh"
 #include "G4SystemOfUnits.hh"
@@ -364,6 +365,31 @@ void SimulationLogger::Log3DLorentzianFitResults(G4int eventID, const Lorentzian
             *fFittingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
         }
         *fFittingLog << "=======================================================\n\n";
+        fFittingLog->flush();
+    }
+    
+    fTotalFits++;
+    if (results.fit_successful) {
+        fSuccessfulFits++;
+    } else {
+        fFailedFits++;
+    }
+}
+
+void SimulationLogger::Log3DGaussianFitResults(G4int eventID, const GaussianFit3DResultsCeres& results) {
+    if (fFittingLog) {
+        *fFittingLog << "\n=== EVENT " << eventID << " - 3D GAUSSIAN FIT RESULTS ===\n";
+        *fFittingLog << "Success: " << (results.fit_successful ? "YES" : "NO") << "\n";
+        if (results.fit_successful) {
+            *fFittingLog << "3D Gaussian Parameters:\n";
+            *fFittingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
+            *fFittingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
+            *fFittingLog << "  Sigma X: " << results.sigma_x/mm << " ± " << results.sigma_x_err/mm << " mm\n";
+            *fFittingLog << "  Sigma Y: " << results.sigma_y/mm << " ± " << results.sigma_y_err/mm << " mm\n";
+            *fFittingLog << "  Amplitude: " << results.amplitude << " ± " << results.amplitude_err << "\n";
+            *fFittingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
+        }
+        *fFittingLog << "======================================================\n\n";
         fFittingLog->flush();
     }
     

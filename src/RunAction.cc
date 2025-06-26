@@ -356,6 +356,27 @@ RunAction::RunAction()
   f3DPowerLorentzianFitDOF(0),
   f3DPowerLorentzianFitChargeUncertainty(0),
   f3DPowerLorentzianFitSuccessful(false),
+  // Initialize 3D Gaussian fitting delta variables
+  f3DGaussianDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
+  f3DGaussianDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
+  // Initialize 3D Gaussian fit variables
+  f3DGaussianFitCenterX(0),
+  f3DGaussianFitCenterY(0),
+  f3DGaussianFitSigmaX(0),
+  f3DGaussianFitSigmaY(0),
+  f3DGaussianFitAmplitude(0),
+  f3DGaussianFitVerticalOffset(0),
+  f3DGaussianFitCenterXErr(0),
+  f3DGaussianFitCenterYErr(0),
+  f3DGaussianFitSigmaXErr(0),
+  f3DGaussianFitSigmaYErr(0),
+  f3DGaussianFitAmplitudeErr(0),
+  f3DGaussianFitVerticalOffsetErr(0),
+  f3DGaussianFitChi2red(0),
+  f3DGaussianFitPp(0),
+  f3DGaussianFitDOF(0),
+  f3DGaussianFitChargeUncertainty(0),
+  f3DGaussianFitSuccessful(false),
   // Legacy variables
   fPixelZ(0),
   fIsPixelHit(false),
@@ -764,6 +785,43 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     fTree->Branch("PowerLorentzMeanTrueDeltaY", &fPowerLorentzMeanTrueDeltaY, "PowerLorentzMeanTrueDeltaY/D")->SetTitle("Mean Delta Y from all Power-Law Lorentzian estimation methods to True Position [mm]");
 
     } // End of Power-Law Lorentzian fitting branches
+
+    // =============================================
+    // 3D GAUSSIAN FITS BRANCHES (conditionally created)
+    // =============================================
+    if (Constants::ENABLE_3D_GAUSSIAN_FITTING) {
+    // 3D Gaussian fit parameters
+    fTree->Branch("3DGaussianFitCenterX", &f3DGaussianFitCenterX, "3DGaussianFitCenterX/D")->SetTitle("3D Gaussian Fit Center X [mm]");
+    fTree->Branch("3DGaussianFitCenterY", &f3DGaussianFitCenterY, "3DGaussianFitCenterY/D")->SetTitle("3D Gaussian Fit Center Y [mm]");
+    fTree->Branch("3DGaussianFitSigmaX", &f3DGaussianFitSigmaX, "3DGaussianFitSigmaX/D")->SetTitle("3D Gaussian Fit Sigma X Parameter");
+    fTree->Branch("3DGaussianFitSigmaY", &f3DGaussianFitSigmaY, "3DGaussianFitSigmaY/D")->SetTitle("3D Gaussian Fit Sigma Y Parameter");
+    fTree->Branch("3DGaussianFitAmplitude", &f3DGaussianFitAmplitude, "3DGaussianFitAmplitude/D")->SetTitle("3D Gaussian Fit Amplitude");
+    fTree->Branch("3DGaussianFitVerticalOffset", &f3DGaussianFitVerticalOffset, "3DGaussianFitVerticalOffset/D")->SetTitle("3D Gaussian Fit Vertical Offset");
+    
+    // 3D Gaussian fit parameter errors
+    fTree->Branch("3DGaussianFitCenterXErr", &f3DGaussianFitCenterXErr, "3DGaussianFitCenterXErr/D")->SetTitle("3D Gaussian Fit Center X Error [mm]");
+    fTree->Branch("3DGaussianFitCenterYErr", &f3DGaussianFitCenterYErr, "3DGaussianFitCenterYErr/D")->SetTitle("3D Gaussian Fit Center Y Error [mm]");
+    fTree->Branch("3DGaussianFitSigmaXErr", &f3DGaussianFitSigmaXErr, "3DGaussianFitSigmaXErr/D")->SetTitle("3D Gaussian Fit Sigma X Parameter Error");
+    fTree->Branch("3DGaussianFitSigmaYErr", &f3DGaussianFitSigmaYErr, "3DGaussianFitSigmaYErr/D")->SetTitle("3D Gaussian Fit Sigma Y Parameter Error");
+    fTree->Branch("3DGaussianFitAmplitudeErr", &f3DGaussianFitAmplitudeErr, "3DGaussianFitAmplitudeErr/D")->SetTitle("3D Gaussian Fit Amplitude Error");
+    fTree->Branch("3DGaussianFitVerticalOffsetErr", &f3DGaussianFitVerticalOffsetErr, "3DGaussianFitVerticalOffsetErr/D")->SetTitle("3D Gaussian Fit Vertical Offset Error");
+    
+    // 3D Gaussian fit statistics
+    fTree->Branch("3DGaussianFitChi2red", &f3DGaussianFitChi2red, "3DGaussianFitChi2red/D")->SetTitle("3D Gaussian Fit Reduced Chi-squared");
+    fTree->Branch("3DGaussianFitPp", &f3DGaussianFitPp, "3DGaussianFitPp/D")->SetTitle("3D Gaussian Fit P-value");
+    fTree->Branch("3DGaussianFitDOF", &f3DGaussianFitDOF, "3DGaussianFitDOF/I")->SetTitle("3D Gaussian Fit Degrees of Freedom");
+    fTree->Branch("3DGaussianFitSuccessful", &f3DGaussianFitSuccessful, "3DGaussianFitSuccessful/O")->SetTitle("3D Gaussian Fit Success Flag");
+    
+    // Conditionally create charge uncertainty branch for 3D Gaussian fit
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        fTree->Branch("3DGaussianFitChargeUncertainty", &f3DGaussianFitChargeUncertainty, "3DGaussianFitChargeUncertainty/D")->SetTitle("3D Gaussian Fit Charge Uncertainty");
+    }
+    
+    // 3D Gaussian delta branches
+    fTree->Branch("3DGaussianDeltaX", &f3DGaussianDeltaX, "3DGaussianDeltaX/D")->SetTitle("Delta X from 3D Gaussian Fit to True Position [mm]");
+    fTree->Branch("3DGaussianDeltaY", &f3DGaussianDeltaY, "3DGaussianDeltaY/D")->SetTitle("Delta Y from 3D Gaussian Fit to True Position [mm]");
+    
+    } // End of 3D Gaussian fitting branches
 
     // =============================================
     // 3D LORENTZIAN FITS BRANCHES (conditionally created)
@@ -1744,6 +1802,14 @@ void RunAction::CalculateMeanEstimations()
     // ADD 3D FITTING RESULTS TO MEAN CALCULATIONS
     // =============================================
     
+    // Add 3D Gaussian fit results to Gaussian estimation collections
+    if (!std::isnan(f3DGaussianFitCenterX) && f3DGaussianFitSuccessful) {
+        gauss_x_coords.push_back(f3DGaussianFitCenterX);
+    }
+    if (!std::isnan(f3DGaussianFitCenterY) && f3DGaussianFitSuccessful) {
+        gauss_y_coords.push_back(f3DGaussianFitCenterY);
+    }
+    
     // Add 3D Lorentzian fit results to Lorentzian estimation collections
     if (!std::isnan(f3DLorentzianFitCenterX) && f3DLorentzianFitSuccessful) {
         lorentz_x_coords.push_back(f3DLorentzianFitCenterX);
@@ -2097,6 +2163,55 @@ void RunAction::Set3DPowerLorentzianFitResults(G4double center_x, G4double cente
         // Set delta values to NaN for failed fits
         f3DPowerLorentzianDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         f3DPowerLorentzianDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+    
+    // Calculate mean estimations from all fitting methods (including 3D)
+    CalculateMeanEstimations();
+}
+
+void RunAction::Set3DGaussianFitResults(G4double center_x, G4double center_y, G4double sigma_x, G4double sigma_y, G4double amplitude, G4double vertical_offset,
+                                        G4double center_x_err, G4double center_y_err, G4double sigma_x_err, G4double sigma_y_err, G4double amplitude_err, G4double vertical_offset_err,
+                                        G4double chi2red, G4double pp, G4int dof,
+                                        G4double charge_uncertainty,
+                                        G4bool fit_successful)
+{
+    // Store 3D Gaussian fit parameters
+    f3DGaussianFitCenterX = center_x;
+    f3DGaussianFitCenterY = center_y;
+    f3DGaussianFitSigmaX = sigma_x;
+    f3DGaussianFitSigmaY = sigma_y;
+    f3DGaussianFitAmplitude = amplitude;
+    f3DGaussianFitVerticalOffset = vertical_offset;
+    
+    // Store 3D Gaussian fit parameter errors
+    f3DGaussianFitCenterXErr = center_x_err;
+    f3DGaussianFitCenterYErr = center_y_err;
+    f3DGaussianFitSigmaXErr = sigma_x_err;
+    f3DGaussianFitSigmaYErr = sigma_y_err;
+    f3DGaussianFitAmplitudeErr = amplitude_err;
+    f3DGaussianFitVerticalOffsetErr = vertical_offset_err;
+    
+    // Store 3D Gaussian fit statistics
+    f3DGaussianFitChi2red = chi2red;
+    f3DGaussianFitPp = pp;
+    f3DGaussianFitDOF = dof;
+    f3DGaussianFitSuccessful = fit_successful;
+    
+    // Store charge uncertainty (5% of max charge) only if feature is enabled
+    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+        f3DGaussianFitChargeUncertainty = charge_uncertainty;
+    } else {
+        f3DGaussianFitChargeUncertainty = 0.0;
+    }
+    
+    // Calculate delta values vs true position
+    if (fit_successful && dof > 0) {
+        f3DGaussianDeltaX = center_x - fTrueX;      // x_3D_fit - x_true
+        f3DGaussianDeltaY = center_y - fTrueY;      // y_3D_fit - y_true
+    } else {
+        // Set delta values to NaN for failed fits
+        f3DGaussianDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+        f3DGaussianDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
     
     // Calculate mean estimations from all fitting methods (including 3D)
