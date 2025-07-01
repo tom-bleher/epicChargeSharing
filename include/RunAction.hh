@@ -12,6 +12,8 @@
 #include "TTree.h"
 #include "G4Threading.hh"
 #include <mutex>
+#include <atomic>
+#include <condition_variable>
 
 class RunAction : public G4UserRunAction
 {
@@ -25,6 +27,21 @@ public:
     // Access methods for ROOT objects
     TFile* GetRootFile() const { return fRootFile; }
     TTree* GetTree() const { return fTree; }
+    
+    // Thread synchronization for ROOT file operations
+    static void WaitForAllWorkersToComplete();
+    static void SignalWorkerCompletion();
+    static void ResetSynchronization();
+    
+    // Safe ROOT file operations
+    bool SafeWriteRootFile();
+    bool ValidateRootFile(const G4String& filename);
+    void CleanupRootObjects();
+    
+    // Auto-save mechanism
+    void EnableAutoSave(G4int interval = 1000);
+    void DisableAutoSave();
+    void PerformAutoSave();
     
     // Variables for the branch (edep [MeV], positions [mm])
     void SetEventData(G4double edep, G4double x, G4double y, G4double z);
@@ -218,6 +235,18 @@ private:
     
     // Thread-safety mutex for ROOT operations
     static std::mutex fRootMutex;
+    
+    // Thread synchronization for robust file operations
+    static std::atomic<int> fWorkersCompleted;
+    static std::atomic<int> fTotalWorkers;
+    static std::condition_variable fWorkerCompletionCV;
+    static std::mutex fSyncMutex;
+    static std::atomic<bool> fAllWorkersCompleted;
+    
+    // Auto-save mechanism
+    G4bool fAutoSaveEnabled;
+    G4int fAutoSaveInterval;
+    G4int fEventsSinceLastSave;
     
     // =============================================
     // HITS DATA VARIABLES
