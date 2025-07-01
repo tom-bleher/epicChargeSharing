@@ -98,8 +98,8 @@ namespace Constants {
     // Set to 'false' to disable a fitting model and skip its computation entirely
     // This reduces simulation time and ROOT output file size when specific models aren't needed
     const G4bool ENABLE_GAUSSIAN_FITTING = true;         // Enable Gaussian fitting (2D and diagonal)
-    const G4bool ENABLE_LORENTZIAN_FITTING = true;       // Enable Lorentzian fitting (2D and diagonal) 
-    const G4bool ENABLE_POWER_LORENTZIAN_FITTING = true; // Enable Power Lorentzian fitting (2D and diagonal)
+    const G4bool ENABLE_LORENTZIAN_FITTING = false;       // Enable Lorentzian fitting (2D and diagonal) 
+    const G4bool ENABLE_POWER_LORENTZIAN_FITTING = false; // Enable Power Lorentzian fitting (2D and diagonal)
     
     // Individual fitting type control (only used if main model is enabled)
     const G4bool ENABLE_2D_FITTING = true;               // Enable central row/column fitting
@@ -107,8 +107,8 @@ namespace Constants {
     
     // 3D fitting control flags (fit entire neighborhood surface directly)
     const G4bool ENABLE_3D_GAUSSIAN_FITTING = true;      // Enable 3D Gaussian surface fitting
-    const G4bool ENABLE_3D_LORENTZIAN_FITTING = true;    // Enable 3D Lorentzian surface fitting
-    const G4bool ENABLE_3D_POWER_LORENTZIAN_FITTING = true; // Enable 3D Power-Law Lorentzian surface fitting
+    const G4bool ENABLE_3D_LORENTZIAN_FITTING = false;    // Enable 3D Lorentzian surface fitting
+    const G4bool ENABLE_3D_POWER_LORENTZIAN_FITTING = false; // Enable 3D Power-Law Lorentzian surface fitting
     
     // ========================
     // VERTICAL CHARGE UNCERTAINTIES CONTROL
@@ -141,4 +141,4 @@ namespace Constants {
     
 } // namespace Constants
 
-#endif // CONSTANTS_HH 
+#endif // CONSTANTS_HH
