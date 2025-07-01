@@ -25,8 +25,9 @@ from datetime import datetime
 
 try:
     import uproot
+    import awkward as ak
 except ImportError:
-    print("Error: uproot not found. Please install with: pip install uproot awkward")
+    print("Error: uproot and awkward not found. Please install with: pip install uproot awkward")
     sys.exit(1)
 
 
@@ -88,75 +89,95 @@ def read_root_data(root_file_path):
     
     # Open ROOT file with uproot
     try:
-        with uproot.open(root_file_path) as root_file:
-            # Get the tree
-            if "Hits" not in root_file:
-                raise RuntimeError("Cannot find 'Hits' tree in ROOT file")
+        root_file = uproot.open(root_file_path)
+        
+        # Get the tree
+        if "Hits" not in root_file:
+            raise RuntimeError("Cannot find 'Hits' tree in ROOT file")
+        
+        tree = root_file["Hits"]
+        n_entries = tree.num_entries
+        print(f"Found {n_entries} entries in tree")
+        
+        # List ALL available branches to debug what's actually there
+        available_branches = tree.keys()
+        print(f"Total available branches: {len(available_branches)}")
+        
+        # Look for diagonal branches specifically
+        diagonal_branches = [b for b in available_branches if 'Diag' in b and 'Delta' in b]
+        print(f"Found diagonal delta branches: {diagonal_branches}")
+        
+        # Branch names based on actual ROOT file structure
+        branches = [
+            'TrueX', 'TrueY',  # True positions
+            'PixelTrueDeltaX', 'PixelTrueDeltaY',  # Digital readout deltas
+            'GaussRowDeltaX', 'GaussColumnDeltaY',  # Gaussian row/column fit deltas
+            'LorentzRowDeltaX', 'LorentzColumnDeltaY',  # Lorentzian row/column fit deltas
+            'PowerLorentzRowDeltaX', 'PowerLorentzColumnDeltaY',  # Power Lorentzian row/column fit deltas
             
-            tree = root_file["Hits"]
-            n_entries = tree.num_entries
-            print(f"Found {n_entries} entries in tree")
+            # Main diagonal deltas
+            'GaussMainDiagTransformedDeltaX', 'GaussMainDiagTransformedDeltaY',
+            'LorentzMainDiagTransformedDeltaX', 'LorentzMainDiagTransformedDeltaY',
             
-            # List ALL available branches to debug what's actually there
-            available_branches = list(tree.keys())
-            print(f"Total available branches: {len(available_branches)}")
+            # Secondary diagonal deltas (check if they exist)
+            'GaussSecondDiagTransformedDeltaX', 'GaussSecondDiagTransformedDeltaY',
+            'LorentzSecondDiagTransformedDeltaX', 'LorentzSecondDiagTransformedDeltaY',
             
-            # Look for diagonal branches specifically
-            diagonal_branches = [b for b in available_branches if 'Diag' in b and 'Delta' in b]
-            print(f"Found diagonal delta branches: {diagonal_branches}")
+            # Power Lorentzian deltas (check if they exist)
+            'PowerLorentzMainDiagTransformedDeltaX', 'PowerLorentzMainDiagTransformedDeltaY',
+            'PowerLorentzSecondDiagTransformedDeltaX', 'PowerLorentzSecondDiagTransformedDeltaY',
             
-            # Branch names based on actual ROOT file structure
-            branches = [
-                'TrueX', 'TrueY',  # True positions
-                'PixelTrueDeltaX', 'PixelTrueDeltaY',  # Digital readout deltas
-                'GaussRowDeltaX', 'GaussColumnDeltaY',  # Gaussian row/column fit deltas
-                'LorentzRowDeltaX', 'LorentzColumnDeltaY',  # Lorentzian row/column fit deltas
-                'PowerLorentzRowDeltaX', 'PowerLorentzColumnDeltaY',  # Power Lorentzian row/column fit deltas
-                
-                # Main diagonal deltas
-                'GaussMainDiagTransformedDeltaX', 'GaussMainDiagTransformedDeltaY',
-                'LorentzMainDiagTransformedDeltaX', 'LorentzMainDiagTransformedDeltaY',
-                
-                # Secondary diagonal deltas (check if they exist)
-                'GaussSecondDiagTransformedDeltaX', 'GaussSecondDiagTransformedDeltaY',
-                'LorentzSecondDiagTransformedDeltaX', 'LorentzSecondDiagTransformedDeltaY',
-                
-                # Power Lorentzian deltas (check if they exist)
-                'PowerLorentzMainDiagTransformedDeltaX', 'PowerLorentzMainDiagTransformedDeltaY',
-                'PowerLorentzSecondDiagTransformedDeltaX', 'PowerLorentzSecondDiagTransformedDeltaY',
-                
-                # 3D fit deltas (check if they exist)
-                '3DLorentzianDeltaX', '3DLorentzianDeltaY',  # 3D Lorentzian fit deltas
-                '3DPowerLorentzianDeltaX', '3DPowerLorentzianDeltaY',  # 3D Power-Law Lorentzian fit deltas
-                
-                # Mean estimators
-                'GaussMeanTrueDeltaX', 'GaussMeanTrueDeltaY',
-                'LorentzMeanTrueDeltaX', 'LorentzMeanTrueDeltaY',
-                'PowerLorentzMeanTrueDeltaX', 'PowerLorentzMeanTrueDeltaY',
-            ]
+            # 3D fit deltas (check if they exist)
+            '3DGaussianDeltaX', '3DGaussianDeltaY',  # 3D Gaussian fit deltas
+            '3DLorentzianDeltaX', '3DLorentzianDeltaY',  # 3D Lorentzian fit deltas
+            '3DPowerLorentzianDeltaX', '3DPowerLorentzianDeltaY',  # 3D Power-Law Lorentzian fit deltas
             
-            # Read all branches at once
-            print("Reading tree data...")
-            print(f"Available branches: {sorted(available_branches)}")
-            
-            data = {}
-            missing_branches = []
-            for branch in branches:
-                if branch in available_branches:
-                    data[branch] = tree[branch].array(library="np")
+            # Mean estimators
+            'GaussMeanTrueDeltaX', 'GaussMeanTrueDeltaY',
+            'LorentzMeanTrueDeltaX', 'LorentzMeanTrueDeltaY',
+            'PowerLorentzMeanTrueDeltaX', 'PowerLorentzMeanTrueDeltaY',
+        ]
+        
+        # Read all branches at once with better error handling
+        print("Reading tree data...")
+        print(f"Available branches: {sorted(available_branches)}")
+        
+        data = {}
+        missing_branches = []
+        corrupted_branches = []
+        
+        for branch in branches:
+            if branch in available_branches:
+                try:
+                    # Use step_size to handle potential corruption
+                    branch_data = tree[branch].array(library="np", entry_stop=None)
+                    data[branch] = branch_data
                     print(f"  ✓ Read {branch}: {len(data[branch])} entries")
-                else:
-                    missing_branches.append(branch)
-                    print(f"  ✗ Missing: {branch}")
-                    data[branch] = np.zeros(n_entries)
-            
-            if missing_branches:
-                print(f"\nMissing branches ({len(missing_branches)}):")
-                for branch in missing_branches:
-                    print(f"  - {branch}")
-            
-            print("ROOT file reading complete")
-            return data
+                except Exception as e:
+                    print(f"  ✗ Error reading {branch}: {e}")
+                    corrupted_branches.append(branch)
+                    # For corrupted branches, create array of NaNs
+                    data[branch] = np.full(n_entries, np.nan, dtype=np.float64)
+            else:
+                missing_branches.append(branch)
+                print(f"  ✗ Missing: {branch}")
+                data[branch] = np.full(n_entries, np.nan, dtype=np.float64)
+        
+        if missing_branches:
+            print(f"\nMissing branches ({len(missing_branches)}):")
+            for branch in missing_branches:
+                print(f"  - {branch}")
+        
+        if corrupted_branches:
+            print(f"\nCorrupted branches ({len(corrupted_branches)}):")
+            for branch in corrupted_branches:
+                print(f"  - {branch}")
+            print("\nWARNING: Some branches are corrupted. Results may be incomplete.")
+            print("Consider re-running the simulation to generate a clean ROOT file.")
+        
+        print("ROOT file reading complete")
+        root_file.close()
+        return data
             
     except Exception as e:
         raise RuntimeError(f"Error reading ROOT file: {e}")
@@ -210,6 +231,8 @@ def calculate_all_resolutions(data):
         ('Power Lorentzian Secondary Diagonal Fit Y', 'PowerLorentzSecondDiagTransformedDeltaY'),
         
         # 3D Surface Fits
+        ('3D Gaussian Fit X', '3DGaussianDeltaX'),
+        ('3D Gaussian Fit Y', '3DGaussianDeltaY'),
         ('3D Lorentzian Fit X', '3DLorentzianDeltaX'),
         ('3D Lorentzian Fit Y', '3DLorentzianDeltaY'),
         ('3D Power Lorentzian Fit X', '3DPowerLorentzianDeltaX'),
@@ -261,6 +284,11 @@ def save_results_to_file(results, output_file):
     print(f"\nSaving results to: {output_file}")
     
     with open(output_file, 'w') as f:
+        # Write header with timestamp
+        f.write(f"Spatial Resolution Analysis Results\n")
+        f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write("=" * 80 + "\n\n")
+        
         # Group results by category for better organization
         digital_results = [r for r in results if 'Digital' in r['name']]
         gauss_row_col_results = [r for r in results if ('Gaussian Row Fit' in r['name'] or 'Gaussian Column Fit' in r['name'])]
@@ -379,8 +407,8 @@ Examples:
     )
     
     parser.add_argument('root_file', nargs='?', 
-                               default='../build/epicChargeSharingOutput.root',
-        help='Path to ROOT file (default: ../build/epicChargeSharingOutput.root)')
+                       default='epicChargeSharingOutput.root',
+                       help='Path to ROOT file (default: epicChargeSharingOutput.root)')
     
     parser.add_argument('-o', '--output', 
                        default='spatial_resolution_results.txt',
