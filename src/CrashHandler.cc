@@ -149,9 +149,9 @@ void CrashHandler::ForceSave(const G4String& reason) {
         // Get ROOT file from RunAction and force write
         TFile* rootFile = fRunAction->GetRootFile();
         if (rootFile && rootFile->IsOpen() && !rootFile->IsZombie()) {
+            // Use Write() only - avoid flush during regular operation to prevent corruption
             rootFile->Write();
-            rootFile->Flush();
-            G4cout << "ROOT file written and flushed successfully" << G4endl;
+            G4cout << "ROOT file written successfully" << G4endl;
         } else {
             G4cout << "ROOT file not available or already closed - skipping save" << G4endl;
         }
@@ -296,27 +296,15 @@ void CrashHandler::PerformEmergencySave(const G4String& reason) {
             // Try to save ROOT file
             TFile* rootFile = fRunAction->GetRootFile();
             if (rootFile && rootFile->IsOpen()) {
+                // Only perform basic write and flush - avoid dangerous operations during crash
                 rootFile->Write();
                 rootFile->Flush();
                 std::cerr << "ROOT file emergency save completed" << std::endl;
                 
-                // Create emergency backup with timestamp
-                std::string backupName = GenerateBackupFileName("_emergency");
-                try {
-                    TFile* backup = new TFile(backupName.c_str(), "RECREATE");
-                    if (backup && backup->IsOpen()) {
-                        TTree* tree = fRunAction->GetTree();
-                        if (tree) {
-                            TTree* backupTree = tree->CloneTree();
-                            backup->Write();
-                            backup->Close();
-                            delete backup;
-                            std::cerr << "Emergency backup created: " << backupName << std::endl;
-                        }
-                    }
-                } catch (...) {
-                    std::cerr << "Emergency backup creation failed" << std::endl;
-                }
+                // REMOVED: Emergency backup creation with tree cloning 
+                // This was causing memory corruption during crash recovery
+                // The tree cloning operation is not safe during a crash scenario
+                // where memory may already be corrupted
             }
         }
         
@@ -334,9 +322,12 @@ void CrashHandler::PerformAutoSave() {
     try {
         if (!fRunAction) return;
         
-        // Quick auto-save without locking simulation
+        // Use proper locking for thread safety during auto-save
+        std::lock_guard<std::mutex> lock(fMutex);
+        
         TFile* rootFile = fRunAction->GetRootFile();
         if (rootFile && rootFile->IsOpen()) {
+            // Only perform write, avoid flush which can be expensive and cause issues
             rootFile->Write();
             
             auto now = std::chrono::steady_clock::now();

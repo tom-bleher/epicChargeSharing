@@ -784,8 +784,11 @@ void EventAction::EndOfEventAction(const G4Event* event)
     logger->LogEventEnd(eventID);
   }
   
-  // Update crash recovery progress tracking
-  CrashHandler::GetInstance().UpdateProgress(eventID);
+  // Update crash recovery progress tracking - only every 100 events to reduce mutex contention
+  // The auto-save functionality in CrashHandler will still work at its configured intervals
+  if (eventID % 100 == 0) {
+    CrashHandler::GetInstance().UpdateProgress(eventID);
+  }
 }
 
 void EventAction::AddEdep(G4double edep, G4ThreeVector position)
