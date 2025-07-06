@@ -9,6 +9,7 @@
 #include "G4ThreeVector.hh"
 #include "G4PVPlacement.hh"
 #include "G4VisAttributes.hh"
+#include <set>
 
 class DetectorMessenger;
 class EventAction;
@@ -55,6 +56,14 @@ public:
     // Method to check if a position is within a pixel area
     G4bool IsPositionOnPixel(const G4ThreeVector& position) const;
     
+    // Defective pixels methods
+    void GenerateDefectivePixels();
+    G4bool IsPixelDefective(G4int pixelI, G4int pixelJ) const;
+    void SetDefectPixelFraction(G4double fraction);
+    G4double GetDefectPixelFraction() const { return fDefectPixelFraction; }
+    G4int GetNumberOfDefectivePixels() const { return fDefectivePixels.size(); }
+    void PrintDefectivePixelsInfo() const;
+    
     // Method to save simulation parameters to a log file
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
     
@@ -82,6 +91,11 @@ private:
     
     // Neighborhood radius
     G4int fNeighborhoodRadius;
+    
+    // Defective pixels storage and configuration
+    std::set<std::pair<G4int, G4int>> fDefectivePixels;  // Set of defective pixel indices (i,j)
+    G4double fDefectPixelFraction;                       // Fraction of pixels to be defective (0.0-1.0)
+    G4bool fDefectivePixelsGenerated;                    // Flag to track if defective pixels have been generated
 };
 
 #endif

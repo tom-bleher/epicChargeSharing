@@ -44,13 +44,13 @@ public:
     void PerformAutoSave();
     
     // Variables for the branch (edep [MeV], positions [mm])
-    void SetEventData(G4double edep, G4double x, G4double y, G4double z);
+    void SetEventData(G4double edep, G4double x, G4double y);
     
     // Method to set initial particle gun position [mm]
     void SetInitialPosition(G4double x, G4double y, G4double z);
     
     // Method to set nearest pixel position [mm]
-    void SetNearestPixelPosition(G4double x, G4double y, G4double z);
+    void SetNearestPixelPosition(G4double x, G4double y);
     
     // Method to set initial particle energy [MeV]
     void SetInitialEnergy(G4double energy);
@@ -253,7 +253,6 @@ private:
     // =============================================
     G4double fTrueX;   // True Hit position X [mm]
     G4double fTrueY;   // True Hit position Y [mm]
-    G4double fTrueZ;   // True Hit position Z [mm]
     G4double fInitX;  // Initial X [mm]
     G4double fInitY;  // Initial Y [mm]
     G4double fInitZ;  // Initial Z [mm]
@@ -689,7 +688,6 @@ private:
     G4bool f3DPowerLorentzianFitSuccessful;           // Fit success flag
 
     // Legacy variables that may still be used
-    G4double fPixelZ; // Nearest to hit pixel center Z [mm]
     G4bool fIsPixelHit;  // True if hit is on pixel OR distance <= D0
     
     // NON-PIXEL HIT DATA (distance > D0 and not on pixel)
