@@ -18,17 +18,17 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     G4ParticleTable *particleTable = G4ParticleTable::GetParticleTable();
     G4ParticleDefinition *particle = particleTable->FindParticle("e-");
 
-    // Calculate the central pixel assignment region (yellow square)
-    CalculateCentralPixelRegion();
+    // Calculate the full detector bounds
+    CalculateDetectorBounds();
     
     // Print information about the shooting region
-    G4cout << "\n=== PARTICLE GUN CONSTRAINED TO CENTRAL PIXEL ===" << G4endl;
-    G4cout << "Central pixel assignment region (yellow square):" << G4endl;
-    G4cout << "  X range: [" << fCentralRegionXmin/mm << ", " << fCentralRegionXmax/mm << "] mm" << G4endl;
-    G4cout << "  Y range: [" << fCentralRegionYmin/mm << ", " << fCentralRegionYmax/mm << "] mm" << G4endl;
-    G4cout << "  Region size: " << (fCentralRegionXmax-fCentralRegionXmin)/mm << " × " << (fCentralRegionYmax-fCentralRegionYmin)/mm << " mm²" << G4endl;
-    G4cout << "All particles will be shot within this region only." << G4endl;
-    G4cout << "=================================================" << G4endl;
+    G4cout << "\n=== PARTICLE GUN COVERING FULL DETECTOR ===" << G4endl;
+    G4cout << "Full detector bounds:" << G4endl;
+    G4cout << "  X range: [" << fDetectorXmin/mm << ", " << fDetectorXmax/mm << "] mm" << G4endl;
+    G4cout << "  Y range: [" << fDetectorYmin/mm << ", " << fDetectorYmax/mm << "] mm" << G4endl;
+    G4cout << "  Detector size: " << (fDetectorXmax-fDetectorXmin)/mm << " × " << (fDetectorYmax-fDetectorYmin)/mm << " mm²" << G4endl;
+    G4cout << "All particles will be shot within the full detector area." << G4endl;
+    G4cout << "=============================================" << G4endl;
 
     // Initial position will be set randomly in GenerateRandomPosition()
     GenerateRandomPosition();
@@ -52,40 +52,24 @@ void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
     fParticleGun->GeneratePrimaryVertex(anEvent);
 }
 
-void PrimaryGenerator::CalculateCentralPixelRegion()
+void PrimaryGenerator::CalculateDetectorBounds()
 {
     // Get detector parameters
     G4double detSize = fDetector->GetDetSize();
-    G4double pixelSpacing = fDetector->GetPixelSpacing();
-    G4double pixelSize = fDetector->GetPixelSize();
-    G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
-    G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
     
-    // Calculate central pixel indices (middle of the detector grid)
-    G4int centralPixelI = numBlocksPerSide / 2;
-    G4int centralPixelJ = numBlocksPerSide / 2;
-    
-    // Calculate first pixel center position
-    G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
-    
-    // Calculate central pixel center position
-    G4double centralPixelX = firstPixelPos + centralPixelI * pixelSpacing;
-    G4double centralPixelY = firstPixelPos + centralPixelJ * pixelSpacing;
-    
-    // Define the assignment region for the central pixel (yellow square)
-    // Any hit within this region will be assigned to the central pixel
-    G4double halfSpacing = pixelSpacing / 2.0;
-    fCentralRegionXmin = centralPixelX - halfSpacing;
-    fCentralRegionXmax = centralPixelX + halfSpacing;
-    fCentralRegionYmin = centralPixelY - halfSpacing;
-    fCentralRegionYmax = centralPixelY + halfSpacing;
+    // Calculate the full detector bounds
+    // The detector extends from -detSize/2 to +detSize/2 in both X and Y
+    fDetectorXmin = -detSize/2;
+    fDetectorXmax = +detSize/2;
+    fDetectorYmin = -detSize/2;
+    fDetectorYmax = +detSize/2;
 }
 
 void PrimaryGenerator::GenerateRandomPosition()
 {
-    // Generate random position ONLY within the central pixel assignment region (yellow square)
-    G4double x = G4UniformRand() * (fCentralRegionXmax - fCentralRegionXmin) + fCentralRegionXmin;
-    G4double y = G4UniformRand() * (fCentralRegionYmax - fCentralRegionYmin) + fCentralRegionYmin;
+    // Generate random position anywhere within the full detector bounds
+    G4double x = G4UniformRand() * (fDetectorXmax - fDetectorXmin) + fDetectorXmin;
+    G4double y = G4UniformRand() * (fDetectorYmax - fDetectorYmin) + fDetectorYmin;
     
     // Fixed z position in front of the detector
     G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;

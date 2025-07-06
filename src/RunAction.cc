@@ -77,7 +77,6 @@ RunAction::RunAction()
   // Initialize HITS variables
   fTrueX(0),
   fTrueY(0),
-  fTrueZ(0),
   fInitX(0),
   fInitY(0),
   fInitZ(0),
@@ -410,7 +409,6 @@ RunAction::RunAction()
   f3DGaussianFitChargeUncertainty(0),
   f3DGaussianFitSuccessful(false),
   // Legacy variables
-  fPixelZ(0),
   fIsPixelHit(false),
   fInitialEnergy(0),
   fGridPixelSize(0),
@@ -519,13 +517,11 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         fTree->Branch("TrueX", &fTrueX, "TrueX/D")->SetTitle("True Position X [mm]");
         fTree->Branch("TrueY", &fTrueY, "TrueY/D")->SetTitle("True Position Y [mm]");
-        fTree->Branch("TrueZ", &fTrueZ, "TrueZ/D")->SetTitle("True Position Z [mm]");
         fTree->Branch("InitX", &fInitX, "InitX/D")->SetTitle("Initial X [mm]");
         fTree->Branch("InitY", &fInitY, "InitY/D")->SetTitle("Initial Y [mm]");
         fTree->Branch("InitZ", &fInitZ, "InitZ/D")->SetTitle("Initial Z [mm]");
         fTree->Branch("PixelX", &fPixelX, "PixelX/D")->SetTitle("Nearest Pixel X [mm]");
         fTree->Branch("PixelY", &fPixelY, "PixelY/D")->SetTitle("Nearest Pixel Y [mm]");
-        fTree->Branch("PixelZ", &fPixelZ, "PixelZ/D")->SetTitle("Nearest to hit pixel center Z [mm]");
         fTree->Branch("EdepAtDet", &fEdep, "Edep/D")->SetTitle("Energy Deposit [MeV]");
         fTree->Branch("InitialEnergy", &fInitialEnergy, "InitialEnergy/D")->SetTitle("Initial Particle Energy [MeV]");
         fTree->Branch("IsPixelHit", &fIsPixelHit, "IsPixelHit/O")->SetTitle("True if hit is on pixel OR distance <= D0");
@@ -545,42 +541,78 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // DELTA VARIABLES (RESIDUALS) BRANCHES
         // =============================================
         // These are the key branches that CalcRes.py looks for
-        fTree->Branch("GaussRowDeltaX", &fGaussRowDeltaX, "GaussRowDeltaX/D")->SetTitle("Gaussian Row Fit Delta X [mm] (fit - true)");
-        fTree->Branch("GaussColumnDeltaY", &fGaussColumnDeltaY, "GaussColumnDeltaY/D")->SetTitle("Gaussian Column Fit Delta Y [mm] (fit - true)");
-        fTree->Branch("LorentzRowDeltaX", &fLorentzRowDeltaX, "LorentzRowDeltaX/D")->SetTitle("Lorentzian Row Fit Delta X [mm] (fit - true)");
-        fTree->Branch("LorentzColumnDeltaY", &fLorentzColumnDeltaY, "LorentzColumnDeltaY/D")->SetTitle("Lorentzian Column Fit Delta Y [mm] (fit - true)");
-        fTree->Branch("PowerLorentzRowDeltaX", &fPowerLorentzRowDeltaX, "PowerLorentzRowDeltaX/D")->SetTitle("Power Lorentzian Row Fit Delta X [mm] (fit - true)");
-        fTree->Branch("PowerLorentzColumnDeltaY", &fPowerLorentzColumnDeltaY, "PowerLorentzColumnDeltaY/D")->SetTitle("Power Lorentzian Column Fit Delta Y [mm] (fit - true)");
+        
+        // Gaussian 2D fit deltas
+        if (Constants::ENABLE_GAUSSIAN_FITTING && Constants::ENABLE_2D_FITTING) {
+            fTree->Branch("GaussRowDeltaX", &fGaussRowDeltaX, "GaussRowDeltaX/D")->SetTitle("Gaussian Row Fit Delta X [mm] (fit - true)");
+            fTree->Branch("GaussColumnDeltaY", &fGaussColumnDeltaY, "GaussColumnDeltaY/D")->SetTitle("Gaussian Column Fit Delta Y [mm] (fit - true)");
+        }
+        
+        // Lorentzian 2D fit deltas
+        if (Constants::ENABLE_LORENTZIAN_FITTING && Constants::ENABLE_2D_FITTING) {
+            fTree->Branch("LorentzRowDeltaX", &fLorentzRowDeltaX, "LorentzRowDeltaX/D")->SetTitle("Lorentzian Row Fit Delta X [mm] (fit - true)");
+            fTree->Branch("LorentzColumnDeltaY", &fLorentzColumnDeltaY, "LorentzColumnDeltaY/D")->SetTitle("Lorentzian Column Fit Delta Y [mm] (fit - true)");
+        }
+        
+        // Power Lorentzian 2D fit deltas
+        if (Constants::ENABLE_POWER_LORENTZIAN_FITTING && Constants::ENABLE_2D_FITTING) {
+            fTree->Branch("PowerLorentzRowDeltaX", &fPowerLorentzRowDeltaX, "PowerLorentzRowDeltaX/D")->SetTitle("Power Lorentzian Row Fit Delta X [mm] (fit - true)");
+            fTree->Branch("PowerLorentzColumnDeltaY", &fPowerLorentzColumnDeltaY, "PowerLorentzColumnDeltaY/D")->SetTitle("Power Lorentzian Column Fit Delta Y [mm] (fit - true)");
+        }
         
         // Diagonal fit deltas (transformed coordinates)
-        fTree->Branch("GaussMainDiagTransformedDeltaX", &fGaussMainDiagTransformedDeltaX, "GaussMainDiagTransformedDeltaX/D")->SetTitle("Gaussian Main Diagonal Transformed Delta X [mm] (fit - true)");
-        fTree->Branch("GaussMainDiagTransformedDeltaY", &fGaussMainDiagTransformedDeltaY, "GaussMainDiagTransformedDeltaY/D")->SetTitle("Gaussian Main Diagonal Transformed Delta Y [mm] (fit - true)");
-        fTree->Branch("GaussSecondDiagTransformedDeltaX", &fGaussSecondDiagTransformedDeltaX, "GaussSecondDiagTransformedDeltaX/D")->SetTitle("Gaussian Secondary Diagonal Transformed Delta X [mm] (fit - true)");
-        fTree->Branch("GaussSecondDiagTransformedDeltaY", &fGaussSecondDiagTransformedDeltaY, "GaussSecondDiagTransformedDeltaY/D")->SetTitle("Gaussian Secondary Diagonal Transformed Delta Y [mm] (fit - true)");
-        fTree->Branch("LorentzMainDiagTransformedDeltaX", &fLorentzMainDiagTransformedDeltaX, "LorentzMainDiagTransformedDeltaX/D")->SetTitle("Lorentzian Main Diagonal Transformed Delta X [mm] (fit - true)");
-        fTree->Branch("LorentzMainDiagTransformedDeltaY", &fLorentzMainDiagTransformedDeltaY, "LorentzMainDiagTransformedDeltaY/D")->SetTitle("Lorentzian Main Diagonal Transformed Delta Y [mm] (fit - true)");
-        fTree->Branch("LorentzSecondDiagTransformedDeltaX", &fLorentzSecondDiagTransformedDeltaX, "LorentzSecondDiagTransformedDeltaX/D")->SetTitle("Lorentzian Secondary Diagonal Transformed Delta X [mm] (fit - true)");
-        fTree->Branch("LorentzSecondDiagTransformedDeltaY", &fLorentzSecondDiagTransformedDeltaY, "LorentzSecondDiagTransformedDeltaY/D")->SetTitle("Lorentzian Secondary Diagonal Transformed Delta Y [mm] (fit - true)");
-        fTree->Branch("PowerLorentzMainDiagTransformedDeltaX", &fPowerLorentzMainDiagTransformedDeltaX, "PowerLorentzMainDiagTransformedDeltaX/D")->SetTitle("Power Lorentzian Main Diagonal Transformed Delta X [mm] (fit - true)");
-        fTree->Branch("PowerLorentzMainDiagTransformedDeltaY", &fPowerLorentzMainDiagTransformedDeltaY, "PowerLorentzMainDiagTransformedDeltaY/D")->SetTitle("Power Lorentzian Main Diagonal Transformed Delta Y [mm] (fit - true)");
-        fTree->Branch("PowerLorentzSecondDiagTransformedDeltaX", &fPowerLorentzSecondDiagTransformedDeltaX, "PowerLorentzSecondDiagTransformedDeltaX/D")->SetTitle("Power Lorentzian Secondary Diagonal Transformed Delta X [mm] (fit - true)");
-        fTree->Branch("PowerLorentzSecondDiagTransformedDeltaY", &fPowerLorentzSecondDiagTransformedDeltaY, "PowerLorentzSecondDiagTransformedDeltaY/D")->SetTitle("Power Lorentzian Secondary Diagonal Transformed Delta Y [mm] (fit - true)");
+        if (Constants::ENABLE_GAUSSIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
+            fTree->Branch("GaussMainDiagTransformedDeltaX", &fGaussMainDiagTransformedDeltaX, "GaussMainDiagTransformedDeltaX/D")->SetTitle("Gaussian Main Diagonal Transformed Delta X [mm] (fit - true)");
+            fTree->Branch("GaussMainDiagTransformedDeltaY", &fGaussMainDiagTransformedDeltaY, "GaussMainDiagTransformedDeltaY/D")->SetTitle("Gaussian Main Diagonal Transformed Delta Y [mm] (fit - true)");
+            fTree->Branch("GaussSecondDiagTransformedDeltaX", &fGaussSecondDiagTransformedDeltaX, "GaussSecondDiagTransformedDeltaX/D")->SetTitle("Gaussian Secondary Diagonal Transformed Delta X [mm] (fit - true)");
+            fTree->Branch("GaussSecondDiagTransformedDeltaY", &fGaussSecondDiagTransformedDeltaY, "GaussSecondDiagTransformedDeltaY/D")->SetTitle("Gaussian Secondary Diagonal Transformed Delta Y [mm] (fit - true)");
+        }
+        
+        if (Constants::ENABLE_LORENTZIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
+            fTree->Branch("LorentzMainDiagTransformedDeltaX", &fLorentzMainDiagTransformedDeltaX, "LorentzMainDiagTransformedDeltaX/D")->SetTitle("Lorentzian Main Diagonal Transformed Delta X [mm] (fit - true)");
+            fTree->Branch("LorentzMainDiagTransformedDeltaY", &fLorentzMainDiagTransformedDeltaY, "LorentzMainDiagTransformedDeltaY/D")->SetTitle("Lorentzian Main Diagonal Transformed Delta Y [mm] (fit - true)");
+            fTree->Branch("LorentzSecondDiagTransformedDeltaX", &fLorentzSecondDiagTransformedDeltaX, "LorentzSecondDiagTransformedDeltaX/D")->SetTitle("Lorentzian Secondary Diagonal Transformed Delta X [mm] (fit - true)");
+            fTree->Branch("LorentzSecondDiagTransformedDeltaY", &fLorentzSecondDiagTransformedDeltaY, "LorentzSecondDiagTransformedDeltaY/D")->SetTitle("Lorentzian Secondary Diagonal Transformed Delta Y [mm] (fit - true)");
+        }
+        
+        if (Constants::ENABLE_POWER_LORENTZIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
+            fTree->Branch("PowerLorentzMainDiagTransformedDeltaX", &fPowerLorentzMainDiagTransformedDeltaX, "PowerLorentzMainDiagTransformedDeltaX/D")->SetTitle("Power Lorentzian Main Diagonal Transformed Delta X [mm] (fit - true)");
+            fTree->Branch("PowerLorentzMainDiagTransformedDeltaY", &fPowerLorentzMainDiagTransformedDeltaY, "PowerLorentzMainDiagTransformedDeltaY/D")->SetTitle("Power Lorentzian Main Diagonal Transformed Delta Y [mm] (fit - true)");
+            fTree->Branch("PowerLorentzSecondDiagTransformedDeltaX", &fPowerLorentzSecondDiagTransformedDeltaX, "PowerLorentzSecondDiagTransformedDeltaX/D")->SetTitle("Power Lorentzian Secondary Diagonal Transformed Delta X [mm] (fit - true)");
+            fTree->Branch("PowerLorentzSecondDiagTransformedDeltaY", &fPowerLorentzSecondDiagTransformedDeltaY, "PowerLorentzSecondDiagTransformedDeltaY/D")->SetTitle("Power Lorentzian Secondary Diagonal Transformed Delta Y [mm] (fit - true)");
+        }
         
         // 3D fit deltas
-        fTree->Branch("3DLorentzianDeltaX", &f3DLorentzianDeltaX, "3DLorentzianDeltaX/D")->SetTitle("3D Lorentzian Fit Delta X [mm] (fit - true)");
-        fTree->Branch("3DLorentzianDeltaY", &f3DLorentzianDeltaY, "3DLorentzianDeltaY/D")->SetTitle("3D Lorentzian Fit Delta Y [mm] (fit - true)");
-        fTree->Branch("3DGaussianDeltaX", &f3DGaussianDeltaX, "3DGaussianDeltaX/D")->SetTitle("3D Gaussian Fit Delta X [mm] (fit - true)");
-        fTree->Branch("3DGaussianDeltaY", &f3DGaussianDeltaY, "3DGaussianDeltaY/D")->SetTitle("3D Gaussian Fit Delta Y [mm] (fit - true)");
-        fTree->Branch("3DPowerLorentzianDeltaX", &f3DPowerLorentzianDeltaX, "3DPowerLorentzianDeltaX/D")->SetTitle("3D Power Lorentzian Fit Delta X [mm] (fit - true)");
-        fTree->Branch("3DPowerLorentzianDeltaY", &f3DPowerLorentzianDeltaY, "3DPowerLorentzianDeltaY/D")->SetTitle("3D Power Lorentzian Fit Delta Y [mm] (fit - true)");
+        if (Constants::ENABLE_3D_GAUSSIAN_FITTING) {
+            fTree->Branch("3DGaussianDeltaX", &f3DGaussianDeltaX, "3DGaussianDeltaX/D")->SetTitle("3D Gaussian Fit Delta X [mm] (fit - true)");
+            fTree->Branch("3DGaussianDeltaY", &f3DGaussianDeltaY, "3DGaussianDeltaY/D")->SetTitle("3D Gaussian Fit Delta Y [mm] (fit - true)");
+        }
+        
+        if (Constants::ENABLE_3D_LORENTZIAN_FITTING) {
+            fTree->Branch("3DLorentzianDeltaX", &f3DLorentzianDeltaX, "3DLorentzianDeltaX/D")->SetTitle("3D Lorentzian Fit Delta X [mm] (fit - true)");
+            fTree->Branch("3DLorentzianDeltaY", &f3DLorentzianDeltaY, "3DLorentzianDeltaY/D")->SetTitle("3D Lorentzian Fit Delta Y [mm] (fit - true)");
+        }
+        
+        if (Constants::ENABLE_3D_POWER_LORENTZIAN_FITTING) {
+            fTree->Branch("3DPowerLorentzianDeltaX", &f3DPowerLorentzianDeltaX, "3DPowerLorentzianDeltaX/D")->SetTitle("3D Power Lorentzian Fit Delta X [mm] (fit - true)");
+            fTree->Branch("3DPowerLorentzianDeltaY", &f3DPowerLorentzianDeltaY, "3DPowerLorentzianDeltaY/D")->SetTitle("3D Power Lorentzian Fit Delta Y [mm] (fit - true)");
+        }
         
         // Mean estimators (key resolution metrics)
-        fTree->Branch("GaussMeanTrueDeltaX", &fGaussMeanTrueDeltaX, "GaussMeanTrueDeltaX/D")->SetTitle("Gaussian Mean Estimator Delta X [mm] (mean_fit - true)");
-        fTree->Branch("GaussMeanTrueDeltaY", &fGaussMeanTrueDeltaY, "GaussMeanTrueDeltaY/D")->SetTitle("Gaussian Mean Estimator Delta Y [mm] (mean_fit - true)");
-        fTree->Branch("LorentzMeanTrueDeltaX", &fLorentzMeanTrueDeltaX, "LorentzMeanTrueDeltaX/D")->SetTitle("Lorentzian Mean Estimator Delta X [mm] (mean_fit - true)");
-        fTree->Branch("LorentzMeanTrueDeltaY", &fLorentzMeanTrueDeltaY, "LorentzMeanTrueDeltaY/D")->SetTitle("Lorentzian Mean Estimator Delta Y [mm] (mean_fit - true)");
-        fTree->Branch("PowerLorentzMeanTrueDeltaX", &fPowerLorentzMeanTrueDeltaX, "PowerLorentzMeanTrueDeltaX/D")->SetTitle("Power Lorentzian Mean Estimator Delta X [mm] (mean_fit - true)");
-        fTree->Branch("PowerLorentzMeanTrueDeltaY", &fPowerLorentzMeanTrueDeltaY, "PowerLorentzMeanTrueDeltaY/D")->SetTitle("Power Lorentzian Mean Estimator Delta Y [mm] (mean_fit - true)");
+        if (Constants::ENABLE_GAUSSIAN_FITTING) {
+            fTree->Branch("GaussMeanTrueDeltaX", &fGaussMeanTrueDeltaX, "GaussMeanTrueDeltaX/D")->SetTitle("Gaussian Mean Estimator Delta X [mm] (mean_fit - true)");
+            fTree->Branch("GaussMeanTrueDeltaY", &fGaussMeanTrueDeltaY, "GaussMeanTrueDeltaY/D")->SetTitle("Gaussian Mean Estimator Delta Y [mm] (mean_fit - true)");
+        }
+        
+        if (Constants::ENABLE_LORENTZIAN_FITTING) {
+            fTree->Branch("LorentzMeanTrueDeltaX", &fLorentzMeanTrueDeltaX, "LorentzMeanTrueDeltaX/D")->SetTitle("Lorentzian Mean Estimator Delta X [mm] (mean_fit - true)");
+            fTree->Branch("LorentzMeanTrueDeltaY", &fLorentzMeanTrueDeltaY, "LorentzMeanTrueDeltaY/D")->SetTitle("Lorentzian Mean Estimator Delta Y [mm] (mean_fit - true)");
+        }
+        
+        if (Constants::ENABLE_POWER_LORENTZIAN_FITTING) {
+            fTree->Branch("PowerLorentzMeanTrueDeltaX", &fPowerLorentzMeanTrueDeltaX, "PowerLorentzMeanTrueDeltaX/D")->SetTitle("Power Lorentzian Mean Estimator Delta X [mm] (mean_fit - true)");
+            fTree->Branch("PowerLorentzMeanTrueDeltaY", &fPowerLorentzMeanTrueDeltaY, "PowerLorentzMeanTrueDeltaY/D")->SetTitle("Power Lorentzian Mean Estimator Delta Y [mm] (mean_fit - true)");
+        }
         
         // =============================================
         // GAUSSIAN FIT PARAMETERS BRANCHES
@@ -916,26 +948,26 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         // Gaussian diagonal transformed coordinates
         if (Constants::ENABLE_GAUSSIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
-        `fTree->Branch("GaussMainDiagTransformedX", &fGaussMainDiagTransformedX, "GaussMainDiagTransformedX/D")->SetTitle("Gaussian Main Diagonal Transformed X Coordinate [mm]");
-        fTree->Branch("GaussMainDiagTransformedY", &fGaussMainDiagTransformedY, "GaussMainDiagTransformedY/D")->SetTitle("Gaussian Main Diagonal Transformed Y Coordinate [mm]");
-        fTree->Branch("GaussSecondDiagTransformedX", &fGaussSecondDiagTransformedX, "GaussSecondDiagTransformedX/D")->SetTitle("Gaussian Secondary Diagonal Transformed X Coordinate [mm]");
-        fTree->Branch("GaussSecondDiagTransformedY", &fGaussSecondDiagTransformedY, "GaussSecondDiagTransformedY/D")->SetTitle("Gaussian Secondary Diagonal Transformed Y Coordinate [mm]");
+            fTree->Branch("GaussMainDiagTransformedX", &fGaussMainDiagTransformedX, "GaussMainDiagTransformedX/D")->SetTitle("Gaussian Main Diagonal Transformed X Coordinate [mm]");
+            fTree->Branch("GaussMainDiagTransformedY", &fGaussMainDiagTransformedY, "GaussMainDiagTransformedY/D")->SetTitle("Gaussian Main Diagonal Transformed Y Coordinate [mm]");
+            fTree->Branch("GaussSecondDiagTransformedX", &fGaussSecondDiagTransformedX, "GaussSecondDiagTransformedX/D")->SetTitle("Gaussian Secondary Diagonal Transformed X Coordinate [mm]");
+            fTree->Branch("GaussSecondDiagTransformedY", &fGaussSecondDiagTransformedY, "GaussSecondDiagTransformedY/D")->SetTitle("Gaussian Secondary Diagonal Transformed Y Coordinate [mm]");
         }
         
         // Lorentzian diagonal transformed coordinates
         if (Constants::ENABLE_LORENTZIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
-        fTree->Branch("LorentzMainDiagTransformedX", &fLorentzMainDiagTransformedX, "LorentzMainDiagTransformedX/D")->SetTitle("Lorentzian Main Diagonal Transformed X Coordinate [mm]");
-        fTree->Branch("LorentzMainDiagTransformedY", &fLorentzMainDiagTransformedY, "LorentzMainDiagTransformedY/D")->SetTitle("Lorentzian Main Diagonal Transformed Y Coordinate [mm]");
-        fTree->Branch("LorentzSecondDiagTransformedX", &fLorentzSecondDiagTransformedX, "LorentzSecondDiagTransformedX/D")->SetTitle("Lorentzian Secondary Diagonal Transformed X Coordinate [mm]");
-        fTree->Branch("LorentzSecondDiagTransformedY", &fLorentzSecondDiagTransformedY, "LorentzSecondDiagTransformedY/D")->SetTitle("Lorentzian Secondary Diagonal Transformed Y Coordinate [mm]");
+            fTree->Branch("LorentzMainDiagTransformedX", &fLorentzMainDiagTransformedX, "LorentzMainDiagTransformedX/D")->SetTitle("Lorentzian Main Diagonal Transformed X Coordinate [mm]");
+            fTree->Branch("LorentzMainDiagTransformedY", &fLorentzMainDiagTransformedY, "LorentzMainDiagTransformedY/D")->SetTitle("Lorentzian Main Diagonal Transformed Y Coordinate [mm]");
+            fTree->Branch("LorentzSecondDiagTransformedX", &fLorentzSecondDiagTransformedX, "LorentzSecondDiagTransformedX/D")->SetTitle("Lorentzian Secondary Diagonal Transformed X Coordinate [mm]");
+            fTree->Branch("LorentzSecondDiagTransformedY", &fLorentzSecondDiagTransformedY, "LorentzSecondDiagTransformedY/D")->SetTitle("Lorentzian Secondary Diagonal Transformed Y Coordinate [mm]");
         }
         
         // Power-Law Lorentzian diagonal transformed coordinates
         if (Constants::ENABLE_POWER_LORENTZIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
-        fTree->Branch("PowerLorentzMainDiagTransformedX", &fPowerLorentzMainDiagTransformedX, "PowerLorentzMainDiagTransformedX/D")->SetTitle("Power-Law Lorentzian Main Diagonal Transformed X Coordinate [mm]");
-        fTree->Branch("PowerLorentzMainDiagTransformedY", &fPowerLorentzMainDiagTransformedY, "PowerLorentzMainDiagTransformedY/D")->SetTitle("Power-Law Lorentzian Main Diagonal Transformed Y Coordinate [mm]");
-        fTree->Branch("PowerLorentzSecondDiagTransformedX", &fPowerLorentzSecondDiagTransformedX, "PowerLorentzSecondDiagTransformedX/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Transformed X Coordinate [mm]");
-        fTree->Branch("PowerLorentzSecondDiagTransformedY", &fPowerLorentzSecondDiagTransformedY, "PowerLorentzSecondDiagTransformedY/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Transformed Y Coordinate [mm]");
+            fTree->Branch("PowerLorentzMainDiagTransformedX", &fPowerLorentzMainDiagTransformedX, "PowerLorentzMainDiagTransformedX/D")->SetTitle("Power-Law Lorentzian Main Diagonal Transformed X Coordinate [mm]");
+            fTree->Branch("PowerLorentzMainDiagTransformedY", &fPowerLorentzMainDiagTransformedY, "PowerLorentzMainDiagTransformedY/D")->SetTitle("Power-Law Lorentzian Main Diagonal Transformed Y Coordinate [mm]");
+            fTree->Branch("PowerLorentzSecondDiagTransformedX", &fPowerLorentzSecondDiagTransformedX, "PowerLorentzSecondDiagTransformedX/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Transformed X Coordinate [mm]");
+            fTree->Branch("PowerLorentzSecondDiagTransformedY", &fPowerLorentzSecondDiagTransformedY, "PowerLorentzSecondDiagTransformedY/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Transformed Y Coordinate [mm]");
         }
         
         G4cout << "Created ROOT tree with " << fTree->GetNbranches() << " branches" << G4endl;
@@ -1141,15 +1173,14 @@ void RunAction::EndOfRunAction(const G4Run* run)
     G4cout << "Master thread: File operations completed" << G4endl;
 }
 
-void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z) 
+void RunAction::SetEventData(G4double edep, G4double x, G4double y)
 {
-    // Store energy deposit in MeV (Geant4 internal energy unit is MeV)
+    // Store energy deposition in MeV (Geant4 internal energy unit is MeV)
     fEdep = edep;
     
     // Store positions in mm (Geant4 internal length unit is mm)
     fTrueX = x;
     fTrueY = y;
-    fTrueZ = z;
 }
 
 void RunAction::SetInitialPosition(G4double x, G4double y, G4double z) 
@@ -1160,12 +1191,11 @@ void RunAction::SetInitialPosition(G4double x, G4double y, G4double z)
     fInitZ = z;
 }
 
-void RunAction::SetNearestPixelPosition(G4double x, G4double y, G4double z) 
+void RunAction::SetNearestPixelPosition(G4double x, G4double y)
 {
     // Store positions in mm (Geant4 internal length unit is mm)
     fPixelX = x;
     fPixelY = y;
-    fPixelZ = z;
 }
 
 void RunAction::SetInitialEnergy(G4double energy) 

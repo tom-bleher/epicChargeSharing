@@ -103,7 +103,7 @@ namespace Constants {
     
     // Individual fitting type control (only used if main model is enabled)
     const G4bool ENABLE_2D_FITTING = true;               // Enable central row/column fitting
-    const G4bool ENABLE_DIAGONAL_FITTING = true;         // Enable diagonal fitting
+    const G4bool ENABLE_DIAGONAL_FITTING = false;         // Enable diagonal fitting
     
     // 3D fitting control flags (fit entire neighborhood surface directly)
     const G4bool ENABLE_3D_GAUSSIAN_FITTING = true;      // Enable 3D Gaussian surface fitting
@@ -119,6 +119,19 @@ namespace Constants {
     // When disabled: Uses uniform weighting (uncertainty = 1.0) for unweighted fitting
     // Also controls whether uncertainty values are saved to ROOT file branches
     const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = true;  // Enable charge uncertainties
+    
+    // ========================
+    // DEFECT PIXELS CONSTANTS  
+    // ========================
+    
+    // Enable/disable defect pixels functionality
+    const G4bool ENABLE_DEFECT_PIXELS = false;           // Enable defect pixels functionality
+    
+    // Fraction of pixels to be defective (0.0 = no defects, 1.0 = all pixels defective)
+    const G4double DEFECT_PIXEL_FRACTION = 0.1;          // 10% defective pixels by default
+    
+    // Random seed for defect pixel generation (0 = use system time)
+    const G4int DEFECT_PIXELS_RANDOM_SEED = 0;       // Fixed seed for reproducible defect patterns
     
     // ========================
     // COVARIANCE CALCULATION CONTROL
