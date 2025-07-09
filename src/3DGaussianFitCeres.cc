@@ -664,11 +664,10 @@ bool Fit3DGaussianCeres(
                 }
             }
             
-            // HIERARCHICAL DECISION: Only add perturbations if χ²ᵣ > 0.5
-            // Updated threshold based on actual data: χ²ᵣ > 0.5 (around median-to-P75 range)
-            if (any_success && best_chi2_reduced > 0.5) {
+            // HIERARCHICAL DECISION: Only add perturbations if χ²ᵣ > 0.3
+            if (any_success && best_chi2_reduced > 0.3) {
                 if (verbose) {
-                    std::cout << "Base 3D Gaussian fit χ²ᵣ=" << best_chi2_reduced << " > 0.5, trying 2 perturbations..." << std::endl;
+                    std::cout << "Base 3D Gaussian fit χ²ᵣ=" << best_chi2_reduced << " > 0.3, trying 2 perturbations..." << std::endl;
                 }
                 
                 // Add exactly 2 perturbations for 3D case
@@ -923,4 +922,4 @@ GaussianFit3DResultsCeres Fit3DGaussianCeres(
     }
     
     return result;
-} 
+}
