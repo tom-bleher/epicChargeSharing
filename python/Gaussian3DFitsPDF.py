@@ -347,9 +347,9 @@ def create_3d_gaussian_plot(event_idx, data):
         residuals = charges - fitted_charges
         rms_res   = np.sqrt(np.mean(residuals**2))
 
-        # Setup figure – two columns ------------------------------------------------
-        fig = plt.figure(figsize=(14, 6))
-        gs  = fig.add_gridspec(1, 2, width_ratios=[1, 1], wspace=0.28)
+        # Setup figure – two columns with constrained layout for symmetry ----------
+        fig = plt.figure(figsize=(14, 6), constrained_layout=True)
+        gs  = fig.add_gridspec(1, 2, width_ratios=[1, 1])
 
         # ----------------------------- Residual panel -----------------------------
         ax_res = fig.add_subplot(gs[0])
@@ -376,13 +376,36 @@ def create_3d_gaussian_plot(event_idx, data):
 
         # ----------------------------- Fit panel ----------------------------------
         ax_fit = fig.add_subplot(gs[1], projection='3d')
-        # Generate surface grid slightly larger than data span
-        x_min, x_max = x_coords.min() - 0.3, x_coords.max() + 0.3
-        y_min, y_max = y_coords.min() - 0.3, y_coords.max() + 0.3
+        # ------------------------------------------------------------------
+        # Build a *symmetric* square XY footprint so that the 3-D panel
+        # visually occupies the same extent as the residual panel.  This
+        # prevents the right-hand plot from looking "smaller" and keeps the
+        # bottom corner (minimum Y) aligned with the left plot.
+        # ------------------------------------------------------------------
+        margin = 0.0  # extra space [mm] around the data, adjust if desired
+
+        # Determine the data span
+        x_center = 0.5 * (x_coords.max() + x_coords.min())
+        y_center = 0.5 * (y_coords.max() + y_coords.min())
+
+        # Largest half-span in either X or Y → ensures square footprint
+        half_span = max(x_coords.max() - x_center,
+                        x_center - x_coords.min(),
+                        y_coords.max() - y_center,
+                        y_center - y_coords.min()) + margin
+
+        # Symmetric limits
+        x_min, x_max = x_center - half_span, x_center + half_span
+        y_min, y_max = y_center - half_span, y_center + half_span
+        
         Xg, Yg = np.meshgrid(np.linspace(x_min, x_max, 60),
                              np.linspace(y_min, y_max, 60))
         Zg = gaussian_3d(Xg, Yg, fit_amp, fit_cx, fit_cy, fit_sx, fit_sy, fit_off)
         surf = ax_fit.plot_surface(Xg, Yg, Zg, cmap='viridis', alpha=0.6, linewidth=0)
+        # Apply the same symmetric limits to the axes so the rendered view
+        # exactly matches the generated grid extents.
+        ax_fit.set_xlim(x_min, x_max)
+        ax_fit.set_ylim(y_min, y_max)
         # Overlay measured charges
         ax_fit.scatter(x_coords, y_coords, charges, c='red', s=60, depthshade=True, label='Data')
 
@@ -393,23 +416,22 @@ def create_3d_gaussian_plot(event_idx, data):
                 ax_fit.plot([xi, xi], [yi, yi], [zi - uncertainty, zi + uncertainty],
                             color='gray', alpha=0.5, linewidth=1)
 
-            # Add proxy artist for error bars in legend
-            import matplotlib.lines as mlines
-            err_proxy = mlines.Line2D([], [], color='gray', linewidth=1, label='±σ(Q)')
-            # Append to existing handles
-            handles, labels = ax_fit.get_legend_handles_labels()
-            handles.append(err_proxy)
-            labels.append('±σ(Q)')
-            ax_fit.legend(handles, labels, loc='upper left', fontsize=9, framealpha=0.9)
+            # Keep error bars silent in legend; only show Data
+            ax_fit.legend(loc='upper right', fontsize=9, framealpha=0.9)
         else:
-            ax_fit.legend(loc='upper left')
+            ax_fit.legend(loc='upper right')
 
         ax_fit.set_xlabel('X Position (mm)', fontsize=12)
         ax_fit.set_ylabel('Y Position (mm)', fontsize=12)
         ax_fit.set_zlabel('Charge (C)', fontsize=12)
         ax_fit.set_title(f'Event {event_idx}: 3D Gaussian Surface Fit', fontsize=14, pad=15)
-        ax_fit.view_init(elev=25, azim=45)  # a pleasant viewing angle
-        ax_fit.legend(loc='upper right')
+        # Use equal XY aspect and a balanced Z aspect for visual symmetry
+        try:
+            ax_fit.set_box_aspect([1, 1, 0.7])  # Requires Matplotlib ≥3.3
+        except Exception:
+            pass
+        ax_fit.view_init(elev=25, azim=45)  # pleasant viewing angle
+        # (Legend already placed inside – no further call)
 
         # ---------------------- Info textbox -----------------------------------
         delta_x = fit_cx - true_x
@@ -432,7 +454,8 @@ def create_3d_gaussian_plot(event_idx, data):
                       va='top', ha='left', fontsize=8,
                       bbox=dict(boxstyle='round', facecolor='white', alpha=0.85))
         
-        plt.tight_layout()
+        # constrained_layout handles spacing
+        # plt.tight_layout()  # not needed with constrained_layout
         return fig, True
         
     except Exception as e:
