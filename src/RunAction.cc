@@ -1154,6 +1154,8 @@ void RunAction::EndOfRunAction(const G4Run* run)
             G4cout << "Master thread: File merging completed successfully" << G4endl;
             
             // Add metadata to the merged file
+            // NOTE: This is the ONLY place metadata should be written to avoid duplicates
+            // Worker threads write only their tree data, master adds metadata once to final file
             if (fGridPixelSize > 0) {
                 TFile* mergedFile = TFile::Open("epicChargeSharingOutput.root", "UPDATE");
                 if (mergedFile && !mergedFile->IsZombie()) {
@@ -1221,7 +1223,6 @@ void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
     // Store positions in mm (Geant4 internal length unit is mm)
     fTrueX = x;
     fTrueY = y;
-    fTrueZ = z;
 }
 
 void RunAction::SetInitialPosition(G4double x, G4double y, G4double z) 
@@ -2414,8 +2415,9 @@ bool RunAction::SafeWriteRootFile()
     }
     
     try {
-        // Save detector grid parameters as metadata before writing the tree
-        if (fGridPixelSize > 0) {
+        // In single-threaded mode, write metadata here since there's no merging
+        // In multi-threaded mode, metadata is written only by master thread after merging
+        if (!G4Threading::IsMultithreadedApplication() && fGridPixelSize > 0) {
             fRootFile->cd();
             
             // Create and write metadata objects
@@ -2432,12 +2434,14 @@ bool RunAction::SafeWriteRootFile()
             detSizeMeta.Write();
             numBlocksMeta.Write();
             neighborhoodRadiusMeta.Write();
+            
+            G4cout << "RunAction: Saved detector grid metadata to single-threaded file" << G4endl;
         }
         
         // Make sure all in-memory baskets are flushed only once at end-of-run
         fTree->FlushBaskets();   // replaces thousands of small AutoSave flushes
         
-        // Write the full tree and metadata in a single operation
+        // Write the full tree in a single operation (metadata added above for single-threaded, by master for multi-threaded)
         fRootFile->cd();
         fTree->Write();
         // Final flush for the file header / directory structure
