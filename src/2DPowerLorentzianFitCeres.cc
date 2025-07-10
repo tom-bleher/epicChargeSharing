@@ -651,9 +651,8 @@ bool FitPowerLorentzianCeres(
                 }
             }
             
-            // HIERARCHICAL DECISION: Only add perturbations if χ²ᵣ > 0.3
-            // Updated threshold based on actual data: χ²ᵣ > 0.3 (around median-to-P75 range)
-            if (any_success && best_chi2_reduced > 0.2) {
+            // ALWAYS add perturbations regardless of chi-squared quality  
+            if (any_success) {
                 if (verbose) {
                     std::cout << "Base Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << " > 0.3, trying 2 perturbations..." << std::endl;
                 }
@@ -795,7 +794,7 @@ bool FitPowerLorentzianCeres(
                     }
                 }
             } else if (verbose && any_success) {
-                std::cout << "Base Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << " ≤ 0.5, skipping perturbations (hierarchical multi-start)" << std::endl;
+                std::cout << "Base Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
             }
             
             if (any_success) {
@@ -831,33 +830,42 @@ bool FitPowerLorentzianCeres(
             return false;
         };
         
-        // OPTIMIZED SOLVER ESCALATION: Try cheap config first, escalate only if needed
+        // Try ALL configurations without early exits
         bool success = try_config(cheap_config, "cheap");
+        bool best_success = success;
+        double best_chi2 = chi2_reduced;
         
-        // Early exit quality check (as per optimize.md section 4.1)
-        // Updated threshold based on actual data: χ²ᵣ ≤ 0.7 (around P75 of real distribution)
-        if (success && chi2_reduced <= 0.7) {
-            if (verbose) {
-                std::cout << "Early exit: cheap Power Lorentzian config succeeded with χ²ᵣ=" << chi2_reduced << " ≤ 0.7" << std::endl;
-            }
-            return true;
+        if (verbose) {
+            std::cout << "Cheap Power Lorentzian config " << (success ? "succeeded" : "failed") 
+                     << " with χ²ᵣ=" << chi2_reduced << std::endl;
         }
         
-        // Escalate to expensive configs only if cheap failed or quality poor
-        if (!success || chi2_reduced > 0.7) {
-            if (verbose) {
-                std::cout << "Escalating to expensive Power Lorentzian configurations (χ²ᵣ=" << chi2_reduced 
-                         << ", success=" << success << ")" << std::endl;
+        // Always try ALL expensive configurations regardless of cheap config result
+        if (verbose) {
+            std::cout << "Trying all " << expensive_configs.size() 
+                     << " expensive Power Lorentzian configurations..." << std::endl;
+        }
+        
+        for (size_t i = 0; i < expensive_configs.size(); ++i) {
+            bool config_success = try_config(expensive_configs[i], "expensive_" + std::to_string(i+1));
+            if (config_success && (!best_success || chi2_reduced < best_chi2)) {
+                best_success = config_success;
+                best_chi2 = chi2_reduced;
+                success = config_success;
             }
             
-            for (size_t i = 0; i < expensive_configs.size(); ++i) {
-                success = try_config(expensive_configs[i], "expensive_" + std::to_string(i+1));
-                if (success && chi2_reduced <= 3.0) {
-                    return true;
-                }
+            if (verbose) {
+                std::cout << "Expensive Power Lorentzian config " << (i+1) << " " 
+                         << (config_success ? "succeeded" : "failed") 
+                         << " with χ²ᵣ=" << chi2_reduced << std::endl;
             }
-        } else {
-            return true; // cheap config succeeded with good quality
+        }
+        
+        if (best_success) {
+            if (verbose) {
+                std::cout << "Best Power Lorentzian fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
+            }
+            return true;
         }
     }
     
