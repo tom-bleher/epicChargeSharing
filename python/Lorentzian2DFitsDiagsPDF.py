@@ -1,13 +1,13 @@
 """
-ROOT File Diagonal Lorentzian Fits Visualization Tool
+ROOT File Diag Lorentz s Visualization Tool
 
 This tool reads ROOT output files from the GEANT4 charge sharing simulation
-and creates PDF visualizations of the pre-computed diagonal Lorentzian fits.
+and creates PDF visualizations of the pre-computed diagonal Lorentz fits.
 
 Key features:
 1. Reads actual simulation data from ROOT files using uproot
-2. Extracts diagonal neighborhood charge distributions and fitted Lorentzian parameters  
-3. Plots data points with fitted Lorentzian curves and residuals
+2. Extracts diagonal neighborhood charge distributions and fitted Lorentz parameters  
+3. Plots data points with fitted Lorentz curves and residuals
 4. Creates comprehensive PDF reports for main and secondary diagonal analysis
 5. NO synthetic data or fitting - only visualization of existing results
 6. OPTIMIZED for parallel processing with multithreading support
@@ -127,7 +127,7 @@ def load_root_data(root_file, max_entries=None):
         # Load essential data
         data = {}
         
-        # Basic position and pixel information
+        # Basic pos and pixel information
         data['TrueX'] = tree['TrueX'].array(library="np", entry_stop=max_entries)
         data['TrueY'] = tree['TrueY'].array(library="np", entry_stop=max_entries)
         data['PixelX'] = tree['PixelX'].array(library="np", entry_stop=max_entries)
@@ -135,75 +135,75 @@ def load_root_data(root_file, max_entries=None):
         data['IsPixelHit'] = tree['IsPixelHit'].array(library="np", entry_stop=max_entries)
         
         # Neighborhood grid data
-        data['GridNeighborhoodCharges'] = tree['GridNeighborhoodCharges'].array(library="np", entry_stop=max_entries)
+        data['NeighborhoodCharges'] = tree['NeighborhoodCharges'].array(library="np", entry_stop=max_entries)
         
-        # Main Diagonal X fit results (using LorentzFit instead of GaussFit)
-        data['LorentzFitMainDiagXCenter'] = tree['LorentzFitMainDiagXCenter'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagXGamma'] = tree['LorentzFitMainDiagXGamma'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagXAmplitude'] = tree['LorentzFitMainDiagXAmplitude'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagXVerticalOffset'] = tree['LorentzFitMainDiagXVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagXCenterErr'] = tree['LorentzFitMainDiagXCenterErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagXGammaErr'] = tree['LorentzFitMainDiagXGammaErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagXAmplitudeErr'] = tree['LorentzFitMainDiagXAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagXChi2red'] = tree['LorentzFitMainDiagXChi2red'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagXDOF'] = tree['LorentzFitMainDiagXDOF'].array(library="np", entry_stop=max_entries)
+        # Main Diag X fit results (using Lorentz instead of Gauss)
+        data['LorentzMainDiagXCenter'] = tree['LorentzMainDiagXCenter'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagXGamma'] = tree['LorentzMainDiagXGamma'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagXAmp'] = tree['LorentzMainDiagXAmp'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagXVertOffset'] = tree['LorentzMainDiagXVertOffset'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagXCenterErr'] = tree['LorentzMainDiagXCenterErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagXGammaErr'] = tree['LorentzMainDiagXGammaErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagXAmpErr'] = tree['LorentzMainDiagXAmpErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagXChi2red'] = tree['LorentzMainDiagXChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagXDOF'] = tree['LorentzMainDiagXDOF'].array(library="np", entry_stop=max_entries)
         
-        # Try to load charge uncertainty - if not available, we'll calculate it later
+        # Try to load charge err - if not available, we'll calculate it later
         try:
-            data['LorentzFitMainDiagXChargeUncertainty'] = tree['LorentzFitMainDiagXChargeUncertainty'].array(library="np", entry_stop=max_entries)
+            data['LorentzMainDiagXChargeErr'] = tree['LorentzMainDiagXChargeErr'].array(library="np", entry_stop=max_entries)
         except:
-            data['LorentzFitMainDiagXChargeUncertainty'] = None
+            data['LorentzMainDiagXChargeErr'] = None
         
-        # Main Diagonal Y fit results
-        data['LorentzFitMainDiagYCenter'] = tree['LorentzFitMainDiagYCenter'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagYGamma'] = tree['LorentzFitMainDiagYGamma'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagYAmplitude'] = tree['LorentzFitMainDiagYAmplitude'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagYVerticalOffset'] = tree['LorentzFitMainDiagYVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagYCenterErr'] = tree['LorentzFitMainDiagYCenterErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagYGammaErr'] = tree['LorentzFitMainDiagYGammaErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagYAmplitudeErr'] = tree['LorentzFitMainDiagYAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagYChi2red'] = tree['LorentzFitMainDiagYChi2red'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitMainDiagYDOF'] = tree['LorentzFitMainDiagYDOF'].array(library="np", entry_stop=max_entries)
+        # Main Diag Y fit results
+        data['LorentzMainDiagYCenter'] = tree['LorentzMainDiagYCenter'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagYGamma'] = tree['LorentzMainDiagYGamma'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagYAmp'] = tree['LorentzMainDiagYAmp'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagYVertOffset'] = tree['LorentzMainDiagYVertOffset'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagYCenterErr'] = tree['LorentzMainDiagYCenterErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagYGammaErr'] = tree['LorentzMainDiagYGammaErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagYAmpErr'] = tree['LorentzMainDiagYAmpErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagYChi2red'] = tree['LorentzMainDiagYChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzMainDiagYDOF'] = tree['LorentzMainDiagYDOF'].array(library="np", entry_stop=max_entries)
         
-        # Try to load charge uncertainty - if not available, we'll calculate it later
+        # Try to load charge err - if not available, we'll calculate it later
         try:
-            data['LorentzFitMainDiagYChargeUncertainty'] = tree['LorentzFitMainDiagYChargeUncertainty'].array(library="np", entry_stop=max_entries)
+            data['LorentzMainDiagYChargeErr'] = tree['LorentzMainDiagYChargeErr'].array(library="np", entry_stop=max_entries)
         except:
-            data['LorentzFitMainDiagYChargeUncertainty'] = None
+            data['LorentzMainDiagYChargeErr'] = None
         
-        # Secondary Diagonal X fit results (note: uses "SecondDiag" not "SecDiag")
-        data['LorentzFitSecDiagXCenter'] = tree['LorentzFitSecondDiagXCenter'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagXGamma'] = tree['LorentzFitSecondDiagXGamma'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagXAmplitude'] = tree['LorentzFitSecondDiagXAmplitude'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagXVerticalOffset'] = tree['LorentzFitSecondDiagXVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagXCenterErr'] = tree['LorentzFitSecondDiagXCenterErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagXGammaErr'] = tree['LorentzFitSecondDiagXGammaErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagXAmplitudeErr'] = tree['LorentzFitSecondDiagXAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagXChi2red'] = tree['LorentzFitSecondDiagXChi2red'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagXDOF'] = tree['LorentzFitSecondDiagXDOF'].array(library="np", entry_stop=max_entries)
+        # Secondary Diag X fit results (note: uses "SecDiag" not "SecDiag")
+        data['LorentzSecDiagXCenter'] = tree['LorentzSecDiagXCenter'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagXGamma'] = tree['LorentzSecDiagXGamma'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagXAmp'] = tree['LorentzSecDiagXAmp'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagXVertOffset'] = tree['LorentzSecDiagXVertOffset'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagXCenterErr'] = tree['LorentzSecDiagXCenterErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagXGammaErr'] = tree['LorentzSecDiagXGammaErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagXAmpErr'] = tree['LorentzSecDiagXAmpErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagXChi2red'] = tree['LorentzSecDiagXChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagXDOF'] = tree['LorentzSecDiagXDOF'].array(library="np", entry_stop=max_entries)
         
-        # Try to load charge uncertainty - if not available, we'll calculate it later
+        # Try to load charge err - if not available, we'll calculate it later
         try:
-            data['LorentzFitSecDiagXChargeUncertainty'] = tree['LorentzFitSecDiagXChargeUncertainty'].array(library="np", entry_stop=max_entries)
+            data['LorentzSecDiagXChargeErr'] = tree['LorentzSecDiagXChargeErr'].array(library="np", entry_stop=max_entries)
         except:
-            data['LorentzFitSecDiagXChargeUncertainty'] = None
+            data['LorentzSecDiagXChargeErr'] = None
         
-        # Secondary Diagonal Y fit results (note: uses "SecondDiag" not "SecDiag")
-        data['LorentzFitSecDiagYCenter'] = tree['LorentzFitSecondDiagYCenter'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagYGamma'] = tree['LorentzFitSecondDiagYGamma'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagYAmplitude'] = tree['LorentzFitSecondDiagYAmplitude'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagYVerticalOffset'] = tree['LorentzFitSecondDiagYVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagYCenterErr'] = tree['LorentzFitSecondDiagYCenterErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagYGammaErr'] = tree['LorentzFitSecondDiagYGammaErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagYAmplitudeErr'] = tree['LorentzFitSecondDiagYAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagYChi2red'] = tree['LorentzFitSecondDiagYChi2red'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitSecDiagYDOF'] = tree['LorentzFitSecondDiagYDOF'].array(library="np", entry_stop=max_entries)
+        # Secondary Diag Y fit results (note: uses "SecDiag" not "SecDiag")
+        data['LorentzSecDiagYCenter'] = tree['LorentzSecDiagYCenter'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagYGamma'] = tree['LorentzSecDiagYGamma'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagYAmp'] = tree['LorentzSecDiagYAmp'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagYVertOffset'] = tree['LorentzSecDiagYVertOffset'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagYCenterErr'] = tree['LorentzSecDiagYCenterErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagYGammaErr'] = tree['LorentzSecDiagYGammaErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagYAmpErr'] = tree['LorentzSecDiagYAmpErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagYChi2red'] = tree['LorentzSecDiagYChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzSecDiagYDOF'] = tree['LorentzSecDiagYDOF'].array(library="np", entry_stop=max_entries)
         
-        # Try to load charge uncertainty - if not available, we'll calculate it later
+        # Try to load charge err - if not available, we'll calculate it later
         try:
-            data['LorentzFitSecDiagYChargeUncertainty'] = tree['LorentzFitSecDiagYChargeUncertainty'].array(library="np", entry_stop=max_entries)
+            data['LorentzSecDiagYChargeErr'] = tree['LorentzSecDiagYChargeErr'].array(library="np", entry_stop=max_entries)
         except:
-            data['LorentzFitSecDiagYChargeUncertainty'] = None
+            data['LorentzSecDiagYChargeErr'] = None
         
         # Try to load detector grid parameters from metadata
         try:
@@ -215,7 +215,7 @@ def load_root_data(root_file, max_entries=None):
             data['PixelSpacing'] = 0.5  # Default fallback
         
         n_events = len(data['TrueX'])
-        print(f"Successfully loaded {n_events} events from ROOT file")
+        print(f"Successly loaded {n_events} events from ROOT file")
         
         # Filter for non-pixel hits only
         non_pixel_mask = ~data['IsPixelHit']
@@ -237,7 +237,7 @@ def load_root_data(root_file, max_entries=None):
         print(f"Error loading ROOT file: {e}")
         return None
 
-# Copy the diagonal data extraction functions from Gaussian version (they're the same)
+# Copy the diagonal data extraction functions from Gauss version (they're the same)
 def extract_main_diagonal_data(event_idx, data, grid_size=None):
     """
     Extract main diagonal charge data for a specific event.
@@ -249,19 +249,19 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
         grid_size: Size of neighborhood grid (auto-detected if None)
     
     Returns:
-        positions, charges, valid_data_flag
+        poss, charges, valid_data_flag
     """
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
             # Single event data (already subset)
-            grid_charges = data['GridNeighborhoodCharges']
+            grid_charges = data['NeighborhoodCharges']
             pixel_x = data['PixelX']
             pixel_y = data['PixelY']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
             # Full dataset - extract for specific event
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_x = data['PixelX'][event_idx]
             pixel_y = data['PixelY'][event_idx]
         else:
@@ -276,7 +276,7 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -284,7 +284,7 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
         # Extract main diagonal elements
         diagonal_indices = []
         diagonal_charges = []
-        diagonal_positions = []
+        diagonal_poss = []
         
         for i in range(grid_size):
             # Main diagonal: (i, i) in (row, col) notation
@@ -296,29 +296,29 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
                 diagonal_indices.append(index)
                 diagonal_charges.append(grid_charges[index])
                 
-                # Calculate position relative to pixel center
+                # Calc pos relative to pixel center
                 offset_x = col - radius
                 offset_y = row - radius
                 pos_x = pixel_x + offset_x * pixel_spacing
                 pos_y = pixel_y + offset_y * pixel_spacing
                 
-                # For diagonal, use distance along diagonal as position
+                # For diagonal, use distance along diagonal as pos
                 # Distance from center pixel along diagonal
                 diagonal_distance = np.sqrt(offset_x**2 + offset_y**2) * np.sign(offset_x)
-                diagonal_positions.append(diagonal_distance)
+                diagonal_poss.append(diagonal_distance)
         
         if len(diagonal_charges) < 3:
             return None, None, False
         
-        # Convert to numpy arrays and sort by diagonal position
-        diagonal_positions = np.array(diagonal_positions)
+        # Convert to numpy arrays and sort by diagonal pos
+        diagonal_poss = np.array(diagonal_poss)
         diagonal_charges = np.array(diagonal_charges)
         
-        sort_indices = np.argsort(diagonal_positions)
-        diagonal_positions = diagonal_positions[sort_indices]
+        sort_indices = np.argsort(diagonal_poss)
+        diagonal_poss = diagonal_poss[sort_indices]
         diagonal_charges = diagonal_charges[sort_indices]
         
-        return diagonal_positions, diagonal_charges, True
+        return diagonal_poss, diagonal_charges, True
         
     except Exception as e:
         return None, None, False
@@ -334,19 +334,19 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
         grid_size: Size of neighborhood grid (auto-detected if None)
     
     Returns:
-        positions, charges, valid_data_flag
+        poss, charges, valid_data_flag
     """
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
             # Single event data (already subset)
-            grid_charges = data['GridNeighborhoodCharges']
+            grid_charges = data['NeighborhoodCharges']
             pixel_x = data['PixelX']
             pixel_y = data['PixelY']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
             # Full dataset - extract for specific event
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_x = data['PixelX'][event_idx]
             pixel_y = data['PixelY'][event_idx]
         else:
@@ -361,7 +361,7 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -369,7 +369,7 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
         # Extract secondary diagonal elements
         diagonal_indices = []
         diagonal_charges = []
-        diagonal_positions = []
+        diagonal_poss = []
         
         for i in range(grid_size):
             # Secondary diagonal: (i, grid_size-1-i) in (row, col) notation
@@ -381,53 +381,53 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
                 diagonal_indices.append(index)
                 diagonal_charges.append(grid_charges[index])
                 
-                # Calculate position relative to pixel center
+                # Calc pos relative to pixel center
                 offset_x = col - radius
                 offset_y = row - radius
                 pos_x = pixel_x + offset_x * pixel_spacing
                 pos_y = pixel_y + offset_y * pixel_spacing
                 
-                # For secondary diagonal, use distance along diagonal as position
+                # For secondary diagonal, use distance along diagonal as pos
                 # Distance from center pixel along secondary diagonal
                 diagonal_distance = np.sqrt(offset_x**2 + offset_y**2) * np.sign(-offset_x)
-                diagonal_positions.append(diagonal_distance)
+                diagonal_poss.append(diagonal_distance)
         
         if len(diagonal_charges) < 3:
             return None, None, False
         
-        # Convert to numpy arrays and sort by diagonal position
-        diagonal_positions = np.array(diagonal_positions)
+        # Convert to numpy arrays and sort by diagonal pos
+        diagonal_poss = np.array(diagonal_poss)
         diagonal_charges = np.array(diagonal_charges)
         
-        sort_indices = np.argsort(diagonal_positions)
-        diagonal_positions = diagonal_positions[sort_indices]
+        sort_indices = np.argsort(diagonal_poss)
+        diagonal_poss = diagonal_poss[sort_indices]
         diagonal_charges = diagonal_charges[sort_indices]
         
-        return diagonal_positions, diagonal_charges, True
+        return diagonal_poss, diagonal_charges, True
         
     except Exception as e:
         return None, None, False
 
-def lorentzian_1d(x, amplitude, center, gamma, offset):
+def lorentz_1d(x, amp, center, gamma, offset):
     """
-    1D Lorentzian function for plotting fitted curves.
+    1D Lorentz function for plotting fitted curves.
     
     Args:
-        x: Position array
-        amplitude: Peak amplitude
-        center: Peak center position
+        x: Pos array
+        amp: Peak amp
+        center: Peak center pos
         gamma: Half-width at half-maximum (HWHM)
-        offset: Vertical offset
+        offset: Vert offset
     
     Returns:
-        Lorentzian curve values
+        Lorentz curve values
     """
-    return amplitude / (1 + ((x - center) / gamma)**2) + offset
+    return amp / (1 + ((x - center) / gamma)**2) + offset
 
 def get_stored_charge_uncertainties(event_idx, data, diagonal_type):
     """
     Get the stored charge uncertainties from ROOT file for the specified diagonal type.
-    If the stored uncertainties are not available, calculate fallback uncertainty as 5% of max charge.
+    If the stored uncertainties are not available, calculate fallback err as 5% of max charge.
     
     Args:
         event_idx: Event index (ignored if data is already subset)
@@ -435,56 +435,56 @@ def get_stored_charge_uncertainties(event_idx, data, diagonal_type):
         diagonal_type: 'main_diag_x', 'main_diag_y', 'sec_diag_x', or 'sec_diag_y'
     
     Returns:
-        uncertainty: Single uncertainty value (5% of max charge for this event)
+        err: Single err value (5% of max charge for this event)
     """
     diagonal_map = {
-        'main_diag_x': 'LorentzFitMainDiagXChargeUncertainty',
-        'main_diag_y': 'LorentzFitMainDiagYChargeUncertainty',
-        'sec_diag_x': 'LorentzFitSecDiagXChargeUncertainty',
-        'sec_diag_y': 'LorentzFitSecDiagYChargeUncertainty'
+        'main_diag_x': 'LorentzMainDiagXChargeErr',
+        'main_diag_y': 'LorentzMainDiagYChargeErr',
+        'sec_diag_x': 'LorentzSecDiagXChargeErr',
+        'sec_diag_y': 'LorentzSecDiagYChargeErr'
     }
     
     if diagonal_type.lower() not in diagonal_map:
         raise ValueError(f"Invalid diagonal_type: {diagonal_type}. Must be one of {list(diagonal_map.keys())}")
     
-    uncertainty_data = data[diagonal_map[diagonal_type.lower()]]
+    err_data = data[diagonal_map[diagonal_type.lower()]]
     
-    # Check if uncertainty data is available
-    if uncertainty_data is None:
-        # Calculate fallback uncertainty as 5% of max charge for this event
+    # Check if err data is available
+    if err_data is None:
+        # Calc fallback err as 5% of max charge for this event
         # Extract diagonal data to get the charge values
         if diagonal_type.startswith('main_diag'):
-            diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+            diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
         else:
-            diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+            diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
             
         if valid_data and len(charges) > 0:
-            uncertainty = 0.05 * np.max(charges)  # 5% of max charge
+            err = 0.05 * np.max(charges)  # 5% of max charge
         else:
-            uncertainty = 0.05  # Default fallback
+            err = 0.05  # Default fallback
     else:
         # Handle both single event data and full dataset
-        if np.isscalar(uncertainty_data):
+        if np.isscalar(err_data):
             # Single event data (already subset)
-            uncertainty = uncertainty_data
-        elif hasattr(uncertainty_data, '__len__') and len(uncertainty_data) > event_idx:
+            err = err_data
+        elif hasattr(err_data, '__len__') and len(err_data) > event_idx:
             # Full dataset - extract for specific event
-            uncertainty = uncertainty_data[event_idx]
+            err = err_data[event_idx]
         else:
-            uncertainty = 0.05  # Default fallback
+            err = 0.05  # Default fallback
     
-    return uncertainty
+    return err
 
 def create_main_diagonal_x_plot(event_idx, data):
     """
-    Create a plot showing the main diagonal X-component Lorentzian fit for a specific event.
+    Create a plot showing the main diagonal X-component Lorentz fit for a specific event.
 
     Returns:
         fig, success_flag
     """
     try:
         # Extract main diagonal data
-        diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -498,76 +498,76 @@ def create_main_diagonal_x_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['LorentzFitMainDiagXCenter'], event_idx)
-        fit_gamma = get_param_value(data['LorentzFitMainDiagXGamma'], event_idx)
-        fit_amplitude = get_param_value(data['LorentzFitMainDiagXAmplitude'], event_idx)
-        fit_offset = get_param_value(data['LorentzFitMainDiagXVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['LorentzFitMainDiagXCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['LorentzFitMainDiagXGammaErr'], event_idx)
-        chi2_red = get_param_value(data['LorentzFitMainDiagXChi2red'], event_idx)
-        dof = get_param_value(data['LorentzFitMainDiagXDOF'], event_idx)
+        fit_center = get_param_value(data['LorentzMainDiagXCenter'], event_idx)
+        fit_gamma = get_param_value(data['LorentzMainDiagXGamma'], event_idx)
+        fit_amp = get_param_value(data['LorentzMainDiagXAmp'], event_idx)
+        fit_offset = get_param_value(data['LorentzMainDiagXVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['LorentzMainDiagXCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['LorentzMainDiagXGammaErr'], event_idx)
+        chi2_red = get_param_value(data['LorentzMainDiagXChi2red'], event_idx)
+        dof = get_param_value(data['LorentzMainDiagXDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto main diagonal
+        # Get true pos and project onto main diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto main diagonal direction
+        # Project true pos onto main diagonal direction
         # Main diagonal has direction (1,1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x + true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'main_diag_x')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = lorentzian_1d(diagonal_positions, fit_amplitude, fit_center, fit_gamma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = lorentz_1d(diagonal_poss, fit_amp, fit_center, fit_gamma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='red', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Main Diagonal X Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Main Diag X Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Lorentzian curve
+        # Plot fitted Lorentz curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = lorentzian_1d(pos_fit_range, fit_amplitude, fit_center, fit_gamma, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'r-', linewidth=3, label='Lorentzian Fit')
+        y_fit = lorentz_1d(pos_fit_range, fit_amp, fit_center, fit_gamma, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'r-', linewidth=3, label='Lorentz ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='red', linestyle=':', linewidth=3, alpha=0.8, label='x_fit (main diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Main Diagonal X Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Main Diag X Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -594,14 +594,14 @@ def create_main_diagonal_x_plot(event_idx, data):
 
 def create_main_diagonal_y_plot(event_idx, data):
     """
-    Create a plot showing the main diagonal Y-component Lorentzian fit for a specific event.
+    Create a plot showing the main diagonal Y-component Lorentz fit for a specific event.
     
     Returns:
         fig, success_flag
     """
     try:
         # Extract main diagonal data
-        diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -615,76 +615,76 @@ def create_main_diagonal_y_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['LorentzFitMainDiagYCenter'], event_idx)
-        fit_gamma = get_param_value(data['LorentzFitMainDiagYGamma'], event_idx)
-        fit_amplitude = get_param_value(data['LorentzFitMainDiagYAmplitude'], event_idx)
-        fit_offset = get_param_value(data['LorentzFitMainDiagYVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['LorentzFitMainDiagYCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['LorentzFitMainDiagYGammaErr'], event_idx)
-        chi2_red = get_param_value(data['LorentzFitMainDiagYChi2red'], event_idx)
-        dof = get_param_value(data['LorentzFitMainDiagYDOF'], event_idx)
+        fit_center = get_param_value(data['LorentzMainDiagYCenter'], event_idx)
+        fit_gamma = get_param_value(data['LorentzMainDiagYGamma'], event_idx)
+        fit_amp = get_param_value(data['LorentzMainDiagYAmp'], event_idx)
+        fit_offset = get_param_value(data['LorentzMainDiagYVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['LorentzMainDiagYCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['LorentzMainDiagYGammaErr'], event_idx)
+        chi2_red = get_param_value(data['LorentzMainDiagYChi2red'], event_idx)
+        dof = get_param_value(data['LorentzMainDiagYDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto main diagonal
+        # Get true pos and project onto main diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto main diagonal direction
+        # Project true pos onto main diagonal direction
         # Main diagonal has direction (1,1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x + true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'main_diag_y')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = lorentzian_1d(diagonal_positions, fit_amplitude, fit_center, fit_gamma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = lorentz_1d(diagonal_poss, fit_amp, fit_center, fit_gamma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='blue', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Main Diagonal Y Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Main Diag Y Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Lorentzian curve
+        # Plot fitted Lorentz curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = lorentzian_1d(pos_fit_range, fit_amplitude, fit_center, fit_gamma, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'b-', linewidth=3, label='Lorentzian Fit')
+        y_fit = lorentz_1d(pos_fit_range, fit_amp, fit_center, fit_gamma, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'b-', linewidth=3, label='Lorentz ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='blue', linestyle=':', linewidth=3, alpha=0.8, label='y_fit (main diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Main Diagonal Y Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Main Diag Y Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -711,14 +711,14 @@ def create_main_diagonal_y_plot(event_idx, data):
 
 def create_secondary_diagonal_x_plot(event_idx, data):
     """
-    Create a plot showing the secondary diagonal X-component Lorentzian fit for a specific event.
+    Create a plot showing the secondary diagonal X-component Lorentz fit for a specific event.
 
     Returns:
         fig, success_flag
     """
     try:
         # Extract secondary diagonal data
-        diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -732,76 +732,76 @@ def create_secondary_diagonal_x_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['LorentzFitSecDiagXCenter'], event_idx)
-        fit_gamma = get_param_value(data['LorentzFitSecDiagXGamma'], event_idx)
-        fit_amplitude = get_param_value(data['LorentzFitSecDiagXAmplitude'], event_idx)
-        fit_offset = get_param_value(data['LorentzFitSecDiagXVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['LorentzFitSecDiagXCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['LorentzFitSecDiagXGammaErr'], event_idx)
-        chi2_red = get_param_value(data['LorentzFitSecDiagXChi2red'], event_idx)
-        dof = get_param_value(data['LorentzFitSecDiagXDOF'], event_idx)
+        fit_center = get_param_value(data['LorentzSecDiagXCenter'], event_idx)
+        fit_gamma = get_param_value(data['LorentzSecDiagXGamma'], event_idx)
+        fit_amp = get_param_value(data['LorentzSecDiagXAmp'], event_idx)
+        fit_offset = get_param_value(data['LorentzSecDiagXVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['LorentzSecDiagXCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['LorentzSecDiagXGammaErr'], event_idx)
+        chi2_red = get_param_value(data['LorentzSecDiagXChi2red'], event_idx)
+        dof = get_param_value(data['LorentzSecDiagXDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto secondary diagonal
+        # Get true pos and project onto secondary diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto secondary diagonal direction
+        # Project true pos onto secondary diagonal direction
         # Secondary diagonal has direction (1,-1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x - true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'sec_diag_x')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = lorentzian_1d(diagonal_positions, fit_amplitude, fit_center, fit_gamma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = lorentz_1d(diagonal_poss, fit_amp, fit_center, fit_gamma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='orange', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Secondary Diagonal X Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Secondary Diag X Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Lorentzian curve
+        # Plot fitted Lorentz curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = lorentzian_1d(pos_fit_range, fit_amplitude, fit_center, fit_gamma, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'orange', linewidth=3, label='Lorentzian Fit')
+        y_fit = lorentz_1d(pos_fit_range, fit_amp, fit_center, fit_gamma, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'orange', linewidth=3, label='Lorentz ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='orange', linestyle=':', linewidth=3, alpha=0.8, label='x_fit (sec diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Secondary Diagonal X Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Secondary Diag X Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -828,14 +828,14 @@ def create_secondary_diagonal_x_plot(event_idx, data):
 
 def create_secondary_diagonal_y_plot(event_idx, data):
     """
-    Create a plot showing the secondary diagonal Y-component Lorentzian fit for a specific event.
+    Create a plot showing the secondary diagonal Y-component Lorentz fit for a specific event.
     
     Returns:
         fig, success_flag
     """
     try:
         # Extract secondary diagonal data
-        diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -849,76 +849,76 @@ def create_secondary_diagonal_y_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['LorentzFitSecDiagYCenter'], event_idx)
-        fit_gamma = get_param_value(data['LorentzFitSecDiagYGamma'], event_idx)
-        fit_amplitude = get_param_value(data['LorentzFitSecDiagYAmplitude'], event_idx)
-        fit_offset = get_param_value(data['LorentzFitSecDiagYVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['LorentzFitSecDiagYCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['LorentzFitSecDiagYGammaErr'], event_idx)
-        chi2_red = get_param_value(data['LorentzFitSecDiagYChi2red'], event_idx)
-        dof = get_param_value(data['LorentzFitSecDiagYDOF'], event_idx)
+        fit_center = get_param_value(data['LorentzSecDiagYCenter'], event_idx)
+        fit_gamma = get_param_value(data['LorentzSecDiagYGamma'], event_idx)
+        fit_amp = get_param_value(data['LorentzSecDiagYAmp'], event_idx)
+        fit_offset = get_param_value(data['LorentzSecDiagYVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['LorentzSecDiagYCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['LorentzSecDiagYGammaErr'], event_idx)
+        chi2_red = get_param_value(data['LorentzSecDiagYChi2red'], event_idx)
+        dof = get_param_value(data['LorentzSecDiagYDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto secondary diagonal
+        # Get true pos and project onto secondary diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto secondary diagonal direction
+        # Project true pos onto secondary diagonal direction
         # Secondary diagonal has direction (1,-1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x - true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'sec_diag_y')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = lorentzian_1d(diagonal_positions, fit_amplitude, fit_center, fit_gamma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = lorentz_1d(diagonal_poss, fit_amp, fit_center, fit_gamma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='purple', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Secondary Diagonal Y Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Secondary Diag Y Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Lorentzian curve
+        # Plot fitted Lorentz curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = lorentzian_1d(pos_fit_range, fit_amplitude, fit_center, fit_gamma, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'purple', linewidth=3, label='Lorentzian Fit')
+        y_fit = lorentz_1d(pos_fit_range, fit_amp, fit_center, fit_gamma, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'purple', linewidth=3, label='Lorentz ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='purple', linestyle=':', linewidth=3, alpha=0.8, label='y_fit (sec diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Secondary Diagonal Y Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Secondary Diag Y Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -1004,27 +1004,27 @@ def _prepare_data_subset(data, event_idx):
     # List of all keys we need for plotting
     keys_needed = [
         'TrueX', 'TrueY', 'PixelX', 'PixelY', 'IsPixelHit',
-        'GridNeighborhoodCharges', 'PixelSpacing',
+        'NeighborhoodCharges', 'PixelSpacing',
         # Main diagonal X parameters
-        'LorentzFitMainDiagXCenter', 'LorentzFitMainDiagXGamma', 'LorentzFitMainDiagXAmplitude', 
-        'LorentzFitMainDiagXVerticalOffset', 'LorentzFitMainDiagXCenterErr', 'LorentzFitMainDiagXGammaErr',
-        'LorentzFitMainDiagXAmplitudeErr', 'LorentzFitMainDiagXChi2red', 'LorentzFitMainDiagXDOF',
-        'LorentzFitMainDiagXChargeUncertainty',
+        'LorentzMainDiagXCenter', 'LorentzMainDiagXGamma', 'LorentzMainDiagXAmp', 
+        'LorentzMainDiagXVertOffset', 'LorentzMainDiagXCenterErr', 'LorentzMainDiagXGammaErr',
+        'LorentzMainDiagXAmpErr', 'LorentzMainDiagXChi2red', 'LorentzMainDiagXDOF',
+        'LorentzMainDiagXChargeErr',
         # Main diagonal Y parameters
-        'LorentzFitMainDiagYCenter', 'LorentzFitMainDiagYGamma', 'LorentzFitMainDiagYAmplitude',
-        'LorentzFitMainDiagYVerticalOffset', 'LorentzFitMainDiagYCenterErr', 'LorentzFitMainDiagYGammaErr',
-        'LorentzFitMainDiagYAmplitudeErr', 'LorentzFitMainDiagYChi2red', 'LorentzFitMainDiagYDOF',
-        'LorentzFitMainDiagYChargeUncertainty',
+        'LorentzMainDiagYCenter', 'LorentzMainDiagYGamma', 'LorentzMainDiagYAmp',
+        'LorentzMainDiagYVertOffset', 'LorentzMainDiagYCenterErr', 'LorentzMainDiagYGammaErr',
+        'LorentzMainDiagYAmpErr', 'LorentzMainDiagYChi2red', 'LorentzMainDiagYDOF',
+        'LorentzMainDiagYChargeErr',
         # Secondary diagonal X parameters
-        'LorentzFitSecDiagXCenter', 'LorentzFitSecDiagXGamma', 'LorentzFitSecDiagXAmplitude', 
-        'LorentzFitSecDiagXVerticalOffset', 'LorentzFitSecDiagXCenterErr', 'LorentzFitSecDiagXGammaErr',
-        'LorentzFitSecDiagXAmplitudeErr', 'LorentzFitSecDiagXChi2red', 'LorentzFitSecDiagXDOF',
-        'LorentzFitSecDiagXChargeUncertainty',
+        'LorentzSecDiagXCenter', 'LorentzSecDiagXGamma', 'LorentzSecDiagXAmp', 
+        'LorentzSecDiagXVertOffset', 'LorentzSecDiagXCenterErr', 'LorentzSecDiagXGammaErr',
+        'LorentzSecDiagXAmpErr', 'LorentzSecDiagXChi2red', 'LorentzSecDiagXDOF',
+        'LorentzSecDiagXChargeErr',
         # Secondary diagonal Y parameters
-        'LorentzFitSecDiagYCenter', 'LorentzFitSecDiagYGamma', 'LorentzFitSecDiagYAmplitude',
-        'LorentzFitSecDiagYVerticalOffset', 'LorentzFitSecDiagYCenterErr', 'LorentzFitSecDiagYGammaErr',
-        'LorentzFitSecDiagYAmplitudeErr', 'LorentzFitSecDiagYChi2red', 'LorentzFitSecDiagYDOF',
-        'LorentzFitSecDiagYChargeUncertainty'
+        'LorentzSecDiagYCenter', 'LorentzSecDiagYGamma', 'LorentzSecDiagYAmp',
+        'LorentzSecDiagYVertOffset', 'LorentzSecDiagYCenterErr', 'LorentzSecDiagYGammaErr',
+        'LorentzSecDiagYAmpErr', 'LorentzSecDiagYChi2red', 'LorentzSecDiagYDOF',
+        'LorentzSecDiagYChargeErr'
     ]
     
     for key in keys_needed:
@@ -1036,9 +1036,9 @@ def _prepare_data_subset(data, event_idx):
     
     return subset
 
-def create_diagonal_lorentzian_fit_pdfs(data, output_dir="diagonal_lorentzian_plots", max_events=None, n_workers=None):
+def create_diagonal_lorentz_fit_pdfs(data, output_dir="diagonal_lorentz_plots", max_events=None, n_workers=None):
     """
-    Create PDF files with diagonal Lorentzian fits visualization using parallel processing.
+    Create PDF files with diagonal Lorentz fits visualization using parallel processing.
     
     Args:
         data: Data dictionary from ROOT file
@@ -1060,28 +1060,28 @@ def create_diagonal_lorentzian_fit_pdfs(data, output_dir="diagonal_lorentzian_pl
     if n_workers is None:
         n_workers = min(mp.cpu_count(), 8)  # Cap at 8 to avoid memory issues
     
-    print(f"Creating diagonal Lorentzian fit visualizations for {n_events} events using {n_workers} workers")
+    print(f"Creating diagonal Lorentz fit visualizations for {n_events} events using {n_workers} workers")
     
     # Create output paths
-    main_diag_x_pdf = os.path.join(output_dir, "lorentzian_fits_main_diagonal_x.pdf")
-    main_diag_y_pdf = os.path.join(output_dir, "lorentzian_fits_main_diagonal_y.pdf")
-    sec_diag_x_pdf = os.path.join(output_dir, "lorentzian_fits_secondary_diagonal_x.pdf")
-    sec_diag_y_pdf = os.path.join(output_dir, "lorentzian_fits_secondary_diagonal_y.pdf")
+    main_diag_x_pdf = os.path.join(output_dir, "lorentz_fits_main_diagonal_x.pdf")
+    main_diag_y_pdf = os.path.join(output_dir, "lorentz_fits_main_diagonal_y.pdf")
+    sec_diag_x_pdf = os.path.join(output_dir, "lorentz_fits_secondary_diagonal_x.pdf")
+    sec_diag_y_pdf = os.path.join(output_dir, "lorentz_fits_secondary_diagonal_y.pdf")
     
-    # Pre-filter events with successful fits
+    # Pre-filter events with success fits
     main_diag_x_valid = []
     main_diag_y_valid = []
     sec_diag_x_valid = []
     sec_diag_y_valid = []
     
     for event_idx in range(n_events):
-        if data['LorentzFitMainDiagXDOF'][event_idx] > 0:
+        if data['LorentzMainDiagXDOF'][event_idx] > 0:
             main_diag_x_valid.append(event_idx)
-        if data['LorentzFitMainDiagYDOF'][event_idx] > 0:
+        if data['LorentzMainDiagYDOF'][event_idx] > 0:
             main_diag_y_valid.append(event_idx)
-        if data['LorentzFitSecDiagXDOF'][event_idx] > 0:
+        if data['LorentzSecDiagXDOF'][event_idx] > 0:
             sec_diag_x_valid.append(event_idx)
-        if data['LorentzFitSecDiagYDOF'][event_idx] > 0:
+        if data['LorentzSecDiagYDOF'][event_idx] > 0:
             sec_diag_y_valid.append(event_idx)
     
     print(f"Found {len(main_diag_x_valid)} valid main diagonal X fits")
@@ -1093,10 +1093,10 @@ def create_diagonal_lorentzian_fit_pdfs(data, output_dir="diagonal_lorentzian_pl
     
     # Define diagonal types and their corresponding data
     diagonal_types = [
-        ('main_diag_x', main_diag_x_valid, main_diag_x_pdf, "Main Diagonal X"),
-        ('main_diag_y', main_diag_y_valid, main_diag_y_pdf, "Main Diagonal Y"),
-        ('sec_diag_x', sec_diag_x_valid, sec_diag_x_pdf, "Secondary Diagonal X"),
-        ('sec_diag_y', sec_diag_y_valid, sec_diag_y_pdf, "Secondary Diagonal Y")
+        ('main_diag_x', main_diag_x_valid, main_diag_x_pdf, "Main Diag X"),
+        ('main_diag_y', main_diag_y_valid, main_diag_y_pdf, "Main Diag Y"),
+        ('sec_diag_x', sec_diag_x_valid, sec_diag_x_pdf, "Secondary Diag X"),
+        ('sec_diag_y', sec_diag_y_valid, sec_diag_y_pdf, "Secondary Diag Y")
     ]
     
     for diag_type, valid_events, pdf_path, display_name in diagonal_types:
@@ -1154,7 +1154,7 @@ def create_diagonal_lorentzian_fit_pdfs(data, output_dir="diagonal_lorentzian_pl
         del args_list
         gc.collect()
     
-    print(f"\nDiagonal Lorentzian PDF generation completed!")
+    print(f"\nDiag Lorentz PDF generation completed!")
     return (success_counts.get('main_diag_x', 0), 
             success_counts.get('main_diag_y', 0),
             success_counts.get('sec_diag_x', 0), 
@@ -1175,9 +1175,9 @@ def inspect_root_file(root_file):
         
         print(f"\nTree 'Hits' contains {len(branches)} branches:")
         
-        # Show diagonal Lorentzian fitting branches
-        diagonal_branches = [b for b in branches if 'LorentzFit' in b and 'Diag' in b]
-        print(f"\nDiagonal Lorentzian fitting branches ({len(diagonal_branches)}):")
+        # Show diagonal Lorentz fitting branches
+        diagonal_branches = [b for b in branches if 'Lorentz' in b and 'Diag' in b]
+        print(f"\nDiag Lorentz fitting branches ({len(diagonal_branches)}):")
         for i, branch in enumerate(sorted(diagonal_branches)):
             print(f"  {i+1:2d}: {branch}")
         
@@ -1197,19 +1197,19 @@ def inspect_root_file(root_file):
         print(f"  Non-pixel hits: {n_non_pixel} ({100*n_non_pixel/n_events:.1f}%)")
         print(f"  Pixel hits: {n_events - n_non_pixel} ({100*(n_events - n_non_pixel)/n_events:.1f}%)")
         
-        # Check for successful diagonal fits
+        # Check for success diagonal fits
         diagonal_dofs = [
-            ('LorentzFitMainDiagXDOF', 'Main Diagonal X'),
-            ('LorentzFitMainDiagYDOF', 'Main Diagonal Y'),
-            ('LorentzFitSecDiagXDOF', 'Secondary Diagonal X'),
-            ('LorentzFitSecDiagYDOF', 'Secondary Diagonal Y')
+            ('LorentzMainDiagXDOF', 'Main Diag X'),
+            ('LorentzMainDiagYDOF', 'Main Diag Y'),
+            ('LorentzSecDiagXDOF', 'Secondary Diag X'),
+            ('LorentzSecDiagYDOF', 'Secondary Diag Y')
         ]
         
         for dof_branch, name in diagonal_dofs:
             if dof_branch in branches:
                 dof_data = tree[dof_branch].array(library="np")
-                successful_fits = np.sum(dof_data > 0)
-                print(f"  Successful {name} fits: {successful_fits} ({100*successful_fits/n_events:.1f}%)")
+                success_fits = np.sum(dof_data > 0)
+                print(f"  Success {name} fits: {success_fits} ({100*success_fits/n_events:.1f}%)")
         
     except Exception as e:
         print(f"Error inspecting ROOT file: {e}")
@@ -1217,11 +1217,11 @@ def inspect_root_file(root_file):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Visualize diagonal Lorentzian fits from GEANT4 charge sharing simulation ROOT files",
+        description="Visualize diagonal Lorentz fits from GEANT4 charge sharing simulation ROOT files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("root_file", help="Path to ROOT file from GEANT4 simulation")
-    parser.add_argument("-o", "--output", default="diagonal_lorentzian_fits", 
+    parser.add_argument("-o", "--output", default="diagonal_lorentz_fits", 
                        help="Output directory for PDF files")
     parser.add_argument("-n", "--num_events", type=int, default=None,
                        help="Maximum number of events to process (default: all events)")
@@ -1250,26 +1250,26 @@ def main():
         print("Failed to load data. Exiting.")
         return 1
     
-    # Check if we have diagonal Lorentzian fitting data
+    # Check if we have diagonal Lorentz fitting data
     n_events = len(data['TrueX'])
     if n_events == 0:
         print("No events found in the data!")
         return 1
     
-    # Count successful fits
-    main_diag_x_successful = np.sum(data['LorentzFitMainDiagXDOF'] > 0)
-    main_diag_y_successful = np.sum(data['LorentzFitMainDiagYDOF'] > 0)
-    sec_diag_x_successful = np.sum(data['LorentzFitSecDiagXDOF'] > 0)
-    sec_diag_y_successful = np.sum(data['LorentzFitSecDiagYDOF'] > 0)
+    # Count success fits
+    main_diag_x_success = np.sum(data['LorentzMainDiagXDOF'] > 0)
+    main_diag_y_success = np.sum(data['LorentzMainDiagYDOF'] > 0)
+    sec_diag_x_success = np.sum(data['LorentzSecDiagXDOF'] > 0)
+    sec_diag_y_success = np.sum(data['LorentzSecDiagYDOF'] > 0)
     
-    print(f"Found {main_diag_x_successful} successful main diagonal X fits")
-    print(f"Found {main_diag_y_successful} successful main diagonal Y fits")
-    print(f"Found {sec_diag_x_successful} successful secondary diagonal X fits")
-    print(f"Found {sec_diag_y_successful} successful secondary diagonal Y fits")
+    print(f"Found {main_diag_x_success} success main diagonal X fits")
+    print(f"Found {main_diag_y_success} success main diagonal Y fits")
+    print(f"Found {sec_diag_x_success} success secondary diagonal X fits")
+    print(f"Found {sec_diag_y_success} success secondary diagonal Y fits")
     
-    total_successful = main_diag_x_successful + main_diag_y_successful + sec_diag_x_successful + sec_diag_y_successful
-    if total_successful == 0:
-        print("No successful diagonal Lorentzian fits found in the data!")
+    total_success = main_diag_x_success + main_diag_y_success + sec_diag_x_success + sec_diag_y_success
+    if total_success == 0:
+        print("No success diagonal Lorentz fits found in the data!")
         return 1
     
     # Create output directory
@@ -1277,7 +1277,7 @@ def main():
     print(f"Output directory: {args.output}")
     
     # Create PDF visualizations
-    main_diag_x_count, main_diag_y_count, sec_diag_x_count, sec_diag_y_count = create_diagonal_lorentzian_fit_pdfs(
+    main_diag_x_count, main_diag_y_count, sec_diag_x_count, sec_diag_y_count = create_diagonal_lorentz_fit_pdfs(
         data, args.output, args.num_events, args.workers
     )
     

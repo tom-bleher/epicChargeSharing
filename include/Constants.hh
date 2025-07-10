@@ -46,7 +46,6 @@ namespace Constants {
     const G4bool ENABLE_AUTO_RADIUS = false;             // Enable automatic radius selection per hit
     
     // Fit quality thresholds for radius selection
-    const G4double RESIDUAL_OUTLIER_THRESHOLD = 3.0;     // Outlier threshold in standard deviations
     const G4int MIN_POINTS_FOR_FIT = 3;                  // Minimum number of points required for fitting
     
     // ========================
@@ -61,7 +60,7 @@ namespace Constants {
     
     // Primary generator constants
     const G4double PRIMARY_PARTICLE_Z_POSITION = 2.0*cm; // Z position for primary particle generation
-    
+        
     // ========================
     // NUMERICAL TOLERANCE CONSTANTS
     // ========================
@@ -94,9 +93,7 @@ namespace Constants {
     // FITTING MODEL CONTROL FLAGS
     // ========================
     
-    // Enable/disable different fitting models for performance and flexibility
-    // Set to 'false' to disable a fitting model and skip its computation entirely
-    // This reduces simulation time and ROOT output file size when specific models aren't needed
+    // Enable/disable different fitting models
     const G4bool ENABLE_GAUSS_FIT = true;         // Enable Gauss fitting (2D and diagonal)
     const G4bool ENABLE_LORENTZ_FIT = true;       // Enable Lorentz fitting (2D and diagonal) 
     const G4bool ENABLE_POWER_LORENTZ_FIT = false; // Enable Power Lorentz fitting (2D and diagonal)
@@ -129,17 +126,7 @@ namespace Constants {
     // file system momentarily blocks.  Set this flag to 'false' to disable the per-interval
     // AutoSave and rely on a single FlushBaskets()+Write() at the end of the run instead.
     const G4bool ENABLE_AUTOSAVE = false;  // disable by default
-    
-    // USAGE EXAMPLES:
-    // - To disable all Power Lorentz: set ENABLE_POWER_LORENTZ_FIT = false
-    // - To enable only 2D fits (not diagonals): set ENABLE_DIAG_FIT = false  
-    // - To run only Gauss fits: set ENABLE_LORENTZ_FIT and ENABLE_POWER_LORENTZ_FIT to false
-    // - To disable charge uncertainties: set ENABLE_VERT_CHARGE_ERR = false
-    // - To enable only 3D Gauss: set ENABLE_3D_GAUSS_FIT = true, others to false
-    // - To enable only 3D Lorentz: set ENABLE_3D_LORENTZ_FIT = true, others to false
-    // - To enable both 2D and 3D Power-Law Lorentz: set ENABLE_POWER_LORENTZ_FIT and ENABLE_3D_POWER_LORENTZ_FIT = true
-    // - To enable all 3D fits: set ENABLE_3D_GAUSS_FIT, ENABLE_3D_LORENTZ_FIT, and ENABLE_3D_POWER_LORENTZ_FIT = true
-    
+
 } // namespace Constants
 
 #endif // CONSTANTS_HH

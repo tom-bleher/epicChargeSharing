@@ -47,10 +47,10 @@ public:
     void SetEventData(G4double edep, G4double x, G4double y, G4double z);
     
     // Method to set initial particle gun position [mm]
-    void SetInitialPosition(G4double x, G4double y, G4double z);
+    void SetInitialPos(G4double x, G4double y, G4double z);
     
     // Method to set nearest pixel position [mm]
-    void SetNearestPixelPosition(G4double x, G4double y);
+    void SetNearestPixelPos(G4double x, G4double y);
     
     // Method to set initial particle energy [MeV]
     void SetInitialEnergy(G4double energy);
@@ -75,130 +75,130 @@ public:
                                    G4double pixelCornerOffset, G4double detSize, 
                                    G4int numBlocksPerSide);
     
-    // Method to set 2D Gaussian fit results (central row and column fitting)
-    void Set2DGaussianFitResults(G4double x_center, G4double x_sigma, G4double x_amplitude,
-                                G4double x_center_err, G4double x_sigma_err, G4double x_amplitude_err,
-                                G4double x_vertical_offset, G4double x_vertical_offset_err,
+    // Method to set 2D Gauss fit results (central row and column fitting)
+    void Set2DGaussResults(G4double x_center, G4double x_sigma, G4double x_amp,
+                                G4double x_center_err, G4double x_sigma_err, G4double x_amp_err,
+                                G4double x_vert_offset, G4double x_vert_offset_err,
                                 G4double x_chi2red, G4double x_pp, G4int x_dof,
-                                G4double y_center, G4double y_sigma, G4double y_amplitude,
-                                G4double y_center_err, G4double y_sigma_err, G4double y_amplitude_err,
-                                G4double y_vertical_offset, G4double y_vertical_offset_err,
+                                G4double y_center, G4double y_sigma, G4double y_amp,
+                                G4double y_center_err, G4double y_sigma_err, G4double y_amp_err,
+                                G4double y_vert_offset, G4double y_vert_offset_err,
                                 G4double y_chi2red, G4double y_pp, G4int y_dof,
-                                G4double x_charge_uncertainty, G4double y_charge_uncertainty,
-                                G4bool fit_successful);
+                                G4double x_charge_err, G4double y_charge_err,
+                                G4bool fit_success);
     
-    // Method to set diagonal Gaussian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-    void SetDiagonalGaussianFitResults(G4double main_diag_x_center, G4double main_diag_x_sigma, G4double main_diag_x_amplitude,
-                                      G4double main_diag_x_center_err, G4double main_diag_x_sigma_err, G4double main_diag_x_amplitude_err,
-                                      G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
-                                      G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
-                                      G4double main_diag_y_center, G4double main_diag_y_sigma, G4double main_diag_y_amplitude,
-                                      G4double main_diag_y_center_err, G4double main_diag_y_sigma_err, G4double main_diag_y_amplitude_err,
-                                      G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
-                                      G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
-                                      G4double sec_diag_x_center, G4double sec_diag_x_sigma, G4double sec_diag_x_amplitude,
-                                      G4double sec_diag_x_center_err, G4double sec_diag_x_sigma_err, G4double sec_diag_x_amplitude_err,
-                                      G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
-                                      G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
-                                      G4double sec_diag_y_center, G4double sec_diag_y_sigma, G4double sec_diag_y_amplitude,
-                                      G4double sec_diag_y_center_err, G4double sec_diag_y_sigma_err, G4double sec_diag_y_amplitude_err,
-                                      G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
-                                      G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
-                                      G4bool fit_successful);
+    // Method to set diagonal Gauss fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+    void SetDiagGaussResults(G4double main_diag_x_center, G4double main_diag_x_sigma, G4double main_diag_x_amp,
+                                      G4double main_diag_x_center_err, G4double main_diag_x_sigma_err, G4double main_diag_x_amp_err,
+                                      G4double main_diag_x_vert_offset, G4double main_diag_x_vert_offset_err,
+                                      G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_success,
+                                      G4double main_diag_y_center, G4double main_diag_y_sigma, G4double main_diag_y_amp,
+                                      G4double main_diag_y_center_err, G4double main_diag_y_sigma_err, G4double main_diag_y_amp_err,
+                                      G4double main_diag_y_vert_offset, G4double main_diag_y_vert_offset_err,
+                                      G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_success,
+                                      G4double sec_diag_x_center, G4double sec_diag_x_sigma, G4double sec_diag_x_amp,
+                                      G4double sec_diag_x_center_err, G4double sec_diag_x_sigma_err, G4double sec_diag_x_amp_err,
+                                      G4double sec_diag_x_vert_offset, G4double sec_diag_x_vert_offset_err,
+                                      G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_success,
+                                      G4double sec_diag_y_center, G4double sec_diag_y_sigma, G4double sec_diag_y_amp,
+                                      G4double sec_diag_y_center_err, G4double sec_diag_y_sigma_err, G4double sec_diag_y_amp_err,
+                                      G4double sec_diag_y_vert_offset, G4double sec_diag_y_vert_offset_err,
+                                      G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_success,
+                                      G4bool fit_success);
     
-    // Method to set 2D Lorentzian fit results (central row and column fitting)
-    void Set2DLorentzianFitResults(G4double x_center, G4double x_gamma, G4double x_amplitude,
-                                  G4double x_center_err, G4double x_gamma_err, G4double x_amplitude_err,
-                                  G4double x_vertical_offset, G4double x_vertical_offset_err,
+    // Method to set 2D Lorentz fit results (central row and column fitting)
+    void Set2DLorentzResults(G4double x_center, G4double x_gamma, G4double x_amp,
+                                  G4double x_center_err, G4double x_gamma_err, G4double x_amp_err,
+                                  G4double x_vert_offset, G4double x_vert_offset_err,
                                   G4double x_chi2red, G4double x_pp, G4int x_dof,
-                                  G4double y_center, G4double y_gamma, G4double y_amplitude,
-                                  G4double y_center_err, G4double y_gamma_err, G4double y_amplitude_err,
-                                  G4double y_vertical_offset, G4double y_vertical_offset_err,
+                                  G4double y_center, G4double y_gamma, G4double y_amp,
+                                  G4double y_center_err, G4double y_gamma_err, G4double y_amp_err,
+                                  G4double y_vert_offset, G4double y_vert_offset_err,
                                   G4double y_chi2red, G4double y_pp, G4int y_dof,
-                                  G4double x_charge_uncertainty, G4double y_charge_uncertainty,
-                                  G4bool fit_successful);
+                                  G4double x_charge_err, G4double y_charge_err,
+                                  G4bool fit_success);
     
 
     
-    // Method to set diagonal Lorentzian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-    void SetDiagonalLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_amplitude,
-                                        G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_amplitude_err,
-                                        G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
-                                        G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
-                                        G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_amplitude,
-                                        G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_amplitude_err,
-                                        G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
-                                        G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
-                                        G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_amplitude,
-                                        G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_amplitude_err,
-                                        G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
-                                        G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
-                                        G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_amplitude,
-                                        G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_amplitude_err,
-                                        G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
-                                        G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
-                                        G4bool fit_successful);
+    // Method to set diagonal Lorentz fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+    void SetDiagLorentzResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_amp,
+                                        G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_amp_err,
+                                        G4double main_diag_x_vert_offset, G4double main_diag_x_vert_offset_err,
+                                        G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_success,
+                                        G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_amp,
+                                        G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_amp_err,
+                                        G4double main_diag_y_vert_offset, G4double main_diag_y_vert_offset_err,
+                                        G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_success,
+                                        G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_amp,
+                                        G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_amp_err,
+                                        G4double sec_diag_x_vert_offset, G4double sec_diag_x_vert_offset_err,
+                                        G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_success,
+                                        G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_amp,
+                                        G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_amp_err,
+                                        G4double sec_diag_y_vert_offset, G4double sec_diag_y_vert_offset_err,
+                                        G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_success,
+                                        G4bool fit_success);
 
-    // Method to set 2D Power-Law Lorentzian fit results (central row and column fitting)
+    // Method to set 2D Power-Law Lorentz fit results (central row and column fitting)
     // Model: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
-    void Set2DPowerLorentzianFitResults(G4double x_center, G4double x_gamma, G4double x_beta, G4double x_amplitude,
-                                        G4double x_center_err, G4double x_gamma_err, G4double x_beta_err, G4double x_amplitude_err,
-                                        G4double x_vertical_offset, G4double x_vertical_offset_err,
+    void Set2DPowerLorentzResults(G4double x_center, G4double x_gamma, G4double x_beta, G4double x_amp,
+                                        G4double x_center_err, G4double x_gamma_err, G4double x_beta_err, G4double x_amp_err,
+                                        G4double x_vert_offset, G4double x_vert_offset_err,
                                         G4double x_chi2red, G4double x_pp, G4int x_dof,
-                                        G4double y_center, G4double y_gamma, G4double y_beta, G4double y_amplitude,
-                                        G4double y_center_err, G4double y_gamma_err, G4double y_beta_err, G4double y_amplitude_err,
-                                        G4double y_vertical_offset, G4double y_vertical_offset_err,
+                                        G4double y_center, G4double y_gamma, G4double y_beta, G4double y_amp,
+                                        G4double y_center_err, G4double y_gamma_err, G4double y_beta_err, G4double y_amp_err,
+                                        G4double y_vert_offset, G4double y_vert_offset_err,
                                         G4double y_chi2red, G4double y_pp, G4int y_dof,
-                                        G4double x_charge_uncertainty, G4double y_charge_uncertainty,
-                                        G4bool fit_successful);
+                                        G4double x_charge_err, G4double y_charge_err,
+                                        G4bool fit_success);
     
-    // Method to set diagonal Power-Law Lorentzian fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
+    // Method to set diagonal Power-Law Lorentz fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
     // Model: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
-    void SetDiagonalPowerLorentzianFitResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_beta, G4double main_diag_x_amplitude,
-                                              G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_beta_err, G4double main_diag_x_amplitude_err,
-                                              G4double main_diag_x_vertical_offset, G4double main_diag_x_vertical_offset_err,
-                                              G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_successful,
-                                              G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_beta, G4double main_diag_y_amplitude,
-                                              G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_beta_err, G4double main_diag_y_amplitude_err,
-                                              G4double main_diag_y_vertical_offset, G4double main_diag_y_vertical_offset_err,
-                                              G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_successful,
-                                              G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_beta, G4double sec_diag_x_amplitude,
-                                              G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_beta_err, G4double sec_diag_x_amplitude_err,
-                                              G4double sec_diag_x_vertical_offset, G4double sec_diag_x_vertical_offset_err,
-                                              G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_successful,
-                                              G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_beta, G4double sec_diag_y_amplitude,
-                                              G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_beta_err, G4double sec_diag_y_amplitude_err,
-                                              G4double sec_diag_y_vertical_offset, G4double sec_diag_y_vertical_offset_err,
-                                              G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_successful,
-                                              G4bool fit_successful);
+    void SetDiagPowerLorentzResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_beta, G4double main_diag_x_amp,
+                                              G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_beta_err, G4double main_diag_x_amp_err,
+                                              G4double main_diag_x_vert_offset, G4double main_diag_x_vert_offset_err,
+                                              G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_success,
+                                              G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_beta, G4double main_diag_y_amp,
+                                              G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_beta_err, G4double main_diag_y_amp_err,
+                                              G4double main_diag_y_vert_offset, G4double main_diag_y_vert_offset_err,
+                                              G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_success,
+                                              G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_beta, G4double sec_diag_x_amp,
+                                              G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_beta_err, G4double sec_diag_x_amp_err,
+                                              G4double sec_diag_x_vert_offset, G4double sec_diag_x_vert_offset_err,
+                                              G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_success,
+                                              G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_beta, G4double sec_diag_y_amp,
+                                              G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_beta_err, G4double sec_diag_y_amp_err,
+                                              G4double sec_diag_y_vert_offset, G4double sec_diag_y_vert_offset_err,
+                                              G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_success,
+                                              G4bool fit_success);
 
     // =============================================
-    // 3D FITTING RESULTS SETTER METHODS
+    // 3D FIT RESULTS SETTER METHODS
     // =============================================
     
-    // Method to set 3D Lorentzian fit results (entire neighborhood surface fitting)
+    // Method to set 3D Lorentz fit results (entire neighborhood surface fitting)
     // Model: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2) + B
-    void Set3DLorentzianFitResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double amplitude, G4double vertical_offset,
-                                   G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double amplitude_err, G4double vertical_offset_err,
+    void Set3DLorentzResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double amp, G4double vert_offset,
+                                   G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double amp_err, G4double vert_offset_err,
                                    G4double chi2red, G4double pp, G4int dof,
-                                   G4double charge_uncertainty,
-                                   G4bool fit_successful);
+                                   G4double charge_err,
+                                   G4bool fit_success);
     
-    // Method to set 3D Gaussian fit results (entire neighborhood surface fitting)
+    // Method to set 3D Gauss fit results (entire neighborhood surface fitting)
     // Model: z(x,y) = A * exp(-((x-mx)^2/(2*σx^2) + (y-my)^2/(2*σy^2))) + B
-    void Set3DGaussianFitResults(G4double center_x, G4double center_y, G4double sigma_x, G4double sigma_y, G4double amplitude, G4double vertical_offset,
-                                 G4double center_x_err, G4double center_y_err, G4double sigma_x_err, G4double sigma_y_err, G4double amplitude_err, G4double vertical_offset_err,
+    void Set3DGaussResults(G4double center_x, G4double center_y, G4double sigma_x, G4double sigma_y, G4double amp, G4double vert_offset,
+                                 G4double center_x_err, G4double center_y_err, G4double sigma_x_err, G4double sigma_y_err, G4double amp_err, G4double vert_offset_err,
                                  G4double chi2red, G4double pp, G4int dof,
-                                 G4double charge_uncertainty,
-                                 G4bool fit_successful);
+                                 G4double charge_err,
+                                 G4bool fit_success);
     
-    // Method to set 3D Power-Law Lorentzian fit results (entire neighborhood surface fitting)
+    // Method to set 3D Power-Law Lorentz fit results (entire neighborhood surface fitting)
     // Model: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2)^β + B
-    void Set3DPowerLorentzianFitResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double beta, G4double amplitude, G4double vertical_offset,
-                                        G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double beta_err, G4double amplitude_err, G4double vertical_offset_err,
+    void Set3DPowerLorentzResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double beta, G4double amp, G4double vert_offset,
+                                        G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double beta_err, G4double amp_err, G4double vert_offset_err,
                                         G4double chi2red, G4double pp, G4int dof,
-                                        G4double charge_uncertainty,
-                                        G4bool fit_successful);
+                                        G4double charge_err,
+                                        G4bool fit_success);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -212,22 +212,22 @@ private:
     // =============================================
     
     // Apply rotation matrix transformation for diagonal coordinates
-    void TransformDiagonalCoordinates(G4double x_prime, G4double y_prime, G4double theta_deg, 
+    void TransformDiagCoords(G4double x_prime, G4double y_prime, G4double theta_deg, 
                                       G4double& x_transformed, G4double& y_transformed);
     
-    // Calculate transformed coordinates for all diagonal fits
-    void CalculateTransformedDiagonalCoordinates();
+    // Calc transformed coordinates for all diagonal fits
+    void CalcTransformedDiagCoords();
     
-    // Calculate mean estimations from all fitting methods
-    void CalculateMeanEstimations();
+    // Calc mean estimations from all fitting methods
+    void CalcMeanEstimations();
     
     // Helper functions to organize branch creation
     void CreateHitsBranches();
-    void CreateGaussianFitBranches();
-    void CreateLorentzianFitBranches();
-    void CreatePowerLorentzianFitBranches();
-    void Create3DFitBranches();
-    void CreateGridNeighborhoodBranches();
+    void CreateGaussBranches();
+    void CreateLorentzBranches();
+    void CreatePowerLorentzBranches();
+    void Create3DBranches();
+    void CreateNeighborhoodBranches();
     void CreateMetadataBranches();
 
     TFile* fRootFile;
@@ -248,38 +248,44 @@ private:
     G4int fAutoSaveInterval;
     G4int fEventsSinceLastSave;
     
+    // Initial particle gun position
+    G4double fInitialX, fInitialY, fInitialZ;
+    
+    // Nearest pixel position
+    G4double fNearestPixelX, fNearestPixelY;
+
     // =============================================
     // HITS DATA VARIABLES
     // =============================================
-    G4double fTrueX;   // True Hit position X [mm]
-    G4double fTrueY;   // True Hit position Y [mm]
+    G4double fTrueX;   // True Hit pos X [mm]
+    G4double fTrueY;   // True Hit pos Y [mm]
     G4double fInitX;  // Initial X [mm]
     G4double fInitY;  // Initial Y [mm]
     G4double fInitZ;  // Initial Z [mm]
     G4double fPixelX; // Nearest to hit pixel center X [mm]
     G4double fPixelY; // Nearest to hit pixel center Y [mm]
-    G4double fEdep;   // Energy deposit [MeV]
-    G4double fPixelTrueDeltaX; // Delta X from pixel center to true position [mm] (x_pixel - x_true)
-    G4double fPixelTrueDeltaY; // Delta Y from pixel center to true position [mm] (y_pixel - y_true)
+    G4double fEdep;   // Energy depositionit [MeV]
+    G4double fPixelTrueDeltaX; // Delta X from pixel center to true pos [mm] (x_pixel - x_true)
+    G4double fPixelTrueDeltaY; // Delta Y from pixel center to true pos [mm] (y_pixel - y_true)
     
-    // Delta variables for estimations vs true position
+    // Delta variables for estimations vs true pos
     G4double fGaussRowDeltaX;
-    G4double fGaussColumnDeltaY;
+    G4double fGaussColDeltaY;
     G4double fLorentzRowDeltaX;
-    G4double fLorentzColumnDeltaY;
+    G4double fLorentzColDeltaY;
     G4double fPowerLorentzRowDeltaX;
-    G4double fPowerLorentzColumnDeltaY;
+    G4double fPowerLorentzColDeltaY;
     
     // 3D fitting delta variables
-    G4double f3DLorentzianDeltaX;          // Delta X from 3D Lorentzian fit to True Position [mm]
-    G4double f3DLorentzianDeltaY;          // Delta Y from 3D Lorentzian fit to True Position [mm]
-    G4double f3DGaussianDeltaX;            // Delta X from 3D Gaussian fit to True Position [mm]
-    G4double f3DGaussianDeltaY;            // Delta Y from 3D Gaussian fit to True Position [mm]
-    G4double f3DPowerLorentzianDeltaX;     // Delta X from 3D Power-Law Lorentzian fit to True Position [mm]
-    G4double f3DPowerLorentzianDeltaY;     // Delta Y from 3D Power-Law Lorentzian fit to True Position [mm]
+    G4double f3DLorentzDeltaX;          // Delta X from 3D Lorentz fit to True Pos [mm]
+    G4double f3DLorentzDeltaY;          // Delta Y from 3D Lorentz fit to True Pos [mm]
+    G4double f3DGaussDeltaX;            // Delta X from 3D Gauss fit to True Pos [mm]
+    G4double f3DGaussDeltaY;            // Delta Y from 3D Gauss fit to True Pos [mm]
+    G4double f3DPowerLorentzDeltaX;     // Delta X from 3D Power-Law Lorentz fit to True Pos [mm]
+    G4double f3DPowerLorentzDeltaY;     // Delta Y from 3D Power-Law Lorentz fit to True Pos [mm]
 
     // =============================================
-    // TRANSFORMED DIAGONAL COORDINATES (ROTATION MATRIX)
+    // TRANSFORMED DIAG COORDINATES (ROTATION MATRIX)
     // =============================================
     
     // Transformed main diagonal coordinates (θ = 45°)
@@ -289,40 +295,40 @@ private:
     G4double fLorentzMainDiagTransformedY;    // Transformed Y from main diagonal (y' -> y)
     
     // Transformed secondary diagonal coordinates (θ = -45°)
-    G4double fGaussSecondDiagTransformedX;    // Transformed X from secondary diagonal (x' -> x)
-    G4double fGaussSecondDiagTransformedY;    // Transformed Y from secondary diagonal (y' -> y)
-    G4double fLorentzSecondDiagTransformedX;  // Transformed X from secondary diagonal (x' -> x)
-    G4double fLorentzSecondDiagTransformedY;  // Transformed Y from secondary diagonal (y' -> y)
-    G4double fPowerLorentzMainDiagTransformedX;    // Transformed X from Power-Law Lorentzian main diagonal (x' -> x)
-    G4double fPowerLorentzMainDiagTransformedY;    // Transformed Y from Power-Law Lorentzian main diagonal (y' -> y)
-    G4double fPowerLorentzSecondDiagTransformedX;  // Transformed X from Power-Law Lorentzian secondary diagonal (x' -> x)
-    G4double fPowerLorentzSecondDiagTransformedY;  // Transformed Y from Power-Law Lorentzian secondary diagonal (y' -> y)
+    G4double fGaussSecDiagTransformedX;    // Transformed X from secondary diagonal (x' -> x)
+    G4double fGaussSecDiagTransformedY;    // Transformed Y from secondary diagonal (y' -> y)
+    G4double fLorentzSecDiagTransformedX;  // Transformed X from secondary diagonal (x' -> x)
+    G4double fLorentzSecDiagTransformedY;  // Transformed Y from secondary diagonal (y' -> y)
+    G4double fPowerLorentzMainDiagTransformedX;    // Transformed X from Power-Law Lorentz main diagonal (x' -> x)
+    G4double fPowerLorentzMainDiagTransformedY;    // Transformed Y from Power-Law Lorentz main diagonal (y' -> y)
+    G4double fPowerLorentzSecDiagTransformedX;  // Transformed X from Power-Law Lorentz secondary diagonal (x' -> x)
+    G4double fPowerLorentzSecDiagTransformedY;  // Transformed Y from Power-Law Lorentz secondary diagonal (y' -> y)
     
-    // Delta values for transformed coordinates vs true position
+    // Delta values for transformed coordinates vs true pos
     G4double fGaussMainDiagTransformedDeltaX;   // x_transformed - x_true (main diagonal)
     G4double fGaussMainDiagTransformedDeltaY;   // y_transformed - y_true (main diagonal)
-    G4double fGaussSecondDiagTransformedDeltaX; // x_transformed - x_true (secondary diagonal)
-    G4double fGaussSecondDiagTransformedDeltaY; // y_transformed - y_true (secondary diagonal)
+    G4double fGaussSecDiagTransformedDeltaX; // x_transformed - x_true (secondary diagonal)
+    G4double fGaussSecDiagTransformedDeltaY; // y_transformed - y_true (secondary diagonal)
     G4double fLorentzMainDiagTransformedDeltaX;   // x_transformed - x_true (main diagonal)
     G4double fLorentzMainDiagTransformedDeltaY;   // y_transformed - y_true (main diagonal)
-    G4double fLorentzSecondDiagTransformedDeltaX; // x_transformed - x_true (secondary diagonal)
-    G4double fLorentzSecondDiagTransformedDeltaY; // y_transformed - y_true (secondary diagonal)
-    G4double fPowerLorentzMainDiagTransformedDeltaX;   // x_transformed - x_true (Power-Law Lorentzian main diagonal)
-    G4double fPowerLorentzMainDiagTransformedDeltaY;   // y_transformed - y_true (Power-Law Lorentzian main diagonal)
-    G4double fPowerLorentzSecondDiagTransformedDeltaX; // x_transformed - x_true (Power-Law Lorentzian secondary diagonal)
-    G4double fPowerLorentzSecondDiagTransformedDeltaY; // y_transformed - y_true (Power-Law Lorentzian secondary diagonal)
+    G4double fLorentzSecDiagTransformedDeltaX; // x_transformed - x_true (secondary diagonal)
+    G4double fLorentzSecDiagTransformedDeltaY; // y_transformed - y_true (secondary diagonal)
+    G4double fPowerLorentzMainDiagTransformedDeltaX;   // x_transformed - x_true (Power-Law Lorentz main diagonal)
+    G4double fPowerLorentzMainDiagTransformedDeltaY;   // y_transformed - y_true (Power-Law Lorentz main diagonal)
+    G4double fPowerLorentzSecDiagTransformedDeltaX; // x_transformed - x_true (Power-Law Lorentz secondary diagonal)
+    G4double fPowerLorentzSecDiagTransformedDeltaY; // y_transformed - y_true (Power-Law Lorentz secondary diagonal)
 
     // =============================================
-    // MEAN ESTIMATIONS FROM ALL FITTING METHODS
+    // MEAN ESTIMATIONS FROM ALL FIT METHODS
     // =============================================
     
     // Mean of all X coordinate estimations (row, transformed diagonals)
-    G4double fGaussMeanTrueDeltaX;   // Mean delta X from all Gaussian estimation methods to True Position [mm]
-    G4double fGaussMeanTrueDeltaY;   // Mean delta Y from all Gaussian estimation methods to True Position [mm]
-    G4double fLorentzMeanTrueDeltaX; // Mean delta X from all Lorentzian estimation methods to True Position [mm]
-    G4double fLorentzMeanTrueDeltaY; // Mean delta Y from all Lorentzian estimation methods to True Position [mm]
-    G4double fPowerLorentzMeanTrueDeltaX; // Mean delta X from all Power-Law Lorentzian estimation methods to True Position [mm]
-    G4double fPowerLorentzMeanTrueDeltaY; // Mean delta Y from all Power-Law Lorentzian estimation methods to True Position [mm]
+    G4double fGaussMeanTrueDeltaX;   // Mean delta X from all Gauss estimation methods to True Pos [mm]
+    G4double fGaussMeanTrueDeltaY;   // Mean delta Y from all Gauss estimation methods to True Pos [mm]
+    G4double fLorentzMeanTrueDeltaX; // Mean delta X from all Lorentz estimation methods to True Pos [mm]
+    G4double fLorentzMeanTrueDeltaY; // Mean delta Y from all Lorentz estimation methods to True Pos [mm]
+    G4double fPowerLorentzMeanTrueDeltaX; // Mean delta X from all Power-Law Lorentz estimation methods to True Pos [mm]
+    G4double fPowerLorentzMeanTrueDeltaY; // Mean delta Y from all Power-Law Lorentz estimation methods to True Pos [mm]
 
     // =============================================
     // AUTOMATIC RADIUS SELECTION VARIABLES
@@ -331,370 +337,370 @@ private:
     G4int fSelectedRadius;          // Automatically selected radius for this event
 
     // =============================================
-    // GAUSSIAN FITS VARIABLES
+    // GAUSS FITS VARIABLES
     // =============================================
     
-    // GaussFitRow/GaussFitRowX
-    G4double fGaussFitRowAmplitude;
-    G4double fGaussFitRowAmplitudeErr;
-    G4double fGaussFitRowStdev;
-    G4double fGaussFitRowStdevErr;
-    G4double fGaussFitRowVerticalOffset;
-    G4double fGaussFitRowVerticalOffsetErr;
-    G4double fGaussFitRowCenter;
-    G4double fGaussFitRowCenterErr;
-    G4double fGaussFitRowChi2red;
-    G4double fGaussFitRowPp;
-    G4int fGaussFitRowDOF;
+    // GaussRow/GaussRowX
+    G4double fGaussRowAmp;
+    G4double fGaussRowAmpErr;
+    G4double fGaussRowSigma;
+    G4double fGaussRowSigmaErr;
+    G4double fGaussRowVertOffset;
+    G4double fGaussRowVertOffsetErr;
+    G4double fGaussRowCenter;
+    G4double fGaussRowCenterErr;
+    G4double fGaussRowChi2red;
+    G4double fGaussRowPp;
+    G4int fGaussRowDOF;
     
-    // Charge uncertainties (5% of max charge for Gaussian fits)
-    G4double fGaussFitRowChargeUncertainty;     // Row charge uncertainty (5% of max charge)
+    // Charge uncertainties (5% of max charge for Gauss fits)
+    G4double fGaussRowChargeErr;     // Row charge uncertainty (5% of max charge)
     
-    // GaussFitColumn/GaussFitColumnY
-    G4double fGaussFitColumnAmplitude;
-    G4double fGaussFitColumnAmplitudeErr;
-    G4double fGaussFitColumnStdev;
-    G4double fGaussFitColumnStdevErr;
-    G4double fGaussFitColumnVerticalOffset;
-    G4double fGaussFitColumnVerticalOffsetErr;
-    G4double fGaussFitColumnCenter;
-    G4double fGaussFitColumnCenterErr;
-    G4double fGaussFitColumnChi2red;
-    G4double fGaussFitColumnPp;
-    G4int fGaussFitColumnDOF;
+    // GaussCol/GaussColY
+    G4double fGaussColAmp;
+    G4double fGaussColAmpErr;
+    G4double fGaussColSigma;
+    G4double fGaussColSigmaErr;
+    G4double fGaussColVertOffset;
+    G4double fGaussColVertOffsetErr;
+    G4double fGaussColCenter;
+    G4double fGaussColCenterErr;
+    G4double fGaussColChi2red;
+    G4double fGaussColPp;
+    G4int fGaussColDOF;
     
-    // Charge uncertainty for Gaussian column fit
-    G4double fGaussFitColumnChargeUncertainty;  // Column charge uncertainty (5% of max charge)
+    // Charge err for Gauss column fit
+    G4double fGaussColChargeErr;  // Col charge uncertainty (5% of max charge)
     
-    // GaussFitMainDiag/GaussFitMainDiagX
-    G4double fGaussFitMainDiagXAmplitude;
-    G4double fGaussFitMainDiagXAmplitudeErr;
-    G4double fGaussFitMainDiagXStdev;
-    G4double fGaussFitMainDiagXStdevErr;
-    G4double fGaussFitMainDiagXVerticalOffset;
-    G4double fGaussFitMainDiagXVerticalOffsetErr;
-    G4double fGaussFitMainDiagXCenter;
-    G4double fGaussFitMainDiagXCenterErr;
-    G4double fGaussFitMainDiagXChi2red;
-    G4double fGaussFitMainDiagXPp;
-    G4int fGaussFitMainDiagXDOF;
+    // GaussMainDiag/GaussMainDiagX
+    G4double fGaussMainDiagXAmp;
+    G4double fGaussMainDiagXAmpErr;
+    G4double fGaussMainDiagXSigma;
+    G4double fGaussMainDiagXSigmaErr;
+    G4double fGaussMainDiagXVertOffset;
+    G4double fGaussMainDiagXVertOffsetErr;
+    G4double fGaussMainDiagXCenter;
+    G4double fGaussMainDiagXCenterErr;
+    G4double fGaussMainDiagXChi2red;
+    G4double fGaussMainDiagXPp;
+    G4int fGaussMainDiagXDOF;
     
-    // GaussFitMainDiag/GaussFitMainDiagY
-    G4double fGaussFitMainDiagYAmplitude;
-    G4double fGaussFitMainDiagYAmplitudeErr;
-    G4double fGaussFitMainDiagYStdev;
-    G4double fGaussFitMainDiagYStdevErr;
-    G4double fGaussFitMainDiagYVerticalOffset;
-    G4double fGaussFitMainDiagYVerticalOffsetErr;
-    G4double fGaussFitMainDiagYCenter;
-    G4double fGaussFitMainDiagYCenterErr;
-    G4double fGaussFitMainDiagYChi2red;
-    G4double fGaussFitMainDiagYPp;
-    G4int fGaussFitMainDiagYDOF;
+    // GaussMainDiag/GaussMainDiagY
+    G4double fGaussMainDiagYAmp;
+    G4double fGaussMainDiagYAmpErr;
+    G4double fGaussMainDiagYSigma;
+    G4double fGaussMainDiagYSigmaErr;
+    G4double fGaussMainDiagYVertOffset;
+    G4double fGaussMainDiagYVertOffsetErr;
+    G4double fGaussMainDiagYCenter;
+    G4double fGaussMainDiagYCenterErr;
+    G4double fGaussMainDiagYChi2red;
+    G4double fGaussMainDiagYPp;
+    G4int fGaussMainDiagYDOF;
     
-    // GaussFitSecondDiag/GaussFitSecondDiagX
-    G4double fGaussFitSecondDiagXAmplitude;
-    G4double fGaussFitSecondDiagXAmplitudeErr;
-    G4double fGaussFitSecondDiagXStdev;
-    G4double fGaussFitSecondDiagXStdevErr;
-    G4double fGaussFitSecondDiagXVerticalOffset;
-    G4double fGaussFitSecondDiagXVerticalOffsetErr;
-    G4double fGaussFitSecondDiagXCenter;
-    G4double fGaussFitSecondDiagXCenterErr;
-    G4double fGaussFitSecondDiagXChi2red;
-    G4double fGaussFitSecondDiagXPp;
-    G4int fGaussFitSecondDiagXDOF;
+    // GaussSecDiag/GaussSecDiagX
+    G4double fGaussSecDiagXAmp;
+    G4double fGaussSecDiagXAmpErr;
+    G4double fGaussSecDiagXSigma;
+    G4double fGaussSecDiagXSigmaErr;
+    G4double fGaussSecDiagXVertOffset;
+    G4double fGaussSecDiagXVertOffsetErr;
+    G4double fGaussSecDiagXCenter;
+    G4double fGaussSecDiagXCenterErr;
+    G4double fGaussSecDiagXChi2red;
+    G4double fGaussSecDiagXPp;
+    G4int fGaussSecDiagXDOF;
     
-    // GaussFitSecondDiag/GaussFitSecondDiagY
-    G4double fGaussFitSecondDiagYAmplitude;
-    G4double fGaussFitSecondDiagYAmplitudeErr;
-    G4double fGaussFitSecondDiagYStdev;
-    G4double fGaussFitSecondDiagYStdevErr;
-    G4double fGaussFitSecondDiagYVerticalOffset;
-    G4double fGaussFitSecondDiagYVerticalOffsetErr;
-    G4double fGaussFitSecondDiagYCenter;
-    G4double fGaussFitSecondDiagYCenterErr;
-    G4double fGaussFitSecondDiagYChi2red;
-    G4double fGaussFitSecondDiagYPp;
-    G4int fGaussFitSecondDiagYDOF;
+    // GaussSecDiag/GaussSecDiagY
+    G4double fGaussSecDiagYAmp;
+    G4double fGaussSecDiagYAmpErr;
+    G4double fGaussSecDiagYSigma;
+    G4double fGaussSecDiagYSigmaErr;
+    G4double fGaussSecDiagYVertOffset;
+    G4double fGaussSecDiagYVertOffsetErr;
+    G4double fGaussSecDiagYCenter;
+    G4double fGaussSecDiagYCenterErr;
+    G4double fGaussSecDiagYChi2red;
+    G4double fGaussSecDiagYPp;
+    G4int fGaussSecDiagYDOF;
 
     // =============================================
-    // LORENTZIAN FITS VARIABLES
+    // LORENTZ FITS VARIABLES
     // =============================================
     
-    // LorentzFitRow/LorentzFitRowX
-    G4double fLorentzFitRowAmplitude;
-    G4double fLorentzFitRowAmplitudeErr;
-    G4double fLorentzFitRowGamma;
-    G4double fLorentzFitRowGammaErr;
-    G4double fLorentzFitRowVerticalOffset;
-    G4double fLorentzFitRowVerticalOffsetErr;
-    G4double fLorentzFitRowCenter;
-    G4double fLorentzFitRowCenterErr;
-    G4double fLorentzFitRowChi2red;
-    G4double fLorentzFitRowPp;
-    G4int fLorentzFitRowDOF;
+    // LorentzRow/LorentzRowX
+    G4double fLorentzRowAmp;
+    G4double fLorentzRowAmpErr;
+    G4double fLorentzRowGamma;
+    G4double fLorentzRowGammaErr;
+    G4double fLorentzRowVertOffset;
+    G4double fLorentzRowVertOffsetErr;
+    G4double fLorentzRowCenter;
+    G4double fLorentzRowCenterErr;
+    G4double fLorentzRowChi2red;
+    G4double fLorentzRowPp;
+    G4int fLorentzRowDOF;
     
-    // Charge uncertainty for Lorentzian row fit  
-    G4double fLorentzFitRowChargeUncertainty;   // Row charge uncertainty (5% of max charge)
+    // Charge err for Lorentz row fit  
+    G4double fLorentzRowChargeErr;   // Row charge uncertainty (5% of max charge)
     
-    // LorentzFitColumn/LorentzFitColumnY
-    G4double fLorentzFitColumnAmplitude;
-    G4double fLorentzFitColumnAmplitudeErr;
-    G4double fLorentzFitColumnGamma;
-    G4double fLorentzFitColumnGammaErr;
-    G4double fLorentzFitColumnVerticalOffset;
-    G4double fLorentzFitColumnVerticalOffsetErr;
-    G4double fLorentzFitColumnCenter;
-    G4double fLorentzFitColumnCenterErr;
-    G4double fLorentzFitColumnChi2red;
-    G4double fLorentzFitColumnPp;
-    G4int fLorentzFitColumnDOF;
+    // LorentzCol/LorentzColY
+    G4double fLorentzColAmp;
+    G4double fLorentzColAmpErr;
+    G4double fLorentzColGamma;
+    G4double fLorentzColGammaErr;
+    G4double fLorentzColVertOffset;
+    G4double fLorentzColVertOffsetErr;
+    G4double fLorentzColCenter;
+    G4double fLorentzColCenterErr;
+    G4double fLorentzColChi2red;
+    G4double fLorentzColPp;
+    G4int fLorentzColDOF;
     
-    // Charge uncertainty for Lorentzian column fit
-    G4double fLorentzFitColumnChargeUncertainty; // Column charge uncertainty (5% of max charge)
+    // Charge err for Lorentz column fit
+    G4double fLorentzColChargeErr; // Column charge uncertainty (5% of max charge)
     
-    // LorentzFitMainDiag/LorentzFitMainDiagX
-    G4double fLorentzFitMainDiagXAmplitude;
-    G4double fLorentzFitMainDiagXAmplitudeErr;
-    G4double fLorentzFitMainDiagXGamma;
-    G4double fLorentzFitMainDiagXGammaErr;
-    G4double fLorentzFitMainDiagXVerticalOffset;
-    G4double fLorentzFitMainDiagXVerticalOffsetErr;
-    G4double fLorentzFitMainDiagXCenter;
-    G4double fLorentzFitMainDiagXCenterErr;
-    G4double fLorentzFitMainDiagXChi2red;
-    G4double fLorentzFitMainDiagXPp;
-    G4int fLorentzFitMainDiagXDOF;
+    // LorentzMainDiag/LorentzMainDiagX
+    G4double fLorentzMainDiagXAmp;
+    G4double fLorentzMainDiagXAmpErr;
+    G4double fLorentzMainDiagXGamma;
+    G4double fLorentzMainDiagXGammaErr;
+    G4double fLorentzMainDiagXVertOffset;
+    G4double fLorentzMainDiagXVertOffsetErr;
+    G4double fLorentzMainDiagXCenter;
+    G4double fLorentzMainDiagXCenterErr;
+    G4double fLorentzMainDiagXChi2red;
+    G4double fLorentzMainDiagXPp;
+    G4int fLorentzMainDiagXDOF;
     
-    // LorentzFitMainDiag/LorentzFitMainDiagY
-    G4double fLorentzFitMainDiagYAmplitude;
-    G4double fLorentzFitMainDiagYAmplitudeErr;
-    G4double fLorentzFitMainDiagYGamma;
-    G4double fLorentzFitMainDiagYGammaErr;
-    G4double fLorentzFitMainDiagYVerticalOffset;
-    G4double fLorentzFitMainDiagYVerticalOffsetErr;
-    G4double fLorentzFitMainDiagYCenter;
-    G4double fLorentzFitMainDiagYCenterErr;
-    G4double fLorentzFitMainDiagYChi2red;
-    G4double fLorentzFitMainDiagYPp;
-    G4int fLorentzFitMainDiagYDOF;
+    // LorentzMainDiag/LorentzMainDiagY
+    G4double fLorentzMainDiagYAmp;
+    G4double fLorentzMainDiagYAmpErr;
+    G4double fLorentzMainDiagYGamma;
+    G4double fLorentzMainDiagYGammaErr;
+    G4double fLorentzMainDiagYVertOffset;
+    G4double fLorentzMainDiagYVertOffsetErr;
+    G4double fLorentzMainDiagYCenter;
+    G4double fLorentzMainDiagYCenterErr;
+    G4double fLorentzMainDiagYChi2red;
+    G4double fLorentzMainDiagYPp;
+    G4int fLorentzMainDiagYDOF;
     
-    // LorentzFitSecondDiag/LorentzFitSecondDiagX
-    G4double fLorentzFitSecondDiagXAmplitude;
-    G4double fLorentzFitSecondDiagXAmplitudeErr;
-    G4double fLorentzFitSecondDiagXGamma;
-    G4double fLorentzFitSecondDiagXGammaErr;
-    G4double fLorentzFitSecondDiagXVerticalOffset;
-    G4double fLorentzFitSecondDiagXVerticalOffsetErr;
-    G4double fLorentzFitSecondDiagXCenter;
-    G4double fLorentzFitSecondDiagXCenterErr;
-    G4double fLorentzFitSecondDiagXChi2red;
-    G4double fLorentzFitSecondDiagXPp;
-    G4int fLorentzFitSecondDiagXDOF;
+    // LorentzSecDiag/LorentzSecDiagX
+    G4double fLorentzSecDiagXAmp;
+    G4double fLorentzSecDiagXAmpErr;
+    G4double fLorentzSecDiagXGamma;
+    G4double fLorentzSecDiagXGammaErr;
+    G4double fLorentzSecDiagXVertOffset;
+    G4double fLorentzSecDiagXVertOffsetErr;
+    G4double fLorentzSecDiagXCenter;
+    G4double fLorentzSecDiagXCenterErr;
+    G4double fLorentzSecDiagXChi2red;
+    G4double fLorentzSecDiagXPp;
+    G4int fLorentzSecDiagXDOF;
     
-    // LorentzFitSecondDiag/LorentzFitSecondDiagY
-    G4double fLorentzFitSecondDiagYAmplitude;
-    G4double fLorentzFitSecondDiagYAmplitudeErr;
-    G4double fLorentzFitSecondDiagYGamma;
-    G4double fLorentzFitSecondDiagYGammaErr;
-    G4double fLorentzFitSecondDiagYVerticalOffset;
-    G4double fLorentzFitSecondDiagYVerticalOffsetErr;
-    G4double fLorentzFitSecondDiagYCenter;
-    G4double fLorentzFitSecondDiagYCenterErr;
-    G4double fLorentzFitSecondDiagYChi2red;
-    G4double fLorentzFitSecondDiagYPp;
-    G4int fLorentzFitSecondDiagYDOF;
+    // LorentzSecDiag/LorentzSecDiagY
+    G4double fLorentzSecDiagYAmp;
+    G4double fLorentzSecDiagYAmpErr;
+    G4double fLorentzSecDiagYGamma;
+    G4double fLorentzSecDiagYGammaErr;
+    G4double fLorentzSecDiagYVertOffset;
+    G4double fLorentzSecDiagYVertOffsetErr;
+    G4double fLorentzSecDiagYCenter;
+    G4double fLorentzSecDiagYCenterErr;
+    G4double fLorentzSecDiagYChi2red;
+    G4double fLorentzSecDiagYPp;
+    G4int fLorentzSecDiagYDOF;
 
     // =============================================
-    // POWER-LAW LORENTZIAN FITS VARIABLES
+    // POWER-LAW LORENTZ FITS VARIABLES
     // =============================================
     
-    // PowerLorentzFitRow/PowerLorentzFitRowX
-    G4double fPowerLorentzFitRowAmplitude;
-    G4double fPowerLorentzFitRowAmplitudeErr;
-    G4double fPowerLorentzFitRowBeta;
-    G4double fPowerLorentzFitRowBetaErr;
-    G4double fPowerLorentzFitRowGamma;
-    G4double fPowerLorentzFitRowGammaErr;
-    G4double fPowerLorentzFitRowVerticalOffset;
-    G4double fPowerLorentzFitRowVerticalOffsetErr;
-    G4double fPowerLorentzFitRowCenter;
-    G4double fPowerLorentzFitRowCenterErr;
-    G4double fPowerLorentzFitRowChi2red;
-    G4double fPowerLorentzFitRowPp;
-    G4int fPowerLorentzFitRowDOF;
+    // PowerLorentzRow/PowerLorentzRowX
+    G4double fPowerLorentzRowAmp;
+    G4double fPowerLorentzRowAmpErr;
+    G4double fPowerLorentzRowBeta;
+    G4double fPowerLorentzRowBetaErr;
+    G4double fPowerLorentzRowGamma;
+    G4double fPowerLorentzRowGammaErr;
+    G4double fPowerLorentzRowVertOffset;
+    G4double fPowerLorentzRowVertOffsetErr;
+    G4double fPowerLorentzRowCenter;
+    G4double fPowerLorentzRowCenterErr;
+    G4double fPowerLorentzRowChi2red;
+    G4double fPowerLorentzRowPp;
+    G4int fPowerLorentzRowDOF;
     
-    // PowerLorentzFitColumn/PowerLorentzFitColumnY
-    G4double fPowerLorentzFitColumnAmplitude;
-    G4double fPowerLorentzFitColumnAmplitudeErr;
-    G4double fPowerLorentzFitColumnBeta;
-    G4double fPowerLorentzFitColumnBetaErr;
-    G4double fPowerLorentzFitColumnGamma;
-    G4double fPowerLorentzFitColumnGammaErr;
-    G4double fPowerLorentzFitColumnVerticalOffset;
-    G4double fPowerLorentzFitColumnVerticalOffsetErr;
-    G4double fPowerLorentzFitColumnCenter;
-    G4double fPowerLorentzFitColumnCenterErr;
-    G4double fPowerLorentzFitColumnChi2red;
-    G4double fPowerLorentzFitColumnPp;
-    G4int fPowerLorentzFitColumnDOF;
+    // PowerLorentzCol/PowerLorentzColY
+    G4double fPowerLorentzColAmp;
+    G4double fPowerLorentzColAmpErr;
+    G4double fPowerLorentzColBeta;
+    G4double fPowerLorentzColBetaErr;
+    G4double fPowerLorentzColGamma;
+    G4double fPowerLorentzColGammaErr;
+    G4double fPowerLorentzColVertOffset;
+    G4double fPowerLorentzColVertOffsetErr;
+    G4double fPowerLorentzColCenter;
+    G4double fPowerLorentzColCenterErr;
+    G4double fPowerLorentzColChi2red;
+    G4double fPowerLorentzColPp;
+    G4int fPowerLorentzColDOF;
     
-    // Charge uncertainties for Power-Law Lorentzian fits (5% of max charge)
-    G4double fPowerLorentzFitRowChargeUncertainty;    // Row charge uncertainty (5% of max charge)
-    G4double fPowerLorentzFitColumnChargeUncertainty; // Column charge uncertainty (5% of max charge)
+    // Charge uncertainties for Power-Law Lorentz fits (5% of max charge)
+    G4double fPowerLorentzRowChargeErr;    // Row charge uncertainty (5% of max charge)
+    G4double fPowerLorentzColChargeErr; // Column charge uncertainty (5% of max charge)
     
-    // PowerLorentzFitMainDiag/PowerLorentzFitMainDiagX
-    G4double fPowerLorentzFitMainDiagXAmplitude;
-    G4double fPowerLorentzFitMainDiagXAmplitudeErr;
-    G4double fPowerLorentzFitMainDiagXBeta;
-    G4double fPowerLorentzFitMainDiagXBetaErr;
-    G4double fPowerLorentzFitMainDiagXGamma;
-    G4double fPowerLorentzFitMainDiagXGammaErr;
-    G4double fPowerLorentzFitMainDiagXVerticalOffset;
-    G4double fPowerLorentzFitMainDiagXVerticalOffsetErr;
-    G4double fPowerLorentzFitMainDiagXCenter;
-    G4double fPowerLorentzFitMainDiagXCenterErr;
-    G4double fPowerLorentzFitMainDiagXChi2red;
-    G4double fPowerLorentzFitMainDiagXPp;
-    G4int fPowerLorentzFitMainDiagXDOF;
+    // PowerLorentzMainDiag/PowerLorentzMainDiagX
+    G4double fPowerLorentzMainDiagXAmp;
+    G4double fPowerLorentzMainDiagXAmpErr;
+    G4double fPowerLorentzMainDiagXBeta;
+    G4double fPowerLorentzMainDiagXBetaErr;
+    G4double fPowerLorentzMainDiagXGamma;
+    G4double fPowerLorentzMainDiagXGammaErr;
+    G4double fPowerLorentzMainDiagXVertOffset;
+    G4double fPowerLorentzMainDiagXVertOffsetErr;
+    G4double fPowerLorentzMainDiagXCenter;
+    G4double fPowerLorentzMainDiagXCenterErr;
+    G4double fPowerLorentzMainDiagXChi2red;
+    G4double fPowerLorentzMainDiagXPp;
+    G4int fPowerLorentzMainDiagXDOF;
     
-    // PowerLorentzFitMainDiag/PowerLorentzFitMainDiagY
-    G4double fPowerLorentzFitMainDiagYAmplitude;
-    G4double fPowerLorentzFitMainDiagYAmplitudeErr;
-    G4double fPowerLorentzFitMainDiagYBeta;
-    G4double fPowerLorentzFitMainDiagYBetaErr;
-    G4double fPowerLorentzFitMainDiagYGamma;
-    G4double fPowerLorentzFitMainDiagYGammaErr;
-    G4double fPowerLorentzFitMainDiagYVerticalOffset;
-    G4double fPowerLorentzFitMainDiagYVerticalOffsetErr;
-    G4double fPowerLorentzFitMainDiagYCenter;
-    G4double fPowerLorentzFitMainDiagYCenterErr;
-    G4double fPowerLorentzFitMainDiagYChi2red;
-    G4double fPowerLorentzFitMainDiagYPp;
-    G4int fPowerLorentzFitMainDiagYDOF;
+    // PowerLorentzMainDiag/PowerLorentzMainDiagY
+    G4double fPowerLorentzMainDiagYAmp;
+    G4double fPowerLorentzMainDiagYAmpErr;
+    G4double fPowerLorentzMainDiagYBeta;
+    G4double fPowerLorentzMainDiagYBetaErr;
+    G4double fPowerLorentzMainDiagYGamma;
+    G4double fPowerLorentzMainDiagYGammaErr;
+    G4double fPowerLorentzMainDiagYVertOffset;
+    G4double fPowerLorentzMainDiagYVertOffsetErr;
+    G4double fPowerLorentzMainDiagYCenter;
+    G4double fPowerLorentzMainDiagYCenterErr;
+    G4double fPowerLorentzMainDiagYChi2red;
+    G4double fPowerLorentzMainDiagYPp;
+    G4int fPowerLorentzMainDiagYDOF;
     
-    // PowerLorentzFitSecondDiag/PowerLorentzFitSecondDiagX
-    G4double fPowerLorentzFitSecondDiagXAmplitude;
-    G4double fPowerLorentzFitSecondDiagXAmplitudeErr;
-    G4double fPowerLorentzFitSecondDiagXBeta;
-    G4double fPowerLorentzFitSecondDiagXBetaErr;
-    G4double fPowerLorentzFitSecondDiagXGamma;
-    G4double fPowerLorentzFitSecondDiagXGammaErr;
-    G4double fPowerLorentzFitSecondDiagXVerticalOffset;
-    G4double fPowerLorentzFitSecondDiagXVerticalOffsetErr;
-    G4double fPowerLorentzFitSecondDiagXCenter;
-    G4double fPowerLorentzFitSecondDiagXCenterErr;
-    G4double fPowerLorentzFitSecondDiagXChi2red;
-    G4double fPowerLorentzFitSecondDiagXPp;
-    G4int fPowerLorentzFitSecondDiagXDOF;
+    // PowerLorentzSecDiag/PowerLorentzSecDiagX
+    G4double fPowerLorentzSecDiagXAmp;
+    G4double fPowerLorentzSecDiagXAmpErr;
+    G4double fPowerLorentzSecDiagXBeta;
+    G4double fPowerLorentzSecDiagXBetaErr;
+    G4double fPowerLorentzSecDiagXGamma;
+    G4double fPowerLorentzSecDiagXGammaErr;
+    G4double fPowerLorentzSecDiagXVertOffset;
+    G4double fPowerLorentzSecDiagXVertOffsetErr;
+    G4double fPowerLorentzSecDiagXCenter;
+    G4double fPowerLorentzSecDiagXCenterErr;
+    G4double fPowerLorentzSecDiagXChi2red;
+    G4double fPowerLorentzSecDiagXPp;
+    G4int fPowerLorentzSecDiagXDOF;
     
-    // PowerLorentzFitSecondDiag/PowerLorentzFitSecondDiagY
-    G4double fPowerLorentzFitSecondDiagYAmplitude;
-    G4double fPowerLorentzFitSecondDiagYAmplitudeErr;
-    G4double fPowerLorentzFitSecondDiagYBeta;
-    G4double fPowerLorentzFitSecondDiagYBetaErr;
-    G4double fPowerLorentzFitSecondDiagYGamma;
-    G4double fPowerLorentzFitSecondDiagYGammaErr;
-    G4double fPowerLorentzFitSecondDiagYVerticalOffset;
-    G4double fPowerLorentzFitSecondDiagYVerticalOffsetErr;
-    G4double fPowerLorentzFitSecondDiagYCenter;
-    G4double fPowerLorentzFitSecondDiagYCenterErr;
-    G4double fPowerLorentzFitSecondDiagYChi2red;
-    G4double fPowerLorentzFitSecondDiagYPp;
-    G4int fPowerLorentzFitSecondDiagYDOF;
+    // PowerLorentzSecDiag/PowerLorentzSecDiagY
+    G4double fPowerLorentzSecDiagYAmp;
+    G4double fPowerLorentzSecDiagYAmpErr;
+    G4double fPowerLorentzSecDiagYBeta;
+    G4double fPowerLorentzSecDiagYBetaErr;
+    G4double fPowerLorentzSecDiagYGamma;
+    G4double fPowerLorentzSecDiagYGammaErr;
+    G4double fPowerLorentzSecDiagYVertOffset;
+    G4double fPowerLorentzSecDiagYVertOffsetErr;
+    G4double fPowerLorentzSecDiagYCenter;
+    G4double fPowerLorentzSecDiagYCenterErr;
+    G4double fPowerLorentzSecDiagYChi2red;
+    G4double fPowerLorentzSecDiagYPp;
+    G4int fPowerLorentzSecDiagYDOF;
 
     // =============================================
-    // 3D LORENTZIAN FITS VARIABLES
+    // 3D LORENTZ FITS VARIABLES
     // =============================================
     
-    // 3D Lorentzian fit parameters: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2) + B
-    G4double f3DLorentzianFitCenterX;            // mx parameter (X center)
-    G4double f3DLorentzianFitCenterY;            // my parameter (Y center)
-    G4double f3DLorentzianFitGammaX;             // γx parameter (X width/HWHM)
-    G4double f3DLorentzianFitGammaY;             // γy parameter (Y width/HWHM)
-    G4double f3DLorentzianFitAmplitude;          // A parameter (peak amplitude)
-    G4double f3DLorentzianFitVerticalOffset;     // B parameter (baseline)
+    // 3D Lorentz fit parameters: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2) + B
+    G4double f3DLorentzCenterX;            // mx parameter (X center)
+    G4double f3DLorentzCenterY;            // my parameter (Y center)
+    G4double f3DLorentzGammaX;             // γx parameter (X width/HWHM)
+    G4double f3DLorentzGammaY;             // γy parameter (Y width/HWHM)
+    G4double f3DLorentzAmp;          // A parameter (peak amplitude)
+    G4double f3DLorentzVertOffset;     // B parameter (baseline)
     
-    // 3D Lorentzian fit parameter errors
-    G4double f3DLorentzianFitCenterXErr;         
-    G4double f3DLorentzianFitCenterYErr;         
-    G4double f3DLorentzianFitGammaXErr;          
-    G4double f3DLorentzianFitGammaYErr;          
-    G4double f3DLorentzianFitAmplitudeErr;       
-    G4double f3DLorentzianFitVerticalOffsetErr;  
+    // 3D Lorentz fit parameter errors
+    G4double f3DLorentzCenterXErr;         
+    G4double f3DLorentzCenterYErr;         
+    G4double f3DLorentzGammaXErr;          
+    G4double f3DLorentzGammaYErr;          
+    G4double f3DLorentzAmpErr;       
+    G4double f3DLorentzVertOffsetErr;  
     
-    // 3D Lorentzian fit statistics
-    G4double f3DLorentzianFitChi2red;            // Reduced Chi-squared
-    G4double f3DLorentzianFitPp;                 // P-value  
-    G4int f3DLorentzianFitDOF;                   // Degrees of Freedom
-    G4double f3DLorentzianFitChargeUncertainty;  // Charge uncertainty (5% of max charge)
-    G4bool f3DLorentzianFitSuccessful;           // Fit success flag
+    // 3D Lorentz fit statistics
+    G4double f3DLorentzChi2red;            // Reduced Chi-squared
+    G4double f3DLorentzPp;                 // P-value  
+    G4int f3DLorentzDOF;                   // Degrees of Freedom
+    G4double f3DLorentzChargeErr;  // Charge uncertainty (5% of max charge)
+    G4bool f3DLorentzSuccess;           //  success flag
 
     // =============================================
-    // 3D GAUSSIAN FITS VARIABLES
+    // 3D GAUSS FITS VARIABLES
     // =============================================
     
-    // 3D Gaussian fit parameters: z(x,y) = A * exp(-((x-mx)^2/(2*σx^2) + (y-my)^2/(2*σy^2))) + B
-    G4double f3DGaussianFitCenterX;            // mx parameter (X center)
-    G4double f3DGaussianFitCenterY;            // my parameter (Y center)
-    G4double f3DGaussianFitSigmaX;             // σx parameter (X standard deviation)
-    G4double f3DGaussianFitSigmaY;             // σy parameter (Y standard deviation)
-    G4double f3DGaussianFitAmplitude;          // A parameter (peak amplitude)
-    G4double f3DGaussianFitVerticalOffset;     // B parameter (baseline)
+    // 3D Gauss fit parameters: z(x,y) = A * exp(-((x-mx)^2/(2*σx^2) + (y-my)^2/(2*σy^2))) + B
+    G4double f3DGaussCenterX;            // mx parameter (X center)
+    G4double f3DGaussCenterY;            // my parameter (Y center)
+    G4double f3DGaussSigmaX;             // σx parameter (X standard deviation)
+    G4double f3DGaussSigmaY;             // σy parameter (Y standard deviation)
+    G4double f3DGaussAmp;          // A parameter (peak amplitude)
+    G4double f3DGaussVertOffset;     // B parameter (baseline)
     
-    // 3D Gaussian fit parameter errors
-    G4double f3DGaussianFitCenterXErr;         
-    G4double f3DGaussianFitCenterYErr;         
-    G4double f3DGaussianFitSigmaXErr;          
-    G4double f3DGaussianFitSigmaYErr;          
-    G4double f3DGaussianFitAmplitudeErr;       
-    G4double f3DGaussianFitVerticalOffsetErr;  
+    // 3D Gauss fit parameter errors
+    G4double f3DGaussCenterXErr;         
+    G4double f3DGaussCenterYErr;         
+    G4double f3DGaussSigmaXErr;          
+    G4double f3DGaussSigmaYErr;          
+    G4double f3DGaussAmpErr;       
+    G4double f3DGaussVertOffsetErr;  
     
-    // 3D Gaussian fit statistics
-    G4double f3DGaussianFitChi2red;            // Reduced Chi-squared
-    G4double f3DGaussianFitPp;                 // P-value  
-    G4int f3DGaussianFitDOF;                   // Degrees of Freedom
-    G4double f3DGaussianFitChargeUncertainty;  // Charge uncertainty (5% of max charge)
-    G4bool f3DGaussianFitSuccessful;           // Fit success flag
+    // 3D Gauss fit statistics
+    G4double f3DGaussChi2red;            // Reduced Chi-squared
+    G4double f3DGaussPp;                 // P-value  
+    G4int f3DGaussDOF;                   // Degrees of Freedom
+    G4double f3DGaussChargeErr;  // Charge uncertainty (5% of max charge)
+    G4bool f3DGaussSuccess;           //  success flag
 
     // =============================================
-    // 3D POWER-LAW LORENTZIAN FITS VARIABLES
+    // 3D POWER-LAW LORENTZ FITS VARIABLES
     // =============================================
     
-    // 3D Power-Law Lorentzian fit parameters: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2)^β + B
-    G4double f3DPowerLorentzianFitCenterX;            // mx parameter (X center)
-    G4double f3DPowerLorentzianFitCenterY;            // my parameter (Y center)
-    G4double f3DPowerLorentzianFitGammaX;             // γx parameter (X width)
-    G4double f3DPowerLorentzianFitGammaY;             // γy parameter (Y width)
-    G4double f3DPowerLorentzianFitBeta;               // β parameter (power exponent)  
-    G4double f3DPowerLorentzianFitAmplitude;          // A parameter (peak amplitude)
-    G4double f3DPowerLorentzianFitVerticalOffset;     // B parameter (baseline)
+    // 3D Power-Law Lorentz fit parameters: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2)^β + B
+    G4double f3DPowerLorentzCenterX;            // mx parameter (X center)
+    G4double f3DPowerLorentzCenterY;            // my parameter (Y center)
+    G4double f3DPowerLorentzGammaX;             // γx parameter (X width)
+    G4double f3DPowerLorentzGammaY;             // γy parameter (Y width)
+    G4double f3DPowerLorentzBeta;               // β parameter (power exponent)  
+    G4double f3DPowerLorentzAmp;          // A parameter (peak amplitude)
+    G4double f3DPowerLorentzVertOffset;     // B parameter (baseline)
     
-    // 3D Power-Law Lorentzian fit parameter errors
-    G4double f3DPowerLorentzianFitCenterXErr;         
-    G4double f3DPowerLorentzianFitCenterYErr;         
-    G4double f3DPowerLorentzianFitGammaXErr;          
-    G4double f3DPowerLorentzianFitGammaYErr;          
-    G4double f3DPowerLorentzianFitBetaErr;            
-    G4double f3DPowerLorentzianFitAmplitudeErr;       
-    G4double f3DPowerLorentzianFitVerticalOffsetErr;  
+    // 3D Power-Law Lorentz fit parameter errors
+    G4double f3DPowerLorentzCenterXErr;         
+    G4double f3DPowerLorentzCenterYErr;         
+    G4double f3DPowerLorentzGammaXErr;          
+    G4double f3DPowerLorentzGammaYErr;          
+    G4double f3DPowerLorentzBetaErr;            
+    G4double f3DPowerLorentzAmpErr;       
+    G4double f3DPowerLorentzVertOffsetErr;  
     
-    // 3D Power-Law Lorentzian fit statistics
-    G4double f3DPowerLorentzianFitChi2red;            // Reduced Chi-squared
-    G4double f3DPowerLorentzianFitPp;                 // P-value  
-    G4int f3DPowerLorentzianFitDOF;                   // Degrees of Freedom
-    G4double f3DPowerLorentzianFitChargeUncertainty;  // Charge uncertainty (5% of max charge)
-    G4bool f3DPowerLorentzianFitSuccessful;           // Fit success flag
+    // 3D Power-Law Lorentz fit statistics
+    G4double f3DPowerLorentzChi2red;            // Reduced Chi-squared
+    G4double f3DPowerLorentzPp;                 // P-value  
+    G4int f3DPowerLorentzDOF;                   // Degrees of Freedom
+    G4double f3DPowerLorentzChargeErr;  // Charge uncertainty (5% of max charge)
+    G4bool f3DPowerLorentzSuccess;           //  success flag
 
     // Legacy variables that may still be used
     G4bool fIsPixelHit;  // True if hit is on pixel OR distance <= D0
     
     // NON-PIXEL HIT DATA (distance > D0 and not on pixel)
-    std::vector<G4double> fNonPixel_GridNeighborhoodAngles; // Angles from hit to neighborhood grid pixels [deg]
-    std::vector<G4double> fNonPixel_GridNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels
-    std::vector<G4double> fNonPixel_GridNeighborhoodDistances;         // Distances from hit to neighborhood grid pixels [mm]
-    std::vector<G4double> fNonPixel_GridNeighborhoodCharge;       // Charge values in Coulombs for neighborhood grid pixels
+    std::vector<G4double> fNeighborhoodAngles; // Angles from hit to neighborhood grid pixels [deg]
+    std::vector<G4double> fNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels
+    std::vector<G4double> fNeighborhoodDistances;         // Distances from hit to neighborhood grid pixels [mm]
+    std::vector<G4double> fNeighborhoodCharge;       // Charge values in Coulombs for neighborhood grid pixels
 
     // Variables for particle information (reduced set)
     G4double fInitialEnergy;        // Initial particle energy [MeV]

@@ -1,13 +1,13 @@
 """
-ROOT File 3D Gaussian Fits Visualization Tool
+ROOT File 3D Gauss s Visualization Tool
 
 This tool reads ROOT output files from the GEANT4 charge sharing simulation
-and creates PDF visualizations of the pre-computed 3D Gaussian surface fits.
+and creates PDF visualizations of the pre-computed 3D Gauss surface fits.
 
 Key features:
 1. Reads actual simulation data from ROOT files using uproot
-2. Extracts neighborhood charge distributions and fitted 3D Gaussian parameters  
-3. Creates 3D surface plots with fitted Gaussian surfaces and residuals
+2. Extracts neighborhood charge distributions and fitted 3D Gauss parameters  
+3. Creates 3D surface plots with fitted Gauss surfaces and residuals
 4. Creates comprehensive PDF reports for analysis verification
 5. NO synthetic data or fitting - only visualization of existing results
 6. OPTIMIZED for parallel processing with multithreading support
@@ -123,7 +123,7 @@ def load_root_data(root_file, max_entries=None):
         # Load essential data
         data = {}
         
-        # Basic position and pixel information
+        # Basic pos and pixel information
         data['TrueX'] = tree['TrueX'].array(library="np", entry_stop=max_entries)
         data['TrueY'] = tree['TrueY'].array(library="np", entry_stop=max_entries)
         data['PixelX'] = tree['PixelX'].array(library="np", entry_stop=max_entries)
@@ -131,28 +131,28 @@ def load_root_data(root_file, max_entries=None):
         data['IsPixelHit'] = tree['IsPixelHit'].array(library="np", entry_stop=max_entries)
         
         # Neighborhood grid data
-        data['GridNeighborhoodCharges'] = tree['GridNeighborhoodCharges'].array(library="np", entry_stop=max_entries)
+        data['NeighborhoodCharges'] = tree['NeighborhoodCharges'].array(library="np", entry_stop=max_entries)
         
-        # 3D Gaussian fit results
-        data['GaussFit3DAmplitude'] = tree['3DGaussianFitAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DCenterX'] = tree['3DGaussianFitCenterX'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DCenterY'] = tree['3DGaussianFitCenterY'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DSigmaX'] = tree['3DGaussianFitSigmaX'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DSigmaY'] = tree['3DGaussianFitSigmaY'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DVerticalOffset'] = tree['3DGaussianFitVerticalOffset'].array(library="np", entry_stop=max_entries)
+        # 3D Gauss fit results
+        data['Gauss3DAmp'] = tree['3DGaussAmp'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DCenterX'] = tree['3DGaussCenterX'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DCenterY'] = tree['3DGaussCenterY'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DSigmaX'] = tree['3DGaussSigmaX'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DSigmaY'] = tree['3DGaussSigmaY'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DVertOffset'] = tree['3DGaussVertOffset'].array(library="np", entry_stop=max_entries)
         
         # Error estimates
-        data['GaussFit3DAmplitudeErr'] = tree['3DGaussianFitAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DCenterXErr'] = tree['3DGaussianFitCenterXErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DCenterYErr'] = tree['3DGaussianFitCenterYErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DSigmaXErr'] = tree['3DGaussianFitSigmaXErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DSigmaYErr'] = tree['3DGaussianFitSigmaYErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DVerticalOffsetErr'] = tree['3DGaussianFitVerticalOffsetErr'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DAmpErr'] = tree['3DGaussAmpErr'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DCenterXErr'] = tree['3DGaussCenterXErr'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DCenterYErr'] = tree['3DGaussCenterYErr'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DSigmaXErr'] = tree['3DGaussSigmaXErr'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DSigmaYErr'] = tree['3DGaussSigmaYErr'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DVertOffsetErr'] = tree['3DGaussVertOffsetErr'].array(library="np", entry_stop=max_entries)
         
-        # Fit quality metrics
-        data['GaussFit3DChi2red'] = tree['3DGaussianFitChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DDOF'] = tree['3DGaussianFitDOF'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DChargeUncertainty'] = tree['3DGaussianFitChargeUncertainty'].array(library="np", entry_stop=max_entries)
+        #  quality metrics
+        data['Gauss3DChi2red'] = tree['3DGaussChi2red'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DDOF'] = tree['3DGaussDOF'].array(library="np", entry_stop=max_entries)
+        data['Gauss3DChargeErr'] = tree['3DGaussChargeErr'].array(library="np", entry_stop=max_entries)
         
         # Try to load detector grid parameters from metadata
         try:
@@ -164,7 +164,7 @@ def load_root_data(root_file, max_entries=None):
             data['PixelSpacing'] = 0.5  # Default fallback
         
         n_events = len(data['TrueX'])
-        print(f"Successfully loaded {n_events} events from ROOT file")
+        print(f"Successly loaded {n_events} events from ROOT file")
         
         # Filter for non-pixel hits only
         non_pixel_mask = ~data['IsPixelHit']
@@ -201,7 +201,7 @@ def extract_3d_data(event_idx, data, grid_size=None):
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        grid_data = data['GridNeighborhoodCharges']
+        grid_data = data['NeighborhoodCharges']
         
         # Check the data structure
         if hasattr(grid_data, '__len__') and len(grid_data) > event_idx:
@@ -233,7 +233,7 @@ def extract_3d_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -254,7 +254,7 @@ def extract_3d_data(event_idx, data, grid_size=None):
         valid_cols = cols[valid_mask]
         valid_charges = grid_charges[valid_mask]
         
-        # Calculate actual world coordinates
+        # Calc actual world coordinates
         offset_x = valid_cols - radius
         offset_y = valid_rows - radius
         x_coords = pixel_x + offset_x * pixel_spacing
@@ -265,15 +265,15 @@ def extract_3d_data(event_idx, data, grid_size=None):
     except Exception as e:
         return None, None, None, False
 
-def gaussian_3d(x, y, amplitude, center_x, center_y, sigma_x, sigma_y, offset):
+def gauss_3d(x, y, amp, center_x, center_y, sigma_x, sigma_y, offset):
     """
-    3D Gaussian function for plotting fitted surfaces.
+    3D Gauss function for plotting fitted surfaces.
     z(x,y) = A * exp(-((x - mx)^2 / (2 * σx^2) + (y - my)^2 / (2 * σy^2))) + B
     """
     dx = x - center_x
     dy = y - center_y
     exponent = -((dx**2) / (2 * sigma_x**2) + (dy**2) / (2 * sigma_y**2))
-    return amplitude * np.exp(exponent) + offset
+    return amp * np.exp(exponent) + offset
 
 def get_stored_3d_charge_uncertainties(event_idx, data):
     """
@@ -284,32 +284,32 @@ def get_stored_3d_charge_uncertainties(event_idx, data):
         data: Full data dictionary or single-event data subset
     
     Returns:
-        uncertainty: Single uncertainty value (5% of max charge for this event)
+        err: Single err value (5% of max charge for this event)
     """
-    uncertainty_data = data['GaussFit3DChargeUncertainty']
+    err_data = data['Gauss3DChargeErr']
     
     # Handle both single event data and full dataset
-    if np.isscalar(uncertainty_data):
+    if np.isscalar(err_data):
         # Single event data (already subset)
-        uncertainty = uncertainty_data
-    elif hasattr(uncertainty_data, '__len__') and len(uncertainty_data) > event_idx:
+        err = err_data
+    elif hasattr(err_data, '__len__') and len(err_data) > event_idx:
         # Full dataset - extract for specific event
-        uncertainty = uncertainty_data[event_idx]
+        err = err_data[event_idx]
     else:
-        uncertainty = 0.05  # Default fallback
+        err = 0.05  # Default fallback
     
-    return uncertainty
+    return err
 
-def create_3d_gaussian_plot(event_idx, data):
+def create_3d_gauss_plot(event_idx, data):
     """
-    Create a compact visualization of the 3D Gaussian fit for one event.
+    Create a compact visualization of the 3D Gauss fit for one event.
 
     The figure now contains ONLY TWO panels (vs. previous 4):
-      1. Left  – 2-D scatter of residuals (Data − Fit) coloured by value,
+      1. Left  – 2-D scatter of residuals (Data − ) coloured by value,
                  making it immediately obvious where the fit under/over-estimates.
-      2. Right – 3-D surface plot of the fitted Gaussian overlaid with the
+      2. Right – 3-D surface plot of the fitted Gauss overlaid with the
                  measured charge distribution and markers for the true and
-                 fitted hit positions.
+                 fitted hit poss.
 
     Both panels include auxiliary information (colourbars / text boxes) so that
     the viewer can quickly judge the goodness-of-fit.
@@ -334,31 +334,31 @@ def create_3d_gaussian_plot(event_idx, data):
             except (TypeError, ValueError, IndexError):
                 return default
 
-        fit_amp = _get(data['GaussFit3DAmplitude'], event_idx)
-        fit_cx  = _get(data['GaussFit3DCenterX'],   event_idx)
-        fit_cy  = _get(data['GaussFit3DCenterY'],   event_idx)
-        fit_sx  = _get(data['GaussFit3DSigmaX'],    event_idx)
-        fit_sy  = _get(data['GaussFit3DSigmaY'],    event_idx)
-        fit_off = _get(data['GaussFit3DVerticalOffset'], event_idx)
+        fit_amp = _get(data['Gauss3DAmp'], event_idx)
+        fit_cx  = _get(data['Gauss3DCenterX'],   event_idx)
+        fit_cy  = _get(data['Gauss3DCenterY'],   event_idx)
+        fit_sx  = _get(data['Gauss3DSigmaX'],    event_idx)
+        fit_sy  = _get(data['Gauss3DSigmaY'],    event_idx)
+        fit_off = _get(data['Gauss3DVertOffset'], event_idx)
 
         # Retrieve uncertainties for displaying
-        fit_cx_err = _get(data['GaussFit3DCenterXErr'], event_idx)
-        fit_cy_err = _get(data['GaussFit3DCenterYErr'], event_idx)
-        fit_sx_err = _get(data['GaussFit3DSigmaXErr'],  event_idx)
-        fit_sy_err = _get(data['GaussFit3DSigmaYErr'],  event_idx)
+        fit_cx_err = _get(data['Gauss3DCenterXErr'], event_idx)
+        fit_cy_err = _get(data['Gauss3DCenterYErr'], event_idx)
+        fit_sx_err = _get(data['Gauss3DSigmaXErr'],  event_idx)
+        fit_sy_err = _get(data['Gauss3DSigmaYErr'],  event_idx)
         
-        chi2_red = _get(data['GaussFit3DChi2red'], event_idx)
-        dof      = _get(data['GaussFit3DDOF'],     event_idx)
+        chi2_red = _get(data['Gauss3DChi2red'], event_idx)
+        dof      = _get(data['Gauss3DDOF'],     event_idx)
         
-        if dof <= 0:  # unsuccessful fit according to stored metadata
+        if dof <= 0:  # unsuccess fit according to stored metadata
             return None, False
         
-        # True hit position for reference
+        # True hit pos for reference
         true_x = _get(data['TrueX'], event_idx)
         true_y = _get(data['TrueY'], event_idx)
 
-        # ----------------------------- Fit evaluation -----------------------------
-        fitted_charges = gaussian_3d(x_coords, y_coords,
+        # -----------------------------  evaluation -----------------------------
+        fitted_charges = gauss_3d(x_coords, y_coords,
                                       fit_amp, fit_cx, fit_cy, fit_sx, fit_sy, fit_off)
         residuals = charges - fitted_charges
         rms_res   = np.sqrt(np.mean(residuals**2))
@@ -375,22 +375,22 @@ def create_3d_gaussian_plot(event_idx, data):
         cbar = fig.colorbar(sc, ax=ax_res, pad=0.01, label='Residual (C)')
         ax_res.axhline(true_y, color='green', linestyle='--', linewidth=1.5, alpha=0.7)
         ax_res.axvline(true_x, color='green', linestyle='--', linewidth=1.5, alpha=0.7)
-        # Add lines for reconstructed (fit) position
+        # Add lines for reconstructed (fit) pos
         ax_res.axhline(fit_cy, color='blue', linestyle=':', linewidth=1.5, alpha=0.7)
         ax_res.axvline(fit_cx, color='blue', linestyle=':', linewidth=1.5, alpha=0.7)
 
         # Legend showing meaning of guides
         import matplotlib.lines as mlines
         true_proxy = mlines.Line2D([], [], color='green', linestyle='--', linewidth=1.5, label='True (x, y)')
-        fit_proxy  = mlines.Line2D([], [], color='blue', linestyle=':', linewidth=1.5, label='Fit (x, y)')
+        fit_proxy  = mlines.Line2D([], [], color='blue', linestyle=':', linewidth=1.5, label=' (x, y)')
         ax_res.legend(handles=[true_proxy, fit_proxy], loc='upper right', fontsize=9, framealpha=0.9)
-        ax_res.set_xlabel('X Position (mm)', fontsize=12)
-        ax_res.set_ylabel('Y Position (mm)', fontsize=12)
-        ax_res.set_title(f'Event {event_idx}: Residuals (Data − Fit)', fontsize=14, pad=15)
+        ax_res.set_xlabel('X Pos (mm)', fontsize=12)
+        ax_res.set_ylabel('Y Pos (mm)', fontsize=12)
+        ax_res.set_title(f'Event {event_idx}: Residuals (Data − )', fontsize=14, pad=15)
         ax_res.set_aspect('equal', adjustable='box')
         ax_res.grid(True, alpha=0.3)
 
-        # ----------------------------- Fit panel ----------------------------------
+        # -----------------------------  panel ----------------------------------
         ax_fit = fig.add_subplot(gs[1], projection='3d')
         # ------------------------------------------------------------------
         # Build a *symmetric* square XY footprint so that the 3-D panel
@@ -416,7 +416,7 @@ def create_3d_gaussian_plot(event_idx, data):
         
         Xg, Yg = np.meshgrid(np.linspace(x_min, x_max, 60),
                              np.linspace(y_min, y_max, 60))
-        Zg = gaussian_3d(Xg, Yg, fit_amp, fit_cx, fit_cy, fit_sx, fit_sy, fit_off)
+        Zg = gauss_3d(Xg, Yg, fit_amp, fit_cx, fit_cy, fit_sx, fit_sy, fit_off)
         surf = ax_fit.plot_surface(Xg, Yg, Zg, cmap='viridis', alpha=0.6, linewidth=0)
         # Apply the same symmetric limits to the axes so the rendered view
         # exactly matches the generated grid extents.
@@ -425,11 +425,11 @@ def create_3d_gaussian_plot(event_idx, data):
         # Overlay measured charges
         ax_fit.scatter(x_coords, y_coords, charges, c='red', s=60, depthshade=True, label='Data')
 
-        # Draw vertical error bars if charge uncertainty is available (>0)
-        uncertainty = get_stored_3d_charge_uncertainties(event_idx, data)
-        if uncertainty and float(uncertainty) > 0:
+        # Draw vert error bars if charge err is available (>0)
+        err = get_stored_3d_charge_uncertainties(event_idx, data)
+        if err and float(err) > 0:
             for xi, yi, zi in zip(x_coords, y_coords, charges):
-                ax_fit.plot([xi, xi], [yi, yi], [zi - uncertainty, zi + uncertainty],
+                ax_fit.plot([xi, xi], [yi, yi], [zi - err, zi + err],
                             color='gray', alpha=0.5, linewidth=1)
 
             # Keep error bars silent in legend; only show Data
@@ -437,13 +437,13 @@ def create_3d_gaussian_plot(event_idx, data):
         else:
             ax_fit.legend(loc='upper right')
 
-        ax_fit.set_xlabel('X Position (mm)', fontsize=12)
-        ax_fit.set_ylabel('Y Position (mm)', fontsize=12)
+        ax_fit.set_xlabel('X Pos (mm)', fontsize=12)
+        ax_fit.set_ylabel('Y Pos (mm)', fontsize=12)
         ax_fit.set_zlabel('Charge (C)', fontsize=12)
-        ax_fit.set_title(f'Event {event_idx}: 3D Gaussian Surface Fit', fontsize=14, pad=15)
+        ax_fit.set_title(f'Event {event_idx}: 3D Gauss Surface ', fontsize=14, pad=15)
         # Use equal XY aspect and a balanced Z aspect for visual symmetry
         try:
-            # Increase Z aspect so the 3-D axis occupies more vertical space.
+            # Increase Z aspect so the 3-D axis occupies more vert space.
             # A cubic aspect (1,1,1) yields a visually larger 3-D plot whose
             # bottom edge aligns better with the left residual panel.
             ax_fit.set_box_aspect([1, 1, 1])  # Requires Matplotlib ≥3.3
@@ -507,7 +507,7 @@ def _create_3d_plot_worker(args):
         for key, value in data_subset.items():
             data[key] = value
         
-        fig, success = create_3d_gaussian_plot(event_idx, data)
+        fig, success = create_3d_gauss_plot(event_idx, data)
         
         if success and fig is not None:
             return event_idx, fig, True
@@ -536,12 +536,12 @@ def _prepare_3d_data_subset(data, event_idx):
     # List of all keys we need for 3D plotting
     keys_needed = [
         'TrueX', 'TrueY', 'PixelX', 'PixelY', 'IsPixelHit',
-        'GridNeighborhoodCharges', 'PixelSpacing',
-        'GaussFit3DAmplitude', 'GaussFit3DCenterX', 'GaussFit3DCenterY',
-        'GaussFit3DSigmaX', 'GaussFit3DSigmaY', 'GaussFit3DVerticalOffset',
-        'GaussFit3DAmplitudeErr', 'GaussFit3DCenterXErr', 'GaussFit3DCenterYErr',
-        'GaussFit3DSigmaXErr', 'GaussFit3DSigmaYErr', 'GaussFit3DVerticalOffsetErr',
-        'GaussFit3DChi2red', 'GaussFit3DDOF', 'GaussFit3DChargeUncertainty'
+        'NeighborhoodCharges', 'PixelSpacing',
+        'Gauss3DAmp', 'Gauss3DCenterX', 'Gauss3DCenterY',
+        'Gauss3DSigmaX', 'Gauss3DSigmaY', 'Gauss3DVertOffset',
+        'Gauss3DAmpErr', 'Gauss3DCenterXErr', 'Gauss3DCenterYErr',
+        'Gauss3DSigmaXErr', 'Gauss3DSigmaYErr', 'Gauss3DVertOffsetErr',
+        'Gauss3DChi2red', 'Gauss3DDOF', 'Gauss3DChargeErr'
     ]
     
     for key in keys_needed:
@@ -556,9 +556,9 @@ def _prepare_3d_data_subset(data, event_idx):
     
     return subset
 
-def create_3d_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
+def create_3d_gauss_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
     """
-    Create PDF files with 3D Gaussian fits visualization using parallel processing.
+    Create PDF files with 3D Gauss fits visualization using parallel processing.
     
     Args:
         data: Data dictionary from ROOT file
@@ -567,7 +567,7 @@ def create_3d_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_wor
         n_workers: Number of worker processes (default: CPU count)
     
     Returns:
-        success_count: Number of successful visualizations
+        success_count: Number of success visualizations
     """
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -580,16 +580,16 @@ def create_3d_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_wor
     if n_workers is None:
         n_workers = min(mp.cpu_count(), 8)  # Cap at 8 to avoid memory issues
     
-    print(f"Creating 3D Gaussian fit visualizations for {n_events} events using {n_workers} workers")
+    print(f"Creating 3D Gauss fit visualizations for {n_events} events using {n_workers} workers")
     
     # Create output path
-    pdf_path = os.path.join(output_dir, "gaussian_3d_fits.pdf")
+    pdf_path = os.path.join(output_dir, "gauss_3d_fits.pdf")
     
-    # Pre-filter events with successful fits to avoid processing invalid events
+    # Pre-filter events with success fits to avoid processing invalid events
     valid_events = []
     
     for event_idx in range(n_events):
-        if data['GaussFit3DDOF'][event_idx] > 0:
+        if data['Gauss3DDOF'][event_idx] > 0:
             valid_events.append(event_idx)
     
     print(f"Found {len(valid_events)} valid 3D fits")
@@ -600,13 +600,13 @@ def create_3d_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_wor
     
     # Pre-calculate grid size to avoid repeated calculations
     sample_event = valid_events[0]
-    sample_grid = np.array(data['GridNeighborhoodCharges'][sample_event])
+    sample_grid = np.array(data['NeighborhoodCharges'][sample_event])
     grid_size = int(np.sqrt(len(sample_grid))) if len(sample_grid) > 0 else 9
     print(f"Detected grid size: {grid_size}x{grid_size}")
     
     success_count = 0
     
-    print("Creating 3D Gaussian fits PDF...")
+    print("Creating 3D Gauss fits PDF...")
     
     # Prepare arguments for parallel processing
     args_list = []
@@ -671,18 +671,18 @@ def export_single_event_svg(data, event_idx, output_path):
     print(f"Exporting event {event_idx} as SVG...")
     
     # Check if the event has a valid fit
-    if data['GaussFit3DDOF'][event_idx] <= 0:
-        print(f"Event {event_idx} does not have a valid 3D fit (DOF = {data['GaussFit3DDOF'][event_idx]})")
+    if data['Gauss3DDOF'][event_idx] <= 0:
+        print(f"Event {event_idx} does not have a valid 3D fit (DOF = {data['Gauss3DDOF'][event_idx]})")
         return False
     
     # Create the plot using full dataset (don't subset for single event export)
-    fig, success = create_3d_gaussian_plot(event_idx, data)
+    fig, success = create_3d_gauss_plot(event_idx, data)
     
     if success and fig is not None:
         # Save as SVG
         fig.savefig(output_path, format='svg', dpi=300, bbox_inches='tight')
         plt.close(fig)
-        print(f"Successfully exported event {event_idx} to {output_path}")
+        print(f"Successly exported event {event_idx} to {output_path}")
         return True
     else:
         print(f"Failed to create plot for event {event_idx}")
@@ -705,10 +705,10 @@ def inspect_root_file(root_file):
         
         print(f"\nTree 'Hits' contains {len(branches)} branches:")
         
-        # Show 3D Gaussian fitting branches
-        gaussian_3d_branches = [b for b in branches if '3DGaussianFit' in b]
-        print(f"\n3D Gaussian fitting branches ({len(gaussian_3d_branches)}):")
-        for i, branch in enumerate(sorted(gaussian_3d_branches)):
+        # Show 3D Gauss fitting branches
+        gauss_3d_branches = [b for b in branches if '3DGauss' in b]
+        print(f"\n3D Gauss fitting branches ({len(gauss_3d_branches)}):")
+        for i, branch in enumerate(sorted(gauss_3d_branches)):
             print(f"  {i+1:2d}: {branch}")
         
         # Show grid data branches
@@ -727,11 +727,11 @@ def inspect_root_file(root_file):
         print(f"  Non-pixel hits: {n_non_pixel} ({100*n_non_pixel/n_events:.1f}%)")
         print(f"  Pixel hits: {n_events - n_non_pixel} ({100*(n_events - n_non_pixel)/n_events:.1f}%)")
         
-        # Check for successful 3D fits
-        if '3DGaussianFitDOF' in branches:
-            fit_3d_dof = tree['3DGaussianFitDOF'].array(library="np")
-            successful_3d_fits = np.sum(fit_3d_dof > 0)
-            print(f"  Successful 3D fits: {successful_3d_fits} ({100*successful_3d_fits/n_events:.1f}%)")
+        # Check for success 3D fits
+        if '3DGaussDOF' in branches:
+            fit_3d_dof = tree['3DGaussDOF'].array(library="np")
+            success_3d_fits = np.sum(fit_3d_dof > 0)
+            print(f"  Success 3D fits: {success_3d_fits} ({100*success_3d_fits/n_events:.1f}%)")
         
     except Exception as e:
         print(f"Error inspecting ROOT file: {e}")
@@ -739,11 +739,11 @@ def inspect_root_file(root_file):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Visualize 3D Gaussian fits from GEANT4 charge sharing simulation ROOT files",
+        description="Visualize 3D Gauss fits from GEANT4 charge sharing simulation ROOT files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("root_file", help="Path to ROOT file from GEANT4 simulation")
-    parser.add_argument("-o", "--output", default="gaussian_3d_fits", 
+    parser.add_argument("-o", "--output", default="gauss_3d_fits", 
                        help="Output directory for PDF files")
     parser.add_argument("-n", "--num_events", type=int, default=None,
                        help="Maximum number of events to process (default: all events)")
@@ -776,19 +776,19 @@ def main():
         print("Failed to load data. Exiting.")
         return 1
     
-    # Check if we have 3D Gaussian fitting data
+    # Check if we have 3D Gauss fitting data
     n_events = len(data['TrueX'])
     if n_events == 0:
         print("No events found in the data!")
         return 1
     
-    # Count successful 3D fits
-    successful_3d = np.sum(data['GaussFit3DDOF'] > 0)
+    # Count success 3D fits
+    success_3d = np.sum(data['Gauss3DDOF'] > 0)
     
-    print(f"Found {successful_3d} successful 3D fits")
+    print(f"Found {success_3d} success 3D fits")
     
-    if successful_3d == 0:
-        print("No successful 3D Gaussian fits found in the data!")
+    if success_3d == 0:
+        print("No success 3D Gauss fits found in the data!")
         return 1
     
     # SVG export mode
@@ -810,7 +810,7 @@ def main():
     print(f"Output directory: {args.output}")
     
     # Create PDF visualizations
-    success_count = create_3d_gaussian_fit_pdfs(
+    success_count = create_3d_gauss_fit_pdfs(
         data, args.output, args.num_events, args.workers
     )
     

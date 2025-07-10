@@ -13,12 +13,12 @@
 #include <mutex>
 
 // Forward declarations for fitting results
-struct GaussianFit2DResultsCeres;
-struct LorentzianFit2DResultsCeres;
-struct PowerLorentzianFit2DResultsCeres;
-struct GaussianFit3DResultsCeres;
-struct LorentzianFit3DResultsCeres;
-struct PowerLorentzianFit3DResultsCeres;
+struct Gauss2DResultsCeres;
+struct Lorentz2DResultsCeres;
+struct PowerLorentz2DResultsCeres;
+struct Gauss3DResultsCeres;
+struct Lorentz3DResultsCeres;
+struct PowerLorentz3DResultsCeres;
 
 class SimulationLogger {
 public:
@@ -43,25 +43,25 @@ public:
                               G4int numPixelsPerSide, G4int totalPixels);
     void LogPhysicsParameters(G4double cutValue, const std::string& physicsList);
     void LogPrimaryGeneratorParameters(const std::string& particleType, G4double energy,
-                                     G4ThreeVector position, G4ThreeVector direction);
+                                     G4ThreeVector pos, G4ThreeVector direction);
     
-    // Hit and energy deposition logging
+    // Hit and energy depositionition logging
     void LogPixelHit(G4int eventID, G4int pixelI, G4int pixelJ, G4double energyDeposit,
-                    G4ThreeVector position, G4double stepLength);
-    void LogTotalEnergyDeposition(G4int eventID, G4double totalEnergy, G4int numHits);
+                    G4ThreeVector pos, G4double stepLength);
+    void LogTotalEnergyDepos(G4int eventID, G4double totalEnergy, G4int numHits);
     
     // Fitting results logging
-    void LogGaussianFitResults(G4int eventID, const GaussianFit2DResultsCeres& results);
-    void LogLorentzianFitResults(G4int eventID, const LorentzianFit2DResultsCeres& results);
-    void LogPowerLorentzianFitResults(G4int eventID, const PowerLorentzianFit2DResultsCeres& results);
-    void Log3DLorentzianFitResults(G4int eventID, const LorentzianFit3DResultsCeres& results);
-    void Log3DGaussianFitResults(G4int eventID, const GaussianFit3DResultsCeres& results);
-    void Log3DPowerLorentzianFitResults(G4int eventID, const PowerLorentzianFit3DResultsCeres& results);
+    void LogGaussResults(G4int eventID, const Gauss2DResultsCeres& results);
+    void LogLorentzResults(G4int eventID, const Lorentz2DResultsCeres& results);
+    void LogPowerLorentzResults(G4int eventID, const PowerLorentz2DResultsCeres& results);
+    void Log3DLorentzResults(G4int eventID, const Lorentz3DResultsCeres& results);
+    void Log3DGaussResults(G4int eventID, const Gauss3DResultsCeres& results);
+    void Log3DPowerLorentzResults(G4int eventID, const PowerLorentz3DResultsCeres& results);
     
     // Performance and statistics logging
     void LogPerformanceMetrics(G4int eventID, G4double eventProcessingTime,
                               G4double totalSimulationTime, G4double memoryUsage);
-    void LogFittingPerformance(G4int eventID, const std::string& fitType,
+    void LogtingPerformance(G4int eventID, const std::string& fitType,
                               G4double fittingTime, G4bool converged, G4int iterations);
     void LogPixelHitPattern(G4int eventID, const std::vector<std::pair<G4int, G4int>>& hitPixels,
                            const std::vector<G4double>& energies);
@@ -82,8 +82,8 @@ public:
     void LogDebug(const std::string& message, const std::string& location = "");
     
     // Statistics and analysis logging
-    void LogEventStatistics(G4int totalEvents, G4int successfulFits, G4int failedFits,
-                           G4double averageChi2, G4double averageFitTime);
+    void LogEventStatistics(G4int totalEvents, G4int successs, G4int faileds,
+                           G4double averageChi2, G4double averageTime);
     void LogConvergenceStatistics(const std::string& fitType, G4int totalAttempts,
                                  G4int convergences, G4double averageIterations);
     
@@ -131,14 +131,14 @@ private:
     std::string fLogDirectory;
     std::string fMainLogFile;
     std::string fPerformanceLogFile;
-    std::string fFittingLogFile;
+    std::string ftingLogFile;
     std::string fHitsLogFile;
     std::string fErrorLogFile;
     std::string fStatsLogFile;
     
     std::unique_ptr<std::ofstream> fMainLog;
     std::unique_ptr<std::ofstream> fPerformanceLog;
-    std::unique_ptr<std::ofstream> fFittingLog;
+    std::unique_ptr<std::ofstream> ftingLog;
     std::unique_ptr<std::ofstream> fHitsLog;
     std::unique_ptr<std::ofstream> fErrorLog;
     std::unique_ptr<std::ofstream> fStatsLog;
@@ -155,9 +155,9 @@ private:
     
     // Statistics tracking
     G4int fTotalFits;
-    G4int fSuccessfulFits;
-    G4int fFailedFits;
-    G4double fTotalFittingTime;
+    G4int fSuccessFits;
+    G4int fFailFits;
+    G4double fTotFitTime;
     std::map<std::string, G4int> fFitTypeCounters;
     std::map<std::string, G4double> fFitTypeTimings;
     std::map<std::string, G4int> fConvergenceCounters;

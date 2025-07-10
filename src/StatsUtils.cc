@@ -4,7 +4,7 @@
 #include <numeric>
 #include <iostream>
 
-RobustStats1D CalculateRobustStats1D(const std::vector<double>& x_vals, 
+RobustStats1D CalcRobustStats1D(const std::vector<double>& x_vals, 
                                      const std::vector<double>& y_vals) {
     RobustStats1D stats;
     
@@ -64,7 +64,7 @@ RobustStats1D CalculateRobustStats1D(const std::vector<double>& x_vals,
                     stats.std_dev : 1e-12;
     }
     
-    // Weighted statistics (weight by charge value for position estimation)
+    // Weighted statistics (weight by charge value for pos estimation)
     stats.weighted_mean = 0.0;
     stats.total_weight = 0.0;
     
@@ -86,7 +86,7 @@ RobustStats1D CalculateRobustStats1D(const std::vector<double>& x_vals,
     return stats;
 }
 
-RobustStats3D CalculateRobustStats3D(const std::vector<double>& x_vals,
+RobustStats3D CalcRobustStats3D(const std::vector<double>& x_vals,
                                      const std::vector<double>& y_vals,
                                      const std::vector<double>& z_vals) {
     RobustStats3D stats;
@@ -176,7 +176,7 @@ std::pair<std::vector<double>, std::vector<double>> FilterOutliersMad1D(
         return std::make_pair(x_vals, y_vals);
     }
     
-    RobustStats1D stats = CalculateRobustStats1D(x_vals, y_vals);
+    RobustStats1D stats = CalcRobustStats1D(x_vals, y_vals);
     if (!stats.valid) {
         return std::make_pair(x_vals, y_vals);
     }
@@ -246,7 +246,7 @@ std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> Filter
         return std::make_tuple(x_vals, y_vals, z_vals);
     }
     
-    RobustStats3D stats = CalculateRobustStats3D(x_vals, y_vals, z_vals);
+    RobustStats3D stats = CalcRobustStats3D(x_vals, y_vals, z_vals);
     if (!stats.valid) {
         return std::make_tuple(x_vals, y_vals, z_vals);
     }

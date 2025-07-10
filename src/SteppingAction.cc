@@ -27,7 +27,7 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
   G4StepPoint* postPoint = step->GetPostStepPoint();
   
   // Calculate position of this step (middle of step) - CONSISTENT with AddEdep calculation
-  G4ThreeVector stepPosition = 0.5 * (prePoint->GetPosition() + postPoint->GetPosition());
+  G4ThreeVector stepPos = 0.5 * (prePoint->GetPosition() + postPoint->GetPosition());
   
   // Check if energy was deposited
   if (edep > 0) {
@@ -47,7 +47,7 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
     if (insideDetector) {
       // Energy deposited inside detector volume - accumulate in EventAction
       // Only energy deposited while particle travels through detector is counted
-      fEventAction->AddEdep(edep, stepPosition);
+      fEventAction->AddEdep(edep, stepPos);
       
       // Log pixel hit information to SimulationLogger
       SimulationLogger* logger = SimulationLogger::GetInstance();
@@ -65,7 +65,7 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
         G4int pixelJ = -1;  // Will be determined later
         
         // Log this step as a hit (individual energy deposition)
-        logger->LogPixelHit(eventID, pixelI, pixelJ, edep, stepPosition, stepLength);
+        logger->LogPixelHit(eventID, pixelI, pixelJ, edep, stepPos, stepLength);
       }
     }
     // Note: Removed excessive debug output for "outside detector" cases

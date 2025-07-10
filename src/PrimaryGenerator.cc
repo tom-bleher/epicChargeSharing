@@ -39,7 +39,7 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     G4cout << "===============================================================" << G4endl;
 
     // Initial position will be set randomly on the detector surface
-    GenerateRandomPosition();
+    GenerateRandomPos();
     
     fParticleGun->SetParticleMomentumDirection(mom);
     fParticleGun->SetParticleEnergy(0.1*MeV); // Realistic MIP energy
@@ -54,13 +54,13 @@ PrimaryGenerator::~PrimaryGenerator()
 void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
 {
     // Generate a new random position for each event within the central pixel region
-    GenerateRandomPosition();
+    GenerateRandomPos();
     
     // Create Vertex
     fParticleGun->GeneratePrimaryVertex(anEvent);
 }
 
-void PrimaryGenerator::CalculateCentralPixelRegion()
+void PrimaryGenerator::CalcCentralPixelRegion()
 {
     // Get detector parameters
     G4double detSize = fDetector->GetDetSize();
@@ -89,7 +89,7 @@ void PrimaryGenerator::CalculateCentralPixelRegion()
     fCentralRegionYmax = centralPixelY + halfSpacing;
 }
 
-void PrimaryGenerator::GenerateRandomPosition()
+void PrimaryGenerator::GenerateRandomPos()
 {
     // Generate random position ensuring the chosen pixel has a full neighbourhood
     G4double detSize = fDetector->GetDetSize();

@@ -39,11 +39,11 @@ struct RobustStats3D {
 };
 
 // Calculate robust statistics for 1D data
-RobustStats1D CalculateRobustStats1D(const std::vector<double>& x_vals, 
+RobustStats1D CalcRobustStats1D(const std::vector<double>& x_vals, 
                                      const std::vector<double>& y_vals);
 
 // Calculate robust statistics for 3D data
-RobustStats3D CalculateRobustStats3D(const std::vector<double>& x_vals,
+RobustStats3D CalcRobustStats3D(const std::vector<double>& x_vals,
                                      const std::vector<double>& y_vals,
                                      const std::vector<double>& z_vals);
 

@@ -1,18 +1,18 @@
 """
-ROOT File Diagonal Power Lorentzian Fits Visualization Tool
+ROOT File Diag Power Lorentz s Visualization Tool
 
 This tool reads ROOT output files from the GEANT4 charge sharing simulation
-and creates PDF visualizations of the pre-computed diagonal Power Lorentzian fits.
+and creates PDF visualizations of the pre-computed diagonal Power Lorentz fits.
 
 Key features:
 1. Reads actual simulation data from ROOT files using uproot
-2. Extracts diagonal neighborhood charge distributions and fitted Power Lorentzian parameters  
-3. Plots data points with fitted Power Lorentzian curves and residuals
+2. Extracts diagonal neighborhood charge distributions and fitted Power Lorentz parameters  
+3. Plots data points with fitted Power Lorentz curves and residuals
 4. Creates comprehensive PDF reports for main and secondary diagonal analysis
 5. NO synthetic data or fitting - only visualization of existing results
 6. OPTIMIZED for parallel processing with multithreading support
 
-Power Lorentzian model: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
+Power Lorentz model: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
 
 Generates 4 PDFs:
 - MainDiagX: Main diagonal X-component fits
@@ -99,20 +99,20 @@ plt.rcParams['text.usetex'] = False
 plt.rcParams['mathtext.fontset'] = 'cm'
 plt.rcParams['mathtext.default'] = 'regular'
 
-def power_lorentzian_1d(x, amplitude, center, gamma, beta, offset):
+def power_lorentz_1d(x, amp, center, gamma, beta, offset):
     """
-    1D Power Lorentzian function for plotting fitted curves.
+    1D Power Lorentz function for plotting fitted curves.
     
     Args:
-        x: Position array
-        amplitude: Peak amplitude (A)
-        center: Peak center position (m)
+        x: Pos array
+        amp: Peak amp (A)
+        center: Peak center pos (m)
         gamma: Width parameter (gamma, like HWHM)
         beta: Power exponent (beta)
-        offset: Vertical offset (B)
+        offset: Vert offset (B)
     
     Returns:
-        Power Lorentzian curve values: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
+        Power Lorentz curve values: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
     """
     gamma_safe = np.abs(gamma)
     if gamma_safe < 1e-12:
@@ -126,7 +126,7 @@ def power_lorentzian_1d(x, amplitude, center, gamma, beta, offset):
     denominator_base = 1.0 + normalized_dx * normalized_dx
     denominator = np.power(denominator_base, beta_safe)
     
-    return amplitude / denominator + offset 
+    return amp / denominator + offset 
 
 def load_root_data(root_file, max_entries=None):
     """
@@ -158,7 +158,7 @@ def load_root_data(root_file, max_entries=None):
         # Load essential data
         data = {}
         
-        # Basic position and pixel information
+        # Basic pos and pixel information
         data['TrueX'] = tree['TrueX'].array(library="np", entry_stop=max_entries)
         data['TrueY'] = tree['TrueY'].array(library="np", entry_stop=max_entries)
         data['PixelX'] = tree['PixelX'].array(library="np", entry_stop=max_entries)
@@ -166,59 +166,59 @@ def load_root_data(root_file, max_entries=None):
         data['IsPixelHit'] = tree['IsPixelHit'].array(library="np", entry_stop=max_entries)
         
         # Neighborhood grid data
-        data['GridNeighborhoodCharges'] = tree['GridNeighborhoodCharges'].array(library="np", entry_stop=max_entries)
+        data['NeighborhoodCharges'] = tree['NeighborhoodCharges'].array(library="np", entry_stop=max_entries)
         
-        # Main Diagonal X fit results (using PowerLorentzFit prefix)
-        data['PowerLorentzFitMainDiagXCenter'] = tree['PowerLorentzFitMainDiagXCenter'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXGamma'] = tree['PowerLorentzFitMainDiagXGamma'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXBeta'] = tree['PowerLorentzFitMainDiagXBeta'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXAmplitude'] = tree['PowerLorentzFitMainDiagXAmplitude'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXVerticalOffset'] = tree['PowerLorentzFitMainDiagXVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXCenterErr'] = tree['PowerLorentzFitMainDiagXCenterErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXGammaErr'] = tree['PowerLorentzFitMainDiagXGammaErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXBetaErr'] = tree['PowerLorentzFitMainDiagXBetaErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXAmplitudeErr'] = tree['PowerLorentzFitMainDiagXAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXChi2red'] = tree['PowerLorentzFitMainDiagXChi2red'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagXDOF'] = tree['PowerLorentzFitMainDiagXDOF'].array(library="np", entry_stop=max_entries)
+        # Main Diag X fit results (using PowerLorentz prefix)
+        data['PowerLorentzMainDiagXCenter'] = tree['PowerLorentzMainDiagXCenter'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXGamma'] = tree['PowerLorentzMainDiagXGamma'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXBeta'] = tree['PowerLorentzMainDiagXBeta'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXAmp'] = tree['PowerLorentzMainDiagXAmp'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXVertOffset'] = tree['PowerLorentzMainDiagXVertOffset'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXCenterErr'] = tree['PowerLorentzMainDiagXCenterErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXGammaErr'] = tree['PowerLorentzMainDiagXGammaErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXBetaErr'] = tree['PowerLorentzMainDiagXBetaErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXAmpErr'] = tree['PowerLorentzMainDiagXAmpErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXChi2red'] = tree['PowerLorentzMainDiagXChi2red'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagXDOF'] = tree['PowerLorentzMainDiagXDOF'].array(library="np", entry_stop=max_entries)
         
-        # Main Diagonal Y fit results
-        data['PowerLorentzFitMainDiagYCenter'] = tree['PowerLorentzFitMainDiagYCenter'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYGamma'] = tree['PowerLorentzFitMainDiagYGamma'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYBeta'] = tree['PowerLorentzFitMainDiagYBeta'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYAmplitude'] = tree['PowerLorentzFitMainDiagYAmplitude'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYVerticalOffset'] = tree['PowerLorentzFitMainDiagYVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYCenterErr'] = tree['PowerLorentzFitMainDiagYCenterErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYGammaErr'] = tree['PowerLorentzFitMainDiagYGammaErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYBetaErr'] = tree['PowerLorentzFitMainDiagYBetaErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYAmplitudeErr'] = tree['PowerLorentzFitMainDiagYAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYChi2red'] = tree['PowerLorentzFitMainDiagYChi2red'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitMainDiagYDOF'] = tree['PowerLorentzFitMainDiagYDOF'].array(library="np", entry_stop=max_entries)
+        # Main Diag Y fit results
+        data['PowerLorentzMainDiagYCenter'] = tree['PowerLorentzMainDiagYCenter'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYGamma'] = tree['PowerLorentzMainDiagYGamma'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYBeta'] = tree['PowerLorentzMainDiagYBeta'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYAmp'] = tree['PowerLorentzMainDiagYAmp'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYVertOffset'] = tree['PowerLorentzMainDiagYVertOffset'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYCenterErr'] = tree['PowerLorentzMainDiagYCenterErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYGammaErr'] = tree['PowerLorentzMainDiagYGammaErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYBetaErr'] = tree['PowerLorentzMainDiagYBetaErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYAmpErr'] = tree['PowerLorentzMainDiagYAmpErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYChi2red'] = tree['PowerLorentzMainDiagYChi2red'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzMainDiagYDOF'] = tree['PowerLorentzMainDiagYDOF'].array(library="np", entry_stop=max_entries)
         
-        # Secondary Diagonal X fit results
-        data['PowerLorentzFitSecDiagXCenter'] = tree['PowerLorentzFitSecondDiagXCenter'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXGamma'] = tree['PowerLorentzFitSecondDiagXGamma'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXBeta'] = tree['PowerLorentzFitSecondDiagXBeta'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXAmplitude'] = tree['PowerLorentzFitSecondDiagXAmplitude'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXVerticalOffset'] = tree['PowerLorentzFitSecondDiagXVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXCenterErr'] = tree['PowerLorentzFitSecondDiagXCenterErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXGammaErr'] = tree['PowerLorentzFitSecondDiagXGammaErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXBetaErr'] = tree['PowerLorentzFitSecondDiagXBetaErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXAmplitudeErr'] = tree['PowerLorentzFitSecondDiagXAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXChi2red'] = tree['PowerLorentzFitSecondDiagXChi2red'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagXDOF'] = tree['PowerLorentzFitSecondDiagXDOF'].array(library="np", entry_stop=max_entries)
+        # Secondary Diag X fit results
+        data['PowerLorentzSecDiagXCenter'] = tree['PowerLorentzSecDiagXCenter'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXGamma'] = tree['PowerLorentzSecDiagXGamma'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXBeta'] = tree['PowerLorentzSecDiagXBeta'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXAmp'] = tree['PowerLorentzSecDiagXAmp'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXVertOffset'] = tree['PowerLorentzSecDiagXVertOffset'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXCenterErr'] = tree['PowerLorentzSecDiagXCenterErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXGammaErr'] = tree['PowerLorentzSecDiagXGammaErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXBetaErr'] = tree['PowerLorentzSecDiagXBetaErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXAmpErr'] = tree['PowerLorentzSecDiagXAmpErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXChi2red'] = tree['PowerLorentzSecDiagXChi2red'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagXDOF'] = tree['PowerLorentzSecDiagXDOF'].array(library="np", entry_stop=max_entries)
         
-        # Secondary Diagonal Y fit results
-        data['PowerLorentzFitSecDiagYCenter'] = tree['PowerLorentzFitSecondDiagYCenter'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYGamma'] = tree['PowerLorentzFitSecondDiagYGamma'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYBeta'] = tree['PowerLorentzFitSecondDiagYBeta'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYAmplitude'] = tree['PowerLorentzFitSecondDiagYAmplitude'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYVerticalOffset'] = tree['PowerLorentzFitSecondDiagYVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYCenterErr'] = tree['PowerLorentzFitSecondDiagYCenterErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYGammaErr'] = tree['PowerLorentzFitSecondDiagYGammaErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYBetaErr'] = tree['PowerLorentzFitSecondDiagYBetaErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYAmplitudeErr'] = tree['PowerLorentzFitSecondDiagYAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYChi2red'] = tree['PowerLorentzFitSecondDiagYChi2red'].array(library="np", entry_stop=max_entries)
-        data['PowerLorentzFitSecDiagYDOF'] = tree['PowerLorentzFitSecondDiagYDOF'].array(library="np", entry_stop=max_entries)
+        # Secondary Diag Y fit results
+        data['PowerLorentzSecDiagYCenter'] = tree['PowerLorentzSecDiagYCenter'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYGamma'] = tree['PowerLorentzSecDiagYGamma'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYBeta'] = tree['PowerLorentzSecDiagYBeta'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYAmp'] = tree['PowerLorentzSecDiagYAmp'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYVertOffset'] = tree['PowerLorentzSecDiagYVertOffset'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYCenterErr'] = tree['PowerLorentzSecDiagYCenterErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYGammaErr'] = tree['PowerLorentzSecDiagYGammaErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYBetaErr'] = tree['PowerLorentzSecDiagYBetaErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYAmpErr'] = tree['PowerLorentzSecDiagYAmpErr'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYChi2red'] = tree['PowerLorentzSecDiagYChi2red'].array(library="np", entry_stop=max_entries)
+        data['PowerLorentzSecDiagYDOF'] = tree['PowerLorentzSecDiagYDOF'].array(library="np", entry_stop=max_entries)
         
         # Try to load detector grid parameters from metadata
         try:
@@ -230,7 +230,7 @@ def load_root_data(root_file, max_entries=None):
             data['PixelSpacing'] = 0.5  # Default fallback
         
         n_events = len(data['TrueX'])
-        print(f"Successfully loaded {n_events} events from ROOT file")
+        print(f"Successly loaded {n_events} events from ROOT file")
         
         # Filter for non-pixel hits only
         non_pixel_mask = ~data['IsPixelHit']
@@ -257,12 +257,12 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
     """Extract main diagonal charge data for a specific event."""
     try:
         # Get neighborhood data for this event
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
-            grid_charges = data['GridNeighborhoodCharges']
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
+            grid_charges = data['NeighborhoodCharges']
             pixel_x = data['PixelX']
             pixel_y = data['PixelY']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_x = data['PixelX'][event_idx]
             pixel_y = data['PixelY'][event_idx]
         else:
@@ -277,13 +277,13 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2
         pixel_spacing = data['PixelSpacing']
         
         # Extract main diagonal elements
         diagonal_charges = []
-        diagonal_positions = []
+        diagonal_poss = []
         
         for i in range(grid_size):
             # Main diagonal: (i, i) in (row, col) notation
@@ -294,26 +294,26 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
             if index < len(grid_charges) and grid_charges[index] > 0:
                 diagonal_charges.append(grid_charges[index])
                 
-                # Calculate position relative to pixel center
+                # Calc pos relative to pixel center
                 offset_x = col - radius
                 offset_y = row - radius
                 
-                # For diagonal, use distance along diagonal as position
+                # For diagonal, use distance along diagonal as pos
                 diagonal_distance = np.sqrt(offset_x**2 + offset_y**2) * np.sign(offset_x)
-                diagonal_positions.append(diagonal_distance)
+                diagonal_poss.append(diagonal_distance)
         
         if len(diagonal_charges) < 3:
             return None, None, False
         
-        # Convert to numpy arrays and sort by diagonal position
-        diagonal_positions = np.array(diagonal_positions)
+        # Convert to numpy arrays and sort by diagonal pos
+        diagonal_poss = np.array(diagonal_poss)
         diagonal_charges = np.array(diagonal_charges)
         
-        sort_indices = np.argsort(diagonal_positions)
-        diagonal_positions = diagonal_positions[sort_indices]
+        sort_indices = np.argsort(diagonal_poss)
+        diagonal_poss = diagonal_poss[sort_indices]
         diagonal_charges = diagonal_charges[sort_indices]
         
-        return diagonal_positions, diagonal_charges, True
+        return diagonal_poss, diagonal_charges, True
         
     except Exception as e:
         return None, None, False
@@ -322,12 +322,12 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
     """Extract secondary diagonal charge data for a specific event."""
     try:
         # Get neighborhood data for this event
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
-            grid_charges = data['GridNeighborhoodCharges']
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
+            grid_charges = data['NeighborhoodCharges']
             pixel_x = data['PixelX']
             pixel_y = data['PixelY']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_x = data['PixelX'][event_idx]
             pixel_y = data['PixelY'][event_idx]
         else:
@@ -342,13 +342,13 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2
         pixel_spacing = data['PixelSpacing']
         
         # Extract secondary diagonal elements
         diagonal_charges = []
-        diagonal_positions = []
+        diagonal_poss = []
         
         for i in range(grid_size):
             # Secondary diagonal: (i, grid_size-1-i) in (row, col) notation
@@ -359,54 +359,54 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
             if index < len(grid_charges) and grid_charges[index] > 0:
                 diagonal_charges.append(grid_charges[index])
                 
-                # Calculate position relative to pixel center
+                # Calc pos relative to pixel center
                 offset_x = col - radius
                 offset_y = row - radius
                 
-                # For secondary diagonal, use distance along diagonal as position
+                # For secondary diagonal, use distance along diagonal as pos
                 diagonal_distance = np.sqrt(offset_x**2 + offset_y**2) * np.sign(-offset_x)
-                diagonal_positions.append(diagonal_distance)
+                diagonal_poss.append(diagonal_distance)
         
         if len(diagonal_charges) < 3:
             return None, None, False
         
-        # Convert to numpy arrays and sort by diagonal position
-        diagonal_positions = np.array(diagonal_positions)
+        # Convert to numpy arrays and sort by diagonal pos
+        diagonal_poss = np.array(diagonal_poss)
         diagonal_charges = np.array(diagonal_charges)
         
-        sort_indices = np.argsort(diagonal_positions)
-        diagonal_positions = diagonal_positions[sort_indices]
+        sort_indices = np.argsort(diagonal_poss)
+        diagonal_poss = diagonal_poss[sort_indices]
         diagonal_charges = diagonal_charges[sort_indices]
         
-        return diagonal_positions, diagonal_charges, True
+        return diagonal_poss, diagonal_charges, True
         
     except Exception as e:
         return None, None, False 
 
 def get_stored_charge_uncertainties(event_idx, data, diagonal_type):
     """
-    Get charge uncertainties - fallback to 5% of max charge for Power Lorentzian.
+    Get charge uncertainties - fallback to 5% of max charge for Power Lorentz.
     """
-    # For Power Lorentzian, calculate fallback uncertainty as 5% of max charge
+    # For Power Lorentz, calculate fallback err as 5% of max charge
     if diagonal_type.startswith('main_diag'):
-        diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
     else:
-        diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
         
     if valid_data and len(charges) > 0:
-        uncertainty = 0.05 * np.max(charges)  # 5% of max charge
+        err = 0.05 * np.max(charges)  # 5% of max charge
     else:
-        uncertainty = 0.05  # Default fallback
+        err = 0.05  # Default fallback
     
-    return uncertainty
+    return err
 
 def create_main_diagonal_x_plot(event_idx, data):
     """
-    Create a plot showing the main diagonal X-component Power Lorentzian fit for a specific event.
+    Create a plot showing the main diagonal X-component Power Lorentz fit for a specific event.
     """
     try:
         # Extract main diagonal data
-        diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -420,77 +420,77 @@ def create_main_diagonal_x_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['PowerLorentzFitMainDiagXCenter'], event_idx)
-        fit_gamma = get_param_value(data['PowerLorentzFitMainDiagXGamma'], event_idx)
-        fit_beta = get_param_value(data['PowerLorentzFitMainDiagXBeta'], event_idx)
-        fit_amplitude = get_param_value(data['PowerLorentzFitMainDiagXAmplitude'], event_idx)
-        fit_offset = get_param_value(data['PowerLorentzFitMainDiagXVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['PowerLorentzFitMainDiagXCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['PowerLorentzFitMainDiagXGammaErr'], event_idx)
-        fit_beta_err = get_param_value(data['PowerLorentzFitMainDiagXBetaErr'], event_idx)
-        chi2_red = get_param_value(data['PowerLorentzFitMainDiagXChi2red'], event_idx)
-        dof = get_param_value(data['PowerLorentzFitMainDiagXDOF'], event_idx)
+        fit_center = get_param_value(data['PowerLorentzMainDiagXCenter'], event_idx)
+        fit_gamma = get_param_value(data['PowerLorentzMainDiagXGamma'], event_idx)
+        fit_beta = get_param_value(data['PowerLorentzMainDiagXBeta'], event_idx)
+        fit_amp = get_param_value(data['PowerLorentzMainDiagXAmp'], event_idx)
+        fit_offset = get_param_value(data['PowerLorentzMainDiagXVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['PowerLorentzMainDiagXCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['PowerLorentzMainDiagXGammaErr'], event_idx)
+        fit_beta_err = get_param_value(data['PowerLorentzMainDiagXBetaErr'], event_idx)
+        chi2_red = get_param_value(data['PowerLorentzMainDiagXChi2red'], event_idx)
+        dof = get_param_value(data['PowerLorentzMainDiagXDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto main diagonal
+        # Get true pos and project onto main diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto main diagonal direction
+        # Project true pos onto main diagonal direction
         # Main diagonal has direction (1,1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x + true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'main_diag_x')
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = power_lorentzian_1d(diagonal_positions, fit_amplitude, fit_center, fit_gamma, fit_beta, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = power_lorentz_1d(diagonal_poss, fit_amp, fit_center, fit_gamma, fit_beta, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='red', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Main Diagonal X Power Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Main Diag X Power Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Power Lorentzian curve
+        # Plot fitted Power Lorentz curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = power_lorentzian_1d(pos_fit_range, fit_amplitude, fit_center, fit_gamma, fit_beta, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'r-', linewidth=3, label='Power Lorentzian Fit')
+        y_fit = power_lorentz_1d(pos_fit_range, fit_amp, fit_center, fit_gamma, fit_beta, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'r-', linewidth=3, label='Power Lorentz ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='red', linestyle=':', linewidth=3, alpha=0.8, label='x_fit (main diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Main Diagonal X Power Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Main Diag X Power Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -518,11 +518,11 @@ def create_main_diagonal_x_plot(event_idx, data):
 
 def create_main_diagonal_y_plot(event_idx, data):
     """
-    Create a plot showing the main diagonal Y-component Power Lorentzian fit for a specific event.
+    Create a plot showing the main diagonal Y-component Power Lorentz fit for a specific event.
     """
     try:
         # Extract main diagonal data
-        diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -536,70 +536,70 @@ def create_main_diagonal_y_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['PowerLorentzFitMainDiagYCenter'], event_idx)
-        fit_gamma = get_param_value(data['PowerLorentzFitMainDiagYGamma'], event_idx)
-        fit_beta = get_param_value(data['PowerLorentzFitMainDiagYBeta'], event_idx)
-        fit_amplitude = get_param_value(data['PowerLorentzFitMainDiagYAmplitude'], event_idx)
-        fit_offset = get_param_value(data['PowerLorentzFitMainDiagYVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['PowerLorentzFitMainDiagYCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['PowerLorentzFitMainDiagYGammaErr'], event_idx)
-        fit_beta_err = get_param_value(data['PowerLorentzFitMainDiagYBetaErr'], event_idx)
-        chi2_red = get_param_value(data['PowerLorentzFitMainDiagYChi2red'], event_idx)
-        dof = get_param_value(data['PowerLorentzFitMainDiagYDOF'], event_idx)
+        fit_center = get_param_value(data['PowerLorentzMainDiagYCenter'], event_idx)
+        fit_gamma = get_param_value(data['PowerLorentzMainDiagYGamma'], event_idx)
+        fit_beta = get_param_value(data['PowerLorentzMainDiagYBeta'], event_idx)
+        fit_amp = get_param_value(data['PowerLorentzMainDiagYAmp'], event_idx)
+        fit_offset = get_param_value(data['PowerLorentzMainDiagYVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['PowerLorentzMainDiagYCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['PowerLorentzMainDiagYGammaErr'], event_idx)
+        fit_beta_err = get_param_value(data['PowerLorentzMainDiagYBetaErr'], event_idx)
+        chi2_red = get_param_value(data['PowerLorentzMainDiagYChi2red'], event_idx)
+        dof = get_param_value(data['PowerLorentzMainDiagYDOF'], event_idx)
         
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto main diagonal
+        # Get true pos and project onto main diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto main diagonal direction
+        # Project true pos onto main diagonal direction
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x + true_offset_y
         
-        # Calculate uncertainties and fitted curve
+        # Calc uncertainties and fitted curve
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'main_diag_y')
         uncertainties = np.full_like(charges, uncertainties)
-        fitted_charges = power_lorentzian_1d(diagonal_positions, fit_amplitude, fit_center, fit_gamma, fit_beta, fit_offset)
+        fitted_charges = power_lorentz_1d(diagonal_poss, fit_amp, fit_center, fit_gamma, fit_beta, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='blue', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Main Diagonal Y Power Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Main Diag Y Power Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = power_lorentzian_1d(pos_fit_range, fit_amplitude, fit_center, fit_gamma, fit_beta, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'b-', linewidth=3, label='Power Lorentzian Fit')
+        y_fit = power_lorentz_1d(pos_fit_range, fit_amp, fit_center, fit_gamma, fit_beta, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'b-', linewidth=3, label='Power Lorentz ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='blue', linestyle=':', linewidth=3, alpha=0.8, label='y_fit (main diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Main Diagonal Y Power Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Main Diag Y Power Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information
@@ -626,11 +626,11 @@ def create_main_diagonal_y_plot(event_idx, data):
 
 def create_secondary_diagonal_x_plot(event_idx, data):
     """
-    Create a plot showing the secondary diagonal X-component Power Lorentzian fit for a specific event.
+    Create a plot showing the secondary diagonal X-component Power Lorentz fit for a specific event.
     """
     try:
         # Extract secondary diagonal data
-        diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -644,71 +644,71 @@ def create_secondary_diagonal_x_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['PowerLorentzFitSecDiagXCenter'], event_idx)
-        fit_gamma = get_param_value(data['PowerLorentzFitSecDiagXGamma'], event_idx)
-        fit_beta = get_param_value(data['PowerLorentzFitSecDiagXBeta'], event_idx)
-        fit_amplitude = get_param_value(data['PowerLorentzFitSecDiagXAmplitude'], event_idx)
-        fit_offset = get_param_value(data['PowerLorentzFitSecDiagXVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['PowerLorentzFitSecDiagXCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['PowerLorentzFitSecDiagXGammaErr'], event_idx)
-        fit_beta_err = get_param_value(data['PowerLorentzFitSecDiagXBetaErr'], event_idx)
-        chi2_red = get_param_value(data['PowerLorentzFitSecDiagXChi2red'], event_idx)
-        dof = get_param_value(data['PowerLorentzFitSecDiagXDOF'], event_idx)
+        fit_center = get_param_value(data['PowerLorentzSecDiagXCenter'], event_idx)
+        fit_gamma = get_param_value(data['PowerLorentzSecDiagXGamma'], event_idx)
+        fit_beta = get_param_value(data['PowerLorentzSecDiagXBeta'], event_idx)
+        fit_amp = get_param_value(data['PowerLorentzSecDiagXAmp'], event_idx)
+        fit_offset = get_param_value(data['PowerLorentzSecDiagXVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['PowerLorentzSecDiagXCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['PowerLorentzSecDiagXGammaErr'], event_idx)
+        fit_beta_err = get_param_value(data['PowerLorentzSecDiagXBetaErr'], event_idx)
+        chi2_red = get_param_value(data['PowerLorentzSecDiagXChi2red'], event_idx)
+        dof = get_param_value(data['PowerLorentzSecDiagXDOF'], event_idx)
         
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto secondary diagonal
+        # Get true pos and project onto secondary diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto secondary diagonal direction
+        # Project true pos onto secondary diagonal direction
         # Secondary diagonal has direction (1,-1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x - true_offset_y
         
-        # Calculate uncertainties and fitted curve
+        # Calc uncertainties and fitted curve
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'sec_diag_x')
         uncertainties = np.full_like(charges, uncertainties)
-        fitted_charges = power_lorentzian_1d(diagonal_positions, fit_amplitude, fit_center, fit_gamma, fit_beta, fit_offset)
+        fitted_charges = power_lorentz_1d(diagonal_poss, fit_amp, fit_center, fit_gamma, fit_beta, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='orange', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Secondary Diagonal X Power Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Secondary Diag X Power Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = power_lorentzian_1d(pos_fit_range, fit_amplitude, fit_center, fit_gamma, fit_beta, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'orange', linewidth=3, label='Power Lorentzian Fit')
+        y_fit = power_lorentz_1d(pos_fit_range, fit_amp, fit_center, fit_gamma, fit_beta, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'orange', linewidth=3, label='Power Lorentz ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='orange', linestyle=':', linewidth=3, alpha=0.8, label='x_fit (sec diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Secondary Diagonal X Power Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Secondary Diag X Power Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information
@@ -735,11 +735,11 @@ def create_secondary_diagonal_x_plot(event_idx, data):
 
 def create_secondary_diagonal_y_plot(event_idx, data):
     """
-    Create a plot showing the secondary diagonal Y-component Power Lorentzian fit for a specific event.
+    Create a plot showing the secondary diagonal Y-component Power Lorentz fit for a specific event.
     """
     try:
         # Extract secondary diagonal data
-        diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -753,70 +753,70 @@ def create_secondary_diagonal_y_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['PowerLorentzFitSecDiagYCenter'], event_idx)
-        fit_gamma = get_param_value(data['PowerLorentzFitSecDiagYGamma'], event_idx)
-        fit_beta = get_param_value(data['PowerLorentzFitSecDiagYBeta'], event_idx)
-        fit_amplitude = get_param_value(data['PowerLorentzFitSecDiagYAmplitude'], event_idx)
-        fit_offset = get_param_value(data['PowerLorentzFitSecDiagYVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['PowerLorentzFitSecDiagYCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['PowerLorentzFitSecDiagYGammaErr'], event_idx)
-        fit_beta_err = get_param_value(data['PowerLorentzFitSecDiagYBetaErr'], event_idx)
-        chi2_red = get_param_value(data['PowerLorentzFitSecDiagYChi2red'], event_idx)
-        dof = get_param_value(data['PowerLorentzFitSecDiagYDOF'], event_idx)
+        fit_center = get_param_value(data['PowerLorentzSecDiagYCenter'], event_idx)
+        fit_gamma = get_param_value(data['PowerLorentzSecDiagYGamma'], event_idx)
+        fit_beta = get_param_value(data['PowerLorentzSecDiagYBeta'], event_idx)
+        fit_amp = get_param_value(data['PowerLorentzSecDiagYAmp'], event_idx)
+        fit_offset = get_param_value(data['PowerLorentzSecDiagYVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['PowerLorentzSecDiagYCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['PowerLorentzSecDiagYGammaErr'], event_idx)
+        fit_beta_err = get_param_value(data['PowerLorentzSecDiagYBetaErr'], event_idx)
+        chi2_red = get_param_value(data['PowerLorentzSecDiagYChi2red'], event_idx)
+        dof = get_param_value(data['PowerLorentzSecDiagYDOF'], event_idx)
         
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto secondary diagonal
+        # Get true pos and project onto secondary diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto secondary diagonal direction
+        # Project true pos onto secondary diagonal direction
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x - true_offset_y
         
-        # Calculate uncertainties and fitted curve
+        # Calc uncertainties and fitted curve
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'sec_diag_y')
         uncertainties = np.full_like(charges, uncertainties)
-        fitted_charges = power_lorentzian_1d(diagonal_positions, fit_amplitude, fit_center, fit_gamma, fit_beta, fit_offset)
+        fitted_charges = power_lorentz_1d(diagonal_poss, fit_amp, fit_center, fit_gamma, fit_beta, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='purple', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Secondary Diagonal Y Power Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Secondary Diag Y Power Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = power_lorentzian_1d(pos_fit_range, fit_amplitude, fit_center, fit_gamma, fit_beta, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'purple', linewidth=3, label='Power Lorentzian Fit')
+        y_fit = power_lorentz_1d(pos_fit_range, fit_amp, fit_center, fit_gamma, fit_beta, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'purple', linewidth=3, label='Power Lorentz ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='purple', linestyle=':', linewidth=3, alpha=0.8, label='y_fit (sec diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Secondary Diagonal Y Power Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Secondary Diag Y Power Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information
@@ -885,27 +885,27 @@ def _prepare_data_subset(data, event_idx):
     # List of all keys we need for plotting
     keys_needed = [
         'TrueX', 'TrueY', 'PixelX', 'PixelY', 'IsPixelHit',
-        'GridNeighborhoodCharges', 'PixelSpacing',
+        'NeighborhoodCharges', 'PixelSpacing',
         # Main diagonal X parameters
-        'PowerLorentzFitMainDiagXCenter', 'PowerLorentzFitMainDiagXGamma', 'PowerLorentzFitMainDiagXBeta', 
-        'PowerLorentzFitMainDiagXAmplitude', 'PowerLorentzFitMainDiagXVerticalOffset', 
-        'PowerLorentzFitMainDiagXCenterErr', 'PowerLorentzFitMainDiagXGammaErr', 'PowerLorentzFitMainDiagXBetaErr',
-        'PowerLorentzFitMainDiagXAmplitudeErr', 'PowerLorentzFitMainDiagXChi2red', 'PowerLorentzFitMainDiagXDOF',
+        'PowerLorentzMainDiagXCenter', 'PowerLorentzMainDiagXGamma', 'PowerLorentzMainDiagXBeta', 
+        'PowerLorentzMainDiagXAmp', 'PowerLorentzMainDiagXVertOffset', 
+        'PowerLorentzMainDiagXCenterErr', 'PowerLorentzMainDiagXGammaErr', 'PowerLorentzMainDiagXBetaErr',
+        'PowerLorentzMainDiagXAmpErr', 'PowerLorentzMainDiagXChi2red', 'PowerLorentzMainDiagXDOF',
         # Main diagonal Y parameters
-        'PowerLorentzFitMainDiagYCenter', 'PowerLorentzFitMainDiagYGamma', 'PowerLorentzFitMainDiagYBeta',
-        'PowerLorentzFitMainDiagYAmplitude', 'PowerLorentzFitMainDiagYVerticalOffset',
-        'PowerLorentzFitMainDiagYCenterErr', 'PowerLorentzFitMainDiagYGammaErr', 'PowerLorentzFitMainDiagYBetaErr',
-        'PowerLorentzFitMainDiagYAmplitudeErr', 'PowerLorentzFitMainDiagYChi2red', 'PowerLorentzFitMainDiagYDOF',
+        'PowerLorentzMainDiagYCenter', 'PowerLorentzMainDiagYGamma', 'PowerLorentzMainDiagYBeta',
+        'PowerLorentzMainDiagYAmp', 'PowerLorentzMainDiagYVertOffset',
+        'PowerLorentzMainDiagYCenterErr', 'PowerLorentzMainDiagYGammaErr', 'PowerLorentzMainDiagYBetaErr',
+        'PowerLorentzMainDiagYAmpErr', 'PowerLorentzMainDiagYChi2red', 'PowerLorentzMainDiagYDOF',
         # Secondary diagonal X parameters
-        'PowerLorentzFitSecDiagXCenter', 'PowerLorentzFitSecDiagXGamma', 'PowerLorentzFitSecDiagXBeta', 
-        'PowerLorentzFitSecDiagXAmplitude', 'PowerLorentzFitSecDiagXVerticalOffset',
-        'PowerLorentzFitSecDiagXCenterErr', 'PowerLorentzFitSecDiagXGammaErr', 'PowerLorentzFitSecDiagXBetaErr',
-        'PowerLorentzFitSecDiagXAmplitudeErr', 'PowerLorentzFitSecDiagXChi2red', 'PowerLorentzFitSecDiagXDOF',
+        'PowerLorentzSecDiagXCenter', 'PowerLorentzSecDiagXGamma', 'PowerLorentzSecDiagXBeta', 
+        'PowerLorentzSecDiagXAmp', 'PowerLorentzSecDiagXVertOffset',
+        'PowerLorentzSecDiagXCenterErr', 'PowerLorentzSecDiagXGammaErr', 'PowerLorentzSecDiagXBetaErr',
+        'PowerLorentzSecDiagXAmpErr', 'PowerLorentzSecDiagXChi2red', 'PowerLorentzSecDiagXDOF',
         # Secondary diagonal Y parameters
-        'PowerLorentzFitSecDiagYCenter', 'PowerLorentzFitSecDiagYGamma', 'PowerLorentzFitSecDiagYBeta',
-        'PowerLorentzFitSecDiagYAmplitude', 'PowerLorentzFitSecDiagYVerticalOffset',
-        'PowerLorentzFitSecDiagYCenterErr', 'PowerLorentzFitSecDiagYGammaErr', 'PowerLorentzFitSecDiagYBetaErr',
-        'PowerLorentzFitSecDiagYAmplitudeErr', 'PowerLorentzFitSecDiagYChi2red', 'PowerLorentzFitSecDiagYDOF'
+        'PowerLorentzSecDiagYCenter', 'PowerLorentzSecDiagYGamma', 'PowerLorentzSecDiagYBeta',
+        'PowerLorentzSecDiagYAmp', 'PowerLorentzSecDiagYVertOffset',
+        'PowerLorentzSecDiagYCenterErr', 'PowerLorentzSecDiagYGammaErr', 'PowerLorentzSecDiagYBetaErr',
+        'PowerLorentzSecDiagYAmpErr', 'PowerLorentzSecDiagYChi2red', 'PowerLorentzSecDiagYDOF'
     ]
     
     for key in keys_needed:
@@ -917,9 +917,9 @@ def _prepare_data_subset(data, event_idx):
     
     return subset 
 
-def create_diagonal_power_lorentzian_fit_pdfs(data, output_dir="diagonal_power_lorentzian_plots", max_events=None, n_workers=None):
+def create_diagonal_power_lorentz_fit_pdfs(data, output_dir="diagonal_power_lorentz_plots", max_events=None, n_workers=None):
     """
-    Create PDF files with diagonal Power Lorentzian fits visualization using parallel processing.
+    Create PDF files with diagonal Power Lorentz fits visualization using parallel processing.
     
     Args:
         data: Data dictionary from ROOT file
@@ -941,28 +941,28 @@ def create_diagonal_power_lorentzian_fit_pdfs(data, output_dir="diagonal_power_l
     if n_workers is None:
         n_workers = min(mp.cpu_count(), 8)  # Cap at 8 to avoid memory issues
     
-    print(f"Creating diagonal Power Lorentzian fit visualizations for {n_events} events using {n_workers} workers")
+    print(f"Creating diagonal Power Lorentz fit visualizations for {n_events} events using {n_workers} workers")
     
     # Create output paths
-    main_diag_x_pdf = os.path.join(output_dir, "power_lorentzian_fits_main_diagonal_x.pdf")
-    main_diag_y_pdf = os.path.join(output_dir, "power_lorentzian_fits_main_diagonal_y.pdf")
-    sec_diag_x_pdf = os.path.join(output_dir, "power_lorentzian_fits_secondary_diagonal_x.pdf")
-    sec_diag_y_pdf = os.path.join(output_dir, "power_lorentzian_fits_secondary_diagonal_y.pdf")
+    main_diag_x_pdf = os.path.join(output_dir, "power_lorentz_fits_main_diagonal_x.pdf")
+    main_diag_y_pdf = os.path.join(output_dir, "power_lorentz_fits_main_diagonal_y.pdf")
+    sec_diag_x_pdf = os.path.join(output_dir, "power_lorentz_fits_secondary_diagonal_x.pdf")
+    sec_diag_y_pdf = os.path.join(output_dir, "power_lorentz_fits_secondary_diagonal_y.pdf")
     
-    # Pre-filter events with successful fits
+    # Pre-filter events with success fits
     main_diag_x_valid = []
     main_diag_y_valid = []
     sec_diag_x_valid = []
     sec_diag_y_valid = []
     
     for event_idx in range(n_events):
-        if data['PowerLorentzFitMainDiagXDOF'][event_idx] > 0:
+        if data['PowerLorentzMainDiagXDOF'][event_idx] > 0:
             main_diag_x_valid.append(event_idx)
-        if data['PowerLorentzFitMainDiagYDOF'][event_idx] > 0:
+        if data['PowerLorentzMainDiagYDOF'][event_idx] > 0:
             main_diag_y_valid.append(event_idx)
-        if data['PowerLorentzFitSecDiagXDOF'][event_idx] > 0:
+        if data['PowerLorentzSecDiagXDOF'][event_idx] > 0:
             sec_diag_x_valid.append(event_idx)
-        if data['PowerLorentzFitSecDiagYDOF'][event_idx] > 0:
+        if data['PowerLorentzSecDiagYDOF'][event_idx] > 0:
             sec_diag_y_valid.append(event_idx)
     
     print(f"Found {len(main_diag_x_valid)} valid main diagonal X fits")
@@ -974,10 +974,10 @@ def create_diagonal_power_lorentzian_fit_pdfs(data, output_dir="diagonal_power_l
     
     # Define diagonal types and their corresponding data
     diagonal_types = [
-        ('main_diag_x', main_diag_x_valid, main_diag_x_pdf, "Main Diagonal X"),
-        ('main_diag_y', main_diag_y_valid, main_diag_y_pdf, "Main Diagonal Y"),
-        ('sec_diag_x', sec_diag_x_valid, sec_diag_x_pdf, "Secondary Diagonal X"),
-        ('sec_diag_y', sec_diag_y_valid, sec_diag_y_pdf, "Secondary Diagonal Y")
+        ('main_diag_x', main_diag_x_valid, main_diag_x_pdf, "Main Diag X"),
+        ('main_diag_y', main_diag_y_valid, main_diag_y_pdf, "Main Diag Y"),
+        ('sec_diag_x', sec_diag_x_valid, sec_diag_x_pdf, "Secondary Diag X"),
+        ('sec_diag_y', sec_diag_y_valid, sec_diag_y_pdf, "Secondary Diag Y")
     ]
     
     for diag_type, valid_events, pdf_path, display_name in diagonal_types:
@@ -1035,7 +1035,7 @@ def create_diagonal_power_lorentzian_fit_pdfs(data, output_dir="diagonal_power_l
         del args_list
         gc.collect()
     
-    print(f"\nDiagonal Power Lorentzian PDF generation completed!")
+    print(f"\nDiag Power Lorentz PDF generation completed!")
     return (success_counts.get('main_diag_x', 0), 
             success_counts.get('main_diag_y', 0),
             success_counts.get('sec_diag_x', 0), 
@@ -1056,9 +1056,9 @@ def inspect_root_file(root_file):
         
         print(f"\nTree 'Hits' contains {len(branches)} branches:")
         
-        # Show diagonal Power Lorentzian fitting branches
-        diagonal_branches = [b for b in branches if 'PowerLorentzFit' in b and 'Diag' in b]
-        print(f"\nDiagonal Power Lorentzian fitting branches ({len(diagonal_branches)}):")
+        # Show diagonal Power Lorentz fitting branches
+        diagonal_branches = [b for b in branches if 'PowerLorentz' in b and 'Diag' in b]
+        print(f"\nDiag Power Lorentz fitting branches ({len(diagonal_branches)}):")
         for i, branch in enumerate(sorted(diagonal_branches)):
             print(f"  {i+1:2d}: {branch}")
         
@@ -1078,19 +1078,19 @@ def inspect_root_file(root_file):
         print(f"  Non-pixel hits: {n_non_pixel} ({100*n_non_pixel/n_events:.1f}%)")
         print(f"  Pixel hits: {n_events - n_non_pixel} ({100*(n_events - n_non_pixel)/n_events:.1f}%)")
         
-        # Check for successful diagonal fits
+        # Check for success diagonal fits
         diagonal_dofs = [
-            ('PowerLorentzFitMainDiagXDOF', 'Main Diagonal X'),
-            ('PowerLorentzFitMainDiagYDOF', 'Main Diagonal Y'),
-            ('PowerLorentzFitSecDiagXDOF', 'Secondary Diagonal X'),
-            ('PowerLorentzFitSecDiagYDOF', 'Secondary Diagonal Y')
+            ('PowerLorentzMainDiagXDOF', 'Main Diag X'),
+            ('PowerLorentzMainDiagYDOF', 'Main Diag Y'),
+            ('PowerLorentzSecDiagXDOF', 'Secondary Diag X'),
+            ('PowerLorentzSecDiagYDOF', 'Secondary Diag Y')
         ]
         
         for dof_branch, name in diagonal_dofs:
             if dof_branch in branches:
                 dof_data = tree[dof_branch].array(library="np")
-                successful_fits = np.sum(dof_data > 0)
-                print(f"  Successful {name} fits: {successful_fits} ({100*successful_fits/n_events:.1f}%)")
+                success_fits = np.sum(dof_data > 0)
+                print(f"  Success {name} fits: {success_fits} ({100*success_fits/n_events:.1f}%)")
         
     except Exception as e:
         print(f"Error inspecting ROOT file: {e}")
@@ -1098,11 +1098,11 @@ def inspect_root_file(root_file):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Visualize diagonal Power Lorentzian fits from GEANT4 charge sharing simulation ROOT files",
+        description="Visualize diagonal Power Lorentz fits from GEANT4 charge sharing simulation ROOT files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("root_file", help="Path to ROOT file from GEANT4 simulation")
-    parser.add_argument("-o", "--output", default="diagonal_power_lorentzian_fits", 
+    parser.add_argument("-o", "--output", default="diagonal_power_lorentz_fits", 
                        help="Output directory for PDF files")
     parser.add_argument("-n", "--num_events", type=int, default=None,
                        help="Maximum number of events to process (default: all events)")
@@ -1131,26 +1131,26 @@ def main():
         print("Failed to load data. Exiting.")
         return 1
     
-    # Check if we have diagonal Power Lorentzian fitting data
+    # Check if we have diagonal Power Lorentz fitting data
     n_events = len(data['TrueX'])
     if n_events == 0:
         print("No events found in the data!")
         return 1
     
-    # Count successful fits
-    main_diag_x_successful = np.sum(data['PowerLorentzFitMainDiagXDOF'] > 0)
-    main_diag_y_successful = np.sum(data['PowerLorentzFitMainDiagYDOF'] > 0)
-    sec_diag_x_successful = np.sum(data['PowerLorentzFitSecDiagXDOF'] > 0)
-    sec_diag_y_successful = np.sum(data['PowerLorentzFitSecDiagYDOF'] > 0)
+    # Count success fits
+    main_diag_x_success = np.sum(data['PowerLorentzMainDiagXDOF'] > 0)
+    main_diag_y_success = np.sum(data['PowerLorentzMainDiagYDOF'] > 0)
+    sec_diag_x_success = np.sum(data['PowerLorentzSecDiagXDOF'] > 0)
+    sec_diag_y_success = np.sum(data['PowerLorentzSecDiagYDOF'] > 0)
     
-    print(f"Found {main_diag_x_successful} successful main diagonal X fits")
-    print(f"Found {main_diag_y_successful} successful main diagonal Y fits")
-    print(f"Found {sec_diag_x_successful} successful secondary diagonal X fits")
-    print(f"Found {sec_diag_y_successful} successful secondary diagonal Y fits")
+    print(f"Found {main_diag_x_success} success main diagonal X fits")
+    print(f"Found {main_diag_y_success} success main diagonal Y fits")
+    print(f"Found {sec_diag_x_success} success secondary diagonal X fits")
+    print(f"Found {sec_diag_y_success} success secondary diagonal Y fits")
     
-    total_successful = main_diag_x_successful + main_diag_y_successful + sec_diag_x_successful + sec_diag_y_successful
-    if total_successful == 0:
-        print("No successful diagonal Power Lorentzian fits found in the data!")
+    total_success = main_diag_x_success + main_diag_y_success + sec_diag_x_success + sec_diag_y_success
+    if total_success == 0:
+        print("No success diagonal Power Lorentz fits found in the data!")
         return 1
     
     # Create output directory
@@ -1158,7 +1158,7 @@ def main():
     print(f"Output directory: {args.output}")
     
     # Create PDF visualizations
-    main_diag_x_count, main_diag_y_count, sec_diag_x_count, sec_diag_y_count = create_diagonal_power_lorentzian_fit_pdfs(
+    main_diag_x_count, main_diag_y_count, sec_diag_x_count, sec_diag_y_count = create_diagonal_power_lorentz_fit_pdfs(
         data, args.output, args.num_events, args.workers
     )
     

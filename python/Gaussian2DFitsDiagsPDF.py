@@ -1,13 +1,13 @@
 """
-ROOT File Diagonal Gaussian Fits Visualization Tool
+ROOT File Diag Gauss s Visualization Tool
 
 This tool reads ROOT output files from the GEANT4 charge sharing simulation
-and creates PDF visualizations of the pre-computed diagonal Gaussian fits.
+and creates PDF visualizations of the pre-computed diagonal Gauss fits.
 
 Key features:
 1. Reads actual simulation data from ROOT files using uproot
-2. Extracts diagonal neighborhood charge distributions and fitted Gaussian parameters  
-3. Plots data points with fitted Gaussian curves and residuals
+2. Extracts diagonal neighborhood charge distributions and fitted Gauss parameters  
+3. Plots data points with fitted Gauss curves and residuals
 4. Creates comprehensive PDF reports for main and secondary diagonal analysis
 5. NO synthetic data or fitting - only visualization of existing results
 6. OPTIMIZED for parallel processing with multithreading support
@@ -127,7 +127,7 @@ def load_root_data(root_file, max_entries=None):
         # Load essential data
         data = {}
         
-        # Basic position and pixel information
+        # Basic pos and pixel information
         data['TrueX'] = tree['TrueX'].array(library="np", entry_stop=max_entries)
         data['TrueY'] = tree['TrueY'].array(library="np", entry_stop=max_entries)
         data['PixelX'] = tree['PixelX'].array(library="np", entry_stop=max_entries)
@@ -135,75 +135,75 @@ def load_root_data(root_file, max_entries=None):
         data['IsPixelHit'] = tree['IsPixelHit'].array(library="np", entry_stop=max_entries)
         
         # Neighborhood grid data
-        data['GridNeighborhoodCharges'] = tree['GridNeighborhoodCharges'].array(library="np", entry_stop=max_entries)
+        data['NeighborhoodCharges'] = tree['NeighborhoodCharges'].array(library="np", entry_stop=max_entries)
         
-        # Main Diagonal X fit results
-        data['GaussFitMainDiagXCenter'] = tree['GaussFitMainDiagXCenter'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagXStdev'] = tree['GaussFitMainDiagXStdev'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagXAmplitude'] = tree['GaussFitMainDiagXAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagXVerticalOffset'] = tree['GaussFitMainDiagXVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagXCenterErr'] = tree['GaussFitMainDiagXCenterErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagXStdevErr'] = tree['GaussFitMainDiagXStdevErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagXAmplitudeErr'] = tree['GaussFitMainDiagXAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagXChi2red'] = tree['GaussFitMainDiagXChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagXDOF'] = tree['GaussFitMainDiagXDOF'].array(library="np", entry_stop=max_entries)
+        # Main Diag X fit results
+        data['GaussMainDiagXCenter'] = tree['GaussMainDiagXCenter'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagXSigma'] = tree['GaussMainDiagXSigma'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagXAmp'] = tree['GaussMainDiagXAmp'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagXVertOffset'] = tree['GaussMainDiagXVertOffset'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagXCenterErr'] = tree['GaussMainDiagXCenterErr'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagXSigmaErr'] = tree['GaussMainDiagXSigmaErr'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagXAmpErr'] = tree['GaussMainDiagXAmpErr'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagXChi2red'] = tree['GaussMainDiagXChi2red'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagXDOF'] = tree['GaussMainDiagXDOF'].array(library="np", entry_stop=max_entries)
         
-        # Try to load charge uncertainty - if not available, we'll calculate it later
+        # Try to load charge err - if not available, we'll calculate it later
         try:
-            data['GaussFitMainDiagXChargeUncertainty'] = tree['GaussFitMainDiagXChargeUncertainty'].array(library="np", entry_stop=max_entries)
+            data['GaussMainDiagXChargeErr'] = tree['GaussMainDiagXChargeErr'].array(library="np", entry_stop=max_entries)
         except:
-            data['GaussFitMainDiagXChargeUncertainty'] = None
+            data['GaussMainDiagXChargeErr'] = None
         
-        # Main Diagonal Y fit results
-        data['GaussFitMainDiagYCenter'] = tree['GaussFitMainDiagYCenter'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagYStdev'] = tree['GaussFitMainDiagYStdev'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagYAmplitude'] = tree['GaussFitMainDiagYAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagYVerticalOffset'] = tree['GaussFitMainDiagYVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagYCenterErr'] = tree['GaussFitMainDiagYCenterErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagYStdevErr'] = tree['GaussFitMainDiagYStdevErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagYAmplitudeErr'] = tree['GaussFitMainDiagYAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagYChi2red'] = tree['GaussFitMainDiagYChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFitMainDiagYDOF'] = tree['GaussFitMainDiagYDOF'].array(library="np", entry_stop=max_entries)
+        # Main Diag Y fit results
+        data['GaussMainDiagYCenter'] = tree['GaussMainDiagYCenter'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagYSigma'] = tree['GaussMainDiagYSigma'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagYAmp'] = tree['GaussMainDiagYAmp'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagYVertOffset'] = tree['GaussMainDiagYVertOffset'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagYCenterErr'] = tree['GaussMainDiagYCenterErr'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagYSigmaErr'] = tree['GaussMainDiagYSigmaErr'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagYAmpErr'] = tree['GaussMainDiagYAmpErr'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagYChi2red'] = tree['GaussMainDiagYChi2red'].array(library="np", entry_stop=max_entries)
+        data['GaussMainDiagYDOF'] = tree['GaussMainDiagYDOF'].array(library="np", entry_stop=max_entries)
         
-        # Try to load charge uncertainty - if not available, we'll calculate it later
+        # Try to load charge err - if not available, we'll calculate it later
         try:
-            data['GaussFitMainDiagYChargeUncertainty'] = tree['GaussFitMainDiagYChargeUncertainty'].array(library="np", entry_stop=max_entries)
+            data['GaussMainDiagYChargeErr'] = tree['GaussMainDiagYChargeErr'].array(library="np", entry_stop=max_entries)
         except:
-            data['GaussFitMainDiagYChargeUncertainty'] = None
+            data['GaussMainDiagYChargeErr'] = None
         
-        # Secondary Diagonal X fit results (note: uses "SecondDiag" not "SecDiag")
-        data['GaussFitSecDiagXCenter'] = tree['GaussFitSecondDiagXCenter'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagXStdev'] = tree['GaussFitSecondDiagXStdev'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagXAmplitude'] = tree['GaussFitSecondDiagXAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagXVerticalOffset'] = tree['GaussFitSecondDiagXVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagXCenterErr'] = tree['GaussFitSecondDiagXCenterErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagXStdevErr'] = tree['GaussFitSecondDiagXStdevErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagXAmplitudeErr'] = tree['GaussFitSecondDiagXAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagXChi2red'] = tree['GaussFitSecondDiagXChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagXDOF'] = tree['GaussFitSecondDiagXDOF'].array(library="np", entry_stop=max_entries)
+        # Secondary Diag X fit results (note: uses "SecDiag" not "SecDiag")
+        data['GaussSecDiagXCenter'] = tree['GaussSecDiagXCenter'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagXSigma'] = tree['GaussSecDiagXSigma'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagXAmp'] = tree['GaussSecDiagXAmp'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagXVertOffset'] = tree['GaussSecDiagXVertOffset'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagXCenterErr'] = tree['GaussSecDiagXCenterErr'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagXSigmaErr'] = tree['GaussSecDiagXSigmaErr'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagXAmpErr'] = tree['GaussSecDiagXAmpErr'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagXChi2red'] = tree['GaussSecDiagXChi2red'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagXDOF'] = tree['GaussSecDiagXDOF'].array(library="np", entry_stop=max_entries)
         
-        # Try to load charge uncertainty - if not available, we'll calculate it later
+        # Try to load charge err - if not available, we'll calculate it later
         try:
-            data['GaussFitSecDiagXChargeUncertainty'] = tree['GaussFitSecDiagXChargeUncertainty'].array(library="np", entry_stop=max_entries)
+            data['GaussSecDiagXChargeErr'] = tree['GaussSecDiagXChargeErr'].array(library="np", entry_stop=max_entries)
         except:
-            data['GaussFitSecDiagXChargeUncertainty'] = None
+            data['GaussSecDiagXChargeErr'] = None
         
-        # Secondary Diagonal Y fit results (note: uses "SecondDiag" not "SecDiag")
-        data['GaussFitSecDiagYCenter'] = tree['GaussFitSecondDiagYCenter'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagYStdev'] = tree['GaussFitSecondDiagYStdev'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagYAmplitude'] = tree['GaussFitSecondDiagYAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagYVerticalOffset'] = tree['GaussFitSecondDiagYVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagYCenterErr'] = tree['GaussFitSecondDiagYCenterErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagYStdevErr'] = tree['GaussFitSecondDiagYStdevErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagYAmplitudeErr'] = tree['GaussFitSecondDiagYAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagYChi2red'] = tree['GaussFitSecondDiagYChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFitSecDiagYDOF'] = tree['GaussFitSecondDiagYDOF'].array(library="np", entry_stop=max_entries)
+        # Secondary Diag Y fit results (note: uses "SecDiag" not "SecDiag")
+        data['GaussSecDiagYCenter'] = tree['GaussSecDiagYCenter'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagYSigma'] = tree['GaussSecDiagYSigma'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagYAmp'] = tree['GaussSecDiagYAmp'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagYVertOffset'] = tree['GaussSecDiagYVertOffset'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagYCenterErr'] = tree['GaussSecDiagYCenterErr'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagYSigmaErr'] = tree['GaussSecDiagYSigmaErr'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagYAmpErr'] = tree['GaussSecDiagYAmpErr'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagYChi2red'] = tree['GaussSecDiagYChi2red'].array(library="np", entry_stop=max_entries)
+        data['GaussSecDiagYDOF'] = tree['GaussSecDiagYDOF'].array(library="np", entry_stop=max_entries)
         
-        # Try to load charge uncertainty - if not available, we'll calculate it later
+        # Try to load charge err - if not available, we'll calculate it later
         try:
-            data['GaussFitSecDiagYChargeUncertainty'] = tree['GaussFitSecDiagYChargeUncertainty'].array(library="np", entry_stop=max_entries)
+            data['GaussSecDiagYChargeErr'] = tree['GaussSecDiagYChargeErr'].array(library="np", entry_stop=max_entries)
         except:
-            data['GaussFitSecDiagYChargeUncertainty'] = None
+            data['GaussSecDiagYChargeErr'] = None
         
         # Try to load detector grid parameters from metadata
         try:
@@ -215,7 +215,7 @@ def load_root_data(root_file, max_entries=None):
             data['PixelSpacing'] = 0.5  # Default fallback
         
         n_events = len(data['TrueX'])
-        print(f"Successfully loaded {n_events} events from ROOT file")
+        print(f"Successly loaded {n_events} events from ROOT file")
         
         # Filter for non-pixel hits only
         non_pixel_mask = ~data['IsPixelHit']
@@ -248,19 +248,19 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
         grid_size: Size of neighborhood grid (auto-detected if None)
     
     Returns:
-        positions, charges, valid_data_flag
+        poss, charges, valid_data_flag
     """
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
             # Single event data (already subset)
-            grid_charges = data['GridNeighborhoodCharges']
+            grid_charges = data['NeighborhoodCharges']
             pixel_x = data['PixelX']
             pixel_y = data['PixelY']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
             # Full dataset - extract for specific event
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_x = data['PixelX'][event_idx]
             pixel_y = data['PixelY'][event_idx]
         else:
@@ -275,7 +275,7 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -283,7 +283,7 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
         # Extract main diagonal elements
         diagonal_indices = []
         diagonal_charges = []
-        diagonal_positions = []
+        diagonal_poss = []
         
         for i in range(grid_size):
             # Main diagonal: (i, i) in (row, col) notation
@@ -295,29 +295,29 @@ def extract_main_diagonal_data(event_idx, data, grid_size=None):
                 diagonal_indices.append(index)
                 diagonal_charges.append(grid_charges[index])
                 
-                # Calculate position relative to pixel center
+                # Calc pos relative to pixel center
                 offset_x = col - radius
                 offset_y = row - radius
                 pos_x = pixel_x + offset_x * pixel_spacing
                 pos_y = pixel_y + offset_y * pixel_spacing
                 
-                # For diagonal, use distance along diagonal as position
+                # For diagonal, use distance along diagonal as pos
                 # Distance from center pixel along diagonal
                 diagonal_distance = np.sqrt(offset_x**2 + offset_y**2) * np.sign(offset_x)
-                diagonal_positions.append(diagonal_distance)
+                diagonal_poss.append(diagonal_distance)
         
         if len(diagonal_charges) < 3:
             return None, None, False
         
-        # Convert to numpy arrays and sort by diagonal position
-        diagonal_positions = np.array(diagonal_positions)
+        # Convert to numpy arrays and sort by diagonal pos
+        diagonal_poss = np.array(diagonal_poss)
         diagonal_charges = np.array(diagonal_charges)
         
-        sort_indices = np.argsort(diagonal_positions)
-        diagonal_positions = diagonal_positions[sort_indices]
+        sort_indices = np.argsort(diagonal_poss)
+        diagonal_poss = diagonal_poss[sort_indices]
         diagonal_charges = diagonal_charges[sort_indices]
         
-        return diagonal_positions, diagonal_charges, True
+        return diagonal_poss, diagonal_charges, True
         
     except Exception as e:
         return None, None, False
@@ -333,19 +333,19 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
         grid_size: Size of neighborhood grid (auto-detected if None)
     
     Returns:
-        positions, charges, valid_data_flag
+        poss, charges, valid_data_flag
     """
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
             # Single event data (already subset)
-            grid_charges = data['GridNeighborhoodCharges']
+            grid_charges = data['NeighborhoodCharges']
             pixel_x = data['PixelX']
             pixel_y = data['PixelY']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
             # Full dataset - extract for specific event
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_x = data['PixelX'][event_idx]
             pixel_y = data['PixelY'][event_idx]
         else:
@@ -360,7 +360,7 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -368,7 +368,7 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
         # Extract secondary diagonal elements
         diagonal_indices = []
         diagonal_charges = []
-        diagonal_positions = []
+        diagonal_poss = []
         
         for i in range(grid_size):
             # Secondary diagonal: (i, grid_size-1-i) in (row, col) notation
@@ -380,43 +380,43 @@ def extract_secondary_diagonal_data(event_idx, data, grid_size=None):
                 diagonal_indices.append(index)
                 diagonal_charges.append(grid_charges[index])
                 
-                # Calculate position relative to pixel center
+                # Calc pos relative to pixel center
                 offset_x = col - radius
                 offset_y = row - radius
                 pos_x = pixel_x + offset_x * pixel_spacing
                 pos_y = pixel_y + offset_y * pixel_spacing
                 
-                # For secondary diagonal, use distance along diagonal as position
+                # For secondary diagonal, use distance along diagonal as pos
                 # Distance from center pixel along secondary diagonal
                 diagonal_distance = np.sqrt(offset_x**2 + offset_y**2) * np.sign(-offset_x)
-                diagonal_positions.append(diagonal_distance)
+                diagonal_poss.append(diagonal_distance)
         
         if len(diagonal_charges) < 3:
             return None, None, False
         
-        # Convert to numpy arrays and sort by diagonal position
-        diagonal_positions = np.array(diagonal_positions)
+        # Convert to numpy arrays and sort by diagonal pos
+        diagonal_poss = np.array(diagonal_poss)
         diagonal_charges = np.array(diagonal_charges)
         
-        sort_indices = np.argsort(diagonal_positions)
-        diagonal_positions = diagonal_positions[sort_indices]
+        sort_indices = np.argsort(diagonal_poss)
+        diagonal_poss = diagonal_poss[sort_indices]
         diagonal_charges = diagonal_charges[sort_indices]
         
-        return diagonal_positions, diagonal_charges, True
+        return diagonal_poss, diagonal_charges, True
         
     except Exception as e:
         return None, None, False
 
-def gaussian_1d(x, amplitude, center, sigma, offset):
+def gauss_1d(x, amp, center, sigma, offset):
     """
-    1D Gaussian function for plotting fitted curves.
+    1D Gauss function for plotting fitted curves.
     """
-    return amplitude * np.exp(-0.5 * ((x - center) / sigma)**2) + offset
+    return amp * np.exp(-0.5 * ((x - center) / sigma)**2) + offset
 
 def get_stored_charge_uncertainties(event_idx, data, diagonal_type):
     """
     Get the stored charge uncertainties from ROOT file for the specified diagonal type.
-    If the stored uncertainties are not available, calculate fallback uncertainty as 5% of max charge.
+    If the stored uncertainties are not available, calculate fallback err as 5% of max charge.
     
     Args:
         event_idx: Event index (ignored if data is already subset)
@@ -424,56 +424,56 @@ def get_stored_charge_uncertainties(event_idx, data, diagonal_type):
         diagonal_type: 'main_diag_x', 'main_diag_y', 'sec_diag_x', or 'sec_diag_y'
     
     Returns:
-        uncertainty: Single uncertainty value (5% of max charge for this event)
+        err: Single err value (5% of max charge for this event)
     """
     diagonal_map = {
-        'main_diag_x': 'GaussFitMainDiagXChargeUncertainty',
-        'main_diag_y': 'GaussFitMainDiagYChargeUncertainty',
-        'sec_diag_x': 'GaussFitSecDiagXChargeUncertainty',
-        'sec_diag_y': 'GaussFitSecDiagYChargeUncertainty'
+        'main_diag_x': 'GaussMainDiagXChargeErr',
+        'main_diag_y': 'GaussMainDiagYChargeErr',
+        'sec_diag_x': 'GaussSecDiagXChargeErr',
+        'sec_diag_y': 'GaussSecDiagYChargeErr'
     }
     
     if diagonal_type.lower() not in diagonal_map:
         raise ValueError(f"Invalid diagonal_type: {diagonal_type}. Must be one of {list(diagonal_map.keys())}")
     
-    uncertainty_data = data[diagonal_map[diagonal_type.lower()]]
+    err_data = data[diagonal_map[diagonal_type.lower()]]
     
-    # Check if uncertainty data is available
-    if uncertainty_data is None:
-        # Calculate fallback uncertainty as 5% of max charge for this event
+    # Check if err data is available
+    if err_data is None:
+        # Calc fallback err as 5% of max charge for this event
         # Extract diagonal data to get the charge values
         if diagonal_type.startswith('main_diag'):
-            diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+            diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
         else:
-            diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+            diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
             
         if valid_data and len(charges) > 0:
-            uncertainty = 0.05 * np.max(charges)  # 5% of max charge
+            err = 0.05 * np.max(charges)  # 5% of max charge
         else:
-            uncertainty = 0.05  # Default fallback
+            err = 0.05  # Default fallback
     else:
         # Handle both single event data and full dataset
-        if np.isscalar(uncertainty_data):
+        if np.isscalar(err_data):
             # Single event data (already subset)
-            uncertainty = uncertainty_data
-        elif hasattr(uncertainty_data, '__len__') and len(uncertainty_data) > event_idx:
+            err = err_data
+        elif hasattr(err_data, '__len__') and len(err_data) > event_idx:
             # Full dataset - extract for specific event
-            uncertainty = uncertainty_data[event_idx]
+            err = err_data[event_idx]
         else:
-            uncertainty = 0.05  # Default fallback
+            err = 0.05  # Default fallback
     
-    return uncertainty
+    return err
 
 def create_main_diagonal_x_plot(event_idx, data):
     """
-    Create a plot showing the main diagonal X-component Gaussian fit for a specific event.
+    Create a plot showing the main diagonal X-component Gauss fit for a specific event.
 
     Returns:
         fig, success_flag
     """
     try:
         # Extract main diagonal data
-        diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -487,76 +487,76 @@ def create_main_diagonal_x_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['GaussFitMainDiagXCenter'], event_idx)
-        fit_sigma = get_param_value(data['GaussFitMainDiagXStdev'], event_idx)
-        fit_amplitude = get_param_value(data['GaussFitMainDiagXAmplitude'], event_idx)
-        fit_offset = get_param_value(data['GaussFitMainDiagXVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['GaussFitMainDiagXCenterErr'], event_idx)
-        fit_sigma_err = get_param_value(data['GaussFitMainDiagXStdevErr'], event_idx)
-        chi2_red = get_param_value(data['GaussFitMainDiagXChi2red'], event_idx)
-        dof = get_param_value(data['GaussFitMainDiagXDOF'], event_idx)
+        fit_center = get_param_value(data['GaussMainDiagXCenter'], event_idx)
+        fit_sigma = get_param_value(data['GaussMainDiagXSigma'], event_idx)
+        fit_amp = get_param_value(data['GaussMainDiagXAmp'], event_idx)
+        fit_offset = get_param_value(data['GaussMainDiagXVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['GaussMainDiagXCenterErr'], event_idx)
+        fit_sigma_err = get_param_value(data['GaussMainDiagXSigmaErr'], event_idx)
+        chi2_red = get_param_value(data['GaussMainDiagXChi2red'], event_idx)
+        dof = get_param_value(data['GaussMainDiagXDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto main diagonal
+        # Get true pos and project onto main diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto main diagonal direction
+        # Project true pos onto main diagonal direction
         # Main diagonal has direction (1,1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x + true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'main_diag_x')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = gaussian_1d(diagonal_positions, fit_amplitude, fit_center, fit_sigma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = gauss_1d(diagonal_poss, fit_amp, fit_center, fit_sigma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='red', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Main Diagonal X Gaussian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Main Diag X Gauss Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Gaussian curve
+        # Plot fitted Gauss curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = gaussian_1d(pos_fit_range, fit_amplitude, fit_center, fit_sigma, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'r-', linewidth=3, label='Gaussian Fit')
+        y_fit = gauss_1d(pos_fit_range, fit_amp, fit_center, fit_sigma, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'r-', linewidth=3, label='Gauss ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='red', linestyle=':', linewidth=3, alpha=0.8, label='x_fit (main diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Main Diagonal X Gaussian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Main Diag X Gauss ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -583,14 +583,14 @@ def create_main_diagonal_x_plot(event_idx, data):
 
 def create_main_diagonal_y_plot(event_idx, data):
     """
-    Create a plot showing the main diagonal Y-component Gaussian fit for a specific event.
+    Create a plot showing the main diagonal Y-component Gauss fit for a specific event.
     
     Returns:
         fig, success_flag
     """
     try:
         # Extract main diagonal data
-        diagonal_positions, charges, valid_data = extract_main_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_main_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -604,76 +604,76 @@ def create_main_diagonal_y_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['GaussFitMainDiagYCenter'], event_idx)
-        fit_sigma = get_param_value(data['GaussFitMainDiagYStdev'], event_idx)
-        fit_amplitude = get_param_value(data['GaussFitMainDiagYAmplitude'], event_idx)
-        fit_offset = get_param_value(data['GaussFitMainDiagYVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['GaussFitMainDiagYCenterErr'], event_idx)
-        fit_sigma_err = get_param_value(data['GaussFitMainDiagYStdevErr'], event_idx)
-        chi2_red = get_param_value(data['GaussFitMainDiagYChi2red'], event_idx)
-        dof = get_param_value(data['GaussFitMainDiagYDOF'], event_idx)
+        fit_center = get_param_value(data['GaussMainDiagYCenter'], event_idx)
+        fit_sigma = get_param_value(data['GaussMainDiagYSigma'], event_idx)
+        fit_amp = get_param_value(data['GaussMainDiagYAmp'], event_idx)
+        fit_offset = get_param_value(data['GaussMainDiagYVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['GaussMainDiagYCenterErr'], event_idx)
+        fit_sigma_err = get_param_value(data['GaussMainDiagYSigmaErr'], event_idx)
+        chi2_red = get_param_value(data['GaussMainDiagYChi2red'], event_idx)
+        dof = get_param_value(data['GaussMainDiagYDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto main diagonal
+        # Get true pos and project onto main diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto main diagonal direction
+        # Project true pos onto main diagonal direction
         # Main diagonal has direction (1,1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x + true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'main_diag_y')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = gaussian_1d(diagonal_positions, fit_amplitude, fit_center, fit_sigma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = gauss_1d(diagonal_poss, fit_amp, fit_center, fit_sigma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='blue', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Main Diagonal Y Gaussian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Main Diag Y Gauss Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Gaussian curve
+        # Plot fitted Gauss curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = gaussian_1d(pos_fit_range, fit_amplitude, fit_center, fit_sigma, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'b-', linewidth=3, label='Gaussian Fit')
+        y_fit = gauss_1d(pos_fit_range, fit_amp, fit_center, fit_sigma, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'b-', linewidth=3, label='Gauss ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='blue', linestyle=':', linewidth=3, alpha=0.8, label='y_fit (main diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Main Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Main Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Main Diagonal Y Gaussian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Main Diag Y Gauss ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -700,14 +700,14 @@ def create_main_diagonal_y_plot(event_idx, data):
 
 def create_secondary_diagonal_x_plot(event_idx, data):
     """
-    Create a plot showing the secondary diagonal X-component Gaussian fit for a specific event.
+    Create a plot showing the secondary diagonal X-component Gauss fit for a specific event.
 
     Returns:
         fig, success_flag
     """
     try:
         # Extract secondary diagonal data
-        diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -721,76 +721,76 @@ def create_secondary_diagonal_x_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['GaussFitSecDiagXCenter'], event_idx)
-        fit_sigma = get_param_value(data['GaussFitSecDiagXStdev'], event_idx)
-        fit_amplitude = get_param_value(data['GaussFitSecDiagXAmplitude'], event_idx)
-        fit_offset = get_param_value(data['GaussFitSecDiagXVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['GaussFitSecDiagXCenterErr'], event_idx)
-        fit_sigma_err = get_param_value(data['GaussFitSecDiagXStdevErr'], event_idx)
-        chi2_red = get_param_value(data['GaussFitSecDiagXChi2red'], event_idx)
-        dof = get_param_value(data['GaussFitSecDiagXDOF'], event_idx)
+        fit_center = get_param_value(data['GaussSecDiagXCenter'], event_idx)
+        fit_sigma = get_param_value(data['GaussSecDiagXSigma'], event_idx)
+        fit_amp = get_param_value(data['GaussSecDiagXAmp'], event_idx)
+        fit_offset = get_param_value(data['GaussSecDiagXVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['GaussSecDiagXCenterErr'], event_idx)
+        fit_sigma_err = get_param_value(data['GaussSecDiagXSigmaErr'], event_idx)
+        chi2_red = get_param_value(data['GaussSecDiagXChi2red'], event_idx)
+        dof = get_param_value(data['GaussSecDiagXDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto secondary diagonal
+        # Get true pos and project onto secondary diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto secondary diagonal direction
+        # Project true pos onto secondary diagonal direction
         # Secondary diagonal has direction (1,-1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x - true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'sec_diag_x')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = gaussian_1d(diagonal_positions, fit_amplitude, fit_center, fit_sigma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = gauss_1d(diagonal_poss, fit_amp, fit_center, fit_sigma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='orange', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Secondary Diagonal X Gaussian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Secondary Diag X Gauss Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Gaussian curve
+        # Plot fitted Gauss curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = gaussian_1d(pos_fit_range, fit_amplitude, fit_center, fit_sigma, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'orange', linewidth=3, label='Gaussian Fit')
+        y_fit = gauss_1d(pos_fit_range, fit_amp, fit_center, fit_sigma, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'orange', linewidth=3, label='Gauss ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='orange', linestyle=':', linewidth=3, alpha=0.8, label='x_fit (sec diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Secondary Diagonal X Gaussian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Secondary Diag X Gauss ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -817,14 +817,14 @@ def create_secondary_diagonal_x_plot(event_idx, data):
 
 def create_secondary_diagonal_y_plot(event_idx, data):
     """
-    Create a plot showing the secondary diagonal Y-component Gaussian fit for a specific event.
+    Create a plot showing the secondary diagonal Y-component Gauss fit for a specific event.
     
     Returns:
         fig, success_flag
     """
     try:
         # Extract secondary diagonal data
-        diagonal_positions, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
+        diagonal_poss, charges, valid_data = extract_secondary_diagonal_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -838,76 +838,76 @@ def create_secondary_diagonal_y_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['GaussFitSecDiagYCenter'], event_idx)
-        fit_sigma = get_param_value(data['GaussFitSecDiagYStdev'], event_idx)
-        fit_amplitude = get_param_value(data['GaussFitSecDiagYAmplitude'], event_idx)
-        fit_offset = get_param_value(data['GaussFitSecDiagYVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['GaussFitSecDiagYCenterErr'], event_idx)
-        fit_sigma_err = get_param_value(data['GaussFitSecDiagYStdevErr'], event_idx)
-        chi2_red = get_param_value(data['GaussFitSecDiagYChi2red'], event_idx)
-        dof = get_param_value(data['GaussFitSecDiagYDOF'], event_idx)
+        fit_center = get_param_value(data['GaussSecDiagYCenter'], event_idx)
+        fit_sigma = get_param_value(data['GaussSecDiagYSigma'], event_idx)
+        fit_amp = get_param_value(data['GaussSecDiagYAmp'], event_idx)
+        fit_offset = get_param_value(data['GaussSecDiagYVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['GaussSecDiagYCenterErr'], event_idx)
+        fit_sigma_err = get_param_value(data['GaussSecDiagYSigmaErr'], event_idx)
+        chi2_red = get_param_value(data['GaussSecDiagYChi2red'], event_idx)
+        dof = get_param_value(data['GaussSecDiagYDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position and project onto secondary diagonal
+        # Get true pos and project onto secondary diagonal
         true_x = get_param_value(data['TrueX'], event_idx)
         true_y = get_param_value(data['TrueY'], event_idx)
         pixel_x = get_param_value(data['PixelX'], event_idx)
         pixel_y = get_param_value(data['PixelY'], event_idx)
         pixel_spacing = data['PixelSpacing']
         
-        # Project true position onto secondary diagonal direction
+        # Project true pos onto secondary diagonal direction
         # Secondary diagonal has direction (1,-1), so projection distance is:
         true_offset_x = (true_x - pixel_x) / pixel_spacing
         true_offset_y = (true_y - pixel_y) / pixel_spacing
         true_diagonal_pos = true_offset_x - true_offset_y
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'sec_diag_y')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = gaussian_1d(diagonal_positions, fit_amplitude, fit_center, fit_sigma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = gauss_1d(diagonal_poss, fit_amp, fit_center, fit_sigma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        pos_min, pos_max = diagonal_positions.min() - 0.3, diagonal_positions.max() + 0.3
+        pos_min, pos_max = diagonal_poss.min() - 0.3, diagonal_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(diagonal_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(diagonal_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='purple', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(pos_min, pos_max)
-        ax_left.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_left.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Secondary Diagonal Y Gaussian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Secondary Diag Y Gauss Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(diagonal_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(diagonal_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Gaussian curve
+        # Plot fitted Gauss curve
         pos_fit_range = np.linspace(pos_min, pos_max, 200)
-        y_fit = gaussian_1d(pos_fit_range, fit_amplitude, fit_center, fit_sigma, fit_offset)
-        ax_right.plot(pos_fit_range, y_fit, 'purple', linewidth=3, label='Gaussian Fit')
+        y_fit = gauss_1d(pos_fit_range, fit_amp, fit_center, fit_sigma, fit_offset)
+        ax_right.plot(pos_fit_range, y_fit, 'purple', linewidth=3, label='Gauss ')
         
-        # Mark true and fitted positions (projected to diagonal)
+        # Mark true and fitted poss (projected to diagonal)
         ax_right.axvline(true_diagonal_pos, color='green', linestyle='--', linewidth=3, alpha=0.8, label='true_pos')
         ax_right.axvline(fit_center, color='purple', linestyle=':', linewidth=3, alpha=0.8, label='y_fit (sec diag)')
         
         ax_right.set_xlim(pos_min, pos_max)
-        ax_right.set_xlabel('Secondary Diagonal Position (mm)', fontsize=14)
+        ax_right.set_xlabel('Secondary Diag Pos (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Secondary Diagonal Y Gaussian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Secondary Diag Y Gauss ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -993,27 +993,27 @@ def _prepare_data_subset(data, event_idx):
     # List of all keys we need for plotting
     keys_needed = [
         'TrueX', 'TrueY', 'PixelX', 'PixelY', 'IsPixelHit',
-        'GridNeighborhoodCharges', 'PixelSpacing',
+        'NeighborhoodCharges', 'PixelSpacing',
         # Main diagonal X parameters
-        'GaussFitMainDiagXCenter', 'GaussFitMainDiagXStdev', 'GaussFitMainDiagXAmplitude', 
-        'GaussFitMainDiagXVerticalOffset', 'GaussFitMainDiagXCenterErr', 'GaussFitMainDiagXStdevErr',
-        'GaussFitMainDiagXAmplitudeErr', 'GaussFitMainDiagXChi2red', 'GaussFitMainDiagXDOF',
-        'GaussFitMainDiagXChargeUncertainty',
+        'GaussMainDiagXCenter', 'GaussMainDiagXSigma', 'GaussMainDiagXAmp', 
+        'GaussMainDiagXVertOffset', 'GaussMainDiagXCenterErr', 'GaussMainDiagXSigmaErr',
+        'GaussMainDiagXAmpErr', 'GaussMainDiagXChi2red', 'GaussMainDiagXDOF',
+        'GaussMainDiagXChargeErr',
         # Main diagonal Y parameters
-        'GaussFitMainDiagYCenter', 'GaussFitMainDiagYStdev', 'GaussFitMainDiagYAmplitude',
-        'GaussFitMainDiagYVerticalOffset', 'GaussFitMainDiagYCenterErr', 'GaussFitMainDiagYStdevErr',
-        'GaussFitMainDiagYAmplitudeErr', 'GaussFitMainDiagYChi2red', 'GaussFitMainDiagYDOF',
-        'GaussFitMainDiagYChargeUncertainty',
+        'GaussMainDiagYCenter', 'GaussMainDiagYSigma', 'GaussMainDiagYAmp',
+        'GaussMainDiagYVertOffset', 'GaussMainDiagYCenterErr', 'GaussMainDiagYSigmaErr',
+        'GaussMainDiagYAmpErr', 'GaussMainDiagYChi2red', 'GaussMainDiagYDOF',
+        'GaussMainDiagYChargeErr',
         # Secondary diagonal X parameters
-        'GaussFitSecDiagXCenter', 'GaussFitSecDiagXStdev', 'GaussFitSecDiagXAmplitude', 
-        'GaussFitSecDiagXVerticalOffset', 'GaussFitSecDiagXCenterErr', 'GaussFitSecDiagXStdevErr',
-        'GaussFitSecDiagXAmplitudeErr', 'GaussFitSecDiagXChi2red', 'GaussFitSecDiagXDOF',
-        'GaussFitSecDiagXChargeUncertainty',
+        'GaussSecDiagXCenter', 'GaussSecDiagXSigma', 'GaussSecDiagXAmp', 
+        'GaussSecDiagXVertOffset', 'GaussSecDiagXCenterErr', 'GaussSecDiagXSigmaErr',
+        'GaussSecDiagXAmpErr', 'GaussSecDiagXChi2red', 'GaussSecDiagXDOF',
+        'GaussSecDiagXChargeErr',
         # Secondary diagonal Y parameters
-        'GaussFitSecDiagYCenter', 'GaussFitSecDiagYStdev', 'GaussFitSecDiagYAmplitude',
-        'GaussFitSecDiagYVerticalOffset', 'GaussFitSecDiagYCenterErr', 'GaussFitSecDiagYStdevErr',
-        'GaussFitSecDiagYAmplitudeErr', 'GaussFitSecDiagYChi2red', 'GaussFitSecDiagYDOF',
-        'GaussFitSecDiagYChargeUncertainty'
+        'GaussSecDiagYCenter', 'GaussSecDiagYSigma', 'GaussSecDiagYAmp',
+        'GaussSecDiagYVertOffset', 'GaussSecDiagYCenterErr', 'GaussSecDiagYSigmaErr',
+        'GaussSecDiagYAmpErr', 'GaussSecDiagYChi2red', 'GaussSecDiagYDOF',
+        'GaussSecDiagYChargeErr'
     ]
     
     for key in keys_needed:
@@ -1025,9 +1025,9 @@ def _prepare_data_subset(data, event_idx):
     
     return subset
 
-def create_diagonal_gaussian_fit_pdfs(data, output_dir="diagonal_plots", max_events=None, n_workers=None):
+def create_diagonal_gauss_fit_pdfs(data, output_dir="diagonal_plots", max_events=None, n_workers=None):
     """
-    Create PDF files with diagonal Gaussian fits visualization using parallel processing.
+    Create PDF files with diagonal Gauss fits visualization using parallel processing.
     
     Args:
         data: Data dictionary from ROOT file
@@ -1049,28 +1049,28 @@ def create_diagonal_gaussian_fit_pdfs(data, output_dir="diagonal_plots", max_eve
     if n_workers is None:
         n_workers = min(mp.cpu_count(), 8)  # Cap at 8 to avoid memory issues
     
-    print(f"Creating diagonal Gaussian fit visualizations for {n_events} events using {n_workers} workers")
+    print(f"Creating diagonal Gauss fit visualizations for {n_events} events using {n_workers} workers")
     
     # Create output paths
-    main_diag_x_pdf = os.path.join(output_dir, "gaussian_fits_main_diagonal_x.pdf")
-    main_diag_y_pdf = os.path.join(output_dir, "gaussian_fits_main_diagonal_y.pdf")
-    sec_diag_x_pdf = os.path.join(output_dir, "gaussian_fits_secondary_diagonal_x.pdf")
-    sec_diag_y_pdf = os.path.join(output_dir, "gaussian_fits_secondary_diagonal_y.pdf")
+    main_diag_x_pdf = os.path.join(output_dir, "gauss_fits_main_diagonal_x.pdf")
+    main_diag_y_pdf = os.path.join(output_dir, "gauss_fits_main_diagonal_y.pdf")
+    sec_diag_x_pdf = os.path.join(output_dir, "gauss_fits_secondary_diagonal_x.pdf")
+    sec_diag_y_pdf = os.path.join(output_dir, "gauss_fits_secondary_diagonal_y.pdf")
     
-    # Pre-filter events with successful fits
+    # Pre-filter events with success fits
     main_diag_x_valid = []
     main_diag_y_valid = []
     sec_diag_x_valid = []
     sec_diag_y_valid = []
     
     for event_idx in range(n_events):
-        if data['GaussFitMainDiagXDOF'][event_idx] > 0:
+        if data['GaussMainDiagXDOF'][event_idx] > 0:
             main_diag_x_valid.append(event_idx)
-        if data['GaussFitMainDiagYDOF'][event_idx] > 0:
+        if data['GaussMainDiagYDOF'][event_idx] > 0:
             main_diag_y_valid.append(event_idx)
-        if data['GaussFitSecDiagXDOF'][event_idx] > 0:
+        if data['GaussSecDiagXDOF'][event_idx] > 0:
             sec_diag_x_valid.append(event_idx)
-        if data['GaussFitSecDiagYDOF'][event_idx] > 0:
+        if data['GaussSecDiagYDOF'][event_idx] > 0:
             sec_diag_y_valid.append(event_idx)
     
     print(f"Found {len(main_diag_x_valid)} valid main diagonal X fits")
@@ -1082,10 +1082,10 @@ def create_diagonal_gaussian_fit_pdfs(data, output_dir="diagonal_plots", max_eve
     
     # Define diagonal types and their corresponding data
     diagonal_types = [
-        ('main_diag_x', main_diag_x_valid, main_diag_x_pdf, "Main Diagonal X"),
-        ('main_diag_y', main_diag_y_valid, main_diag_y_pdf, "Main Diagonal Y"),
-        ('sec_diag_x', sec_diag_x_valid, sec_diag_x_pdf, "Secondary Diagonal X"),
-        ('sec_diag_y', sec_diag_y_valid, sec_diag_y_pdf, "Secondary Diagonal Y")
+        ('main_diag_x', main_diag_x_valid, main_diag_x_pdf, "Main Diag X"),
+        ('main_diag_y', main_diag_y_valid, main_diag_y_pdf, "Main Diag Y"),
+        ('sec_diag_x', sec_diag_x_valid, sec_diag_x_pdf, "Secondary Diag X"),
+        ('sec_diag_y', sec_diag_y_valid, sec_diag_y_pdf, "Secondary Diag Y")
     ]
     
     for diag_type, valid_events, pdf_path, display_name in diagonal_types:
@@ -1143,7 +1143,7 @@ def create_diagonal_gaussian_fit_pdfs(data, output_dir="diagonal_plots", max_eve
         del args_list
         gc.collect()
     
-    print(f"\nDiagonal PDF generation completed!")
+    print(f"\nDiag PDF generation completed!")
     return (success_counts.get('main_diag_x', 0), 
             success_counts.get('main_diag_y', 0),
             success_counts.get('sec_diag_x', 0), 
@@ -1164,9 +1164,9 @@ def inspect_root_file(root_file):
         
         print(f"\nTree 'Hits' contains {len(branches)} branches:")
         
-        # Show diagonal Gaussian fitting branches
-        diagonal_branches = [b for b in branches if 'GaussFit' in b and 'Diag' in b]
-        print(f"\nDiagonal Gaussian fitting branches ({len(diagonal_branches)}):")
+        # Show diagonal Gauss fitting branches
+        diagonal_branches = [b for b in branches if 'Gauss' in b and 'Diag' in b]
+        print(f"\nDiag Gauss fitting branches ({len(diagonal_branches)}):")
         for i, branch in enumerate(sorted(diagonal_branches)):
             print(f"  {i+1:2d}: {branch}")
         
@@ -1186,19 +1186,19 @@ def inspect_root_file(root_file):
         print(f"  Non-pixel hits: {n_non_pixel} ({100*n_non_pixel/n_events:.1f}%)")
         print(f"  Pixel hits: {n_events - n_non_pixel} ({100*(n_events - n_non_pixel)/n_events:.1f}%)")
         
-        # Check for successful diagonal fits
+        # Check for success diagonal fits
         diagonal_dofs = [
-            ('GaussFitMainDiagXDOF', 'Main Diagonal X'),
-            ('GaussFitMainDiagYDOF', 'Main Diagonal Y'),
-            ('GaussFitSecDiagXDOF', 'Secondary Diagonal X'),
-            ('GaussFitSecDiagYDOF', 'Secondary Diagonal Y')
+            ('GaussMainDiagXDOF', 'Main Diag X'),
+            ('GaussMainDiagYDOF', 'Main Diag Y'),
+            ('GaussSecDiagXDOF', 'Secondary Diag X'),
+            ('GaussSecDiagYDOF', 'Secondary Diag Y')
         ]
         
         for dof_branch, name in diagonal_dofs:
             if dof_branch in branches:
                 dof_data = tree[dof_branch].array(library="np")
-                successful_fits = np.sum(dof_data > 0)
-                print(f"  Successful {name} fits: {successful_fits} ({100*successful_fits/n_events:.1f}%)")
+                success_fits = np.sum(dof_data > 0)
+                print(f"  Success {name} fits: {success_fits} ({100*success_fits/n_events:.1f}%)")
         
     except Exception as e:
         print(f"Error inspecting ROOT file: {e}")
@@ -1206,11 +1206,11 @@ def inspect_root_file(root_file):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Visualize diagonal Gaussian fits from GEANT4 charge sharing simulation ROOT files",
+        description="Visualize diagonal Gauss fits from GEANT4 charge sharing simulation ROOT files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("root_file", help="Path to ROOT file from GEANT4 simulation")
-    parser.add_argument("-o", "--output", default="diagonal_gaussian_fits", 
+    parser.add_argument("-o", "--output", default="diagonal_gauss_fits", 
                        help="Output directory for PDF files")
     parser.add_argument("-n", "--num_events", type=int, default=None,
                        help="Maximum number of events to process (default: all events)")
@@ -1239,26 +1239,26 @@ def main():
         print("Failed to load data. Exiting.")
         return 1
     
-    # Check if we have diagonal Gaussian fitting data
+    # Check if we have diagonal Gauss fitting data
     n_events = len(data['TrueX'])
     if n_events == 0:
         print("No events found in the data!")
         return 1
     
-    # Count successful fits
-    main_diag_x_successful = np.sum(data['GaussFitMainDiagXDOF'] > 0)
-    main_diag_y_successful = np.sum(data['GaussFitMainDiagYDOF'] > 0)
-    sec_diag_x_successful = np.sum(data['GaussFitSecDiagXDOF'] > 0)
-    sec_diag_y_successful = np.sum(data['GaussFitSecDiagYDOF'] > 0)
+    # Count success fits
+    main_diag_x_success = np.sum(data['GaussMainDiagXDOF'] > 0)
+    main_diag_y_success = np.sum(data['GaussMainDiagYDOF'] > 0)
+    sec_diag_x_success = np.sum(data['GaussSecDiagXDOF'] > 0)
+    sec_diag_y_success = np.sum(data['GaussSecDiagYDOF'] > 0)
     
-    print(f"Found {main_diag_x_successful} successful main diagonal X fits")
-    print(f"Found {main_diag_y_successful} successful main diagonal Y fits")
-    print(f"Found {sec_diag_x_successful} successful secondary diagonal X fits")
-    print(f"Found {sec_diag_y_successful} successful secondary diagonal Y fits")
+    print(f"Found {main_diag_x_success} success main diagonal X fits")
+    print(f"Found {main_diag_y_success} success main diagonal Y fits")
+    print(f"Found {sec_diag_x_success} success secondary diagonal X fits")
+    print(f"Found {sec_diag_y_success} success secondary diagonal Y fits")
     
-    total_successful = main_diag_x_successful + main_diag_y_successful + sec_diag_x_successful + sec_diag_y_successful
-    if total_successful == 0:
-        print("No successful diagonal Gaussian fits found in the data!")
+    total_success = main_diag_x_success + main_diag_y_success + sec_diag_x_success + sec_diag_y_success
+    if total_success == 0:
+        print("No success diagonal Gauss fits found in the data!")
         return 1
     
     # Create output directory
@@ -1266,7 +1266,7 @@ def main():
     print(f"Output directory: {args.output}")
     
     # Create PDF visualizations
-    main_diag_x_count, main_diag_y_count, sec_diag_x_count, sec_diag_y_count = create_diagonal_gaussian_fit_pdfs(
+    main_diag_x_count, main_diag_y_count, sec_diag_x_count, sec_diag_y_count = create_diagonal_gauss_fit_pdfs(
         data, args.output, args.num_events, args.workers
     )
     

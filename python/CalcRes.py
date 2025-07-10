@@ -3,9 +3,9 @@
 Spatial Resolution Calculator for PixelChargeSharingToy
 
 This script reads simulated data from a ROOT file and calculates the spatial resolution
-for various reconstruction methods by computing position residuals.
+for various reconstruction methods by computing pos residuals.
 
-Spatial resolution is quantified as the standard deviation of position residuals:
+Spatial resolution is quantified as the standard deviation of pos residuals:
 - Residual: r_i = x_rec(i) - x_true(i)
 - Mean residual (bias): r_bar = (1/N) * sum(r_i)
 - Standard deviation: σ_res = sqrt((1/(N-1)) * sum((r_i - r_bar)^2))
@@ -33,7 +33,7 @@ except ImportError:
 
 def calculate_resolution_stats(residuals, name):
     """
-    Calculate resolution statistics from residuals array.
+    Calc resolution statistics from residuals array.
     
     Args:
         residuals: numpy array of residuals (reconstructed - true)
@@ -46,13 +46,13 @@ def calculate_resolution_stats(residuals, name):
     if n_events == 0:
         return None
         
-    # Calculate mean residual (bias)
+    # Calc mean residual (bias)
     mean_residual = np.mean(residuals)
     
-    # Calculate standard deviation (unbiased estimator)
+    # Calc standard deviation (unbiased estimator)
     std_residual = np.std(residuals, ddof=1)  # ddof=1 for unbiased estimator
     
-    # Calculate RMS (assuming zero mean)
+    # Calc RMS (assuming zero mean)
     rms_residual = np.sqrt(np.mean(residuals**2))
     
     # Additional statistics
@@ -109,28 +109,28 @@ def read_root_data(root_file_path):
         
         # Branch names based on actual ROOT file structure
         branches = [
-            'TrueX', 'TrueY',  # True positions
+            'TrueX', 'TrueY',  # True poss
             'PixelTrueDeltaX', 'PixelTrueDeltaY',  # Digital readout deltas
-            'GaussRowDeltaX', 'GaussColumnDeltaY',  # Gaussian row/column fit deltas
-            'LorentzRowDeltaX', 'LorentzColumnDeltaY',  # Lorentzian row/column fit deltas
-            'PowerLorentzRowDeltaX', 'PowerLorentzColumnDeltaY',  # Power Lorentzian row/column fit deltas
+            'GaussRowDeltaX', 'GaussColDeltaY',  # Gauss row/column fit deltas
+            'LorentzRowDeltaX', 'LorentzColDeltaY',  # Lorentz row/column fit deltas
+            'PowerLorentzRowDeltaX', 'PowerLorentzColDeltaY',  # Power Lorentz row/column fit deltas
             
             # Main diagonal deltas
             'GaussMainDiagTransformedDeltaX', 'GaussMainDiagTransformedDeltaY',
             'LorentzMainDiagTransformedDeltaX', 'LorentzMainDiagTransformedDeltaY',
             
             # Secondary diagonal deltas (check if they exist)
-            'GaussSecondDiagTransformedDeltaX', 'GaussSecondDiagTransformedDeltaY',
-            'LorentzSecondDiagTransformedDeltaX', 'LorentzSecondDiagTransformedDeltaY',
+            'GaussSecDiagTransformedDeltaX', 'GaussSecDiagTransformedDeltaY',
+            'LorentzSecDiagTransformedDeltaX', 'LorentzSecDiagTransformedDeltaY',
             
-            # Power Lorentzian deltas (check if they exist)
+            # Power Lorentz deltas (check if they exist)
             'PowerLorentzMainDiagTransformedDeltaX', 'PowerLorentzMainDiagTransformedDeltaY',
-            'PowerLorentzSecondDiagTransformedDeltaX', 'PowerLorentzSecondDiagTransformedDeltaY',
+            'PowerLorentzSecDiagTransformedDeltaX', 'PowerLorentzSecDiagTransformedDeltaY',
             
             # 3D fit deltas (check if they exist)
-            '3DGaussianDeltaX', '3DGaussianDeltaY',  # 3D Gaussian fit deltas
-            '3DLorentzianDeltaX', '3DLorentzianDeltaY',  # 3D Lorentzian fit deltas
-            '3DPowerLorentzianDeltaX', '3DPowerLorentzianDeltaY',  # 3D Power-Law Lorentzian fit deltas
+            '3DGaussDeltaX', '3DGaussDeltaY',  # 3D Gauss fit deltas
+            '3DLorentzDeltaX', '3DLorentzDeltaY',  # 3D Lorentz fit deltas
+            '3DPowerLorentzDeltaX', '3DPowerLorentzDeltaY',  # 3D Power-Law Lorentz fit deltas
             
             # Mean estimators
             'GaussMeanTrueDeltaX', 'GaussMeanTrueDeltaY',
@@ -185,7 +185,7 @@ def read_root_data(root_file_path):
 
 def calculate_all_resolutions(data):
     """
-    Calculate spatial resolution for all reconstruction methods.
+    Calc spatial resolution for all reconstruction methods.
     
     The ROOT file already contains delta values (residuals = reconstructed - true),
     so we can directly use these for resolution calculation.
@@ -203,48 +203,48 @@ def calculate_all_resolutions(data):
     methods = [
         ('Digital Readout X', 'PixelTrueDeltaX'),
         ('Digital Readout Y', 'PixelTrueDeltaY'),
-        ('Gaussian Row Fit X', 'GaussRowDeltaX'),
-        ('Gaussian Column Fit Y', 'GaussColumnDeltaY'),
-        ('Lorentzian Row Fit X', 'LorentzRowDeltaX'),
-        ('Lorentzian Column Fit Y', 'LorentzColumnDeltaY'),
-        ('Power Lorentzian Row Fit X', 'PowerLorentzRowDeltaX'),
-        ('Power Lorentzian Column Fit Y', 'PowerLorentzColumnDeltaY'),
+        ('Gauss Row  X', 'GaussRowDeltaX'),
+        ('Gauss Col  Y', 'GaussColDeltaY'),
+        ('Lorentz Row  X', 'LorentzRowDeltaX'),
+        ('Lorentz Col  Y', 'LorentzColDeltaY'),
+        ('Power Lorentz Row  X', 'PowerLorentzRowDeltaX'),
+        ('Power Lorentz Col  Y', 'PowerLorentzColDeltaY'),
         
-        # Main Diagonal Fits (slope +1: dx - dy = constant)
-        ('Gaussian Main Diagonal Fit X', 'GaussMainDiagTransformedDeltaX'),
-        ('Gaussian Main Diagonal Fit Y', 'GaussMainDiagTransformedDeltaY'),
-        ('Lorentzian Main Diagonal Fit X', 'LorentzMainDiagTransformedDeltaX'),
-        ('Lorentzian Main Diagonal Fit Y', 'LorentzMainDiagTransformedDeltaY'),
+        # Main Diag s (slope +1: dx - dy = constant)
+        ('Gauss Main Diag  X', 'GaussMainDiagTransformedDeltaX'),
+        ('Gauss Main Diag  Y', 'GaussMainDiagTransformedDeltaY'),
+        ('Lorentz Main Diag  X', 'LorentzMainDiagTransformedDeltaX'),
+        ('Lorentz Main Diag  Y', 'LorentzMainDiagTransformedDeltaY'),
         
-        # Secondary Diagonal Fits (slope -1: dx + dy = constant)
-        ('Gaussian Secondary Diagonal Fit X', 'GaussSecondDiagTransformedDeltaX'),
-        ('Gaussian Secondary Diagonal Fit Y', 'GaussSecondDiagTransformedDeltaY'),
-        ('Lorentzian Secondary Diagonal Fit X', 'LorentzSecondDiagTransformedDeltaX'),
-        ('Lorentzian Secondary Diagonal Fit Y', 'LorentzSecondDiagTransformedDeltaY'),
+        # Secondary Diag s (slope -1: dx + dy = constant)
+        ('Gauss Secondary Diag  X', 'GaussSecDiagTransformedDeltaX'),
+        ('Gauss Secondary Diag  Y', 'GaussSecDiagTransformedDeltaY'),
+        ('Lorentz Secondary Diag  X', 'LorentzSecDiagTransformedDeltaX'),
+        ('Lorentz Secondary Diag  Y', 'LorentzSecDiagTransformedDeltaY'),
         
-        # Power Lorentzian Main Diagonal Fits (slope +1: dx - dy = constant)
-        ('Power Lorentzian Main Diagonal Fit X', 'PowerLorentzMainDiagTransformedDeltaX'),
-        ('Power Lorentzian Main Diagonal Fit Y', 'PowerLorentzMainDiagTransformedDeltaY'),
+        # Power Lorentz Main Diag s (slope +1: dx - dy = constant)
+        ('Power Lorentz Main Diag  X', 'PowerLorentzMainDiagTransformedDeltaX'),
+        ('Power Lorentz Main Diag  Y', 'PowerLorentzMainDiagTransformedDeltaY'),
         
-        # Power Lorentzian Secondary Diagonal Fits (slope -1: dx + dy = constant)
-        ('Power Lorentzian Secondary Diagonal Fit X', 'PowerLorentzSecondDiagTransformedDeltaX'),
-        ('Power Lorentzian Secondary Diagonal Fit Y', 'PowerLorentzSecondDiagTransformedDeltaY'),
+        # Power Lorentz Secondary Diag s (slope -1: dx + dy = constant)
+        ('Power Lorentz Secondary Diag  X', 'PowerLorentzSecDiagTransformedDeltaX'),
+        ('Power Lorentz Secondary Diag  Y', 'PowerLorentzSecDiagTransformedDeltaY'),
         
-        # 3D Surface Fits
-        ('3D Gaussian Fit X', '3DGaussianDeltaX'),
-        ('3D Gaussian Fit Y', '3DGaussianDeltaY'),
-        ('3D Lorentzian Fit X', '3DLorentzianDeltaX'),
-        ('3D Lorentzian Fit Y', '3DLorentzianDeltaY'),
-        ('3D Power Lorentzian Fit X', '3DPowerLorentzianDeltaX'),
-        ('3D Power Lorentzian Fit Y', '3DPowerLorentzianDeltaY'),
+        # 3D Surface s
+        ('3D Gauss  X', '3DGaussDeltaX'),
+        ('3D Gauss  Y', '3DGaussDeltaY'),
+        ('3D Lorentz  X', '3DLorentzDeltaX'),
+        ('3D Lorentz  Y', '3DLorentzDeltaY'),
+        ('3D Power Lorentz  X', '3DPowerLorentzDeltaX'),
+        ('3D Power Lorentz  Y', '3DPowerLorentzDeltaY'),
         
         # Mean Estimators (combined from all methods)
-        ('Gaussian Mean Estimator X', 'GaussMeanTrueDeltaX'),
-        ('Gaussian Mean Estimator Y', 'GaussMeanTrueDeltaY'),
-        ('Lorentzian Mean Estimator X', 'LorentzMeanTrueDeltaX'),
-        ('Lorentzian Mean Estimator Y', 'LorentzMeanTrueDeltaY'),
-        ('Power Lorentzian Mean Estimator X', 'PowerLorentzMeanTrueDeltaX'),
-        ('Power Lorentzian Mean Estimator Y', 'PowerLorentzMeanTrueDeltaY'),
+        ('Gauss Mean Estimator X', 'GaussMeanTrueDeltaX'),
+        ('Gauss Mean Estimator Y', 'GaussMeanTrueDeltaY'),
+        ('Lorentz Mean Estimator X', 'LorentzMeanTrueDeltaX'),
+        ('Lorentz Mean Estimator Y', 'LorentzMeanTrueDeltaY'),
+        ('Power Lorentz Mean Estimator X', 'PowerLorentzMeanTrueDeltaX'),
+        ('Power Lorentz Mean Estimator Y', 'PowerLorentzMeanTrueDeltaY'),
     ]
     
     print("\nCalculating spatial resolution for all methods...")
@@ -291,11 +291,11 @@ def save_results_to_file(results, output_file):
         
         # Group results by category for better organization
         digital_results = [r for r in results if 'Digital' in r['name']]
-        gauss_row_col_results = [r for r in results if ('Gaussian Row Fit' in r['name'] or 'Gaussian Column Fit' in r['name'])]
-        lorentz_row_col_results = [r for r in results if ('Lorentzian Row Fit' in r['name'] or 'Lorentzian Column Fit' in r['name']) and 'Power' not in r['name']]
-        power_lorentz_row_col_results = [r for r in results if ('Power Lorentzian Row Fit' in r['name'] or 'Power Lorentzian Column Fit' in r['name'])]
-        main_diag_results = [r for r in results if 'Main Diagonal' in r['name'] and r['std_dev'] > 0]
-        sec_diag_results = [r for r in results if 'Secondary Diagonal' in r['name'] and r['std_dev'] > 0]
+        gauss_row_col_results = [r for r in results if ('Gauss Row ' in r['name'] or 'Gauss Col ' in r['name'])]
+        lorentz_row_col_results = [r for r in results if ('Lorentz Row ' in r['name'] or 'Lorentz Col ' in r['name']) and 'Power' not in r['name']]
+        power_lorentz_row_col_results = [r for r in results if ('Power Lorentz Row ' in r['name'] or 'Power Lorentz Col ' in r['name'])]
+        main_diag_results = [r for r in results if 'Main Diag' in r['name'] and r['std_dev'] > 0]
+        sec_diag_results = [r for r in results if 'Secondary Diag' in r['name'] and r['std_dev'] > 0]
         three_d_results = [r for r in results if '3D' in r['name'] and r['std_dev'] > 0]
         mean_results = [r for r in results if 'Mean Estimator' in r['name'] and r['std_dev'] > 0]
         
@@ -316,9 +316,9 @@ def save_results_to_file(results, output_file):
                        f"{result['rms']*1000:>12.2f}\n")
             f.write("-" * 103 + "\n")
         
-        # Gaussian Row/Column fits section
+        # Gauss Row/Col fits section
         if gauss_row_col_results:
-            f.write("GAUSSIAN ROW & COLUMN FITS:\n")
+            f.write("GAUSS ROW & COLUMN FITS:\n")
             for result in sorted(gauss_row_col_results, key=lambda x: x['name']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
@@ -327,9 +327,9 @@ def save_results_to_file(results, output_file):
                        f"{result['rms']*1000:>12.2f}\n")
             f.write("-" * 103 + "\n")
         
-        # Lorentzian Row/Column fits section
+        # Lorentz Row/Col fits section
         if lorentz_row_col_results:
-            f.write("LORENTZIAN ROW & COLUMN FITS:\n")
+            f.write("LORENTZ ROW & COLUMN FITS:\n")
             for result in sorted(lorentz_row_col_results, key=lambda x: x['name']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
@@ -338,9 +338,9 @@ def save_results_to_file(results, output_file):
                        f"{result['rms']*1000:>12.2f}\n")
             f.write("-" * 103 + "\n")
         
-        # Power Lorentzian Row/Column fits section
+        # Power Lorentz Row/Col fits section
         if power_lorentz_row_col_results:
-            f.write("POWER LORENTZIAN ROW & COLUMN FITS:\n")
+            f.write("POWER LORENTZ ROW & COLUMN FITS:\n")
             for result in sorted(power_lorentz_row_col_results, key=lambda x: x['name']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
@@ -351,7 +351,7 @@ def save_results_to_file(results, output_file):
         
         # Main diagonal fits section
         if main_diag_results:
-            f.write("MAIN DIAGONAL FITS (slope +1, dx-dy=constant):\n")
+            f.write("MAIN DIAG FITS (slope +1, dx-dy=constant):\n")
             for result in sorted(main_diag_results, key=lambda x: x['std_dev']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
@@ -362,7 +362,7 @@ def save_results_to_file(results, output_file):
         
         # Secondary diagonal fits section
         if sec_diag_results:
-            f.write("SECONDARY DIAGONAL FITS (slope -1, dx+dy=constant):\n")
+            f.write("SECONDARY DIAG FITS (slope -1, dx+dy=constant):\n")
             for result in sorted(sec_diag_results, key=lambda x: x['std_dev']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
@@ -396,7 +396,7 @@ def save_results_to_file(results, output_file):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Calculate spatial resolution from PixelChargeSharingToy ROOT file",
+        description="Calc spatial resolution from PixelChargeSharingToy ROOT file",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -420,7 +420,7 @@ Examples:
         # Read ROOT data
         data = read_root_data(args.root_file)
         
-        # Calculate resolutions
+        # Calc resolutions
         results = calculate_all_resolutions(data)
         
         if not results:

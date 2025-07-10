@@ -1,10 +1,10 @@
 #include "SimulationLogger.hh"
-#include "2DGaussianFitCeres.hh"
-#include "2DLorentzianFitCeres.hh"
-#include "2DPowerLorentzianFitCeres.hh"
-#include "3DGaussianFitCeres.hh"
-#include "3DLorentzianFitCeres.hh"
-#include "3DPowerLorentzianFitCeres.hh"
+#include "2DGaussCeres.hh"
+#include "2DLorentzCeres.hh"
+#include "2DPowerLorentzCeres.hh"
+#include "3DGaussCeres.hh"
+#include "3DLorentzCeres.hh"
+#include "3DPowerLorentzCeres.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <iostream>
@@ -42,9 +42,9 @@ SimulationLogger::SimulationLogger()
       fCurrentEventID(-1),
       fTotalEvents(0),
       fTotalFits(0),
-      fSuccessfulFits(0),
-      fFailedFits(0),
-      fTotalFittingTime(0.0)
+      fSuccessFits(0),
+      fFailFits(0),
+      fTotFitTime(0.0)
 {
 }
 
@@ -90,7 +90,7 @@ void SimulationLogger::CreateLogFiles() {
     // Define log file names
     fMainLogFile = fLogDirectory + "/simulation_" + timestamp + ".log";
     fPerformanceLogFile = fLogDirectory + "/performance_" + timestamp + ".log";
-    fFittingLogFile = fLogDirectory + "/fitting_" + timestamp + ".log";
+    ftingLogFile = fLogDirectory + "/fitting_" + timestamp + ".log";
     fHitsLogFile = fLogDirectory + "/hits_" + timestamp + ".log";
     fErrorLogFile = fLogDirectory + "/errors_" + timestamp + ".log";
     fStatsLogFile = fLogDirectory + "/statistics_" + timestamp + ".log";
@@ -98,7 +98,7 @@ void SimulationLogger::CreateLogFiles() {
     // Create log file objects
     fMainLog = std::make_unique<std::ofstream>(fMainLogFile, std::ios::out | std::ios::app);
     fPerformanceLog = std::make_unique<std::ofstream>(fPerformanceLogFile, std::ios::out | std::ios::app);
-    fFittingLog = std::make_unique<std::ofstream>(fFittingLogFile, std::ios::out | std::ios::app);
+    ftingLog = std::make_unique<std::ofstream>(ftingLogFile, std::ios::out | std::ios::app);
     fHitsLog = std::make_unique<std::ofstream>(fHitsLogFile, std::ios::out | std::ios::app);
     fErrorLog = std::make_unique<std::ofstream>(fErrorLogFile, std::ios::out | std::ios::app);
     fStatsLog = std::make_unique<std::ofstream>(fStatsLogFile, std::ios::out | std::ios::app);
@@ -106,7 +106,7 @@ void SimulationLogger::CreateLogFiles() {
     // Create headers for each log file
     CreateLogHeader(*fMainLog, "EPIC CHARGE SHARING SIMULATION - MAIN LOG");
     CreateLogHeader(*fPerformanceLog, "EPIC CHARGE SHARING SIMULATION - PERFORMANCE LOG");
-    CreateLogHeader(*fFittingLog, "EPIC CHARGE SHARING SIMULATION - FITTING RESULTS LOG");
+    CreateLogHeader(*ftingLog, "EPIC CHARGE SHARING SIMULATION - FIT RESULTS LOG");
     CreateLogHeader(*fHitsLog, "EPIC CHARGE SHARING SIMULATION - PIXEL HITS LOG");
     CreateLogHeader(*fErrorLog, "EPIC CHARGE SHARING SIMULATION - ERRORS AND WARNINGS LOG");
     CreateLogHeader(*fStatsLog, "EPIC CHARGE SHARING SIMULATION - STATISTICS LOG");
@@ -132,7 +132,7 @@ void SimulationLogger::Finalize() {
     // Close all log files
     if (fMainLog) fMainLog->close();
     if (fPerformanceLog) fPerformanceLog->close();
-    if (fFittingLog) fFittingLog->close();
+    if (ftingLog) ftingLog->close();
     if (fHitsLog) fHitsLog->close();
     if (fErrorLog) fErrorLog->close();
     if (fStatsLog) fStatsLog->close();
@@ -155,8 +155,8 @@ void SimulationLogger::LogSimulationEnd() {
     WriteToMainLog("INFO", "Timestamp: " + GetTimestamp());
     
     // Log final statistics
-    LogEventStatistics(fTotalEvents, fSuccessfulFits, fFailedFits, 
-                      fTotalFittingTime / fTotalFits, fTotalFittingTime);
+    LogEventStatistics(fTotalEvents, fSuccessFits, fFailFits, 
+                      fTotFitTime / fTotalFits, fTotFitTime);
 }
 
 void SimulationLogger::LogRunStart(G4int runID, G4int totalEvents) {
@@ -229,13 +229,13 @@ void SimulationLogger::LogPhysicsParameters(G4double cutValue, const std::string
 }
 
 void SimulationLogger::LogPrimaryGeneratorParameters(const std::string& particleType, G4double energy,
-                                                   G4ThreeVector position, G4ThreeVector direction) {
+                                                   G4ThreeVector pos, G4ThreeVector direction) {
     std::ostringstream oss;
     oss << "\n=== PRIMARY GENERATOR PARAMETERS ===\n";
     oss << "Particle Type: " << particleType << "\n";
     oss << "Energy: " << energy/MeV << " MeV\n";
-    oss << "Initial Position: (" << position.x()/mm << ", " << position.y()/mm 
-        << ", " << position.z()/mm << ") mm\n";
+    oss << "Initial Pos: (" << pos.x()/mm << ", " << pos.y()/mm 
+        << ", " << pos.z()/mm << ") mm\n";
     oss << "Direction: (" << direction.x() << ", " << direction.y() 
         << ", " << direction.z() << ")\n";
     oss << "====================================\n";
@@ -244,186 +244,186 @@ void SimulationLogger::LogPrimaryGeneratorParameters(const std::string& particle
 }
 
 void SimulationLogger::LogPixelHit(G4int eventID, G4int pixelI, G4int pixelJ, G4double energyDeposit,
-                                 G4ThreeVector position, G4double stepLength) {
+                                 G4ThreeVector pos, G4double stepLength) {
     if (fHitsLog) {
         *fHitsLog << "EVENT:" << eventID 
                  << " PIXEL:(" << pixelI << "," << pixelJ << ")"
                  << " ENERGY:" << energyDeposit/keV << "keV"
-                 << " POS:(" << position.x()/mm << "," << position.y()/mm 
-                 << "," << position.z()/mm << ")mm"
+                 << " POS:(" << pos.x()/mm << "," << pos.y()/mm 
+                 << "," << pos.z()/mm << ")mm"
                  << " STEP:" << stepLength/micrometer << "μm\n";
         fHitsLog->flush();
     }
 }
 
-void SimulationLogger::LogTotalEnergyDeposition(G4int eventID, G4double totalEnergy, G4int numHits) {
+void SimulationLogger::LogTotalEnergyDepos(G4int eventID, G4double totalEnergy, G4int numHits) {
     WriteToMainLog("DEBUG", "Event " + std::to_string(eventID) + 
                    ": Total energy = " + std::to_string(totalEnergy/keV) + " keV, " +
                    "Number of hits = " + std::to_string(numHits));
 }
 
-void SimulationLogger::LogGaussianFitResults(G4int eventID, const GaussianFit2DResultsCeres& results) {
-    if (fFittingLog) {
-        *fFittingLog << "\n=== EVENT " << eventID << " - GAUSSIAN FIT RESULTS ===\n";
-        *fFittingLog << "Success: " << (results.fit_successful ? "YES" : "NO") << "\n";
-        if (results.fit_successful) {
-            *fFittingLog << "X Direction:\n";
-            *fFittingLog << "  Center: " << results.x_center/mm << " ± " << results.x_center_err/mm << " mm\n";
-            *fFittingLog << "  Sigma: " << results.x_sigma/mm << " ± " << results.x_sigma_err/mm << " mm\n";
-            *fFittingLog << "  Amplitude: " << results.x_amplitude << " ± " << results.x_amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.x_chi2red << " (DOF: " << results.x_dof << ")\n";
+void SimulationLogger::LogGaussResults(G4int eventID, const Gauss2DResultsCeres& results) {
+    if (ftingLog) {
+        *ftingLog << "\n=== EVENT " << eventID << " - GAUSS FIT RESULTS ===\n";
+        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
+        if (results.fit_success) {
+            *ftingLog << "X Direction:\n";
+            *ftingLog << "  Center: " << results.x_center/mm << " ± " << results.x_center_err/mm << " mm\n";
+            *ftingLog << "  Sigma: " << results.x_sigma/mm << " ± " << results.x_sigma_err/mm << " mm\n";
+            *ftingLog << "  Amp: " << results.x_amp << " ± " << results.x_amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.x_chi2red << " (DOF: " << results.x_dof << ")\n";
             
-            *fFittingLog << "Y Direction:\n";
-            *fFittingLog << "  Center: " << results.y_center/mm << " ± " << results.y_center_err/mm << " mm\n";
-            *fFittingLog << "  Sigma: " << results.y_sigma/mm << " ± " << results.y_sigma_err/mm << " mm\n";
-            *fFittingLog << "  Amplitude: " << results.y_amplitude << " ± " << results.y_amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.y_chi2red << " (DOF: " << results.y_dof << ")\n";
+            *ftingLog << "Y Direction:\n";
+            *ftingLog << "  Center: " << results.y_center/mm << " ± " << results.y_center_err/mm << " mm\n";
+            *ftingLog << "  Sigma: " << results.y_sigma/mm << " ± " << results.y_sigma_err/mm << " mm\n";
+            *ftingLog << "  Amp: " << results.y_amp << " ± " << results.y_amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.y_chi2red << " (DOF: " << results.y_dof << ")\n";
         }
-        *fFittingLog << "=================================================\n\n";
-        fFittingLog->flush();
+        *ftingLog << "=================================================\n\n";
+        ftingLog->flush();
     }
     
     fTotalFits++;
-    if (results.fit_successful) {
-        fSuccessfulFits++;
+    if (results.fit_success) {
+        fSuccessFits++;
     } else {
-        fFailedFits++;
+        fFailFits++;
     }
 }
 
-void SimulationLogger::LogLorentzianFitResults(G4int eventID, const LorentzianFit2DResultsCeres& results) {
-    if (fFittingLog) {
-        *fFittingLog << "\n=== EVENT " << eventID << " - LORENTZIAN FIT RESULTS ===\n";
-        *fFittingLog << "Success: " << (results.fit_successful ? "YES" : "NO") << "\n";
-        if (results.fit_successful) {
-            *fFittingLog << "X Direction:\n";
-            *fFittingLog << "  Center: " << results.x_center/mm << " ± " << results.x_center_err/mm << " mm\n";
-            *fFittingLog << "  Gamma: " << results.x_gamma/mm << " ± " << results.x_gamma_err/mm << " mm\n";
-            *fFittingLog << "  Amplitude: " << results.x_amplitude << " ± " << results.x_amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.x_chi2red << " (DOF: " << results.x_dof << ")\n";
+void SimulationLogger::LogLorentzResults(G4int eventID, const Lorentz2DResultsCeres& results) {
+    if (ftingLog) {
+        *ftingLog << "\n=== EVENT " << eventID << " - LORENTZ FIT RESULTS ===\n";
+        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
+        if (results.fit_success) {
+            *ftingLog << "X Direction:\n";
+            *ftingLog << "  Center: " << results.x_center/mm << " ± " << results.x_center_err/mm << " mm\n";
+            *ftingLog << "  Gamma: " << results.x_gamma/mm << " ± " << results.x_gamma_err/mm << " mm\n";
+            *ftingLog << "  Amp: " << results.x_amp << " ± " << results.x_amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.x_chi2red << " (DOF: " << results.x_dof << ")\n";
             
-            *fFittingLog << "Y Direction:\n";
-            *fFittingLog << "  Center: " << results.y_center/mm << " ± " << results.y_center_err/mm << " mm\n";
-            *fFittingLog << "  Gamma: " << results.y_gamma/mm << " ± " << results.y_gamma_err/mm << " mm\n";
-            *fFittingLog << "  Amplitude: " << results.y_amplitude << " ± " << results.y_amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.y_chi2red << " (DOF: " << results.y_dof << ")\n";
+            *ftingLog << "Y Direction:\n";
+            *ftingLog << "  Center: " << results.y_center/mm << " ± " << results.y_center_err/mm << " mm\n";
+            *ftingLog << "  Gamma: " << results.y_gamma/mm << " ± " << results.y_gamma_err/mm << " mm\n";
+            *ftingLog << "  Amp: " << results.y_amp << " ± " << results.y_amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.y_chi2red << " (DOF: " << results.y_dof << ")\n";
         }
-        *fFittingLog << "====================================================\n\n";
-        fFittingLog->flush();
+        *ftingLog << "====================================================\n\n";
+        ftingLog->flush();
     }
     
     fTotalFits++;
-    if (results.fit_successful) {
-        fSuccessfulFits++;
+    if (results.fit_success) {
+        fSuccessFits++;
     } else {
-        fFailedFits++;
+        fFailFits++;
     }
 }
 
-void SimulationLogger::LogPowerLorentzianFitResults(G4int eventID, const PowerLorentzianFit2DResultsCeres& results) {
-    if (fFittingLog) {
-        *fFittingLog << "\n=== EVENT " << eventID << " - POWER LORENTZIAN FIT RESULTS ===\n";
-        *fFittingLog << "Success: " << (results.fit_successful ? "YES" : "NO") << "\n";
-        if (results.fit_successful) {
-            *fFittingLog << "X Direction:\n";
-            *fFittingLog << "  Center: " << results.x_center/mm << " ± " << results.x_center_err/mm << " mm\n";
-            *fFittingLog << "  Gamma: " << results.x_gamma/mm << " ± " << results.x_gamma_err/mm << " mm\n";
-            *fFittingLog << "  Beta: " << results.x_beta << " ± " << results.x_beta_err << "\n";
-            *fFittingLog << "  Amplitude: " << results.x_amplitude << " ± " << results.x_amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.x_chi2red << " (DOF: " << results.x_dof << ")\n";
+void SimulationLogger::LogPowerLorentzResults(G4int eventID, const PowerLorentz2DResultsCeres& results) {
+    if (ftingLog) {
+        *ftingLog << "\n=== EVENT " << eventID << " - POWER LORENTZ FIT RESULTS ===\n";
+        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
+        if (results.fit_success) {
+            *ftingLog << "X Direction:\n";
+            *ftingLog << "  Center: " << results.x_center/mm << " ± " << results.x_center_err/mm << " mm\n";
+            *ftingLog << "  Gamma: " << results.x_gamma/mm << " ± " << results.x_gamma_err/mm << " mm\n";
+            *ftingLog << "  Beta: " << results.x_beta << " ± " << results.x_beta_err << "\n";
+            *ftingLog << "  Amp: " << results.x_amp << " ± " << results.x_amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.x_chi2red << " (DOF: " << results.x_dof << ")\n";
             
-            *fFittingLog << "Y Direction:\n";
-            *fFittingLog << "  Center: " << results.y_center/mm << " ± " << results.y_center_err/mm << " mm\n";
-            *fFittingLog << "  Gamma: " << results.y_gamma/mm << " ± " << results.y_gamma_err/mm << " mm\n";
-            *fFittingLog << "  Beta: " << results.y_beta << " ± " << results.y_beta_err << "\n";
-            *fFittingLog << "  Amplitude: " << results.y_amplitude << " ± " << results.y_amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.y_chi2red << " (DOF: " << results.y_dof << ")\n";
+            *ftingLog << "Y Direction:\n";
+            *ftingLog << "  Center: " << results.y_center/mm << " ± " << results.y_center_err/mm << " mm\n";
+            *ftingLog << "  Gamma: " << results.y_gamma/mm << " ± " << results.y_gamma_err/mm << " mm\n";
+            *ftingLog << "  Beta: " << results.y_beta << " ± " << results.y_beta_err << "\n";
+            *ftingLog << "  Amp: " << results.y_amp << " ± " << results.y_amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.y_chi2red << " (DOF: " << results.y_dof << ")\n";
         }
-        *fFittingLog << "==========================================================\n\n";
-        fFittingLog->flush();
+        *ftingLog << "==========================================================\n\n";
+        ftingLog->flush();
     }
     
     fTotalFits++;
-    if (results.fit_successful) {
-        fSuccessfulFits++;
+    if (results.fit_success) {
+        fSuccessFits++;
     } else {
-        fFailedFits++;
+        fFailFits++;
     }
 }
 
-void SimulationLogger::Log3DLorentzianFitResults(G4int eventID, const LorentzianFit3DResultsCeres& results) {
-    if (fFittingLog) {
-        *fFittingLog << "\n=== EVENT " << eventID << " - 3D LORENTZIAN FIT RESULTS ===\n";
-        *fFittingLog << "Success: " << (results.fit_successful ? "YES" : "NO") << "\n";
-        if (results.fit_successful) {
-            *fFittingLog << "3D Fit Parameters:\n";
-            *fFittingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
-            *fFittingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
-            *fFittingLog << "  Gamma X: " << results.gamma_x/mm << " ± " << results.gamma_x_err/mm << " mm\n";
-            *fFittingLog << "  Gamma Y: " << results.gamma_y/mm << " ± " << results.gamma_y_err/mm << " mm\n";
-            *fFittingLog << "  Amplitude: " << results.amplitude << " ± " << results.amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
+void SimulationLogger::Log3DLorentzResults(G4int eventID, const Lorentz3DResultsCeres& results) {
+    if (ftingLog) {
+        *ftingLog << "\n=== EVENT " << eventID << " - 3D LORENTZ FIT RESULTS ===\n";
+        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
+        if (results.fit_success) {
+            *ftingLog << "3D  Parameters:\n";
+            *ftingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
+            *ftingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
+            *ftingLog << "  Gamma X: " << results.gamma_x/mm << " ± " << results.gamma_x_err/mm << " mm\n";
+            *ftingLog << "  Gamma Y: " << results.gamma_y/mm << " ± " << results.gamma_y_err/mm << " mm\n";
+            *ftingLog << "  Amp: " << results.amp << " ± " << results.amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
         }
-        *fFittingLog << "=======================================================\n\n";
-        fFittingLog->flush();
+        *ftingLog << "=======================================================\n\n";
+        ftingLog->flush();
     }
     
     fTotalFits++;
-    if (results.fit_successful) {
-        fSuccessfulFits++;
+    if (results.fit_success) {
+        fSuccessFits++;
     } else {
-        fFailedFits++;
+        fFailFits++;
     }
 }
 
-void SimulationLogger::Log3DGaussianFitResults(G4int eventID, const GaussianFit3DResultsCeres& results) {
-    if (fFittingLog) {
-        *fFittingLog << "\n=== EVENT " << eventID << " - 3D GAUSSIAN FIT RESULTS ===\n";
-        *fFittingLog << "Success: " << (results.fit_successful ? "YES" : "NO") << "\n";
-        if (results.fit_successful) {
-            *fFittingLog << "3D Gaussian Parameters:\n";
-            *fFittingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
-            *fFittingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
-            *fFittingLog << "  Sigma X: " << results.sigma_x/mm << " ± " << results.sigma_x_err/mm << " mm\n";
-            *fFittingLog << "  Sigma Y: " << results.sigma_y/mm << " ± " << results.sigma_y_err/mm << " mm\n";
-            *fFittingLog << "  Amplitude: " << results.amplitude << " ± " << results.amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
+void SimulationLogger::Log3DGaussResults(G4int eventID, const Gauss3DResultsCeres& results) {
+    if (ftingLog) {
+        *ftingLog << "\n=== EVENT " << eventID << " - 3D GAUSS FIT RESULTS ===\n";
+        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
+        if (results.fit_success) {
+            *ftingLog << "3D Gauss Parameters:\n";
+            *ftingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
+            *ftingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
+            *ftingLog << "  Sigma X: " << results.sigma_x/mm << " ± " << results.sigma_x_err/mm << " mm\n";
+            *ftingLog << "  Sigma Y: " << results.sigma_y/mm << " ± " << results.sigma_y_err/mm << " mm\n";
+            *ftingLog << "  Amp: " << results.amp << " ± " << results.amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
         }
-        *fFittingLog << "======================================================\n\n";
-        fFittingLog->flush();
+        *ftingLog << "======================================================\n\n";
+        ftingLog->flush();
     }
     
     fTotalFits++;
-    if (results.fit_successful) {
-        fSuccessfulFits++;
+    if (results.fit_success) {
+        fSuccessFits++;
     } else {
-        fFailedFits++;
+        fFailFits++;
     }
 }
 
-void SimulationLogger::Log3DPowerLorentzianFitResults(G4int eventID, const PowerLorentzianFit3DResultsCeres& results) {
-    if (fFittingLog) {
-        *fFittingLog << "\n=== EVENT " << eventID << " - 3D POWER LORENTZIAN FIT RESULTS ===\n";
-        *fFittingLog << "Success: " << (results.fit_successful ? "YES" : "NO") << "\n";
-        if (results.fit_successful) {
-            *fFittingLog << "3D Power-Law Lorentzian Parameters:\n";
-            *fFittingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
-            *fFittingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
-            *fFittingLog << "  Gamma X: " << results.gamma_x/mm << " ± " << results.gamma_x_err/mm << " mm\n";
-            *fFittingLog << "  Gamma Y: " << results.gamma_y/mm << " ± " << results.gamma_y_err/mm << " mm\n";
-            *fFittingLog << "  Beta: " << results.beta << " ± " << results.beta_err << "\n";
-            *fFittingLog << "  Amplitude: " << results.amplitude << " ± " << results.amplitude_err << "\n";
-            *fFittingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
+void SimulationLogger::Log3DPowerLorentzResults(G4int eventID, const PowerLorentz3DResultsCeres& results) {
+    if (ftingLog) {
+        *ftingLog << "\n=== EVENT " << eventID << " - 3D POWER LORENTZ FIT RESULTS ===\n";
+        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
+        if (results.fit_success) {
+            *ftingLog << "3D Power-Law Lorentz Parameters:\n";
+            *ftingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
+            *ftingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
+            *ftingLog << "  Gamma X: " << results.gamma_x/mm << " ± " << results.gamma_x_err/mm << " mm\n";
+            *ftingLog << "  Gamma Y: " << results.gamma_y/mm << " ± " << results.gamma_y_err/mm << " mm\n";
+            *ftingLog << "  Beta: " << results.beta << " ± " << results.beta_err << "\n";
+            *ftingLog << "  Amp: " << results.amp << " ± " << results.amp_err << "\n";
+            *ftingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
         }
-        *fFittingLog << "=============================================================\n\n";
-        fFittingLog->flush();
+        *ftingLog << "=============================================================\n\n";
+        ftingLog->flush();
     }
     
     fTotalFits++;
-    if (results.fit_successful) {
-        fSuccessfulFits++;
+    if (results.fit_success) {
+        fSuccessFits++;
     } else {
-        fFailedFits++;
+        fFailFits++;
     }
 }
 
@@ -438,10 +438,10 @@ void SimulationLogger::LogPerformanceMetrics(G4int eventID, G4double eventProces
     }
 }
 
-void SimulationLogger::LogFittingPerformance(G4int eventID, const std::string& fitType,
+void SimulationLogger::LogtingPerformance(G4int eventID, const std::string& fitType,
                                            G4double fittingTime, G4bool converged, G4int iterations) {
     if (fPerformanceLog) {
-        *fPerformanceLog << "FITTING EVENT:" << eventID 
+        *fPerformanceLog << "FIT EVENT:" << eventID 
                         << " TYPE:" << fitType
                         << " TIME:" << fittingTime << "ms"
                         << " CONVERGED:" << (converged ? "YES" : "NO")
@@ -449,7 +449,7 @@ void SimulationLogger::LogFittingPerformance(G4int eventID, const std::string& f
         fPerformanceLog->flush();
     }
     
-    fTotalFittingTime += fittingTime;
+    fTotFitTime += fittingTime;
     fFitTypeTimings[fitType] += fittingTime;
     fFitTypeCounters[fitType]++;
     if (converged) {
@@ -526,13 +526,13 @@ void SimulationLogger::LogConfiguration(const std::map<std::string, std::string>
 }
 
 void SimulationLogger::LogCeresSettings(const std::string& fitType, const std::map<std::string, std::string>& settings) {
-    if (fFittingLog) {
-        *fFittingLog << "\n=== CERES SETTINGS FOR " << fitType << " ===\n";
+    if (ftingLog) {
+        *ftingLog << "\n=== CERES SETTINGS FOR " << fitType << " ===\n";
         for (const auto& pair : settings) {
-            *fFittingLog << pair.first << ": " << pair.second << "\n";
+            *ftingLog << pair.first << ": " << pair.second << "\n";
         }
-        *fFittingLog << "============================================\n\n";
-        fFittingLog->flush();
+        *ftingLog << "============================================\n\n";
+        ftingLog->flush();
     }
 }
 
@@ -568,21 +568,21 @@ void SimulationLogger::LogDebug(const std::string& message, const std::string& l
     WriteToMainLog("DEBUG", message, location);
 }
 
-void SimulationLogger::LogEventStatistics(G4int totalEvents, G4int successfulFits, G4int failedFits,
-                                        G4double averageChi2, G4double averageFitTime) {
+void SimulationLogger::LogEventStatistics(G4int totalEvents, G4int successs, G4int faileds,
+                                        G4double averageChi2, G4double averageTime) {
     if (fStatsLog) {
         *fStatsLog << "\n=== EVENT STATISTICS ===\n";
         *fStatsLog << "Total Events Processed: " << totalEvents << "\n";
-        *fStatsLog << "Total Fitting Algorithm Runs: " << (successfulFits + failedFits) << "\n";
-        *fStatsLog << "  - Successful Algorithm Fits: " << successfulFits << "\n";
-        *fStatsLog << "  - Failed Algorithm Fits: " << failedFits << "\n";
-        G4int totalFitAttempts = successfulFits + failedFits;
-        *fStatsLog << "Algorithm Success Rate: " << (totalFitAttempts > 0 ? 100.0 * successfulFits / totalFitAttempts : 0.0) << "%\n";
+        *fStatsLog << "Total ting Algorithm Runs: " << (successs + faileds) << "\n";
+        *fStatsLog << "  - Success Algorithm s: " << successs << "\n";
+        *fStatsLog << "  - Failed Algorithm s: " << faileds << "\n";
+        G4int totalAttempts = successs + faileds;
+        *fStatsLog << "Algorithm Success Rate: " << (totalAttempts > 0 ? 100.0 * successs / totalAttempts : 0.0) << "%\n";
         if (totalEvents > 0) {
-            *fStatsLog << "Average Fits per Event: " << std::fixed << std::setprecision(1) << (G4double)totalFitAttempts / totalEvents << "\n";
+            *fStatsLog << "Average s per Event: " << std::fixed << std::setprecision(1) << (G4double)totalAttempts / totalEvents << "\n";
         }
         *fStatsLog << "Average Chi2: " << averageChi2 << "\n";
-        *fStatsLog << "Average Fit Time: " << averageFitTime << " ms\n";
+        *fStatsLog << "Average  Time: " << averageTime << " ms\n";
         *fStatsLog << "========================\n\n";
         fStatsLog->flush();
     }
@@ -646,7 +646,7 @@ void SimulationLogger::FlushAllLogs() {
     
     if (fMainLog) fMainLog->flush();
     if (fPerformanceLog) fPerformanceLog->flush();
-    if (fFittingLog) fFittingLog->flush();
+    if (ftingLog) ftingLog->flush();
     if (fHitsLog) fHitsLog->flush();
     if (fErrorLog) fErrorLog->flush();
     if (fStatsLog) fStatsLog->flush();

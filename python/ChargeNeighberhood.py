@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Grid charge sharing analyzer for individual hits from ROOT simulation data.
-Shows neighborhood (9x9) pixel grid visualizations with charge distribution around specific hit positions.
+Shows neighborhood (9x9) pixel grid visualizations with charge distribution around specific hit poss.
 Also generates ensemble averages and handles edge cases.
 """
 
@@ -53,14 +53,14 @@ class RandomHitChargeGridGenerator:
     def plot_single_neighborhood_charge_grid(self, event_idx, charge_type='fraction', save_individual=True, output_dir="", event_type="random"):
         """
         Plot focused neighborhood (9x9) grid for a single hit showing charge distribution
-        Only draws pixels and blocks for valid positions (not outside detector bounds)
+        Only draws pixels and blocks for valid poss (not outside detector bounds)
         
         Parameters:
         -----------
         charge_type : str
             'fraction' for charge fractions, 'coulomb' for charge in Coulombs, 'distance' for distances
         """
-        if 'GridNeighborhoodChargeFractions' not in self.data:
+        if 'NeighborhoodChargeFractions' not in self.data:
             print(f"No neighborhood charge data found for event {event_idx}")
             return None
             
@@ -72,7 +72,7 @@ class RandomHitChargeGridGenerator:
         pixel_x = self.data['PixelX'][event_idx]
         pixel_y = self.data['PixelY'][event_idx]
         
-        # Calculate pixel distance from delta values
+        # Calc pixel distance from delta values
         pixel_delta_x = self.data['PixelTrueDeltaX'][event_idx]
         pixel_delta_y = self.data['PixelTrueDeltaY'][event_idx]
         pixel_dist = np.sqrt(pixel_delta_x**2 + pixel_delta_y**2)
@@ -80,9 +80,9 @@ class RandomHitChargeGridGenerator:
         pixel_hit = self.data['IsPixelHit'][event_idx]
         
         # Get charge data
-        charge_fractions = self.data['GridNeighborhoodChargeFractions'][event_idx]
-        charge_coulombs = self.data['GridNeighborhoodCharges'][event_idx]
-        charge_distances = self.data['GridNeighborhoodDistances'][event_idx]
+        charge_fractions = self.data['NeighborhoodChargeFractions'][event_idx]
+        charge_coulombs = self.data['NeighborhoodCharges'][event_idx]
+        charge_distances = self.data['NeighborhoodDistances'][event_idx]
         
         # Select which data to display
         # NOTE: The C++ code stores data with di (X direction) as outer loop and dj (Y direction) as inner loop
@@ -121,7 +121,7 @@ class RandomHitChargeGridGenerator:
         # Create figure focused on 9x9 grid area
         fig, ax = plt.subplots(figsize=(12, 12))
         
-        # Calculate the bounds of the 9x9 grid centered on PixelX, PixelY
+        # Calc the bounds of the 9x9 grid centered on PixelX, PixelY
         grid_extent = 4.5 * pixel_spacing  # 4.5 pixels in each direction from center
         margin = 0  # No margin around the grid
         
@@ -133,7 +133,7 @@ class RandomHitChargeGridGenerator:
         ax.set_xticks([])
         ax.set_yticks([])
         
-        # Calculate valid data range for colormap
+        # Calc valid data range for colormap
         valid_data = grid_data[~np.isnan(grid_data)]
         if len(valid_data) > 0:
             if charge_type == 'fraction':
@@ -150,28 +150,28 @@ class RandomHitChargeGridGenerator:
         else:
             cmap = plt.cm.plasma  # Plasma: higher charge is brighter
         
-        # Track which grid positions have valid data for grid line drawing
-        valid_positions = set()
+        # Track which grid poss have valid data for grid line drawing
+        valid_poss = set()
         
-        # First, draw the colored blocks (grid cells) behind the pixels - only for valid positions
+        # First, draw the colored blocks (grid cells) behind the pixels - only for valid poss
         for i in range(9):
             for j in range(9):
-                # Get data value for this grid position
+                # Get data value for this grid pos
                 data_value = grid_data[i, j]
                 
                 # Only draw if data is valid (not NaN)
                 if not np.isnan(data_value):
-                    valid_positions.add((i, j))
+                    valid_poss.add((i, j))
                     
-                    # Calculate pixel position relative to center (PixelX, PixelY is center)
+                    # Calc pixel pos relative to center (PixelX, PixelY is center)
                     rel_x = (j - 4) * pixel_spacing  # j maps to x direction, offset from center
                     rel_y = (i - 4) * pixel_spacing  # i maps to y direction, offset from center
                     
-                    # Block center position (same as pixel center)
+                    # Block center pos (same as pixel center)
                     block_center_x = pixel_x + rel_x
                     block_center_y = pixel_y + rel_y
                     
-                    # Calculate block corners for drawing (blocks are pixel_spacing sized)
+                    # Calc block corners for drawing (blocks are pixel_spacing sized)
                     block_corner_x = block_center_x - pixel_spacing/2
                     block_corner_y = block_center_y - pixel_spacing/2
                     
@@ -186,7 +186,7 @@ class RandomHitChargeGridGenerator:
                                                  facecolor=color, alpha=0.7)
                     ax.add_patch(block_rect)
                     
-                    # Position text below the pixel within the block
+                    # Pos text below the pixel within the block
                     text_y = block_center_y - pixel_size/2 - 0.08  # Further below the pixel
                     
                     # Add data value text in the block below the pixel
@@ -201,20 +201,20 @@ class RandomHitChargeGridGenerator:
                            ha='center', va='center', fontsize=9, 
                            color='white', weight='bold')
         
-        # Now draw the pixels on top with uniform fill color - only for valid positions
+        # Now draw the pixels on top with uniform fill color - only for valid poss
         for i in range(9):
             for j in range(9):
-                # Only draw pixel if this position has valid data
-                if (i, j) in valid_positions:
-                    # Calculate pixel position relative to center (PixelX, PixelY is center)
+                # Only draw pixel if this pos has valid data
+                if (i, j) in valid_poss:
+                    # Calc pixel pos relative to center (PixelX, PixelY is center)
                     rel_x = (j - 4) * pixel_spacing  # j maps to x direction, offset from center
                     rel_y = (i - 4) * pixel_spacing  # i maps to y direction, offset from center
                     
-                    # Actual pixel center position
+                    # Actual pixel center pos
                     pixel_center_x = pixel_x + rel_x
                     pixel_center_y = pixel_y + rel_y
                     
-                    # Calculate pixel corners for drawing
+                    # Calc pixel corners for drawing
                     pixel_corner_x = pixel_center_x - pixel_size/2
                     pixel_corner_y = pixel_center_y - pixel_size/2
                     
@@ -225,41 +225,41 @@ class RandomHitChargeGridGenerator:
                                                  facecolor='black', alpha=1.0)
                     ax.add_patch(pixel_rect)
         
-        # Mark the actual hit position
+        # Mark the actual hit pos
         ax.plot(hit_x, hit_y, 'ro', markersize=8, markeredgewidth=4, 
-                label=f'Hit Position ({hit_x:.2f}, {hit_y:.2f})')
+                label=f'Hit Pos ({hit_x:.2f}, {hit_y:.2f})')
         
         # Draw grid lines only where they separate existing blocks
         # Draw borders around each valid block
-        for i, j in valid_positions:
-            # Calculate block position relative to center
+        for i, j in valid_poss:
+            # Calc block pos relative to center
             rel_x = (j - 4) * pixel_spacing
             rel_y = (i - 4) * pixel_spacing
             
-            # Block center position
+            # Block center pos
             block_center_x = pixel_x + rel_x
             block_center_y = pixel_y + rel_y
             
-            # Calculate block boundaries
+            # Calc block boundaries
             left = block_center_x - pixel_spacing/2
             right = block_center_x + pixel_spacing/2
             bottom = block_center_y - pixel_spacing/2
             top = block_center_y + pixel_spacing/2
             
             # Draw left border if no valid block to the left
-            if (i, j-1) not in valid_positions:
+            if (i, j-1) not in valid_poss:
                 ax.plot([left, left], [bottom, top], color='black', linewidth=0.8, alpha=0.9)
             
             # Draw right border if no valid block to the right
-            if (i, j+1) not in valid_positions:
+            if (i, j+1) not in valid_poss:
                 ax.plot([right, right], [bottom, top], color='black', linewidth=0.8, alpha=0.9)
             
             # Draw bottom border if no valid block below
-            if (i+1, j) not in valid_positions:
+            if (i+1, j) not in valid_poss:
                 ax.plot([left, right], [bottom, bottom], color='black', linewidth=0.8, alpha=0.9)
             
             # Draw top border if no valid block above
-            if (i-1, j) not in valid_positions:
+            if (i-1, j) not in valid_poss:
                 ax.plot([left, right], [top, top], color='black', linewidth=0.8, alpha=0.9)
         
         # Add colorbar
@@ -271,12 +271,12 @@ class RandomHitChargeGridGenerator:
         # Add concise scientific title
         hit_type = "Inside Pixel" if pixel_hit else "Outside Pixel"
         
-        # Count invalid positions for edge cases
-        invalid_positions = np.sum(np.array(charge_fractions) == -999.0) if not pixel_hit else 0
+        # Count invalid poss for edge cases
+        invalid_poss = np.sum(np.array(charge_fractions) == -999.0) if not pixel_hit else 0
         
-        if event_type == "edge-case" and invalid_positions > 0:
+        if event_type == "edge-case" and invalid_poss > 0:
             title = f"Grid Charge Sharing Analysis: Event {event_idx} (Edge Case)\n" \
-                    f"Hit: ({hit_x:.2f}, {hit_y:.2f}) mm, Edep: {edep:.3f} MeV, {len(valid_positions)}/81 positions inside detector"
+                    f"Hit: ({hit_x:.2f}, {hit_y:.2f}) mm, Edep: {edep:.3f} MeV, {len(valid_poss)}/81 poss inside detector"
         elif event_type == "inside-pixel":
             title = f"Grid Charge Sharing Analysis: Event {event_idx} (Inside Pixel)\n" \
                     f"Hit: ({hit_x:.2f}, {hit_y:.2f}) mm, Edep: {edep:.3f} MeV, All charge assigned to hit pixel"
@@ -329,8 +329,8 @@ class RandomHitChargeGridGenerator:
     
     def plot_mean_neighborhood_charge_grid(self, charge_type='fraction', save_plot=True, output_dir=""):
         """Plot mean neighborhood (9x9) charge grid averaged across all non-inside-pixel events
-        Only draws pixels and blocks for positions that have valid data across events"""
-        if 'GridNeighborhoodChargeFractions' not in self.data:
+        Only draws pixels and blocks for poss that have valid data across events"""
+        if 'NeighborhoodChargeFractions' not in self.data:
             print("No neighborhood charge data found for mean calculation")
             return None
             
@@ -348,15 +348,15 @@ class RandomHitChargeGridGenerator:
         
         # Select which data to average
         if charge_type == 'fraction':
-            data_key = 'GridNeighborhoodChargeFractions'
+            data_key = 'NeighborhoodChargeFractions'
             data_label = 'Mean Charge Fraction'
             data_unit = ''
         elif charge_type == 'coulomb':
-            data_key = 'GridNeighborhoodCharges'
+            data_key = 'NeighborhoodCharges'
             data_label = 'Mean Charge'
             data_unit = ' C'
         elif charge_type == 'distance':
-            data_key = 'GridNeighborhoodDistances'
+            data_key = 'NeighborhoodDistances'
             data_label = 'Mean Distance'
             data_unit = ' mm'
         else:
@@ -384,12 +384,12 @@ class RandomHitChargeGridGenerator:
             
         print(f"Using {valid_event_count} events with valid charge data for mean calculation")
         
-        # Calculate mean, ignoring NaN values
+        # Calc mean, ignoring NaN values
         grids_array = np.array(all_grids)
         mean_grid = np.nanmean(grids_array, axis=0)
         
-        # Calculate some representative positions for the plot
-        # Use the first valid event for positioning reference
+        # Calc some representative poss for the plot
+        # Use the first valid event for posing reference
         ref_event_idx = valid_indices[0]
         pixel_x = self.data['PixelX'][ref_event_idx]
         pixel_y = self.data['PixelY'][ref_event_idx]
@@ -401,7 +401,7 @@ class RandomHitChargeGridGenerator:
         # Create figure focused on neighborhood (9x9) grid area
         fig, ax = plt.subplots(figsize=(12, 12))
         
-        # Calculate the bounds of the 9x9 grid centered on reference position
+        # Calc the bounds of the 9x9 grid centered on reference pos
         grid_extent = 4.5 * pixel_spacing
         
         ax.set_xlim(pixel_x - grid_extent, pixel_x + grid_extent)
@@ -412,7 +412,7 @@ class RandomHitChargeGridGenerator:
         ax.set_xticks([])
         ax.set_yticks([])
         
-        # Calculate valid data range for colormap
+        # Calc valid data range for colormap
         valid_mean_data = mean_grid[~np.isnan(mean_grid)]
         if len(valid_mean_data) > 0:
             if charge_type == 'fraction':
@@ -428,28 +428,28 @@ class RandomHitChargeGridGenerator:
         else:
             cmap = plt.cm.plasma  # Plasma: higher charge is brighter
         
-        # Track which grid positions have valid mean data for grid line drawing
-        valid_positions = set()
+        # Track which grid poss have valid mean data for grid line drawing
+        valid_poss = set()
         
-        # Draw the colored blocks (grid cells) behind the pixels - only for valid positions
+        # Draw the colored blocks (grid cells) behind the pixels - only for valid poss
         for i in range(9):
             for j in range(9):
-                # Get mean data value for this grid position
+                # Get mean data value for this grid pos
                 mean_value = mean_grid[i, j]
                 
                 # Only draw if mean data is valid (not NaN)
                 if not np.isnan(mean_value):
-                    valid_positions.add((i, j))
+                    valid_poss.add((i, j))
                     
-                    # Calculate pixel position relative to center
+                    # Calc pixel pos relative to center
                     rel_x = (j - 4) * pixel_spacing
                     rel_y = (i - 4) * pixel_spacing
                     
-                    # Block center position
+                    # Block center pos
                     block_center_x = pixel_x + rel_x
                     block_center_y = pixel_y + rel_y
                     
-                    # Calculate block corners for drawing
+                    # Calc block corners for drawing
                     block_corner_x = block_center_x - pixel_spacing/2
                     block_corner_y = block_center_y - pixel_spacing/2
                     
@@ -464,7 +464,7 @@ class RandomHitChargeGridGenerator:
                                                  facecolor=color, alpha=0.7)
                     ax.add_patch(block_rect)
                     
-                    # Position text below the pixel within the block
+                    # Pos text below the pixel within the block
                     text_y = block_center_y - pixel_size/2 - 0.08
                     
                     # Add mean value text in the block below the pixel
@@ -479,20 +479,20 @@ class RandomHitChargeGridGenerator:
                            ha='center', va='center', fontsize=9, 
                            color='white', weight='bold')
         
-        # Draw the pixels on top with uniform fill color - only for valid positions
+        # Draw the pixels on top with uniform fill color - only for valid poss
         for i in range(9):
             for j in range(9):
-                # Only draw pixel if this position has valid mean data
-                if (i, j) in valid_positions:
-                    # Calculate pixel position relative to center
+                # Only draw pixel if this pos has valid mean data
+                if (i, j) in valid_poss:
+                    # Calc pixel pos relative to center
                     rel_x = (j - 4) * pixel_spacing
                     rel_y = (i - 4) * pixel_spacing
                     
-                    # Actual pixel center position
+                    # Actual pixel center pos
                     pixel_center_x = pixel_x + rel_x
                     pixel_center_y = pixel_y + rel_y
                     
-                    # Calculate pixel corners for drawing
+                    # Calc pixel corners for drawing
                     pixel_corner_x = pixel_center_x - pixel_size/2
                     pixel_corner_y = pixel_center_y - pixel_size/2
                     
@@ -505,35 +505,35 @@ class RandomHitChargeGridGenerator:
         
         # Draw grid lines only where they separate existing blocks
         # Draw borders around each valid block
-        for i, j in valid_positions:
-            # Calculate block position relative to center
+        for i, j in valid_poss:
+            # Calc block pos relative to center
             rel_x = (j - 4) * pixel_spacing
             rel_y = (i - 4) * pixel_spacing
             
-            # Block center position
+            # Block center pos
             block_center_x = pixel_x + rel_x
             block_center_y = pixel_y + rel_y
             
-            # Calculate block boundaries
+            # Calc block boundaries
             left = block_center_x - pixel_spacing/2
             right = block_center_x + pixel_spacing/2
             bottom = block_center_y - pixel_spacing/2
             top = block_center_y + pixel_spacing/2
             
             # Draw left border if no valid block to the left
-            if (i, j-1) not in valid_positions:
+            if (i, j-1) not in valid_poss:
                 ax.plot([left, left], [bottom, top], color='black', linewidth=0.8, alpha=0.9)
             
             # Draw right border if no valid block to the right
-            if (i, j+1) not in valid_positions:
+            if (i, j+1) not in valid_poss:
                 ax.plot([right, right], [bottom, top], color='black', linewidth=0.8, alpha=0.9)
             
             # Draw bottom border if no valid block below
-            if (i+1, j) not in valid_positions:
+            if (i+1, j) not in valid_poss:
                 ax.plot([left, right], [bottom, bottom], color='black', linewidth=0.8, alpha=0.9)
             
             # Draw top border if no valid block above
-            if (i-1, j) not in valid_positions:
+            if (i-1, j) not in valid_poss:
                 ax.plot([left, right], [top, top], color='black', linewidth=0.8, alpha=0.9)
         
         # Add colorbar
@@ -569,15 +569,15 @@ class RandomHitChargeGridGenerator:
         # Print statistics
         if len(valid_mean_data) > 0:
             if charge_type == 'fraction':
-                print(f"  Mean grid: {len(valid_mean_data)} valid positions, "
+                print(f"  Mean grid: {len(valid_mean_data)} valid poss, "
                       f"range {np.min(valid_mean_data):.4f} to {np.max(valid_mean_data):.4f}, "
                       f"center mean: {mean_grid[4, 4]:.4f}")
             elif charge_type == 'coulomb':
-                print(f"  Mean grid: {len(valid_mean_data)} valid positions, "
+                print(f"  Mean grid: {len(valid_mean_data)} valid poss, "
                       f"range {np.min(valid_mean_data):.2e} to {np.max(valid_mean_data):.2e} C, "
                       f"center mean: {mean_grid[4, 4]:.2e} C")
             else:  # distance
-                print(f"  Mean grid: {len(valid_mean_data)} valid positions, "
+                print(f"  Mean grid: {len(valid_mean_data)} valid poss, "
                       f"range {np.min(valid_mean_data):.3f} to {np.max(valid_mean_data):.3f} mm, "
                       f"center mean: {mean_grid[4, 4]:.3f} mm")
         
@@ -585,7 +585,7 @@ class RandomHitChargeGridGenerator:
     
     def generate_random_hits_charge_individual(self, num_events=3, charge_type='fraction', save_plots=True, output_dir="", seed=None, include_mean=True, include_edge_case=True):
         """Create individual neighborhood (9x9) charge grid visualizations for N random hits and optionally a mean plot"""
-        if 'GridNeighborhoodChargeFractions' not in self.data:
+        if 'NeighborhoodChargeFractions' not in self.data:
             print("No neighborhood charge data found")
             return None
             
@@ -683,15 +683,15 @@ class RandomHitChargeGridGenerator:
     
     def find_edge_case_event(self):
         """Find an event where the hit is near the detector edge so neighborhood (9x9) grid is incomplete"""
-        if 'GridNeighborhoodChargeFractions' not in self.data:
-            print("GridNeighborhoodChargeFractions data not available for edge case search")
+        if 'NeighborhoodChargeFractions' not in self.data:
+            print("NeighborhoodChargeFractions data not available for edge case search")
             return None
             
         # Get detector parameters
         detector_size = self.detector_params['detector_size']
         pixel_spacing = self.detector_params['pixel_spacing']
         
-        # Calculate how close to edge a hit needs to be for incomplete neighborhood (9x9) grid
+        # Calc how close to edge a hit needs to be for incomplete neighborhood (9x9) grid
         grid_half_extent = 4 * pixel_spacing  # 4 pixels from center to edge of neighborhood grid
         edge_threshold = detector_size/2 - grid_half_extent
         
@@ -704,7 +704,7 @@ class RandomHitChargeGridGenerator:
         hit_y = self.data['TrueY']
         edep = self.data['EdepAtDet']
         
-        # Calculate distance from detector center and edges
+        # Calc distance from detector center and edges
         dist_from_center = np.sqrt(hit_x**2 + hit_y**2)
         
         # Check which events have hits near edges with energy deposition
@@ -729,10 +729,10 @@ class RandomHitChargeGridGenerator:
         max_incomplete_count = 0
         
         for event_idx in near_edge_indices:
-            charge_fractions = self.data['GridNeighborhoodChargeFractions'][event_idx]
+            charge_fractions = self.data['NeighborhoodChargeFractions'][event_idx]
             charge_grid = np.array(charge_fractions).reshape(9, 9).T  # Transpose to fix coordinate system
             
-            # Count incomplete/invalid positions (should be -999.0 for out-of-bounds)
+            # Count incomplete/invalid poss (should be -999.0 for out-of-bounds)
             incomplete_count = np.sum(charge_grid == -999.0)
             
             if incomplete_count > max_incomplete_count:
@@ -744,7 +744,7 @@ class RandomHitChargeGridGenerator:
             hit_y_val = hit_y[best_edge_event]
             distance = dist_from_center[best_edge_event]
             print(f"Found edge case event {best_edge_event} at ({hit_x_val:.3f}, {hit_y_val:.3f}) mm")
-            print(f"Distance from center: {distance:.3f} mm, incomplete positions: {max_incomplete_count}/81")
+            print(f"Distance from center: {distance:.3f} mm, incomplete poss: {max_incomplete_count}/81")
             return int(best_edge_event)
         else:
             # Fallback to the first near-edge event
@@ -763,7 +763,7 @@ class RandomHitChargeGridGenerator:
             return None
             
         pixel_hit = self.data['IsPixelHit']
-        # Calculate pixel distance from delta values
+        # Calc pixel distance from delta values
         pixel_delta_x = self.data['PixelTrueDeltaX']
         pixel_delta_y = self.data['PixelTrueDeltaY']
         pixel_dist = np.sqrt(pixel_delta_x**2 + pixel_delta_y**2)
