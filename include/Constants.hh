@@ -98,7 +98,7 @@ namespace Constants {
     // Set to 'false' to disable a fitting model and skip its computation entirely
     // This reduces simulation time and ROOT output file size when specific models aren't needed
     const G4bool ENABLE_GAUSSIAN_FITTING = true;         // Enable Gaussian fitting (2D and diagonal)
-    const G4bool ENABLE_LORENTZIAN_FITTING = false;       // Enable Lorentzian fitting (2D and diagonal) 
+    const G4bool ENABLE_LORENTZIAN_FITTING = true;       // Enable Lorentzian fitting (2D and diagonal) 
     const G4bool ENABLE_POWER_LORENTZIAN_FITTING = false; // Enable Power Lorentzian fitting (2D and diagonal)
     
     // Individual fitting type control (only used if main model is enabled)
@@ -107,7 +107,7 @@ namespace Constants {
     
     // 3D fitting control flags (fit entire neighborhood surface directly)
     const G4bool ENABLE_3D_GAUSSIAN_FITTING = true;      // Enable 3D Gaussian surface fitting
-    const G4bool ENABLE_3D_LORENTZIAN_FITTING = false;    // Enable 3D Lorentzian surface fitting
+    const G4bool ENABLE_3D_LORENTZIAN_FITTING = true;    // Enable 3D Lorentzian surface fitting
     const G4bool ENABLE_3D_POWER_LORENTZIAN_FITTING = false; // Enable 3D Power-Law Lorentzian surface fitting
     
     // ========================
@@ -121,19 +121,6 @@ namespace Constants {
     const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = true;  // Enable charge uncertainties
     
     // ========================
-    // DEFECT PIXELS CONSTANTS  
-    // ========================
-    
-    // Enable/disable defect pixels functionality
-    const G4bool ENABLE_DEFECT_PIXELS = false;           // Enable defect pixels functionality
-    
-    // Fraction of pixels to be defective (0.0 = no defects, 1.0 = all pixels defective)
-    const G4double DEFECT_PIXEL_FRACTION = 0.1;          // 10% defective pixels by default
-    
-    // Random seed for defect pixel generation (0 = use system time)
-    const G4int DEFECT_PIXELS_RANDOM_SEED = 0;       // Fixed seed for reproducible defect patterns
-    
-    // ========================
     // COVARIANCE CALCULATION CONTROL
     // ========================
     
@@ -141,6 +128,16 @@ namespace Constants {
     // When enabled: Tries multiple covariance algorithms for robust uncertainty estimation
     // When disabled: Uses only the fastest algorithm (DENSE_SVD with default settings)
     const G4bool ENABLE_MULTI_ALGORITHM_COVARIANCE = true;
+    
+    // ========================
+    // ROOT AUTO-SAVE CONTROL
+    // ========================
+
+    // Frequent AutoSave (TTree::AutoSave/Flush) inside RunAction significantly increases the
+    // probability of producing partially-written baskets when the simulation is killed or the
+    // file system momentarily blocks.  Set this flag to 'false' to disable the per-interval
+    // AutoSave and rely on a single FlushBaskets()+Write() at the end of the run instead.
+    const G4bool ENABLE_FREQUENT_AUTOSAVE = false;  // disable by default
     
     // USAGE EXAMPLES:
     // - To disable all Power Lorentzian: set ENABLE_POWER_LORENTZIAN_FITTING = false
