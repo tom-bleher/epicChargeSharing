@@ -20,13 +20,6 @@ private:
     G4ParticleGun* fParticleGun;
     DetectorConstruction* fDetector;
     
-    // Central pixel assignment region boundaries (yellow square)
-    G4double fCentralRegionXmin;
-    G4double fCentralRegionXmax;
-    G4double fCentralRegionYmin;
-    G4double fCentralRegionYmax;
-    
-    void CalcCentralPixelRegion();
     void GenerateRandomPos();
 };
 

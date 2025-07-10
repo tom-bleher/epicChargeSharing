@@ -60,34 +60,6 @@ void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
     fParticleGun->GeneratePrimaryVertex(anEvent);
 }
 
-void PrimaryGenerator::CalcCentralPixelRegion()
-{
-    // Get detector parameters
-    G4double detSize = fDetector->GetDetSize();
-    G4double pixelSpacing = fDetector->GetPixelSpacing();
-    G4double pixelSize = fDetector->GetPixelSize();
-    G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
-    G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
-    
-    // Calculate central pixel indices (middle of the detector grid)
-    G4int centralPixelI = numBlocksPerSide / 2;
-    G4int centralPixelJ = numBlocksPerSide / 2;
-    
-    // Calculate first pixel center position
-    G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
-    
-    // Calculate central pixel center position
-    G4double centralPixelX = firstPixelPos + centralPixelI * pixelSpacing;
-    G4double centralPixelY = firstPixelPos + centralPixelJ * pixelSpacing;
-    
-    // Define the assignment region for the central pixel (yellow square)
-    // Any hit within this region will be assigned to the central pixel
-    G4double halfSpacing = pixelSpacing / 2.0;
-    fCentralRegionXmin = centralPixelX - halfSpacing;
-    fCentralRegionXmax = centralPixelX + halfSpacing;
-    fCentralRegionYmin = centralPixelY - halfSpacing;
-    fCentralRegionYmax = centralPixelY + halfSpacing;
-}
 
 void PrimaryGenerator::GenerateRandomPos()
 {

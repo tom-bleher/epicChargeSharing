@@ -39,7 +39,6 @@ std::atomic<bool> RunAction::fAllWorkersCompleted{false};
 
 // Thread-safe ROOT initialization
 static std::once_flag gRootInitFlag;
-static std::mutex gRootInitMutex;
 
 static void InitializeROOTThreading() {
     if (G4Threading::IsMultithreadedApplication()) {
