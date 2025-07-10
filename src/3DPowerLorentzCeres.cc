@@ -6,16 +6,12 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
-// Removed mutex include - no longer needed for parallelization
-#include <atomic>
 #include <limits>
 #include <numeric>
 
 // Ceres Solver includes
 #include "ceres/ceres.h"
 #include "glog/logging.h"
-
-// Thread counter for debugging (removed mutex for better parallelization)
 
 // Use shared Google logging initialization
 void InitializeCeres3DPowerLorentz() {

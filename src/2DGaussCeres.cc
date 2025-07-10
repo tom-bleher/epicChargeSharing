@@ -7,16 +7,12 @@
 #include <algorithm>
 #include <map>
 #include <iostream>
-#include <atomic>
 #include <limits>
 #include <numeric>
 
 // Ceres Solver includes
 #include "ceres/ceres.h"
 #include "glog/logging.h"
-
-// Thread counter for debugging (removed mutex for better parallelization)
-static std::atomic<int> gGlobalCeresCounter{0};
 
 // Use shared Google logging initialization
 void InitializeCeres() {
