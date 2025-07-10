@@ -513,6 +513,23 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         
         // =============================================
+        // VALIDATION: CHECK THAT REQUIRED CONSTANTS ARE PROPERLY DEFINED
+        // =============================================
+        G4cout << "RunAction: Creating branches with fitting configuration:" << G4endl;
+        G4cout << "  - Gaussian fitting: " << (Constants::ENABLE_GAUSSIAN_FITTING ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Lorentzian fitting: " << (Constants::ENABLE_LORENTZIAN_FITTING ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Power-Law Lorentzian fitting: " << (Constants::ENABLE_POWER_LORENTZIAN_FITTING ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - 2D fitting: " << (Constants::ENABLE_2D_FITTING ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Diagonal fitting: " << (Constants::ENABLE_DIAGONAL_FITTING ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - 3D Gaussian fitting: " << (Constants::ENABLE_3D_GAUSSIAN_FITTING ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - 3D Lorentzian fitting: " << (Constants::ENABLE_3D_LORENTZIAN_FITTING ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - 3D Power-Law Lorentzian fitting: " << (Constants::ENABLE_3D_POWER_LORENTZIAN_FITTING ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Vertical charge uncertainties: " << (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES ? "ENABLED" : "DISABLED") << G4endl;
+        
+        // Track number of branches created for validation
+        G4int branchCount = 0;
+        
+        // =============================================
         // HITS BRANCHES
         // =============================================
         fTree->Branch("TrueX", &fTrueX, "TrueX/D")->SetTitle("True Position X [mm]");
@@ -541,20 +558,19 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // DELTA VARIABLES (RESIDUALS) BRANCHES
         // =============================================
         // These are the key branches that CalcRes.py looks for
+        // Create delta branches only for enabled fitting types
         
-        // Gaussian 2D fit deltas
+        // 2D fitting deltas
         if (Constants::ENABLE_GAUSSIAN_FITTING && Constants::ENABLE_2D_FITTING) {
             fTree->Branch("GaussRowDeltaX", &fGaussRowDeltaX, "GaussRowDeltaX/D")->SetTitle("Gaussian Row Fit Delta X [mm] (fit - true)");
             fTree->Branch("GaussColumnDeltaY", &fGaussColumnDeltaY, "GaussColumnDeltaY/D")->SetTitle("Gaussian Column Fit Delta Y [mm] (fit - true)");
         }
         
-        // Lorentzian 2D fit deltas
         if (Constants::ENABLE_LORENTZIAN_FITTING && Constants::ENABLE_2D_FITTING) {
             fTree->Branch("LorentzRowDeltaX", &fLorentzRowDeltaX, "LorentzRowDeltaX/D")->SetTitle("Lorentzian Row Fit Delta X [mm] (fit - true)");
             fTree->Branch("LorentzColumnDeltaY", &fLorentzColumnDeltaY, "LorentzColumnDeltaY/D")->SetTitle("Lorentzian Column Fit Delta Y [mm] (fit - true)");
         }
         
-        // Power Lorentzian 2D fit deltas
         if (Constants::ENABLE_POWER_LORENTZIAN_FITTING && Constants::ENABLE_2D_FITTING) {
             fTree->Branch("PowerLorentzRowDeltaX", &fPowerLorentzRowDeltaX, "PowerLorentzRowDeltaX/D")->SetTitle("Power Lorentzian Row Fit Delta X [mm] (fit - true)");
             fTree->Branch("PowerLorentzColumnDeltaY", &fPowerLorentzColumnDeltaY, "PowerLorentzColumnDeltaY/D")->SetTitle("Power Lorentzian Column Fit Delta Y [mm] (fit - true)");
@@ -598,18 +614,18 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             fTree->Branch("3DPowerLorentzianDeltaY", &f3DPowerLorentzianDeltaY, "3DPowerLorentzianDeltaY/D")->SetTitle("3D Power Lorentzian Fit Delta Y [mm] (fit - true)");
         }
         
-        // Mean estimators (key resolution metrics)
-        if (Constants::ENABLE_GAUSSIAN_FITTING) {
+        // Mean estimators (key resolution metrics) - only create if corresponding fitting is enabled
+        if (Constants::ENABLE_GAUSSIAN_FITTING && (Constants::ENABLE_DIAGONAL_FITTING || Constants::ENABLE_3D_GAUSSIAN_FITTING)) {
             fTree->Branch("GaussMeanTrueDeltaX", &fGaussMeanTrueDeltaX, "GaussMeanTrueDeltaX/D")->SetTitle("Gaussian Mean Estimator Delta X [mm] (mean_fit - true)");
             fTree->Branch("GaussMeanTrueDeltaY", &fGaussMeanTrueDeltaY, "GaussMeanTrueDeltaY/D")->SetTitle("Gaussian Mean Estimator Delta Y [mm] (mean_fit - true)");
         }
         
-        if (Constants::ENABLE_LORENTZIAN_FITTING) {
+        if (Constants::ENABLE_LORENTZIAN_FITTING && (Constants::ENABLE_DIAGONAL_FITTING || Constants::ENABLE_3D_LORENTZIAN_FITTING)) {
             fTree->Branch("LorentzMeanTrueDeltaX", &fLorentzMeanTrueDeltaX, "LorentzMeanTrueDeltaX/D")->SetTitle("Lorentzian Mean Estimator Delta X [mm] (mean_fit - true)");
             fTree->Branch("LorentzMeanTrueDeltaY", &fLorentzMeanTrueDeltaY, "LorentzMeanTrueDeltaY/D")->SetTitle("Lorentzian Mean Estimator Delta Y [mm] (mean_fit - true)");
         }
         
-        if (Constants::ENABLE_POWER_LORENTZIAN_FITTING) {
+        if (Constants::ENABLE_POWER_LORENTZIAN_FITTING && (Constants::ENABLE_DIAGONAL_FITTING || Constants::ENABLE_3D_POWER_LORENTZIAN_FITTING)) {
             fTree->Branch("PowerLorentzMeanTrueDeltaX", &fPowerLorentzMeanTrueDeltaX, "PowerLorentzMeanTrueDeltaX/D")->SetTitle("Power Lorentzian Mean Estimator Delta X [mm] (mean_fit - true)");
             fTree->Branch("PowerLorentzMeanTrueDeltaY", &fPowerLorentzMeanTrueDeltaY, "PowerLorentzMeanTrueDeltaY/D")->SetTitle("Power Lorentzian Mean Estimator Delta Y [mm] (mean_fit - true)");
         }
@@ -618,261 +634,279 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // GAUSSIAN FIT PARAMETERS BRANCHES
         // =============================================
         if (Constants::ENABLE_GAUSSIAN_FITTING) {
-        // Row fit parameters
-        fTree->Branch("GaussFitRowAmplitude", &fGaussFitRowAmplitude, "GaussFitRowAmplitude/D")->SetTitle("Gaussian Row Fit Amplitude");
-        fTree->Branch("GaussFitRowAmplitudeErr", &fGaussFitRowAmplitudeErr, "GaussFitRowAmplitudeErr/D")->SetTitle("Gaussian Row Fit Amplitude Error");
-        fTree->Branch("GaussFitRowStdev", &fGaussFitRowStdev, "GaussFitRowStdev/D")->SetTitle("Gaussian Row Fit Standard Deviation");
-        fTree->Branch("GaussFitRowStdevErr", &fGaussFitRowStdevErr, "GaussFitRowStdevErr/D")->SetTitle("Gaussian Row Fit Standard Deviation Error");
-        fTree->Branch("GaussFitRowVerticalOffset", &fGaussFitRowVerticalOffset, "GaussFitRowVerticalOffset/D")->SetTitle("Gaussian Row Fit Vertical Offset");
-        fTree->Branch("GaussFitRowVerticalOffsetErr", &fGaussFitRowVerticalOffsetErr, "GaussFitRowVerticalOffsetErr/D")->SetTitle("Gaussian Row Fit Vertical Offset Error");
-        fTree->Branch("GaussFitRowCenter", &fGaussFitRowCenter, "GaussFitRowCenter/D")->SetTitle("Gaussian Row Fit Center");
-        fTree->Branch("GaussFitRowCenterErr", &fGaussFitRowCenterErr, "GaussFitRowCenterErr/D")->SetTitle("Gaussian Row Fit Center Error");
-        fTree->Branch("GaussFitRowChi2red", &fGaussFitRowChi2red, "GaussFitRowChi2red/D")->SetTitle("Gaussian Row Fit Reduced Chi-squared");
-        fTree->Branch("GaussFitRowPp", &fGaussFitRowPp, "GaussFitRowPp/D")->SetTitle("Gaussian Row Fit P-value");
-        fTree->Branch("GaussFitRowDOF", &fGaussFitRowDOF, "GaussFitRowDOF/I")->SetTitle("Gaussian Row Fit Degrees of Freedom");
-        fTree->Branch("GaussFitRowChargeUncertainty", &fGaussFitRowChargeUncertainty, "GaussFitRowChargeUncertainty/D")->SetTitle("Gaussian Row Fit Charge Uncertainty");
-        
-        // Column fit parameters
-        fTree->Branch("GaussFitColumnAmplitude", &fGaussFitColumnAmplitude, "GaussFitColumnAmplitude/D")->SetTitle("Gaussian Column Fit Amplitude");
-        fTree->Branch("GaussFitColumnAmplitudeErr", &fGaussFitColumnAmplitudeErr, "GaussFitColumnAmplitudeErr/D")->SetTitle("Gaussian Column Fit Amplitude Error");
-        fTree->Branch("GaussFitColumnStdev", &fGaussFitColumnStdev, "GaussFitColumnStdev/D")->SetTitle("Gaussian Column Fit Standard Deviation");
-        fTree->Branch("GaussFitColumnStdevErr", &fGaussFitColumnStdevErr, "GaussFitColumnStdevErr/D")->SetTitle("Gaussian Column Fit Standard Deviation Error");
-        fTree->Branch("GaussFitColumnVerticalOffset", &fGaussFitColumnVerticalOffset, "GaussFitColumnVerticalOffset/D")->SetTitle("Gaussian Column Fit Vertical Offset");
-        fTree->Branch("GaussFitColumnVerticalOffsetErr", &fGaussFitColumnVerticalOffsetErr, "GaussFitColumnVerticalOffsetErr/D")->SetTitle("Gaussian Column Fit Vertical Offset Error");
-        fTree->Branch("GaussFitColumnCenter", &fGaussFitColumnCenter, "GaussFitColumnCenter/D")->SetTitle("Gaussian Column Fit Center");
-        fTree->Branch("GaussFitColumnCenterErr", &fGaussFitColumnCenterErr, "GaussFitColumnCenterErr/D")->SetTitle("Gaussian Column Fit Center Error");
-        fTree->Branch("GaussFitColumnChi2red", &fGaussFitColumnChi2red, "GaussFitColumnChi2red/D")->SetTitle("Gaussian Column Fit Reduced Chi-squared");
-        fTree->Branch("GaussFitColumnPp", &fGaussFitColumnPp, "GaussFitColumnPp/D")->SetTitle("Gaussian Column Fit P-value");
-        fTree->Branch("GaussFitColumnDOF", &fGaussFitColumnDOF, "GaussFitColumnDOF/I")->SetTitle("Gaussian Column Fit Degrees of Freedom");
-        fTree->Branch("GaussFitColumnChargeUncertainty", &fGaussFitColumnChargeUncertainty, "GaussFitColumnChargeUncertainty/D")->SetTitle("Gaussian Column Fit Charge Uncertainty");
-        
-        // Main diagonal fit parameters
-        fTree->Branch("GaussFitMainDiagXAmplitude", &fGaussFitMainDiagXAmplitude, "GaussFitMainDiagXAmplitude/D")->SetTitle("Gaussian Main Diagonal X Fit Amplitude");
-        fTree->Branch("GaussFitMainDiagXAmplitudeErr", &fGaussFitMainDiagXAmplitudeErr, "GaussFitMainDiagXAmplitudeErr/D")->SetTitle("Gaussian Main Diagonal X Fit Amplitude Error");
-        fTree->Branch("GaussFitMainDiagXStdev", &fGaussFitMainDiagXStdev, "GaussFitMainDiagXStdev/D")->SetTitle("Gaussian Main Diagonal X Fit Standard Deviation");
-        fTree->Branch("GaussFitMainDiagXStdevErr", &fGaussFitMainDiagXStdevErr, "GaussFitMainDiagXStdevErr/D")->SetTitle("Gaussian Main Diagonal X Fit Standard Deviation Error");
-        fTree->Branch("GaussFitMainDiagXVerticalOffset", &fGaussFitMainDiagXVerticalOffset, "GaussFitMainDiagXVerticalOffset/D")->SetTitle("Gaussian Main Diagonal X Fit Vertical Offset");
-        fTree->Branch("GaussFitMainDiagXVerticalOffsetErr", &fGaussFitMainDiagXVerticalOffsetErr, "GaussFitMainDiagXVerticalOffsetErr/D")->SetTitle("Gaussian Main Diagonal X Fit Vertical Offset Error");
-        fTree->Branch("GaussFitMainDiagXCenter", &fGaussFitMainDiagXCenter, "GaussFitMainDiagXCenter/D")->SetTitle("Gaussian Main Diagonal X Fit Center");
-        fTree->Branch("GaussFitMainDiagXCenterErr", &fGaussFitMainDiagXCenterErr, "GaussFitMainDiagXCenterErr/D")->SetTitle("Gaussian Main Diagonal X Fit Center Error");
-        fTree->Branch("GaussFitMainDiagXChi2red", &fGaussFitMainDiagXChi2red, "GaussFitMainDiagXChi2red/D")->SetTitle("Gaussian Main Diagonal X Fit Reduced Chi-squared");
-        fTree->Branch("GaussFitMainDiagXPp", &fGaussFitMainDiagXPp, "GaussFitMainDiagXPp/D")->SetTitle("Gaussian Main Diagonal X Fit P-value");
-        fTree->Branch("GaussFitMainDiagXDOF", &fGaussFitMainDiagXDOF, "GaussFitMainDiagXDOF/I")->SetTitle("Gaussian Main Diagonal X Fit Degrees of Freedom");
-        
-        fTree->Branch("GaussFitMainDiagYAmplitude", &fGaussFitMainDiagYAmplitude, "GaussFitMainDiagYAmplitude/D")->SetTitle("Gaussian Main Diagonal Y Fit Amplitude");
-        fTree->Branch("GaussFitMainDiagYAmplitudeErr", &fGaussFitMainDiagYAmplitudeErr, "GaussFitMainDiagYAmplitudeErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Amplitude Error");
-        fTree->Branch("GaussFitMainDiagYStdev", &fGaussFitMainDiagYStdev, "GaussFitMainDiagYStdev/D")->SetTitle("Gaussian Main Diagonal Y Fit Standard Deviation");
-        fTree->Branch("GaussFitMainDiagYStdevErr", &fGaussFitMainDiagYStdevErr, "GaussFitMainDiagYStdevErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Standard Deviation Error");
-        fTree->Branch("GaussFitMainDiagYVerticalOffset", &fGaussFitMainDiagYVerticalOffset, "GaussFitMainDiagYVerticalOffset/D")->SetTitle("Gaussian Main Diagonal Y Fit Vertical Offset");
-        fTree->Branch("GaussFitMainDiagYVerticalOffsetErr", &fGaussFitMainDiagYVerticalOffsetErr, "GaussFitMainDiagYVerticalOffsetErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Vertical Offset Error");
-        fTree->Branch("GaussFitMainDiagYCenter", &fGaussFitMainDiagYCenter, "GaussFitMainDiagYCenter/D")->SetTitle("Gaussian Main Diagonal Y Fit Center");
-        fTree->Branch("GaussFitMainDiagYCenterErr", &fGaussFitMainDiagYCenterErr, "GaussFitMainDiagYCenterErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Center Error");
-        fTree->Branch("GaussFitMainDiagYChi2red", &fGaussFitMainDiagYChi2red, "GaussFitMainDiagYChi2red/D")->SetTitle("Gaussian Main Diagonal Y Fit Reduced Chi-squared");
-        fTree->Branch("GaussFitMainDiagYPp", &fGaussFitMainDiagYPp, "GaussFitMainDiagYPp/D")->SetTitle("Gaussian Main Diagonal Y Fit P-value");
-        fTree->Branch("GaussFitMainDiagYDOF", &fGaussFitMainDiagYDOF, "GaussFitMainDiagYDOF/I")->SetTitle("Gaussian Main Diagonal Y Fit Degrees of Freedom");
-        
-        // Secondary diagonal fit parameters
-        fTree->Branch("GaussFitSecondDiagXAmplitude", &fGaussFitSecondDiagXAmplitude, "GaussFitSecondDiagXAmplitude/D")->SetTitle("Gaussian Secondary Diagonal X Fit Amplitude");
-        fTree->Branch("GaussFitSecondDiagXAmplitudeErr", &fGaussFitSecondDiagXAmplitudeErr, "GaussFitSecondDiagXAmplitudeErr/D")->SetTitle("Gaussian Secondary Diagonal X Fit Amplitude Error");
-        fTree->Branch("GaussFitSecondDiagXStdev", &fGaussFitSecondDiagXStdev, "GaussFitSecondDiagXStdev/D")->SetTitle("Gaussian Secondary Diagonal X Fit Standard Deviation");
-        fTree->Branch("GaussFitSecondDiagXStdevErr", &fGaussFitSecondDiagXStdevErr, "GaussFitSecondDiagXStdevErr/D")->SetTitle("Gaussian Secondary Diagonal X Fit Standard Deviation Error");
-        fTree->Branch("GaussFitSecondDiagXVerticalOffset", &fGaussFitSecondDiagXVerticalOffset, "GaussFitSecondDiagXVerticalOffset/D")->SetTitle("Gaussian Secondary Diagonal X Fit Vertical Offset");
-        fTree->Branch("GaussFitSecondDiagXVerticalOffsetErr", &fGaussFitSecondDiagXVerticalOffsetErr, "GaussFitSecondDiagXVerticalOffsetErr/D")->SetTitle("Gaussian Secondary Diagonal X Fit Vertical Offset Error");
-        fTree->Branch("GaussFitSecondDiagXCenter", &fGaussFitSecondDiagXCenter, "GaussFitSecondDiagXCenter/D")->SetTitle("Gaussian Secondary Diagonal X Fit Center");
-        fTree->Branch("GaussFitSecondDiagXCenterErr", &fGaussFitSecondDiagXCenterErr, "GaussFitSecondDiagXCenterErr/D")->SetTitle("Gaussian Secondary Diagonal X Fit Center Error");
-        fTree->Branch("GaussFitSecondDiagXChi2red", &fGaussFitSecondDiagXChi2red, "GaussFitSecondDiagXChi2red/D")->SetTitle("Gaussian Secondary Diagonal X Fit Reduced Chi-squared");
-        fTree->Branch("GaussFitSecondDiagXPp", &fGaussFitSecondDiagXPp, "GaussFitSecondDiagXPp/D")->SetTitle("Gaussian Secondary Diagonal X Fit P-value");
-        fTree->Branch("GaussFitSecondDiagXDOF", &fGaussFitSecondDiagXDOF, "GaussFitSecondDiagXDOF/I")->SetTitle("Gaussian Secondary Diagonal X Fit Degrees of Freedom");
-        
-        fTree->Branch("GaussFitSecondDiagYAmplitude", &fGaussFitSecondDiagYAmplitude, "GaussFitSecondDiagYAmplitude/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Amplitude");
-        fTree->Branch("GaussFitSecondDiagYAmplitudeErr", &fGaussFitSecondDiagYAmplitudeErr, "GaussFitSecondDiagYAmplitudeErr/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Amplitude Error");
-        fTree->Branch("GaussFitSecondDiagYStdev", &fGaussFitSecondDiagYStdev, "GaussFitSecondDiagYStdev/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Standard Deviation");
-        fTree->Branch("GaussFitSecondDiagYStdevErr", &fGaussFitSecondDiagYStdevErr, "GaussFitSecondDiagYStdevErr/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Standard Deviation Error");
-        fTree->Branch("GaussFitSecondDiagYVerticalOffset", &fGaussFitSecondDiagYVerticalOffset, "GaussFitSecondDiagYVerticalOffset/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Vertical Offset");
-        fTree->Branch("GaussFitSecondDiagYVerticalOffsetErr", &fGaussFitSecondDiagYVerticalOffsetErr, "GaussFitSecondDiagYVerticalOffsetErr/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Vertical Offset Error");
-        fTree->Branch("GaussFitSecondDiagYCenter", &fGaussFitSecondDiagYCenter, "GaussFitSecondDiagYCenter/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Center");
-        fTree->Branch("GaussFitSecondDiagYCenterErr", &fGaussFitSecondDiagYCenterErr, "GaussFitSecondDiagYCenterErr/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Center Error");
-        fTree->Branch("GaussFitSecondDiagYChi2red", &fGaussFitSecondDiagYChi2red, "GaussFitSecondDiagYChi2red/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Reduced Chi-squared");
-        fTree->Branch("GaussFitSecondDiagYPp", &fGaussFitSecondDiagYPp, "GaussFitSecondDiagYPp/D")->SetTitle("Gaussian Secondary Diagonal Y Fit P-value");
-        fTree->Branch("GaussFitSecondDiagYDOF", &fGaussFitSecondDiagYDOF, "GaussFitSecondDiagYDOF/I")->SetTitle("Gaussian Secondary Diagonal Y Fit Degrees of Freedom");
+            // Only create central row/column (2D) branches when 2D fitting is enabled
+            if (Constants::ENABLE_2D_FITTING) {
+                // Row fit parameters
+                fTree->Branch("GaussFitRowAmplitude", &fGaussFitRowAmplitude, "GaussFitRowAmplitude/D")->SetTitle("Gaussian Row Fit Amplitude");
+                fTree->Branch("GaussFitRowAmplitudeErr", &fGaussFitRowAmplitudeErr, "GaussFitRowAmplitudeErr/D")->SetTitle("Gaussian Row Fit Amplitude Error");
+                fTree->Branch("GaussFitRowStdev", &fGaussFitRowStdev, "GaussFitRowStdev/D")->SetTitle("Gaussian Row Fit Standard Deviation");
+                fTree->Branch("GaussFitRowStdevErr", &fGaussFitRowStdevErr, "GaussFitRowStdevErr/D")->SetTitle("Gaussian Row Fit Standard Deviation Error");
+                fTree->Branch("GaussFitRowVerticalOffset", &fGaussFitRowVerticalOffset, "GaussFitRowVerticalOffset/D")->SetTitle("Gaussian Row Fit Vertical Offset");
+                fTree->Branch("GaussFitRowVerticalOffsetErr", &fGaussFitRowVerticalOffsetErr, "GaussFitRowVerticalOffsetErr/D")->SetTitle("Gaussian Row Fit Vertical Offset Error");
+                fTree->Branch("GaussFitRowCenter", &fGaussFitRowCenter, "GaussFitRowCenter/D")->SetTitle("Gaussian Row Fit Center");
+                fTree->Branch("GaussFitRowCenterErr", &fGaussFitRowCenterErr, "GaussFitRowCenterErr/D")->SetTitle("Gaussian Row Fit Center Error");
+                fTree->Branch("GaussFitRowChi2red", &fGaussFitRowChi2red, "GaussFitRowChi2red/D")->SetTitle("Gaussian Row Fit Reduced Chi-squared");
+                fTree->Branch("GaussFitRowPp", &fGaussFitRowPp, "GaussFitRowPp/D")->SetTitle("Gaussian Row Fit P-value");
+                fTree->Branch("GaussFitRowDOF", &fGaussFitRowDOF, "GaussFitRowDOF/I")->SetTitle("Gaussian Row Fit Degrees of Freedom");
+                fTree->Branch("GaussFitRowChargeUncertainty", &fGaussFitRowChargeUncertainty, "GaussFitRowChargeUncertainty/D")->SetTitle("Gaussian Row Fit Charge Uncertainty");
+                
+                // Column fit parameters
+                fTree->Branch("GaussFitColumnAmplitude", &fGaussFitColumnAmplitude, "GaussFitColumnAmplitude/D")->SetTitle("Gaussian Column Fit Amplitude");
+                fTree->Branch("GaussFitColumnAmplitudeErr", &fGaussFitColumnAmplitudeErr, "GaussFitColumnAmplitudeErr/D")->SetTitle("Gaussian Column Fit Amplitude Error");
+                fTree->Branch("GaussFitColumnStdev", &fGaussFitColumnStdev, "GaussFitColumnStdev/D")->SetTitle("Gaussian Column Fit Standard Deviation");
+                fTree->Branch("GaussFitColumnStdevErr", &fGaussFitColumnStdevErr, "GaussFitColumnStdevErr/D")->SetTitle("Gaussian Column Fit Standard Deviation Error");
+                fTree->Branch("GaussFitColumnVerticalOffset", &fGaussFitColumnVerticalOffset, "GaussFitColumnVerticalOffset/D")->SetTitle("Gaussian Column Fit Vertical Offset");
+                fTree->Branch("GaussFitColumnVerticalOffsetErr", &fGaussFitColumnVerticalOffsetErr, "GaussFitColumnVerticalOffsetErr/D")->SetTitle("Gaussian Column Fit Vertical Offset Error");
+                fTree->Branch("GaussFitColumnCenter", &fGaussFitColumnCenter, "GaussFitColumnCenter/D")->SetTitle("Gaussian Column Fit Center");
+                fTree->Branch("GaussFitColumnCenterErr", &fGaussFitColumnCenterErr, "GaussFitColumnCenterErr/D")->SetTitle("Gaussian Column Fit Center Error");
+                fTree->Branch("GaussFitColumnChi2red", &fGaussFitColumnChi2red, "GaussFitColumnChi2red/D")->SetTitle("Gaussian Column Fit Reduced Chi-squared");
+                fTree->Branch("GaussFitColumnPp", &fGaussFitColumnPp, "GaussFitColumnPp/D")->SetTitle("Gaussian Column Fit P-value");
+                fTree->Branch("GaussFitColumnDOF", &fGaussFitColumnDOF, "GaussFitColumnDOF/I")->SetTitle("Gaussian Column Fit Degrees of Freedom");
+                fTree->Branch("GaussFitColumnChargeUncertainty", &fGaussFitColumnChargeUncertainty, "GaussFitColumnChargeUncertainty/D")->SetTitle("Gaussian Column Fit Charge Uncertainty");
+            } // end 2D Gaussian branches
+            
+            // Create diagonal fit branches only when diagonal fitting is enabled
+            if (Constants::ENABLE_DIAGONAL_FITTING) {
+                // Main diagonal fit parameters
+                fTree->Branch("GaussFitMainDiagXAmplitude", &fGaussFitMainDiagXAmplitude, "GaussFitMainDiagXAmplitude/D")->SetTitle("Gaussian Main Diagonal X Fit Amplitude");
+                fTree->Branch("GaussFitMainDiagXAmplitudeErr", &fGaussFitMainDiagXAmplitudeErr, "GaussFitMainDiagXAmplitudeErr/D")->SetTitle("Gaussian Main Diagonal X Fit Amplitude Error");
+                fTree->Branch("GaussFitMainDiagXStdev", &fGaussFitMainDiagXStdev, "GaussFitMainDiagXStdev/D")->SetTitle("Gaussian Main Diagonal X Fit Standard Deviation");
+                fTree->Branch("GaussFitMainDiagXStdevErr", &fGaussFitMainDiagXStdevErr, "GaussFitMainDiagXStdevErr/D")->SetTitle("Gaussian Main Diagonal X Fit Standard Deviation Error");
+                fTree->Branch("GaussFitMainDiagXVerticalOffset", &fGaussFitMainDiagXVerticalOffset, "GaussFitMainDiagXVerticalOffset/D")->SetTitle("Gaussian Main Diagonal X Fit Vertical Offset");
+                fTree->Branch("GaussFitMainDiagXVerticalOffsetErr", &fGaussFitMainDiagXVerticalOffsetErr, "GaussFitMainDiagXVerticalOffsetErr/D")->SetTitle("Gaussian Main Diagonal X Fit Vertical Offset Error");
+                fTree->Branch("GaussFitMainDiagXCenter", &fGaussFitMainDiagXCenter, "GaussFitMainDiagXCenter/D")->SetTitle("Gaussian Main Diagonal X Fit Center");
+                fTree->Branch("GaussFitMainDiagXCenterErr", &fGaussFitMainDiagXCenterErr, "GaussFitMainDiagXCenterErr/D")->SetTitle("Gaussian Main Diagonal X Fit Center Error");
+                fTree->Branch("GaussFitMainDiagXChi2red", &fGaussFitMainDiagXChi2red, "GaussFitMainDiagXChi2red/D")->SetTitle("Gaussian Main Diagonal X Fit Reduced Chi-squared");
+                fTree->Branch("GaussFitMainDiagXPp", &fGaussFitMainDiagXPp, "GaussFitMainDiagXPp/D")->SetTitle("Gaussian Main Diagonal X Fit P-value");
+                fTree->Branch("GaussFitMainDiagXDOF", &fGaussFitMainDiagXDOF, "GaussFitMainDiagXDOF/I")->SetTitle("Gaussian Main Diagonal X Fit Degrees of Freedom");
+                
+                fTree->Branch("GaussFitMainDiagYAmplitude", &fGaussFitMainDiagYAmplitude, "GaussFitMainDiagYAmplitude/D")->SetTitle("Gaussian Main Diagonal Y Fit Amplitude");
+                fTree->Branch("GaussFitMainDiagYAmplitudeErr", &fGaussFitMainDiagYAmplitudeErr, "GaussFitMainDiagYAmplitudeErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Amplitude Error");
+                fTree->Branch("GaussFitMainDiagYStdev", &fGaussFitMainDiagYStdev, "GaussFitMainDiagYStdev/D")->SetTitle("Gaussian Main Diagonal Y Fit Standard Deviation");
+                fTree->Branch("GaussFitMainDiagYStdevErr", &fGaussFitMainDiagYStdevErr, "GaussFitMainDiagYStdevErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Standard Deviation Error");
+                fTree->Branch("GaussFitMainDiagYVerticalOffset", &fGaussFitMainDiagYVerticalOffset, "GaussFitMainDiagYVerticalOffset/D")->SetTitle("Gaussian Main Diagonal Y Fit Vertical Offset");
+                fTree->Branch("GaussFitMainDiagYVerticalOffsetErr", &fGaussFitMainDiagYVerticalOffsetErr, "GaussFitMainDiagYVerticalOffsetErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Vertical Offset Error");
+                fTree->Branch("GaussFitMainDiagYCenter", &fGaussFitMainDiagYCenter, "GaussFitMainDiagYCenter/D")->SetTitle("Gaussian Main Diagonal Y Fit Center");
+                fTree->Branch("GaussFitMainDiagYCenterErr", &fGaussFitMainDiagYCenterErr, "GaussFitMainDiagYCenterErr/D")->SetTitle("Gaussian Main Diagonal Y Fit Center Error");
+                fTree->Branch("GaussFitMainDiagYChi2red", &fGaussFitMainDiagYChi2red, "GaussFitMainDiagYChi2red/D")->SetTitle("Gaussian Main Diagonal Y Fit Reduced Chi-squared");
+                fTree->Branch("GaussFitMainDiagYPp", &fGaussFitMainDiagYPp, "GaussFitMainDiagYPp/D")->SetTitle("Gaussian Main Diagonal Y Fit P-value");
+                fTree->Branch("GaussFitMainDiagYDOF", &fGaussFitMainDiagYDOF, "GaussFitMainDiagYDOF/I")->SetTitle("Gaussian Main Diagonal Y Fit Degrees of Freedom");
+                
+                // Secondary diagonal fit parameters
+                fTree->Branch("GaussFitSecondDiagXAmplitude", &fGaussFitSecondDiagXAmplitude, "GaussFitSecondDiagXAmplitude/D")->SetTitle("Gaussian Secondary Diagonal X Fit Amplitude");
+                fTree->Branch("GaussFitSecondDiagXAmplitudeErr", &fGaussFitSecondDiagXAmplitudeErr, "GaussFitSecondDiagXAmplitudeErr/D")->SetTitle("Gaussian Secondary Diagonal X Fit Amplitude Error");
+                fTree->Branch("GaussFitSecondDiagXStdev", &fGaussFitSecondDiagXStdev, "GaussFitSecondDiagXStdev/D")->SetTitle("Gaussian Secondary Diagonal X Fit Standard Deviation");
+                fTree->Branch("GaussFitSecondDiagXStdevErr", &fGaussFitSecondDiagXStdevErr, "GaussFitSecondDiagXStdevErr/D")->SetTitle("Gaussian Secondary Diagonal X Fit Standard Deviation Error");
+                fTree->Branch("GaussFitSecondDiagXVerticalOffset", &fGaussFitSecondDiagXVerticalOffset, "GaussFitSecondDiagXVerticalOffset/D")->SetTitle("Gaussian Secondary Diagonal X Fit Vertical Offset");
+                fTree->Branch("GaussFitSecondDiagXVerticalOffsetErr", &fGaussFitSecondDiagXVerticalOffsetErr, "GaussFitSecondDiagXVerticalOffsetErr/D")->SetTitle("Gaussian Secondary Diagonal X Fit Vertical Offset Error");
+                fTree->Branch("GaussFitSecondDiagXCenter", &fGaussFitSecondDiagXCenter, "GaussFitSecondDiagXCenter/D")->SetTitle("Gaussian Secondary Diagonal X Fit Center");
+                fTree->Branch("GaussFitSecondDiagXCenterErr", &fGaussFitSecondDiagXCenterErr, "GaussFitSecondDiagXCenterErr/D")->SetTitle("Gaussian Secondary Diagonal X Fit Center Error");
+                fTree->Branch("GaussFitSecondDiagXChi2red", &fGaussFitSecondDiagXChi2red, "GaussFitSecondDiagXChi2red/D")->SetTitle("Gaussian Secondary Diagonal X Fit Reduced Chi-squared");
+                fTree->Branch("GaussFitSecondDiagXPp", &fGaussFitSecondDiagXPp, "GaussFitSecondDiagXPp/D")->SetTitle("Gaussian Secondary Diagonal X Fit P-value");
+                fTree->Branch("GaussFitSecondDiagXDOF", &fGaussFitSecondDiagXDOF, "GaussFitSecondDiagXDOF/I")->SetTitle("Gaussian Secondary Diagonal X Fit Degrees of Freedom");
+                
+                fTree->Branch("GaussFitSecondDiagYAmplitude", &fGaussFitSecondDiagYAmplitude, "GaussFitSecondDiagYAmplitude/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Amplitude");
+                fTree->Branch("GaussFitSecondDiagYAmplitudeErr", &fGaussFitSecondDiagYAmplitudeErr, "GaussFitSecondDiagYAmplitudeErr/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Amplitude Error");
+                fTree->Branch("GaussFitSecondDiagYStdev", &fGaussFitSecondDiagYStdev, "GaussFitSecondDiagYStdev/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Standard Deviation");
+                fTree->Branch("GaussFitSecondDiagYStdevErr", &fGaussFitSecondDiagYStdevErr, "GaussFitSecondDiagYStdevErr/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Standard Deviation Error");
+                fTree->Branch("GaussFitSecondDiagYVerticalOffset", &fGaussFitSecondDiagYVerticalOffset, "GaussFitSecondDiagYVerticalOffset/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Vertical Offset");
+                fTree->Branch("GaussFitSecondDiagYVerticalOffsetErr", &fGaussFitSecondDiagYVerticalOffsetErr, "GaussFitSecondDiagYVerticalOffsetErr/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Vertical Offset Error");
+                fTree->Branch("GaussFitSecondDiagYCenter", &fGaussFitSecondDiagYCenter, "GaussFitSecondDiagYCenter/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Center");
+                fTree->Branch("GaussFitSecondDiagYCenterErr", &fGaussFitSecondDiagYCenterErr, "GaussFitSecondDiagYCenterErr/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Center Error");
+                fTree->Branch("GaussFitSecondDiagYChi2red", &fGaussFitSecondDiagYChi2red, "GaussFitSecondDiagYChi2red/D")->SetTitle("Gaussian Secondary Diagonal Y Fit Reduced Chi-squared");
+                fTree->Branch("GaussFitSecondDiagYPp", &fGaussFitSecondDiagYPp, "GaussFitSecondDiagYPp/D")->SetTitle("Gaussian Secondary Diagonal Y Fit P-value");
+                fTree->Branch("GaussFitSecondDiagYDOF", &fGaussFitSecondDiagYDOF, "GaussFitSecondDiagYDOF/I")->SetTitle("Gaussian Secondary Diagonal Y Fit Degrees of Freedom");
+            } // end diagonal Gaussian branches
         }
         
         // =============================================
         // LORENTZIAN FIT PARAMETERS BRANCHES
         // =============================================
         if (Constants::ENABLE_LORENTZIAN_FITTING) {
-        // Row fit parameters
-        fTree->Branch("LorentzFitRowAmplitude", &fLorentzFitRowAmplitude, "LorentzFitRowAmplitude/D")->SetTitle("Lorentzian Row Fit Amplitude");
-        fTree->Branch("LorentzFitRowAmplitudeErr", &fLorentzFitRowAmplitudeErr, "LorentzFitRowAmplitudeErr/D")->SetTitle("Lorentzian Row Fit Amplitude Error");
-        fTree->Branch("LorentzFitRowGamma", &fLorentzFitRowGamma, "LorentzFitRowGamma/D")->SetTitle("Lorentzian Row Fit Gamma (HWHM)");
-        fTree->Branch("LorentzFitRowGammaErr", &fLorentzFitRowGammaErr, "LorentzFitRowGammaErr/D")->SetTitle("Lorentzian Row Fit Gamma Error");
-        fTree->Branch("LorentzFitRowVerticalOffset", &fLorentzFitRowVerticalOffset, "LorentzFitRowVerticalOffset/D")->SetTitle("Lorentzian Row Fit Vertical Offset");
-        fTree->Branch("LorentzFitRowVerticalOffsetErr", &fLorentzFitRowVerticalOffsetErr, "LorentzFitRowVerticalOffsetErr/D")->SetTitle("Lorentzian Row Fit Vertical Offset Error");
-        fTree->Branch("LorentzFitRowCenter", &fLorentzFitRowCenter, "LorentzFitRowCenter/D")->SetTitle("Lorentzian Row Fit Center");
-        fTree->Branch("LorentzFitRowCenterErr", &fLorentzFitRowCenterErr, "LorentzFitRowCenterErr/D")->SetTitle("Lorentzian Row Fit Center Error");
-        fTree->Branch("LorentzFitRowChi2red", &fLorentzFitRowChi2red, "LorentzFitRowChi2red/D")->SetTitle("Lorentzian Row Fit Reduced Chi-squared");
-        fTree->Branch("LorentzFitRowPp", &fLorentzFitRowPp, "LorentzFitRowPp/D")->SetTitle("Lorentzian Row Fit P-value");
-        fTree->Branch("LorentzFitRowDOF", &fLorentzFitRowDOF, "LorentzFitRowDOF/I")->SetTitle("Lorentzian Row Fit Degrees of Freedom");
-        fTree->Branch("LorentzFitRowChargeUncertainty", &fLorentzFitRowChargeUncertainty, "LorentzFitRowChargeUncertainty/D")->SetTitle("Lorentzian Row Fit Charge Uncertainty");
-        
-        // Column fit parameters
-        fTree->Branch("LorentzFitColumnAmplitude", &fLorentzFitColumnAmplitude, "LorentzFitColumnAmplitude/D")->SetTitle("Lorentzian Column Fit Amplitude");
-        fTree->Branch("LorentzFitColumnAmplitudeErr", &fLorentzFitColumnAmplitudeErr, "LorentzFitColumnAmplitudeErr/D")->SetTitle("Lorentzian Column Fit Amplitude Error");
-        fTree->Branch("LorentzFitColumnGamma", &fLorentzFitColumnGamma, "LorentzFitColumnGamma/D")->SetTitle("Lorentzian Column Fit Gamma (HWHM)");
-        fTree->Branch("LorentzFitColumnGammaErr", &fLorentzFitColumnGammaErr, "LorentzFitColumnGammaErr/D")->SetTitle("Lorentzian Column Fit Gamma Error");
-        fTree->Branch("LorentzFitColumnVerticalOffset", &fLorentzFitColumnVerticalOffset, "LorentzFitColumnVerticalOffset/D")->SetTitle("Lorentzian Column Fit Vertical Offset");
-        fTree->Branch("LorentzFitColumnVerticalOffsetErr", &fLorentzFitColumnVerticalOffsetErr, "LorentzFitColumnVerticalOffsetErr/D")->SetTitle("Lorentzian Column Fit Vertical Offset Error");
-        fTree->Branch("LorentzFitColumnCenter", &fLorentzFitColumnCenter, "LorentzFitColumnCenter/D")->SetTitle("Lorentzian Column Fit Center");
-        fTree->Branch("LorentzFitColumnCenterErr", &fLorentzFitColumnCenterErr, "LorentzFitColumnCenterErr/D")->SetTitle("Lorentzian Column Fit Center Error");
-        fTree->Branch("LorentzFitColumnChi2red", &fLorentzFitColumnChi2red, "LorentzFitColumnChi2red/D")->SetTitle("Lorentzian Column Fit Reduced Chi-squared");
-        fTree->Branch("LorentzFitColumnPp", &fLorentzFitColumnPp, "LorentzFitColumnPp/D")->SetTitle("Lorentzian Column Fit P-value");
-        fTree->Branch("LorentzFitColumnDOF", &fLorentzFitColumnDOF, "LorentzFitColumnDOF/I")->SetTitle("Lorentzian Column Fit Degrees of Freedom");
-        fTree->Branch("LorentzFitColumnChargeUncertainty", &fLorentzFitColumnChargeUncertainty, "LorentzFitColumnChargeUncertainty/D")->SetTitle("Lorentzian Column Fit Charge Uncertainty");
-        
-        // Main diagonal fit parameters
-        fTree->Branch("LorentzFitMainDiagXAmplitude", &fLorentzFitMainDiagXAmplitude, "LorentzFitMainDiagXAmplitude/D")->SetTitle("Lorentzian Main Diagonal X Fit Amplitude");
-        fTree->Branch("LorentzFitMainDiagXAmplitudeErr", &fLorentzFitMainDiagXAmplitudeErr, "LorentzFitMainDiagXAmplitudeErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Amplitude Error");
-        fTree->Branch("LorentzFitMainDiagXGamma", &fLorentzFitMainDiagXGamma, "LorentzFitMainDiagXGamma/D")->SetTitle("Lorentzian Main Diagonal X Fit Gamma");
-        fTree->Branch("LorentzFitMainDiagXGammaErr", &fLorentzFitMainDiagXGammaErr, "LorentzFitMainDiagXGammaErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Gamma Error");
-        fTree->Branch("LorentzFitMainDiagXVerticalOffset", &fLorentzFitMainDiagXVerticalOffset, "LorentzFitMainDiagXVerticalOffset/D")->SetTitle("Lorentzian Main Diagonal X Fit Vertical Offset");
-        fTree->Branch("LorentzFitMainDiagXVerticalOffsetErr", &fLorentzFitMainDiagXVerticalOffsetErr, "LorentzFitMainDiagXVerticalOffsetErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Vertical Offset Error");
-        fTree->Branch("LorentzFitMainDiagXCenter", &fLorentzFitMainDiagXCenter, "LorentzFitMainDiagXCenter/D")->SetTitle("Lorentzian Main Diagonal X Fit Center");
-        fTree->Branch("LorentzFitMainDiagXCenterErr", &fLorentzFitMainDiagXCenterErr, "LorentzFitMainDiagXCenterErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Center Error");
-        fTree->Branch("LorentzFitMainDiagXChi2red", &fLorentzFitMainDiagXChi2red, "LorentzFitMainDiagXChi2red/D")->SetTitle("Lorentzian Main Diagonal X Fit Reduced Chi-squared");
-        fTree->Branch("LorentzFitMainDiagXPp", &fLorentzFitMainDiagXPp, "LorentzFitMainDiagXPp/D")->SetTitle("Lorentzian Main Diagonal X Fit P-value");
-        fTree->Branch("LorentzFitMainDiagXDOF", &fLorentzFitMainDiagXDOF, "LorentzFitMainDiagXDOF/I")->SetTitle("Lorentzian Main Diagonal X Fit Degrees of Freedom");
-        
-        fTree->Branch("LorentzFitMainDiagYAmplitude", &fLorentzFitMainDiagYAmplitude, "LorentzFitMainDiagYAmplitude/D")->SetTitle("Lorentzian Main Diagonal Y Fit Amplitude");
-        fTree->Branch("LorentzFitMainDiagYAmplitudeErr", &fLorentzFitMainDiagYAmplitudeErr, "LorentzFitMainDiagYAmplitudeErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Amplitude Error");
-        fTree->Branch("LorentzFitMainDiagYGamma", &fLorentzFitMainDiagYGamma, "LorentzFitMainDiagYGamma/D")->SetTitle("Lorentzian Main Diagonal Y Fit Gamma");
-        fTree->Branch("LorentzFitMainDiagYGammaErr", &fLorentzFitMainDiagYGammaErr, "LorentzFitMainDiagYGammaErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Gamma Error");
-        fTree->Branch("LorentzFitMainDiagYVerticalOffset", &fLorentzFitMainDiagYVerticalOffset, "LorentzFitMainDiagYVerticalOffset/D")->SetTitle("Lorentzian Main Diagonal Y Fit Vertical Offset");
-        fTree->Branch("LorentzFitMainDiagYVerticalOffsetErr", &fLorentzFitMainDiagYVerticalOffsetErr, "LorentzFitMainDiagYVerticalOffsetErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Vertical Offset Error");
-        fTree->Branch("LorentzFitMainDiagYCenter", &fLorentzFitMainDiagYCenter, "LorentzFitMainDiagYCenter/D")->SetTitle("Lorentzian Main Diagonal Y Fit Center");
-        fTree->Branch("LorentzFitMainDiagYCenterErr", &fLorentzFitMainDiagYCenterErr, "LorentzFitMainDiagYCenterErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Center Error");
-        fTree->Branch("LorentzFitMainDiagYChi2red", &fLorentzFitMainDiagYChi2red, "LorentzFitMainDiagYChi2red/D")->SetTitle("Lorentzian Main Diagonal Y Fit Reduced Chi-squared");
-        fTree->Branch("LorentzFitMainDiagYPp", &fLorentzFitMainDiagYPp, "LorentzFitMainDiagYPp/D")->SetTitle("Lorentzian Main Diagonal Y Fit P-value");
-        fTree->Branch("LorentzFitMainDiagYDOF", &fLorentzFitMainDiagYDOF, "LorentzFitMainDiagYDOF/I")->SetTitle("Lorentzian Main Diagonal Y Fit Degrees of Freedom");
-        
-        // Secondary diagonal fit parameters
-        fTree->Branch("LorentzFitSecondDiagXAmplitude", &fLorentzFitSecondDiagXAmplitude, "LorentzFitSecondDiagXAmplitude/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Amplitude");
-        fTree->Branch("LorentzFitSecondDiagXAmplitudeErr", &fLorentzFitSecondDiagXAmplitudeErr, "LorentzFitSecondDiagXAmplitudeErr/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Amplitude Error");
-        fTree->Branch("LorentzFitSecondDiagXGamma", &fLorentzFitSecondDiagXGamma, "LorentzFitSecondDiagXGamma/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Gamma");
-        fTree->Branch("LorentzFitSecondDiagXGammaErr", &fLorentzFitSecondDiagXGammaErr, "LorentzFitSecondDiagXGammaErr/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Gamma Error");
-        fTree->Branch("LorentzFitSecondDiagXVerticalOffset", &fLorentzFitSecondDiagXVerticalOffset, "LorentzFitSecondDiagXVerticalOffset/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Vertical Offset");
-        fTree->Branch("LorentzFitSecondDiagXVerticalOffsetErr", &fLorentzFitSecondDiagXVerticalOffsetErr, "LorentzFitSecondDiagXVerticalOffsetErr/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Vertical Offset Error");
-        fTree->Branch("LorentzFitSecondDiagXCenter", &fLorentzFitSecondDiagXCenter, "LorentzFitSecondDiagXCenter/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Center");
-        fTree->Branch("LorentzFitSecondDiagXCenterErr", &fLorentzFitSecondDiagXCenterErr, "LorentzFitSecondDiagXCenterErr/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Center Error");
-        fTree->Branch("LorentzFitSecondDiagXChi2red", &fLorentzFitSecondDiagXChi2red, "LorentzFitSecondDiagXChi2red/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Reduced Chi-squared");
-        fTree->Branch("LorentzFitSecondDiagXPp", &fLorentzFitSecondDiagXPp, "LorentzFitSecondDiagXPp/D")->SetTitle("Lorentzian Secondary Diagonal X Fit P-value");
-        fTree->Branch("LorentzFitSecondDiagXDOF", &fLorentzFitSecondDiagXDOF, "LorentzFitSecondDiagXDOF/I")->SetTitle("Lorentzian Secondary Diagonal X Fit Degrees of Freedom");
-        
-        fTree->Branch("LorentzFitSecondDiagYAmplitude", &fLorentzFitSecondDiagYAmplitude, "LorentzFitSecondDiagYAmplitude/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Amplitude");
-        fTree->Branch("LorentzFitSecondDiagYAmplitudeErr", &fLorentzFitSecondDiagYAmplitudeErr, "LorentzFitSecondDiagYAmplitudeErr/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Amplitude Error");
-        fTree->Branch("LorentzFitSecondDiagYGamma", &fLorentzFitSecondDiagYGamma, "LorentzFitSecondDiagYGamma/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Gamma");
-        fTree->Branch("LorentzFitSecondDiagYGammaErr", &fLorentzFitSecondDiagYGammaErr, "LorentzFitSecondDiagYGammaErr/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Gamma Error");
-        fTree->Branch("LorentzFitSecondDiagYVerticalOffset", &fLorentzFitSecondDiagYVerticalOffset, "LorentzFitSecondDiagYVerticalOffset/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Vertical Offset");
-        fTree->Branch("LorentzFitSecondDiagYVerticalOffsetErr", &fLorentzFitSecondDiagYVerticalOffsetErr, "LorentzFitSecondDiagYVerticalOffsetErr/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Vertical Offset Error");
-        fTree->Branch("LorentzFitSecondDiagYCenter", &fLorentzFitSecondDiagYCenter, "LorentzFitSecondDiagYCenter/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Center");
-        fTree->Branch("LorentzFitSecondDiagYCenterErr", &fLorentzFitSecondDiagYCenterErr, "LorentzFitSecondDiagYCenterErr/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Center Error");
-        fTree->Branch("LorentzFitSecondDiagYChi2red", &fLorentzFitSecondDiagYChi2red, "LorentzFitSecondDiagYChi2red/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Reduced Chi-squared");
-        fTree->Branch("LorentzFitSecondDiagYPp", &fLorentzFitSecondDiagYPp, "LorentzFitSecondDiagYPp/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit P-value");
-        fTree->Branch("LorentzFitSecondDiagYDOF", &fLorentzFitSecondDiagYDOF, "LorentzFitSecondDiagYDOF/I")->SetTitle("Lorentzian Secondary Diagonal Y Fit Degrees of Freedom");
+            // Only create central row/column (2D) branches when 2D fitting is enabled
+            if (Constants::ENABLE_2D_FITTING) {
+                // Row fit parameters
+                fTree->Branch("LorentzFitRowAmplitude", &fLorentzFitRowAmplitude, "LorentzFitRowAmplitude/D")->SetTitle("Lorentzian Row Fit Amplitude");
+                fTree->Branch("LorentzFitRowAmplitudeErr", &fLorentzFitRowAmplitudeErr, "LorentzFitRowAmplitudeErr/D")->SetTitle("Lorentzian Row Fit Amplitude Error");
+                fTree->Branch("LorentzFitRowGamma", &fLorentzFitRowGamma, "LorentzFitRowGamma/D")->SetTitle("Lorentzian Row Fit Gamma (HWHM)");
+                fTree->Branch("LorentzFitRowGammaErr", &fLorentzFitRowGammaErr, "LorentzFitRowGammaErr/D")->SetTitle("Lorentzian Row Fit Gamma Error");
+                fTree->Branch("LorentzFitRowVerticalOffset", &fLorentzFitRowVerticalOffset, "LorentzFitRowVerticalOffset/D")->SetTitle("Lorentzian Row Fit Vertical Offset");
+                fTree->Branch("LorentzFitRowVerticalOffsetErr", &fLorentzFitRowVerticalOffsetErr, "LorentzFitRowVerticalOffsetErr/D")->SetTitle("Lorentzian Row Fit Vertical Offset Error");
+                fTree->Branch("LorentzFitRowCenter", &fLorentzFitRowCenter, "LorentzFitRowCenter/D")->SetTitle("Lorentzian Row Fit Center");
+                fTree->Branch("LorentzFitRowCenterErr", &fLorentzFitRowCenterErr, "LorentzFitRowCenterErr/D")->SetTitle("Lorentzian Row Fit Center Error");
+                fTree->Branch("LorentzFitRowChi2red", &fLorentzFitRowChi2red, "LorentzFitRowChi2red/D")->SetTitle("Lorentzian Row Fit Reduced Chi-squared");
+                fTree->Branch("LorentzFitRowPp", &fLorentzFitRowPp, "LorentzFitRowPp/D")->SetTitle("Lorentzian Row Fit P-value");
+                fTree->Branch("LorentzFitRowDOF", &fLorentzFitRowDOF, "LorentzFitRowDOF/I")->SetTitle("Lorentzian Row Fit Degrees of Freedom");
+                fTree->Branch("LorentzFitRowChargeUncertainty", &fLorentzFitRowChargeUncertainty, "LorentzFitRowChargeUncertainty/D")->SetTitle("Lorentzian Row Fit Charge Uncertainty");
+                
+                // Column fit parameters
+                fTree->Branch("LorentzFitColumnAmplitude", &fLorentzFitColumnAmplitude, "LorentzFitColumnAmplitude/D")->SetTitle("Lorentzian Column Fit Amplitude");
+                fTree->Branch("LorentzFitColumnAmplitudeErr", &fLorentzFitColumnAmplitudeErr, "LorentzFitColumnAmplitudeErr/D")->SetTitle("Lorentzian Column Fit Amplitude Error");
+                fTree->Branch("LorentzFitColumnGamma", &fLorentzFitColumnGamma, "LorentzFitColumnGamma/D")->SetTitle("Lorentzian Column Fit Gamma (HWHM)");
+                fTree->Branch("LorentzFitColumnGammaErr", &fLorentzFitColumnGammaErr, "LorentzFitColumnGammaErr/D")->SetTitle("Lorentzian Column Fit Gamma Error");
+                fTree->Branch("LorentzFitColumnVerticalOffset", &fLorentzFitColumnVerticalOffset, "LorentzFitColumnVerticalOffset/D")->SetTitle("Lorentzian Column Fit Vertical Offset");
+                fTree->Branch("LorentzFitColumnVerticalOffsetErr", &fLorentzFitColumnVerticalOffsetErr, "LorentzFitColumnVerticalOffsetErr/D")->SetTitle("Lorentzian Column Fit Vertical Offset Error");
+                fTree->Branch("LorentzFitColumnCenter", &fLorentzFitColumnCenter, "LorentzFitColumnCenter/D")->SetTitle("Lorentzian Column Fit Center");
+                fTree->Branch("LorentzFitColumnCenterErr", &fLorentzFitColumnCenterErr, "LorentzFitColumnCenterErr/D")->SetTitle("Lorentzian Column Fit Center Error");
+                fTree->Branch("LorentzFitColumnChi2red", &fLorentzFitColumnChi2red, "LorentzFitColumnChi2red/D")->SetTitle("Lorentzian Column Fit Reduced Chi-squared");
+                fTree->Branch("LorentzFitColumnPp", &fLorentzFitColumnPp, "LorentzFitColumnPp/D")->SetTitle("Lorentzian Column Fit P-value");
+                fTree->Branch("LorentzFitColumnDOF", &fLorentzFitColumnDOF, "LorentzFitColumnDOF/I")->SetTitle("Lorentzian Column Fit Degrees of Freedom");
+                fTree->Branch("LorentzFitColumnChargeUncertainty", &fLorentzFitColumnChargeUncertainty, "LorentzFitColumnChargeUncertainty/D")->SetTitle("Lorentzian Column Fit Charge Uncertainty");
+            } // end 2D Lorentzian branches
+            
+            // Create diagonal fit branches only when diagonal fitting is enabled
+            if (Constants::ENABLE_DIAGONAL_FITTING) {
+                // Main diagonal fit parameters
+                fTree->Branch("LorentzFitMainDiagXAmplitude", &fLorentzFitMainDiagXAmplitude, "LorentzFitMainDiagXAmplitude/D")->SetTitle("Lorentzian Main Diagonal X Fit Amplitude");
+                fTree->Branch("LorentzFitMainDiagXAmplitudeErr", &fLorentzFitMainDiagXAmplitudeErr, "LorentzFitMainDiagXAmplitudeErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Amplitude Error");
+                fTree->Branch("LorentzFitMainDiagXGamma", &fLorentzFitMainDiagXGamma, "LorentzFitMainDiagXGamma/D")->SetTitle("Lorentzian Main Diagonal X Fit Gamma");
+                fTree->Branch("LorentzFitMainDiagXGammaErr", &fLorentzFitMainDiagXGammaErr, "LorentzFitMainDiagXGammaErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Gamma Error");
+                fTree->Branch("LorentzFitMainDiagXVerticalOffset", &fLorentzFitMainDiagXVerticalOffset, "LorentzFitMainDiagXVerticalOffset/D")->SetTitle("Lorentzian Main Diagonal X Fit Vertical Offset");
+                fTree->Branch("LorentzFitMainDiagXVerticalOffsetErr", &fLorentzFitMainDiagXVerticalOffsetErr, "LorentzFitMainDiagXVerticalOffsetErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Vertical Offset Error");
+                fTree->Branch("LorentzFitMainDiagXCenter", &fLorentzFitMainDiagXCenter, "LorentzFitMainDiagXCenter/D")->SetTitle("Lorentzian Main Diagonal X Fit Center");
+                fTree->Branch("LorentzFitMainDiagXCenterErr", &fLorentzFitMainDiagXCenterErr, "LorentzFitMainDiagXCenterErr/D")->SetTitle("Lorentzian Main Diagonal X Fit Center Error");
+                fTree->Branch("LorentzFitMainDiagXChi2red", &fLorentzFitMainDiagXChi2red, "LorentzFitMainDiagXChi2red/D")->SetTitle("Lorentzian Main Diagonal X Fit Reduced Chi-squared");
+                fTree->Branch("LorentzFitMainDiagXPp", &fLorentzFitMainDiagXPp, "LorentzFitMainDiagXPp/D")->SetTitle("Lorentzian Main Diagonal X Fit P-value");
+                fTree->Branch("LorentzFitMainDiagXDOF", &fLorentzFitMainDiagXDOF, "LorentzFitMainDiagXDOF/I")->SetTitle("Lorentzian Main Diagonal X Fit Degrees of Freedom");
+                
+                fTree->Branch("LorentzFitMainDiagYAmplitude", &fLorentzFitMainDiagYAmplitude, "LorentzFitMainDiagYAmplitude/D")->SetTitle("Lorentzian Main Diagonal Y Fit Amplitude");
+                fTree->Branch("LorentzFitMainDiagYAmplitudeErr", &fLorentzFitMainDiagYAmplitudeErr, "LorentzFitMainDiagYAmplitudeErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Amplitude Error");
+                fTree->Branch("LorentzFitMainDiagYGamma", &fLorentzFitMainDiagYGamma, "LorentzFitMainDiagYGamma/D")->SetTitle("Lorentzian Main Diagonal Y Fit Gamma");
+                fTree->Branch("LorentzFitMainDiagYGammaErr", &fLorentzFitMainDiagYGammaErr, "LorentzFitMainDiagYGammaErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Gamma Error");
+                fTree->Branch("LorentzFitMainDiagYVerticalOffset", &fLorentzFitMainDiagYVerticalOffset, "LorentzFitMainDiagYVerticalOffset/D")->SetTitle("Lorentzian Main Diagonal Y Fit Vertical Offset");
+                fTree->Branch("LorentzFitMainDiagYVerticalOffsetErr", &fLorentzFitMainDiagYVerticalOffsetErr, "LorentzFitMainDiagYVerticalOffsetErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Vertical Offset Error");
+                fTree->Branch("LorentzFitMainDiagYCenter", &fLorentzFitMainDiagYCenter, "LorentzFitMainDiagYCenter/D")->SetTitle("Lorentzian Main Diagonal Y Fit Center");
+                fTree->Branch("LorentzFitMainDiagYCenterErr", &fLorentzFitMainDiagYCenterErr, "LorentzFitMainDiagYCenterErr/D")->SetTitle("Lorentzian Main Diagonal Y Fit Center Error");
+                fTree->Branch("LorentzFitMainDiagYChi2red", &fLorentzFitMainDiagYChi2red, "LorentzFitMainDiagYChi2red/D")->SetTitle("Lorentzian Main Diagonal Y Fit Reduced Chi-squared");
+                fTree->Branch("LorentzFitMainDiagYPp", &fLorentzFitMainDiagYPp, "LorentzFitMainDiagYPp/D")->SetTitle("Lorentzian Main Diagonal Y Fit P-value");
+                fTree->Branch("LorentzFitMainDiagYDOF", &fLorentzFitMainDiagYDOF, "LorentzFitMainDiagYDOF/I")->SetTitle("Lorentzian Main Diagonal Y Fit Degrees of Freedom");
+                
+                // Secondary diagonal fit parameters
+                fTree->Branch("LorentzFitSecondDiagXAmplitude", &fLorentzFitSecondDiagXAmplitude, "LorentzFitSecondDiagXAmplitude/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Amplitude");
+                fTree->Branch("LorentzFitSecondDiagXAmplitudeErr", &fLorentzFitSecondDiagXAmplitudeErr, "LorentzFitSecondDiagXAmplitudeErr/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Amplitude Error");
+                fTree->Branch("LorentzFitSecondDiagXGamma", &fLorentzFitSecondDiagXGamma, "LorentzFitSecondDiagXGamma/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Gamma");
+                fTree->Branch("LorentzFitSecondDiagXGammaErr", &fLorentzFitSecondDiagXGammaErr, "LorentzFitSecondDiagXGammaErr/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Gamma Error");
+                fTree->Branch("LorentzFitSecondDiagXVerticalOffset", &fLorentzFitSecondDiagXVerticalOffset, "LorentzFitSecondDiagXVerticalOffset/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Vertical Offset");
+                fTree->Branch("LorentzFitSecondDiagXVerticalOffsetErr", &fLorentzFitSecondDiagXVerticalOffsetErr, "LorentzFitSecondDiagXVerticalOffsetErr/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Vertical Offset Error");
+                fTree->Branch("LorentzFitSecondDiagXCenter", &fLorentzFitSecondDiagXCenter, "LorentzFitSecondDiagXCenter/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Center");
+                fTree->Branch("LorentzFitSecondDiagXCenterErr", &fLorentzFitSecondDiagXCenterErr, "LorentzFitSecondDiagXCenterErr/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Center Error");
+                fTree->Branch("LorentzFitSecondDiagXChi2red", &fLorentzFitSecondDiagXChi2red, "LorentzFitSecondDiagXChi2red/D")->SetTitle("Lorentzian Secondary Diagonal X Fit Reduced Chi-squared");
+                fTree->Branch("LorentzFitSecondDiagXPp", &fLorentzFitSecondDiagXPp, "LorentzFitSecondDiagXPp/D")->SetTitle("Lorentzian Secondary Diagonal X Fit P-value");
+                fTree->Branch("LorentzFitSecondDiagXDOF", &fLorentzFitSecondDiagXDOF, "LorentzFitSecondDiagXDOF/I")->SetTitle("Lorentzian Secondary Diagonal X Fit Degrees of Freedom");
+                
+                fTree->Branch("LorentzFitSecondDiagYAmplitude", &fLorentzFitSecondDiagYAmplitude, "LorentzFitSecondDiagYAmplitude/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Amplitude");
+                fTree->Branch("LorentzFitSecondDiagYAmplitudeErr", &fLorentzFitSecondDiagYAmplitudeErr, "LorentzFitSecondDiagYAmplitudeErr/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Amplitude Error");
+                fTree->Branch("LorentzFitSecondDiagYGamma", &fLorentzFitSecondDiagYGamma, "LorentzFitSecondDiagYGamma/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Gamma");
+                fTree->Branch("LorentzFitSecondDiagYGammaErr", &fLorentzFitSecondDiagYGammaErr, "LorentzFitSecondDiagYGammaErr/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Gamma Error");
+                fTree->Branch("LorentzFitSecondDiagYVerticalOffset", &fLorentzFitSecondDiagYVerticalOffset, "LorentzFitSecondDiagYVerticalOffset/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Vertical Offset");
+                fTree->Branch("LorentzFitSecondDiagYVerticalOffsetErr", &fLorentzFitSecondDiagYVerticalOffsetErr, "LorentzFitSecondDiagYVerticalOffsetErr/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Vertical Offset Error");
+                fTree->Branch("LorentzFitSecondDiagYCenter", &fLorentzFitSecondDiagYCenter, "LorentzFitSecondDiagYCenter/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Center");
+                fTree->Branch("LorentzFitSecondDiagYCenterErr", &fLorentzFitSecondDiagYCenterErr, "LorentzFitSecondDiagYCenterErr/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Center Error");
+                fTree->Branch("LorentzFitSecondDiagYChi2red", &fLorentzFitSecondDiagYChi2red, "LorentzFitSecondDiagYChi2red/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit Reduced Chi-squared");
+                fTree->Branch("LorentzFitSecondDiagYPp", &fLorentzFitSecondDiagYPp, "LorentzFitSecondDiagYPp/D")->SetTitle("Lorentzian Secondary Diagonal Y Fit P-value");
+                fTree->Branch("LorentzFitSecondDiagYDOF", &fLorentzFitSecondDiagYDOF, "LorentzFitSecondDiagYDOF/I")->SetTitle("Lorentzian Secondary Diagonal Y Fit Degrees of Freedom");
+            } // end diagonal Lorentzian branches
         }
         
         // =============================================
         // POWER-LAW LORENTZIAN FIT PARAMETERS BRANCHES
         // =============================================
         if (Constants::ENABLE_POWER_LORENTZIAN_FITTING) {
-        // Row fit parameters
-        fTree->Branch("PowerLorentzFitRowAmplitude", &fPowerLorentzFitRowAmplitude, "PowerLorentzFitRowAmplitude/D")->SetTitle("Power-Law Lorentzian Row Fit Amplitude");
-        fTree->Branch("PowerLorentzFitRowAmplitudeErr", &fPowerLorentzFitRowAmplitudeErr, "PowerLorentzFitRowAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Row Fit Amplitude Error");
-        fTree->Branch("PowerLorentzFitRowBeta", &fPowerLorentzFitRowBeta, "PowerLorentzFitRowBeta/D")->SetTitle("Power-Law Lorentzian Row Fit Beta (Power-Law Exponent)");
-        fTree->Branch("PowerLorentzFitRowBetaErr", &fPowerLorentzFitRowBetaErr, "PowerLorentzFitRowBetaErr/D")->SetTitle("Power-Law Lorentzian Row Fit Beta Error");
-        fTree->Branch("PowerLorentzFitRowGamma", &fPowerLorentzFitRowGamma, "PowerLorentzFitRowGamma/D")->SetTitle("Power-Law Lorentzian Row Fit Gamma (HWHM)");
-        fTree->Branch("PowerLorentzFitRowGammaErr", &fPowerLorentzFitRowGammaErr, "PowerLorentzFitRowGammaErr/D")->SetTitle("Power-Law Lorentzian Row Fit Gamma Error");
-        fTree->Branch("PowerLorentzFitRowVerticalOffset", &fPowerLorentzFitRowVerticalOffset, "PowerLorentzFitRowVerticalOffset/D")->SetTitle("Power-Law Lorentzian Row Fit Vertical Offset");
-        fTree->Branch("PowerLorentzFitRowVerticalOffsetErr", &fPowerLorentzFitRowVerticalOffsetErr, "PowerLorentzFitRowVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Row Fit Vertical Offset Error");
-        fTree->Branch("PowerLorentzFitRowCenter", &fPowerLorentzFitRowCenter, "PowerLorentzFitRowCenter/D")->SetTitle("Power-Law Lorentzian Row Fit Center");
-        fTree->Branch("PowerLorentzFitRowCenterErr", &fPowerLorentzFitRowCenterErr, "PowerLorentzFitRowCenterErr/D")->SetTitle("Power-Law Lorentzian Row Fit Center Error");
-        fTree->Branch("PowerLorentzFitRowChi2red", &fPowerLorentzFitRowChi2red, "PowerLorentzFitRowChi2red/D")->SetTitle("Power-Law Lorentzian Row Fit Reduced Chi-squared");
-        fTree->Branch("PowerLorentzFitRowPp", &fPowerLorentzFitRowPp, "PowerLorentzFitRowPp/D")->SetTitle("Power-Law Lorentzian Row Fit P-value");
-        fTree->Branch("PowerLorentzFitRowDOF", &fPowerLorentzFitRowDOF, "PowerLorentzFitRowDOF/I")->SetTitle("Power-Law Lorentzian Row Fit Degrees of Freedom");
-        fTree->Branch("PowerLorentzFitRowChargeUncertainty", &fPowerLorentzFitRowChargeUncertainty, "PowerLorentzFitRowChargeUncertainty/D")->SetTitle("Power-Law Lorentzian Row Fit Charge Uncertainty");
-        
-        // Column fit parameters
-        fTree->Branch("PowerLorentzFitColumnAmplitude", &fPowerLorentzFitColumnAmplitude, "PowerLorentzFitColumnAmplitude/D")->SetTitle("Power-Law Lorentzian Column Fit Amplitude");
-        fTree->Branch("PowerLorentzFitColumnAmplitudeErr", &fPowerLorentzFitColumnAmplitudeErr, "PowerLorentzFitColumnAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Column Fit Amplitude Error");
-        fTree->Branch("PowerLorentzFitColumnBeta", &fPowerLorentzFitColumnBeta, "PowerLorentzFitColumnBeta/D")->SetTitle("Power-Law Lorentzian Column Fit Beta (Power-Law Exponent)");
-        fTree->Branch("PowerLorentzFitColumnBetaErr", &fPowerLorentzFitColumnBetaErr, "PowerLorentzFitColumnBetaErr/D")->SetTitle("Power-Law Lorentzian Column Fit Beta Error");
-        fTree->Branch("PowerLorentzFitColumnGamma", &fPowerLorentzFitColumnGamma, "PowerLorentzFitColumnGamma/D")->SetTitle("Power-Law Lorentzian Column Fit Gamma (HWHM)");
-        fTree->Branch("PowerLorentzFitColumnGammaErr", &fPowerLorentzFitColumnGammaErr, "PowerLorentzFitColumnGammaErr/D")->SetTitle("Power-Law Lorentzian Column Fit Gamma Error");
-        fTree->Branch("PowerLorentzFitColumnVerticalOffset", &fPowerLorentzFitColumnVerticalOffset, "PowerLorentzFitColumnVerticalOffset/D")->SetTitle("Power-Law Lorentzian Column Fit Vertical Offset");
-        fTree->Branch("PowerLorentzFitColumnVerticalOffsetErr", &fPowerLorentzFitColumnVerticalOffsetErr, "PowerLorentzFitColumnVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Column Fit Vertical Offset Error");
-        fTree->Branch("PowerLorentzFitColumnCenter", &fPowerLorentzFitColumnCenter, "PowerLorentzFitColumnCenter/D")->SetTitle("Power-Law Lorentzian Column Fit Center");
-        fTree->Branch("PowerLorentzFitColumnCenterErr", &fPowerLorentzFitColumnCenterErr, "PowerLorentzFitColumnCenterErr/D")->SetTitle("Power-Law Lorentzian Column Fit Center Error");
-        fTree->Branch("PowerLorentzFitColumnChi2red", &fPowerLorentzFitColumnChi2red, "PowerLorentzFitColumnChi2red/D")->SetTitle("Power-Law Lorentzian Column Fit Reduced Chi-squared");
-        fTree->Branch("PowerLorentzFitColumnPp", &fPowerLorentzFitColumnPp, "PowerLorentzFitColumnPp/D")->SetTitle("Power-Law Lorentzian Column Fit P-value");
-        fTree->Branch("PowerLorentzFitColumnDOF", &fPowerLorentzFitColumnDOF, "PowerLorentzFitColumnDOF/I")->SetTitle("Power-Law Lorentzian Column Fit Degrees of Freedom");
-        fTree->Branch("PowerLorentzFitColumnChargeUncertainty", &fPowerLorentzFitColumnChargeUncertainty, "PowerLorentzFitColumnChargeUncertainty/D")->SetTitle("Power-Law Lorentzian Column Fit Charge Uncertainty");
-        
-        // Main diagonal fit parameters
-        fTree->Branch("PowerLorentzFitMainDiagXAmplitude", &fPowerLorentzFitMainDiagXAmplitude, "PowerLorentzFitMainDiagXAmplitude/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Amplitude");
-        fTree->Branch("PowerLorentzFitMainDiagXAmplitudeErr", &fPowerLorentzFitMainDiagXAmplitudeErr, "PowerLorentzFitMainDiagXAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Amplitude Error");
-        fTree->Branch("PowerLorentzFitMainDiagXBeta", &fPowerLorentzFitMainDiagXBeta, "PowerLorentzFitMainDiagXBeta/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Beta");
-        fTree->Branch("PowerLorentzFitMainDiagXBetaErr", &fPowerLorentzFitMainDiagXBetaErr, "PowerLorentzFitMainDiagXBetaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Beta Error");
-        fTree->Branch("PowerLorentzFitMainDiagXGamma", &fPowerLorentzFitMainDiagXGamma, "PowerLorentzFitMainDiagXGamma/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Gamma");
-        fTree->Branch("PowerLorentzFitMainDiagXGammaErr", &fPowerLorentzFitMainDiagXGammaErr, "PowerLorentzFitMainDiagXGammaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Gamma Error");
-        fTree->Branch("PowerLorentzFitMainDiagXVerticalOffset", &fPowerLorentzFitMainDiagXVerticalOffset, "PowerLorentzFitMainDiagXVerticalOffset/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Vertical Offset");
-        fTree->Branch("PowerLorentzFitMainDiagXVerticalOffsetErr", &fPowerLorentzFitMainDiagXVerticalOffsetErr, "PowerLorentzFitMainDiagXVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Vertical Offset Error");
-        fTree->Branch("PowerLorentzFitMainDiagXCenter", &fPowerLorentzFitMainDiagXCenter, "PowerLorentzFitMainDiagXCenter/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Center");
-        fTree->Branch("PowerLorentzFitMainDiagXCenterErr", &fPowerLorentzFitMainDiagXCenterErr, "PowerLorentzFitMainDiagXCenterErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Center Error");
-        fTree->Branch("PowerLorentzFitMainDiagXChi2red", &fPowerLorentzFitMainDiagXChi2red, "PowerLorentzFitMainDiagXChi2red/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Reduced Chi-squared");
-        fTree->Branch("PowerLorentzFitMainDiagXPp", &fPowerLorentzFitMainDiagXPp, "PowerLorentzFitMainDiagXPp/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit P-value");
-        fTree->Branch("PowerLorentzFitMainDiagXDOF", &fPowerLorentzFitMainDiagXDOF, "PowerLorentzFitMainDiagXDOF/I")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Degrees of Freedom");
-        
-        fTree->Branch("PowerLorentzFitMainDiagYAmplitude", &fPowerLorentzFitMainDiagYAmplitude, "PowerLorentzFitMainDiagYAmplitude/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Amplitude");
-        fTree->Branch("PowerLorentzFitMainDiagYAmplitudeErr", &fPowerLorentzFitMainDiagYAmplitudeErr, "PowerLorentzFitMainDiagYAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Amplitude Error");
-        fTree->Branch("PowerLorentzFitMainDiagYBeta", &fPowerLorentzFitMainDiagYBeta, "PowerLorentzFitMainDiagYBeta/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Beta");
-        fTree->Branch("PowerLorentzFitMainDiagYBetaErr", &fPowerLorentzFitMainDiagYBetaErr, "PowerLorentzFitMainDiagYBetaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Beta Error");
-        fTree->Branch("PowerLorentzFitMainDiagYGamma", &fPowerLorentzFitMainDiagYGamma, "PowerLorentzFitMainDiagYGamma/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Gamma");
-        fTree->Branch("PowerLorentzFitMainDiagYGammaErr", &fPowerLorentzFitMainDiagYGammaErr, "PowerLorentzFitMainDiagYGammaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Gamma Error");
-        fTree->Branch("PowerLorentzFitMainDiagYVerticalOffset", &fPowerLorentzFitMainDiagYVerticalOffset, "PowerLorentzFitMainDiagYVerticalOffset/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Vertical Offset");
-        fTree->Branch("PowerLorentzFitMainDiagYVerticalOffsetErr", &fPowerLorentzFitMainDiagYVerticalOffsetErr, "PowerLorentzFitMainDiagYVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Vertical Offset Error");
-        fTree->Branch("PowerLorentzFitMainDiagYCenter", &fPowerLorentzFitMainDiagYCenter, "PowerLorentzFitMainDiagYCenter/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Center");
-        fTree->Branch("PowerLorentzFitMainDiagYCenterErr", &fPowerLorentzFitMainDiagYCenterErr, "PowerLorentzFitMainDiagYCenterErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Center Error");
-        fTree->Branch("PowerLorentzFitMainDiagYChi2red", &fPowerLorentzFitMainDiagYChi2red, "PowerLorentzFitMainDiagYChi2red/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Reduced Chi-squared");
-        fTree->Branch("PowerLorentzFitMainDiagYPp", &fPowerLorentzFitMainDiagYPp, "PowerLorentzFitMainDiagYPp/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit P-value");
-        fTree->Branch("PowerLorentzFitMainDiagYDOF", &fPowerLorentzFitMainDiagYDOF, "PowerLorentzFitMainDiagYDOF/I")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Degrees of Freedom");
-        
-        // Secondary diagonal fit parameters
-        fTree->Branch("PowerLorentzFitSecondDiagXAmplitude", &fPowerLorentzFitSecondDiagXAmplitude, "PowerLorentzFitSecondDiagXAmplitude/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Amplitude");
-        fTree->Branch("PowerLorentzFitSecondDiagXAmplitudeErr", &fPowerLorentzFitSecondDiagXAmplitudeErr, "PowerLorentzFitSecondDiagXAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Amplitude Error");
-        fTree->Branch("PowerLorentzFitSecondDiagXBeta", &fPowerLorentzFitSecondDiagXBeta, "PowerLorentzFitSecondDiagXBeta/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Beta");
-        fTree->Branch("PowerLorentzFitSecondDiagXBetaErr", &fPowerLorentzFitSecondDiagXBetaErr, "PowerLorentzFitSecondDiagXBetaErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Beta Error");
-        fTree->Branch("PowerLorentzFitSecondDiagXGamma", &fPowerLorentzFitSecondDiagXGamma, "PowerLorentzFitSecondDiagXGamma/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Gamma");
-        fTree->Branch("PowerLorentzFitSecondDiagXGammaErr", &fPowerLorentzFitSecondDiagXGammaErr, "PowerLorentzFitSecondDiagXGammaErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Gamma Error");
-        fTree->Branch("PowerLorentzFitSecondDiagXVerticalOffset", &fPowerLorentzFitSecondDiagXVerticalOffset, "PowerLorentzFitSecondDiagXVerticalOffset/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Vertical Offset");
-        fTree->Branch("PowerLorentzFitSecondDiagXVerticalOffsetErr", &fPowerLorentzFitSecondDiagXVerticalOffsetErr, "PowerLorentzFitSecondDiagXVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Vertical Offset Error");
-        fTree->Branch("PowerLorentzFitSecondDiagXCenter", &fPowerLorentzFitSecondDiagXCenter, "PowerLorentzFitSecondDiagXCenter/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Center");
-        fTree->Branch("PowerLorentzFitSecondDiagXCenterErr", &fPowerLorentzFitSecondDiagXCenterErr, "PowerLorentzFitSecondDiagXCenterErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Center Error");
-        fTree->Branch("PowerLorentzFitSecondDiagXChi2red", &fPowerLorentzFitSecondDiagXChi2red, "PowerLorentzFitSecondDiagXChi2red/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Reduced Chi-squared");
-        fTree->Branch("PowerLorentzFitSecondDiagXPp", &fPowerLorentzFitSecondDiagXPp, "PowerLorentzFitSecondDiagXPp/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit P-value");
-        fTree->Branch("PowerLorentzFitSecondDiagXDOF", &fPowerLorentzFitSecondDiagXDOF, "PowerLorentzFitSecondDiagXDOF/I")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Degrees of Freedom");
-        
-        fTree->Branch("PowerLorentzFitSecondDiagYAmplitude", &fPowerLorentzFitSecondDiagYAmplitude, "PowerLorentzFitSecondDiagYAmplitude/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Amplitude");
-        fTree->Branch("PowerLorentzFitSecondDiagYAmplitudeErr", &fPowerLorentzFitSecondDiagYAmplitudeErr, "PowerLorentzFitSecondDiagYAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Amplitude Error");
-        fTree->Branch("PowerLorentzFitSecondDiagYBeta", &fPowerLorentzFitSecondDiagYBeta, "PowerLorentzFitSecondDiagYBeta/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Beta");
-        fTree->Branch("PowerLorentzFitSecondDiagYBetaErr", &fPowerLorentzFitSecondDiagYBetaErr, "PowerLorentzFitSecondDiagYBetaErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Beta Error");
-        fTree->Branch("PowerLorentzFitSecondDiagYGamma", &fPowerLorentzFitSecondDiagYGamma, "PowerLorentzFitSecondDiagYGamma/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Gamma");
-        fTree->Branch("PowerLorentzFitSecondDiagYGammaErr", &fPowerLorentzFitSecondDiagYGammaErr, "PowerLorentzFitSecondDiagYGammaErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Gamma Error");
-        fTree->Branch("PowerLorentzFitSecondDiagYVerticalOffset", &fPowerLorentzFitSecondDiagYVerticalOffset, "PowerLorentzFitSecondDiagYVerticalOffset/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Vertical Offset");
-        fTree->Branch("PowerLorentzFitSecondDiagYVerticalOffsetErr", &fPowerLorentzFitSecondDiagYVerticalOffsetErr, "PowerLorentzFitSecondDiagYVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Vertical Offset Error");
-        fTree->Branch("PowerLorentzFitSecondDiagYCenter", &fPowerLorentzFitSecondDiagYCenter, "PowerLorentzFitSecondDiagYCenter/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Center");
-        fTree->Branch("PowerLorentzFitSecondDiagYCenterErr", &fPowerLorentzFitSecondDiagYCenterErr, "PowerLorentzFitSecondDiagYCenterErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Center Error");
-        fTree->Branch("PowerLorentzFitSecondDiagYChi2red", &fPowerLorentzFitSecondDiagYChi2red, "PowerLorentzFitSecondDiagYChi2red/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Reduced Chi-squared");
-        fTree->Branch("PowerLorentzFitSecondDiagYPp", &fPowerLorentzFitSecondDiagYPp, "PowerLorentzFitSecondDiagYPp/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit P-value");
-        fTree->Branch("PowerLorentzFitSecondDiagYDOF", &fPowerLorentzFitSecondDiagYDOF, "PowerLorentzFitSecondDiagYDOF/I")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Degrees of Freedom");
+            // Only create central row/column (2D) branches when 2D fitting is enabled
+            if (Constants::ENABLE_2D_FITTING) {
+                // Row fit parameters
+                fTree->Branch("PowerLorentzFitRowAmplitude", &fPowerLorentzFitRowAmplitude, "PowerLorentzFitRowAmplitude/D")->SetTitle("Power-Law Lorentzian Row Fit Amplitude");
+                fTree->Branch("PowerLorentzFitRowAmplitudeErr", &fPowerLorentzFitRowAmplitudeErr, "PowerLorentzFitRowAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Row Fit Amplitude Error");
+                fTree->Branch("PowerLorentzFitRowBeta", &fPowerLorentzFitRowBeta, "PowerLorentzFitRowBeta/D")->SetTitle("Power-Law Lorentzian Row Fit Beta (Power-Law Exponent)");
+                fTree->Branch("PowerLorentzFitRowBetaErr", &fPowerLorentzFitRowBetaErr, "PowerLorentzFitRowBetaErr/D")->SetTitle("Power-Law Lorentzian Row Fit Beta Error");
+                fTree->Branch("PowerLorentzFitRowGamma", &fPowerLorentzFitRowGamma, "PowerLorentzFitRowGamma/D")->SetTitle("Power-Law Lorentzian Row Fit Gamma (HWHM)");
+                fTree->Branch("PowerLorentzFitRowGammaErr", &fPowerLorentzFitRowGammaErr, "PowerLorentzFitRowGammaErr/D")->SetTitle("Power-Law Lorentzian Row Fit Gamma Error");
+                fTree->Branch("PowerLorentzFitRowVerticalOffset", &fPowerLorentzFitRowVerticalOffset, "PowerLorentzFitRowVerticalOffset/D")->SetTitle("Power-Law Lorentzian Row Fit Vertical Offset");
+                fTree->Branch("PowerLorentzFitRowVerticalOffsetErr", &fPowerLorentzFitRowVerticalOffsetErr, "PowerLorentzFitRowVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Row Fit Vertical Offset Error");
+                fTree->Branch("PowerLorentzFitRowCenter", &fPowerLorentzFitRowCenter, "PowerLorentzFitRowCenter/D")->SetTitle("Power-Law Lorentzian Row Fit Center");
+                fTree->Branch("PowerLorentzFitRowCenterErr", &fPowerLorentzFitRowCenterErr, "PowerLorentzFitRowCenterErr/D")->SetTitle("Power-Law Lorentzian Row Fit Center Error");
+                fTree->Branch("PowerLorentzFitRowChi2red", &fPowerLorentzFitRowChi2red, "PowerLorentzFitRowChi2red/D")->SetTitle("Power-Law Lorentzian Row Fit Reduced Chi-squared");
+                fTree->Branch("PowerLorentzFitRowPp", &fPowerLorentzFitRowPp, "PowerLorentzFitRowPp/D")->SetTitle("Power-Law Lorentzian Row Fit P-value");
+                fTree->Branch("PowerLorentzFitRowDOF", &fPowerLorentzFitRowDOF, "PowerLorentzFitRowDOF/I")->SetTitle("Power-Law Lorentzian Row Fit Degrees of Freedom");
+                fTree->Branch("PowerLorentzFitRowChargeUncertainty", &fPowerLorentzFitRowChargeUncertainty, "PowerLorentzFitRowChargeUncertainty/D")->SetTitle("Power-Law Lorentzian Row Fit Charge Uncertainty");
+                
+                // Column fit parameters
+                fTree->Branch("PowerLorentzFitColumnAmplitude", &fPowerLorentzFitColumnAmplitude, "PowerLorentzFitColumnAmplitude/D")->SetTitle("Power-Law Lorentzian Column Fit Amplitude");
+                fTree->Branch("PowerLorentzFitColumnAmplitudeErr", &fPowerLorentzFitColumnAmplitudeErr, "PowerLorentzFitColumnAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Column Fit Amplitude Error");
+                fTree->Branch("PowerLorentzFitColumnBeta", &fPowerLorentzFitColumnBeta, "PowerLorentzFitColumnBeta/D")->SetTitle("Power-Law Lorentzian Column Fit Beta (Power-Law Exponent)");
+                fTree->Branch("PowerLorentzFitColumnBetaErr", &fPowerLorentzFitColumnBetaErr, "PowerLorentzFitColumnBetaErr/D")->SetTitle("Power-Law Lorentzian Column Fit Beta Error");
+                fTree->Branch("PowerLorentzFitColumnGamma", &fPowerLorentzFitColumnGamma, "PowerLorentzFitColumnGamma/D")->SetTitle("Power-Law Lorentzian Column Fit Gamma (HWHM)");
+                fTree->Branch("PowerLorentzFitColumnGammaErr", &fPowerLorentzFitColumnGammaErr, "PowerLorentzFitColumnGammaErr/D")->SetTitle("Power-Law Lorentzian Column Fit Gamma Error");
+                fTree->Branch("PowerLorentzFitColumnVerticalOffset", &fPowerLorentzFitColumnVerticalOffset, "PowerLorentzFitColumnVerticalOffset/D")->SetTitle("Power-Law Lorentzian Column Fit Vertical Offset");
+                fTree->Branch("PowerLorentzFitColumnVerticalOffsetErr", &fPowerLorentzFitColumnVerticalOffsetErr, "PowerLorentzFitColumnVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Column Fit Vertical Offset Error");
+                fTree->Branch("PowerLorentzFitColumnCenter", &fPowerLorentzFitColumnCenter, "PowerLorentzFitColumnCenter/D")->SetTitle("Power-Law Lorentzian Column Fit Center");
+                fTree->Branch("PowerLorentzFitColumnCenterErr", &fPowerLorentzFitColumnCenterErr, "PowerLorentzFitColumnCenterErr/D")->SetTitle("Power-Law Lorentzian Column Fit Center Error");
+                fTree->Branch("PowerLorentzFitColumnChi2red", &fPowerLorentzFitColumnChi2red, "PowerLorentzFitColumnChi2red/D")->SetTitle("Power-Law Lorentzian Column Fit Reduced Chi-squared");
+                fTree->Branch("PowerLorentzFitColumnPp", &fPowerLorentzFitColumnPp, "PowerLorentzFitColumnPp/D")->SetTitle("Power-Law Lorentzian Column Fit P-value");
+                fTree->Branch("PowerLorentzFitColumnDOF", &fPowerLorentzFitColumnDOF, "PowerLorentzFitColumnDOF/I")->SetTitle("Power-Law Lorentzian Column Fit Degrees of Freedom");
+                fTree->Branch("PowerLorentzFitColumnChargeUncertainty", &fPowerLorentzFitColumnChargeUncertainty, "PowerLorentzFitColumnChargeUncertainty/D")->SetTitle("Power-Law Lorentzian Column Fit Charge Uncertainty");
+            } // end 2D Power-Law Lorentzian branches
+            
+            // Create diagonal fit branches only when diagonal fitting is enabled
+            if (Constants::ENABLE_DIAGONAL_FITTING) {
+                // Main diagonal fit parameters
+                fTree->Branch("PowerLorentzFitMainDiagXAmplitude", &fPowerLorentzFitMainDiagXAmplitude, "PowerLorentzFitMainDiagXAmplitude/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Amplitude");
+                fTree->Branch("PowerLorentzFitMainDiagXAmplitudeErr", &fPowerLorentzFitMainDiagXAmplitudeErr, "PowerLorentzFitMainDiagXAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Amplitude Error");
+                fTree->Branch("PowerLorentzFitMainDiagXBeta", &fPowerLorentzFitMainDiagXBeta, "PowerLorentzFitMainDiagXBeta/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Beta");
+                fTree->Branch("PowerLorentzFitMainDiagXBetaErr", &fPowerLorentzFitMainDiagXBetaErr, "PowerLorentzFitMainDiagXBetaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Beta Error");
+                fTree->Branch("PowerLorentzFitMainDiagXGamma", &fPowerLorentzFitMainDiagXGamma, "PowerLorentzFitMainDiagXGamma/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Gamma");
+                fTree->Branch("PowerLorentzFitMainDiagXGammaErr", &fPowerLorentzFitMainDiagXGammaErr, "PowerLorentzFitMainDiagXGammaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Gamma Error");
+                fTree->Branch("PowerLorentzFitMainDiagXVerticalOffset", &fPowerLorentzFitMainDiagXVerticalOffset, "PowerLorentzFitMainDiagXVerticalOffset/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Vertical Offset");
+                fTree->Branch("PowerLorentzFitMainDiagXVerticalOffsetErr", &fPowerLorentzFitMainDiagXVerticalOffsetErr, "PowerLorentzFitMainDiagXVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Vertical Offset Error");
+                fTree->Branch("PowerLorentzFitMainDiagXCenter", &fPowerLorentzFitMainDiagXCenter, "PowerLorentzFitMainDiagXCenter/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Center");
+                fTree->Branch("PowerLorentzFitMainDiagXCenterErr", &fPowerLorentzFitMainDiagXCenterErr, "PowerLorentzFitMainDiagXCenterErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Center Error");
+                fTree->Branch("PowerLorentzFitMainDiagXChi2red", &fPowerLorentzFitMainDiagXChi2red, "PowerLorentzFitMainDiagXChi2red/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Reduced Chi-squared");
+                fTree->Branch("PowerLorentzFitMainDiagXPp", &fPowerLorentzFitMainDiagXPp, "PowerLorentzFitMainDiagXPp/D")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit P-value");
+                fTree->Branch("PowerLorentzFitMainDiagXDOF", &fPowerLorentzFitMainDiagXDOF, "PowerLorentzFitMainDiagXDOF/I")->SetTitle("Power-Law Lorentzian Main Diagonal X Fit Degrees of Freedom");
+                
+                fTree->Branch("PowerLorentzFitMainDiagYAmplitude", &fPowerLorentzFitMainDiagYAmplitude, "PowerLorentzFitMainDiagYAmplitude/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Amplitude");
+                fTree->Branch("PowerLorentzFitMainDiagYAmplitudeErr", &fPowerLorentzFitMainDiagYAmplitudeErr, "PowerLorentzFitMainDiagYAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Amplitude Error");
+                fTree->Branch("PowerLorentzFitMainDiagYBeta", &fPowerLorentzFitMainDiagYBeta, "PowerLorentzFitMainDiagYBeta/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Beta");
+                fTree->Branch("PowerLorentzFitMainDiagYBetaErr", &fPowerLorentzFitMainDiagYBetaErr, "PowerLorentzFitMainDiagYBetaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Beta Error");
+                fTree->Branch("PowerLorentzFitMainDiagYGamma", &fPowerLorentzFitMainDiagYGamma, "PowerLorentzFitMainDiagYGamma/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Gamma");
+                fTree->Branch("PowerLorentzFitMainDiagYGammaErr", &fPowerLorentzFitMainDiagYGammaErr, "PowerLorentzFitMainDiagYGammaErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Gamma Error");
+                fTree->Branch("PowerLorentzFitMainDiagYVerticalOffset", &fPowerLorentzFitMainDiagYVerticalOffset, "PowerLorentzFitMainDiagYVerticalOffset/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Vertical Offset");
+                fTree->Branch("PowerLorentzFitMainDiagYVerticalOffsetErr", &fPowerLorentzFitMainDiagYVerticalOffsetErr, "PowerLorentzFitMainDiagYVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Vertical Offset Error");
+                fTree->Branch("PowerLorentzFitMainDiagYCenter", &fPowerLorentzFitMainDiagYCenter, "PowerLorentzFitMainDiagYCenter/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Center");
+                fTree->Branch("PowerLorentzFitMainDiagYCenterErr", &fPowerLorentzFitMainDiagYCenterErr, "PowerLorentzFitMainDiagYCenterErr/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Center Error");
+                fTree->Branch("PowerLorentzFitMainDiagYChi2red", &fPowerLorentzFitMainDiagYChi2red, "PowerLorentzFitMainDiagYChi2red/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Reduced Chi-squared");
+                fTree->Branch("PowerLorentzFitMainDiagYPp", &fPowerLorentzFitMainDiagYPp, "PowerLorentzFitMainDiagYPp/D")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit P-value");
+                fTree->Branch("PowerLorentzFitMainDiagYDOF", &fPowerLorentzFitMainDiagYDOF, "PowerLorentzFitMainDiagYDOF/I")->SetTitle("Power-Law Lorentzian Main Diagonal Y Fit Degrees of Freedom");
+                
+                // Secondary diagonal fit parameters
+                fTree->Branch("PowerLorentzFitSecondDiagXAmplitude", &fPowerLorentzFitSecondDiagXAmplitude, "PowerLorentzFitSecondDiagXAmplitude/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Amplitude");
+                fTree->Branch("PowerLorentzFitSecondDiagXAmplitudeErr", &fPowerLorentzFitSecondDiagXAmplitudeErr, "PowerLorentzFitSecondDiagXAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Amplitude Error");
+                fTree->Branch("PowerLorentzFitSecondDiagXBeta", &fPowerLorentzFitSecondDiagXBeta, "PowerLorentzFitSecondDiagXBeta/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Beta");
+                fTree->Branch("PowerLorentzFitSecondDiagXBetaErr", &fPowerLorentzFitSecondDiagXBetaErr, "PowerLorentzFitSecondDiagXBetaErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Beta Error");
+                fTree->Branch("PowerLorentzFitSecondDiagXGamma", &fPowerLorentzFitSecondDiagXGamma, "PowerLorentzFitSecondDiagXGamma/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Gamma");
+                fTree->Branch("PowerLorentzFitSecondDiagXGammaErr", &fPowerLorentzFitSecondDiagXGammaErr, "PowerLorentzFitSecondDiagXGammaErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Gamma Error");
+                fTree->Branch("PowerLorentzFitSecondDiagXVerticalOffset", &fPowerLorentzFitSecondDiagXVerticalOffset, "PowerLorentzFitSecondDiagXVerticalOffset/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Vertical Offset");
+                fTree->Branch("PowerLorentzFitSecondDiagXVerticalOffsetErr", &fPowerLorentzFitSecondDiagXVerticalOffsetErr, "PowerLorentzFitSecondDiagXVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Vertical Offset Error");
+                fTree->Branch("PowerLorentzFitSecondDiagXCenter", &fPowerLorentzFitSecondDiagXCenter, "PowerLorentzFitSecondDiagXCenter/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Center");
+                fTree->Branch("PowerLorentzFitSecondDiagXCenterErr", &fPowerLorentzFitSecondDiagXCenterErr, "PowerLorentzFitSecondDiagXCenterErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Center Error");
+                fTree->Branch("PowerLorentzFitSecondDiagXChi2red", &fPowerLorentzFitSecondDiagXChi2red, "PowerLorentzFitSecondDiagXChi2red/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Reduced Chi-squared");
+                fTree->Branch("PowerLorentzFitSecondDiagXPp", &fPowerLorentzFitSecondDiagXPp, "PowerLorentzFitSecondDiagXPp/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit P-value");
+                fTree->Branch("PowerLorentzFitSecondDiagXDOF", &fPowerLorentzFitSecondDiagXDOF, "PowerLorentzFitSecondDiagXDOF/I")->SetTitle("Power-Law Lorentzian Secondary Diagonal X Fit Degrees of Freedom");
+                
+                fTree->Branch("PowerLorentzFitSecondDiagYAmplitude", &fPowerLorentzFitSecondDiagYAmplitude, "PowerLorentzFitSecondDiagYAmplitude/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Amplitude");
+                fTree->Branch("PowerLorentzFitSecondDiagYAmplitudeErr", &fPowerLorentzFitSecondDiagYAmplitudeErr, "PowerLorentzFitSecondDiagYAmplitudeErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Amplitude Error");
+                fTree->Branch("PowerLorentzFitSecondDiagYBeta", &fPowerLorentzFitSecondDiagYBeta, "PowerLorentzFitSecondDiagYBeta/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Beta");
+                fTree->Branch("PowerLorentzFitSecondDiagYBetaErr", &fPowerLorentzFitSecondDiagYBetaErr, "PowerLorentzFitSecondDiagYBetaErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Beta Error");
+                fTree->Branch("PowerLorentzFitSecondDiagYGamma", &fPowerLorentzFitSecondDiagYGamma, "PowerLorentzFitSecondDiagYGamma/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Gamma");
+                fTree->Branch("PowerLorentzFitSecondDiagYGammaErr", &fPowerLorentzFitSecondDiagYGammaErr, "PowerLorentzFitSecondDiagYGammaErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Gamma Error");
+                fTree->Branch("PowerLorentzFitSecondDiagYVerticalOffset", &fPowerLorentzFitSecondDiagYVerticalOffset, "PowerLorentzFitSecondDiagYVerticalOffset/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Vertical Offset");
+                fTree->Branch("PowerLorentzFitSecondDiagYVerticalOffsetErr", &fPowerLorentzFitSecondDiagYVerticalOffsetErr, "PowerLorentzFitSecondDiagYVerticalOffsetErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Vertical Offset Error");
+                fTree->Branch("PowerLorentzFitSecondDiagYCenter", &fPowerLorentzFitSecondDiagYCenter, "PowerLorentzFitSecondDiagYCenter/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Center");
+                fTree->Branch("PowerLorentzFitSecondDiagYCenterErr", &fPowerLorentzFitSecondDiagYCenterErr, "PowerLorentzFitSecondDiagYCenterErr/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Center Error");
+                fTree->Branch("PowerLorentzFitSecondDiagYChi2red", &fPowerLorentzFitSecondDiagYChi2red, "PowerLorentzFitSecondDiagYChi2red/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Reduced Chi-squared");
+                fTree->Branch("PowerLorentzFitSecondDiagYPp", &fPowerLorentzFitSecondDiagYPp, "PowerLorentzFitSecondDiagYPp/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit P-value");
+                fTree->Branch("PowerLorentzFitSecondDiagYDOF", &fPowerLorentzFitSecondDiagYDOF, "PowerLorentzFitSecondDiagYDOF/I")->SetTitle("Power-Law Lorentzian Secondary Diagonal Y Fit Degrees of Freedom");
+            } // end diagonal Power-Law Lorentzian branches
         }
         
         // =============================================
@@ -948,32 +982,38 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         // Gaussian diagonal transformed coordinates
         if (Constants::ENABLE_GAUSSIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
-            fTree->Branch("GaussMainDiagTransformedX", &fGaussMainDiagTransformedX, "GaussMainDiagTransformedX/D")->SetTitle("Gaussian Main Diagonal Transformed X Coordinate [mm]");
-            fTree->Branch("GaussMainDiagTransformedY", &fGaussMainDiagTransformedY, "GaussMainDiagTransformedY/D")->SetTitle("Gaussian Main Diagonal Transformed Y Coordinate [mm]");
-            fTree->Branch("GaussSecondDiagTransformedX", &fGaussSecondDiagTransformedX, "GaussSecondDiagTransformedX/D")->SetTitle("Gaussian Secondary Diagonal Transformed X Coordinate [mm]");
-            fTree->Branch("GaussSecondDiagTransformedY", &fGaussSecondDiagTransformedY, "GaussSecondDiagTransformedY/D")->SetTitle("Gaussian Secondary Diagonal Transformed Y Coordinate [mm]");
+        fTree->Branch("GaussMainDiagTransformedX", &fGaussMainDiagTransformedX, "GaussMainDiagTransformedX/D")->SetTitle("Gaussian Main Diagonal Transformed X Coordinate [mm]");
+        fTree->Branch("GaussMainDiagTransformedY", &fGaussMainDiagTransformedY, "GaussMainDiagTransformedY/D")->SetTitle("Gaussian Main Diagonal Transformed Y Coordinate [mm]");
+        fTree->Branch("GaussSecondDiagTransformedX", &fGaussSecondDiagTransformedX, "GaussSecondDiagTransformedX/D")->SetTitle("Gaussian Secondary Diagonal Transformed X Coordinate [mm]");
+        fTree->Branch("GaussSecondDiagTransformedY", &fGaussSecondDiagTransformedY, "GaussSecondDiagTransformedY/D")->SetTitle("Gaussian Secondary Diagonal Transformed Y Coordinate [mm]");
         }
         
         // Lorentzian diagonal transformed coordinates
         if (Constants::ENABLE_LORENTZIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
-            fTree->Branch("LorentzMainDiagTransformedX", &fLorentzMainDiagTransformedX, "LorentzMainDiagTransformedX/D")->SetTitle("Lorentzian Main Diagonal Transformed X Coordinate [mm]");
-            fTree->Branch("LorentzMainDiagTransformedY", &fLorentzMainDiagTransformedY, "LorentzMainDiagTransformedY/D")->SetTitle("Lorentzian Main Diagonal Transformed Y Coordinate [mm]");
-            fTree->Branch("LorentzSecondDiagTransformedX", &fLorentzSecondDiagTransformedX, "LorentzSecondDiagTransformedX/D")->SetTitle("Lorentzian Secondary Diagonal Transformed X Coordinate [mm]");
-            fTree->Branch("LorentzSecondDiagTransformedY", &fLorentzSecondDiagTransformedY, "LorentzSecondDiagTransformedY/D")->SetTitle("Lorentzian Secondary Diagonal Transformed Y Coordinate [mm]");
+        fTree->Branch("LorentzMainDiagTransformedX", &fLorentzMainDiagTransformedX, "LorentzMainDiagTransformedX/D")->SetTitle("Lorentzian Main Diagonal Transformed X Coordinate [mm]");
+        fTree->Branch("LorentzMainDiagTransformedY", &fLorentzMainDiagTransformedY, "LorentzMainDiagTransformedY/D")->SetTitle("Lorentzian Main Diagonal Transformed Y Coordinate [mm]");
+        fTree->Branch("LorentzSecondDiagTransformedX", &fLorentzSecondDiagTransformedX, "LorentzSecondDiagTransformedX/D")->SetTitle("Lorentzian Secondary Diagonal Transformed X Coordinate [mm]");
+        fTree->Branch("LorentzSecondDiagTransformedY", &fLorentzSecondDiagTransformedY, "LorentzSecondDiagTransformedY/D")->SetTitle("Lorentzian Secondary Diagonal Transformed Y Coordinate [mm]");
         }
         
         // Power-Law Lorentzian diagonal transformed coordinates
         if (Constants::ENABLE_POWER_LORENTZIAN_FITTING && Constants::ENABLE_DIAGONAL_FITTING) {
-            fTree->Branch("PowerLorentzMainDiagTransformedX", &fPowerLorentzMainDiagTransformedX, "PowerLorentzMainDiagTransformedX/D")->SetTitle("Power-Law Lorentzian Main Diagonal Transformed X Coordinate [mm]");
-            fTree->Branch("PowerLorentzMainDiagTransformedY", &fPowerLorentzMainDiagTransformedY, "PowerLorentzMainDiagTransformedY/D")->SetTitle("Power-Law Lorentzian Main Diagonal Transformed Y Coordinate [mm]");
-            fTree->Branch("PowerLorentzSecondDiagTransformedX", &fPowerLorentzSecondDiagTransformedX, "PowerLorentzSecondDiagTransformedX/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Transformed X Coordinate [mm]");
-            fTree->Branch("PowerLorentzSecondDiagTransformedY", &fPowerLorentzSecondDiagTransformedY, "PowerLorentzSecondDiagTransformedY/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Transformed Y Coordinate [mm]");
+        fTree->Branch("PowerLorentzMainDiagTransformedX", &fPowerLorentzMainDiagTransformedX, "PowerLorentzMainDiagTransformedX/D")->SetTitle("Power-Law Lorentzian Main Diagonal Transformed X Coordinate [mm]");
+        fTree->Branch("PowerLorentzMainDiagTransformedY", &fPowerLorentzMainDiagTransformedY, "PowerLorentzMainDiagTransformedY/D")->SetTitle("Power-Law Lorentzian Main Diagonal Transformed Y Coordinate [mm]");
+        fTree->Branch("PowerLorentzSecondDiagTransformedX", &fPowerLorentzSecondDiagTransformedX, "PowerLorentzSecondDiagTransformedX/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Transformed X Coordinate [mm]");
+        fTree->Branch("PowerLorentzSecondDiagTransformedY", &fPowerLorentzSecondDiagTransformedY, "PowerLorentzSecondDiagTransformedY/D")->SetTitle("Power-Law Lorentzian Secondary Diagonal Transformed Y Coordinate [mm]");
         }
         
         G4cout << "Created ROOT tree with " << fTree->GetNbranches() << " branches" << G4endl;
         
-        // Enable auto-save by default
-        EnableAutoSave(1000);
+        // Enable frequent AutoSave only when explicitly requested via Constants flag
+        if (Constants::ENABLE_FREQUENT_AUTOSAVE) {
+            // 1000-event interval was the historical default; keep it when enabled.
+            EnableAutoSave(1000);
+        } else {
+            // Ensure the internal counter is reset and AutoSave remains disabled
+            fAutoSaveEnabled = false;
+        }
     }
 }
 
@@ -1173,14 +1213,15 @@ void RunAction::EndOfRunAction(const G4Run* run)
     G4cout << "Master thread: File operations completed" << G4endl;
 }
 
-void RunAction::SetEventData(G4double edep, G4double x, G4double y)
+void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z) 
 {
-    // Store energy deposition in MeV (Geant4 internal energy unit is MeV)
+    // Store energy deposit in MeV (Geant4 internal energy unit is MeV)
     fEdep = edep;
     
     // Store positions in mm (Geant4 internal length unit is mm)
     fTrueX = x;
     fTrueY = y;
+    fTrueZ = z;
 }
 
 void RunAction::SetInitialPosition(G4double x, G4double y, G4double z) 
@@ -1191,11 +1232,12 @@ void RunAction::SetInitialPosition(G4double x, G4double y, G4double z)
     fInitZ = z;
 }
 
-void RunAction::SetNearestPixelPosition(G4double x, G4double y)
+void RunAction::SetNearestPixelPosition(G4double x, G4double y, G4double z) 
 {
     // Store positions in mm (Geant4 internal length unit is mm)
     fPixelX = x;
     fPixelY = y;
+    fPixelZ = z;
 }
 
 void RunAction::SetInitialEnergy(G4double energy) 
@@ -2392,9 +2434,13 @@ bool RunAction::SafeWriteRootFile()
             neighborhoodRadiusMeta.Write();
         }
         
-        // Write tree and flush data
+        // Make sure all in-memory baskets are flushed only once at end-of-run
+        fTree->FlushBaskets();   // replaces thousands of small AutoSave flushes
+        
+        // Write the full tree and metadata in a single operation
         fRootFile->cd();
         fTree->Write();
+        // Final flush for the file header / directory structure
         fRootFile->Flush();
         
         G4cout << "RunAction: Successfully wrote ROOT file with " << fTree->GetEntries() << " entries" << G4endl;
