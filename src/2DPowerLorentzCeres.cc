@@ -7,17 +7,12 @@
 #include <algorithm>
 #include <map>
 #include <iostream>
-// Removed mutex include - no longer needed for parallelization
-#include <atomic>
 #include <limits>
 #include <numeric>
 
 // Ceres Solver includes
 #include "ceres/ceres.h"
 #include "glog/logging.h"
-
-// Thread counter for debugging (removed mutex for better parallelization)
-static std::atomic<int> gGlobalCeresPowerLorentzCounter{0};
 
 // Use shared Google logging initialization
 void InitializeCeresPowerLorentz() {
@@ -1078,110 +1073,6 @@ PowerLorentz2DResultsCeres PowerLorentzCeres2D(
         std::cout << "2D Power Lorentz fit (Ceres) " << (result.fit_success ? "success" : "failed") 
                  << " (X: " << (x_fit_success ? "OK" : "FAIL") 
                  << ", Y: " << (y_fit_success ? "OK" : "FAIL") << ")" << std::endl;
-    }
-    
-    return result;
-}
-
-// Outlier removal function for Power Lorentz fitting
-PowerLorentzOutlierRemovalResult RemovePowerLorentzOutliers(
-    const std::vector<double>& x_coords,
-    const std::vector<double>& y_coords,
-    const std::vector<double>& charge_values,
-    bool enable_outlier_removal,
-    double sigma_threshold,
-    bool verbose)
-{
-    PowerLorentzOutlierRemovalResult result;
-    
-    if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
-        if (verbose) {
-            std::cout << "RemovePowerLorentzOutliers: Error - coordinate and charge vector sizes don't match" << std::endl;
-        }
-        return result;
-    }
-    
-    if (!enable_outlier_removal) {
-        // No filtering requested - return original data
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.outliers_removed = 0;
-        result.filtering_applied = false;
-        result.success = true;
-        return result;
-    }
-    
-    if (charge_values.size() < 5) {
-        // Not enough data for outlier removal
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.outliers_removed = 0;
-        result.filtering_applied = false;
-        result.success = true;
-        return result;
-    }
-    
-    // Calc robust statistics for outlier detection
-    DataStatistics stats = CalcRobustStatisticsPowerLorentz(x_coords, charge_values);
-    if (!stats.valid) {
-        // Fall back to original data if statistics calculation fails
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.outliers_removed = 0;
-        result.filtering_applied = false;
-        result.success = false;
-        return result;
-    }
-    
-    // Identify outliers using median absolute deviation
-    double outlier_threshold = sigma_threshold * stats.mad;
-    std::vector<bool> is_outlier(charge_values.size(), false);
-    int outlier_count = 0;
-    
-    for (size_t i = 0; i < charge_values.size(); ++i) {
-        double deviation = std::abs(charge_values[i] - stats.median);
-        if (deviation > outlier_threshold) {
-            is_outlier[i] = true;
-            outlier_count++;
-        }
-    }
-    
-    // Ensure we don't remove too many points (keep at least 5)
-    if (charge_values.size() - outlier_count < 5) {
-        // Too many outliers detected - reduce threshold or keep original data
-        result.filtered_x_coords = x_coords;
-        result.filtered_y_coords = y_coords;
-        result.filtered_charge_values = charge_values;
-        result.outliers_removed = 0;
-        result.filtering_applied = false;
-        result.success = true;
-        
-        if (verbose) {
-            std::cout << "RemovePowerLorentzOutliers: Too many outliers detected (" << outlier_count 
-                     << "), keeping original data" << std::endl;
-        }
-        return result;
-    }
-    
-    // Filter out outliers
-    for (size_t i = 0; i < charge_values.size(); ++i) {
-        if (!is_outlier[i]) {
-            result.filtered_x_coords.push_back(x_coords[i]);
-            result.filtered_y_coords.push_back(y_coords[i]);
-            result.filtered_charge_values.push_back(charge_values[i]);
-        }
-    }
-    
-    result.outliers_removed = outlier_count;
-    result.filtering_applied = true;
-    result.success = true;
-    
-    if (verbose) {
-        std::cout << "RemovePowerLorentzOutliers: Removed " << outlier_count 
-                 << " outliers, " << result.filtered_charge_values.size() << " points remaining" << std::endl;
     }
     
     return result;

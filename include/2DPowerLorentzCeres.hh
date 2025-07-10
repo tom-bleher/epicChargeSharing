@@ -4,20 +4,6 @@
 #include <vector>
 #include "globals.hh"
 
-// Structure to hold outlier removal results for Power-Law Lorentz fitting
-struct PowerLorentzOutlierRemovalResult {
-    std::vector<double> filtered_x_coords;
-    std::vector<double> filtered_y_coords;
-    std::vector<double> filtered_charge_values;
-    int outliers_removed;
-    bool filtering_applied;
-    bool success;
-    
-    // Constructor with default values
-    PowerLorentzOutlierRemovalResult() : 
-        outliers_removed(0), filtering_applied(false), success(false) {}
-};
-
 // Structure to hold 2D Power-Law Lorentz fit results
 // Model: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
 struct PowerLorentz2DResultsCeres {
