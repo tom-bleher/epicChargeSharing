@@ -97,37 +97,28 @@ namespace Constants {
     // Enable/disable different fitting models for performance and flexibility
     // Set to 'false' to disable a fitting model and skip its computation entirely
     // This reduces simulation time and ROOT output file size when specific models aren't needed
-    const G4bool ENABLE_GAUSSIAN_FITTING = true;         // Enable Gaussian fitting (2D and diagonal)
-    const G4bool ENABLE_LORENTZIAN_FITTING = true;       // Enable Lorentzian fitting (2D and diagonal) 
-    const G4bool ENABLE_POWER_LORENTZIAN_FITTING = false; // Enable Power Lorentzian fitting (2D and diagonal)
+    const G4bool ENABLE_GAUSS_FIT = true;         // Enable Gauss fitting (2D and diagonal)
+    const G4bool ENABLE_LORENTZ_FIT = true;       // Enable Lorentz fitting (2D and diagonal) 
+    const G4bool ENABLE_POWER_LORENTZ_FIT = false; // Enable Power Lorentz fitting (2D and diagonal)
     
     // Individual fitting type control (only used if main model is enabled)
-    const G4bool ENABLE_2D_FITTING = true;               // Enable central row/column fitting
-    const G4bool ENABLE_DIAGONAL_FITTING = false;         // Enable diagonal fitting
+    const G4bool ENABLE_ROWCOL_FIT = true;               // Enable central row/column fitting
+    const G4bool ENABLE_DIAG_FIT = false;         // Enable diagonal fitting
     
     // 3D fitting control flags (fit entire neighborhood surface directly)
-    const G4bool ENABLE_3D_GAUSSIAN_FITTING = true;      // Enable 3D Gaussian surface fitting
-    const G4bool ENABLE_3D_LORENTZIAN_FITTING = true;    // Enable 3D Lorentzian surface fitting
-    const G4bool ENABLE_3D_POWER_LORENTZIAN_FITTING = false; // Enable 3D Power-Law Lorentzian surface fitting
+    const G4bool ENABLE_3D_GAUSS_FIT = true;      // Enable 3D Gauss surface fitting
+    const G4bool ENABLE_3D_LORENTZ_FIT = true;    // Enable 3D Lorentz surface fitting
+    const G4bool ENABLE_3D_POWER_LORENTZ_FIT = false; // Enable 3D Power-Law Lorentz surface fitting
     
     // ========================
     // VERTICAL CHARGE UNCERTAINTIES CONTROL
     // ========================
     
-    // Enable/disable vertical charge uncertainties in fitting and ROOT output
-    // When enabled: Uses 5% of max charge as uncertainty for weighted least squares fitting
-    // When disabled: Uses uniform weighting (uncertainty = 1.0) for unweighted fitting
-    // Also controls whether uncertainty values are saved to ROOT file branches
-    const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = true;  // Enable charge uncertainties
-    
-    // ========================
-    // COVARIANCE CALCULATION CONTROL
-    // ========================
-    
-    // Enable/disable multi-algorithm covariance calculation
-    // When enabled: Tries multiple covariance algorithms for robust uncertainty estimation
-    // When disabled: Uses only the fastest algorithm (DENSE_SVD with default settings)
-    const G4bool ENABLE_MULTI_ALGORITHM_COVARIANCE = true;
+    // Enable/disable vert charge uncertainties in fitting and ROOT output
+    // When enabled: Uses 5% of max charge as err for weighted least squares fitting
+    // When disabled: Uses uniform weighting (err = 1.0) for unweighted fitting
+    // Also controls whether err values are saved to ROOT file branches
+    const G4bool ENABLE_VERT_CHARGE_ERR = true;  // Enable charge uncertainties
     
     // ========================
     // ROOT AUTO-SAVE CONTROL
@@ -137,17 +128,17 @@ namespace Constants {
     // probability of producing partially-written baskets when the simulation is killed or the
     // file system momentarily blocks.  Set this flag to 'false' to disable the per-interval
     // AutoSave and rely on a single FlushBaskets()+Write() at the end of the run instead.
-    const G4bool ENABLE_FREQUENT_AUTOSAVE = false;  // disable by default
+    const G4bool ENABLE_AUTOSAVE = false;  // disable by default
     
     // USAGE EXAMPLES:
-    // - To disable all Power Lorentzian: set ENABLE_POWER_LORENTZIAN_FITTING = false
-    // - To enable only 2D fits (not diagonals): set ENABLE_DIAGONAL_FITTING = false  
-    // - To run only Gaussian fits: set ENABLE_LORENTZIAN_FITTING and ENABLE_POWER_LORENTZIAN_FITTING to false
-    // - To disable charge uncertainties: set ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = false
-    // - To enable only 3D Gaussian: set ENABLE_3D_GAUSSIAN_FITTING = true, others to false
-    // - To enable only 3D Lorentzian: set ENABLE_3D_LORENTZIAN_FITTING = true, others to false
-    // - To enable both 2D and 3D Power-Law Lorentzian: set ENABLE_POWER_LORENTZIAN_FITTING and ENABLE_3D_POWER_LORENTZIAN_FITTING = true
-    // - To enable all 3D fits: set ENABLE_3D_GAUSSIAN_FITTING, ENABLE_3D_LORENTZIAN_FITTING, and ENABLE_3D_POWER_LORENTZIAN_FITTING = true
+    // - To disable all Power Lorentz: set ENABLE_POWER_LORENTZ_FIT = false
+    // - To enable only 2D fits (not diagonals): set ENABLE_DIAG_FIT = false  
+    // - To run only Gauss fits: set ENABLE_LORENTZ_FIT and ENABLE_POWER_LORENTZ_FIT to false
+    // - To disable charge uncertainties: set ENABLE_VERT_CHARGE_ERR = false
+    // - To enable only 3D Gauss: set ENABLE_3D_GAUSS_FIT = true, others to false
+    // - To enable only 3D Lorentz: set ENABLE_3D_LORENTZ_FIT = true, others to false
+    // - To enable both 2D and 3D Power-Law Lorentz: set ENABLE_POWER_LORENTZ_FIT and ENABLE_3D_POWER_LORENTZ_FIT = true
+    // - To enable all 3D fits: set ENABLE_3D_GAUSS_FIT, ENABLE_3D_LORENTZ_FIT, and ENABLE_3D_POWER_LORENTZ_FIT = true
     
 } // namespace Constants
 
