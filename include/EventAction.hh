@@ -18,28 +18,28 @@ public:
     virtual void BeginOfEventAction(const G4Event* event);
     virtual void EndOfEventAction(const G4Event* event);
     
-    // Method to accumulate energy deposition and position
-    void AddEdep(G4double edep, G4ThreeVector position);
+    // Method to accumulate energy deposition and pos
+    void AddEdep(G4double edep, G4ThreeVector pos);
     
-    // Method to set initial particle position
-    void SetInitialPosition(const G4ThreeVector& position);
+    // Method to set initial particle pos
+    void SetInitialPos(const G4ThreeVector& pos);
     
-    // Method to calculate the nearest pixel position
-    G4ThreeVector CalculateNearestPixel(const G4ThreeVector& position);
+    // Method to calculate the nearest pixel pos
+    G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
     
     // Method to calculate the pixel alpha angle
-    G4double CalculatePixelAlpha(const G4ThreeVector& hitPosition, G4int pixelI, G4int pixelJ);
+    G4double CalcPixelAlpha(const G4ThreeVector& hitPos, G4int pixelI, G4int pixelJ);
     
     // Method to calculate angles from hit to neighborhood (9x9) grid around hit pixel
-    void CalculateNeighborhoodGridAngles(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ);
+    void CalcNeighborhoodGridAngles(const G4ThreeVector& hitPos, G4int hitPixelI, G4int hitPixelJ);
     
     // Method to calculate the angular size subtended by a pixel as seen from a hit point (2D calculation)
-    G4double CalculatePixelAlphaSubtended(G4double hitX, G4double hitY,
+    G4double CalcPixelAlphaSubtended(G4double hitX, G4double hitY,
                                          G4double pixelCenterX, G4double pixelCenterY,
                                          G4double pixelWidth, G4double pixelHeight);
     
     // Method to calculate charge sharing in the neighborhood (9x9) grid
-    void CalculateNeighborhoodChargeSharing();
+    void CalcNeighborhoodChargeSharing();
     
     // Method to set neighborhood radius (default is 4 for 9x9 grid)
     void SetNeighborhoodRadius(G4int radius) { fNeighborhoodRadius = radius; }
@@ -62,9 +62,9 @@ private:
     // Neighborhood configuration
     G4int fNeighborhoodRadius;  // Radius of neighborhood grid (4 = 9x9, 3 = 7x7, etc.)
     
-    G4double fEdep;   // Total energy deposit in the event
-    G4ThreeVector fPosition;  // Position of energy deposit (weighted average)
-    G4ThreeVector fInitialPosition; // Initial particle position
+    G4double fEdep;   // Total energy depositionit in the event
+    G4ThreeVector fPos;  // Pos of energy depositionit (weighted average)
+    G4ThreeVector fInitialPos; // Initial particle pos
     G4bool fHasHit;   // Flag to indicate if any energy was deposited
     
     // Pixel mapping information
@@ -76,12 +76,12 @@ private:
     G4bool fPixelHit;     // Flag to indicate if the hit was on a pixel
     
     // Neighborhood (9x9) grid angle information (for non-pixel hits)
-    std::vector<G4double> fNonPixel_GridNeighborhoodAngles; // Angles from hit to each pixel in neighborhood grid
+    std::vector<G4double> fNeighborhoodAngles; // Angles from hit to each pixel in neighborhood grid
     
     // Neighborhood (9x9) grid charge sharing information (for non-pixel hits)
-    std::vector<G4double> fNonPixel_GridNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid
-    std::vector<G4double> fNonPixel_GridNeighborhoodDistances;       // Distance from hit to each pixel center in neighborhood grid
-    std::vector<G4double> fNonPixel_GridNeighborhoodCharge;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
+    std::vector<G4double> fNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid
+    std::vector<G4double> fNeighborhoodDistances;       // Distance from hit to each pixel center in neighborhood grid
+    std::vector<G4double> fNeighborhoodCharge;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
     
     // Physics constants for charge sharing calculation
     G4double fIonizationEnergy;    // eV per electron-hole pair in silicon
@@ -94,11 +94,11 @@ private:
     G4int fMinAutoRadius;
     G4int fMaxAutoRadius;
     G4int fSelectedRadius;
-    G4double fSelectedFitQuality;
+    G4double fSelectedQuality;
     
     // Helper methods for automatic radius selection
-    G4int SelectOptimalRadius(const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ);
-    G4double EvaluateFitQuality(G4int radius, const G4ThreeVector& hitPosition, G4int hitPixelI, G4int hitPixelJ);
+    G4int SelectOptimalRadius(const G4ThreeVector& hitPos, G4int hitPixelI, G4int hitPixelJ);
+    G4double EvaluateFitQuality(G4int radius, const G4ThreeVector& hitPos, G4int hitPixelI, G4int hitPixelJ);
 };
 
 #endif

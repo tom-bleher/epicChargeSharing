@@ -53,10 +53,10 @@ void DetectorConstruction::SetGridParameters(G4double pixelSize, G4double pixelS
     // Store the original detector size for comparison
     G4double originalDetSize = fDetSize;
     
-    // Calculate the number of pixels that would fit with current parameters
+    // Calc the number of pixels that would fit with current parameters
     fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
     
-    // Calculate the required detector size to accommodate the pixel grid with FIXED corner offset
+    // Calc the required detector size to accommodate the pixel grid with FIXED corner offset
     G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
     
     // Update detector size if it differs significantly (more than 1 μm tolerance)
@@ -119,23 +119,23 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     auto cubeVisAtt = std::make_unique<G4VisAttributes>(G4Colour(0.7, 0.7, 0.7, 0.5)); // Grey, semi-transparent
     logicCube->SetVisAttributes(cubeVisAtt.get());
     
-    // Place the silicon detector at fixed position
-    G4ThreeVector detectorPosition(0., 0., Constants::DETECTOR_Z_POSITION);
+    // Place the silicon detector at fixed pos
+    G4ThreeVector detectorPos(0., 0., Constants::DETECTOR_Z_POSITION);
     
     // Store original detector size for comparison
     G4double originalDetSize = fDetSize;
     
-    // Calculate number of pixels that would fit with current parameters and FIXED corner offset
+    // Calc number of pixels that would fit with current parameters and FIXED corner offset
     fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
     
-    // Calculate the required detector size to accommodate the pixel grid with FIXED corner offset
+    // Calc the required detector size to accommodate the pixel grid with FIXED corner offset
     G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
     
     // Update detector size if needed and notify user
     if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
         G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===" << G4endl;
         G4cout << "Original detector size: " << originalDetSize/mm << " mm" << G4endl;
-        G4cout << "Calculated pixel grid requires: " << fNumBlocksPerSide << "×" << fNumBlocksPerSide << " pixels" << G4endl;
+        G4cout << "Calcd pixel grid requires: " << fNumBlocksPerSide << "×" << fNumBlocksPerSide << " pixels" << G4endl;
         G4cout << "Required detector size: " << requiredDetSize/mm << " mm" << G4endl;
         G4cout << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm" << G4endl;
         
@@ -160,8 +160,8 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         G4cerr << "Expected: " << fPixelCornerOffset/mm << " mm, Got: " << actualCornerOffset/mm << " mm" << G4endl;
     }
     
-    // Place the silicon detector at fixed position (only once)
-    new G4PVPlacement(0, detectorPosition,
+    // Place the silicon detector at fixed pos (only once)
+    new G4PVPlacement(0, detectorPos,
                       logicCube, "physCube", logicWorld, false, 0, checkOverlaps);
     
     // Create aluminum pixels on the detector surface
@@ -180,8 +180,8 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4int copyNo = 0;
     G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
-    // Calculate z position for pixels - they should be on the detector surface
-    G4double pixelZ = detectorPosition.z() + fDetWidth/2 + fPixelWidth/2;
+    // Calc z pos for pixels - they should be on the detector surface
+    G4double pixelZ = detectorPos.z() + fDetWidth/2 + fPixelWidth/2;
     
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
         for (G4int j = 0; j < fNumBlocksPerSide; j++) {
@@ -200,7 +200,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     // Set the world volume to be invisible
     logicWorld->SetVisAttributes(G4VisAttributes::GetInvisible());
     
-    // Calculate and print the ratio of pixel area to detector area
+    // Calc and print the ratio of pixel area to detector area
     G4double totalPixelArea = fNumBlocksPerSide * fNumBlocksPerSide * fPixelSize * fPixelSize;
     G4double detectorArea = fDetSize * fDetSize;
     G4double pixelAreaRatio = totalPixelArea / detectorArea;
@@ -246,35 +246,35 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     return physWorld;
 }
 
-G4ThreeVector DetectorConstruction::GetDetectorPosition() const
+G4ThreeVector DetectorConstruction::GetDetectorPos() const
 {
     return G4ThreeVector(0., 0., Constants::DETECTOR_Z_POSITION);
 }
 
-// Implementation of IsPositionOnPixel method
-G4bool DetectorConstruction::IsPositionOnPixel(const G4ThreeVector& position) const
+// Implementation of IsPosOnPixel method
+G4bool DetectorConstruction::IsPosOnPixel(const G4ThreeVector& pos) const
 {
-    // Get the detector position
-    G4ThreeVector detectorPosition = GetDetectorPosition();
+    // Get the detector pos
+    G4ThreeVector detectorPos = GetDetectorPos();
     
     // Check if the hit is in the detector volume first
     G4double detHalfSize = fDetSize/2;
     G4double detHalfWidth = fDetWidth/2;
     
     // Check if hit is within the detector boundaries
-    if (std::abs(position.x()) > detHalfSize || 
-        std::abs(position.y()) > detHalfSize ||
-        position.z() < detectorPosition.z() - detHalfWidth ||
-        position.z() > detectorPosition.z() + detHalfWidth + fPixelWidth) {
+    if (std::abs(pos.x()) > detHalfSize || 
+        std::abs(pos.y()) > detHalfSize ||
+        pos.z() < detectorPos.z() - detHalfWidth ||
+        pos.z() > detectorPos.z() + detHalfWidth + fPixelWidth) {
         return false; // Outside detector volume
     }
     
-    // Calculate the first pixel position (corner)
+    // Calc the first pixel pos (corner)
     G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
-    // Calculate which pixel grid position is closest (i and j indices)
-    G4double normX = (position.x() - firstPixelPos) / fPixelSpacing;
-    G4double normY = (position.y() - firstPixelPos) / fPixelSpacing;
+    // Calc which pixel grid pos is closest (i and j indices)
+    G4double normX = (pos.x() - firstPixelPos) / fPixelSpacing;
+    G4double normY = (pos.y() - firstPixelPos) / fPixelSpacing;
     
     // Convert to pixel indices
     G4int i = std::round(normX);
@@ -285,13 +285,13 @@ G4bool DetectorConstruction::IsPositionOnPixel(const G4ThreeVector& position) co
         return false; // Outside pixel grid
     }
     
-    // Calculate the actual pixel center position
+    // Calc the actual pixel center pos
     G4double pixelX = firstPixelPos + i * fPixelSpacing;
     G4double pixelY = firstPixelPos + j * fPixelSpacing;
     
-    // Calculate distance from hit to pixel center
-    G4double distanceX = std::abs(position.x() - pixelX);
-    G4double distanceY = std::abs(position.y() - pixelY);
+    // Calc distance from hit to pixel center
+    G4double distanceX = std::abs(pos.x() - pixelX);
+    G4double distanceY = std::abs(pos.y() - pixelY);
     
     // Check if the hit is within the pixel boundary (half the size in each direction)
     return (distanceX <= fPixelSize/2 && distanceY <= fPixelSize/2);

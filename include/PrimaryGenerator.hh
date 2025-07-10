@@ -26,8 +26,8 @@ private:
     G4double fCentralRegionYmin;
     G4double fCentralRegionYmax;
     
-    void CalculateCentralPixelRegion();
-    void GenerateRandomPosition();
+    void CalcCentralPixelRegion();
+    void GenerateRandomPos();
 };
 
 #endif

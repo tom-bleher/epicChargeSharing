@@ -50,10 +50,10 @@ public:
     G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
-    G4ThreeVector GetDetectorPosition() const; // Fixed position from Construct()
+    G4ThreeVector GetDetectorPos() const; // Fixed pos from Construct()
     
-    // Method to check if a position is within a pixel area
-    G4bool IsPositionOnPixel(const G4ThreeVector& position) const;
+    // Method to check if a pos is within a pixel area
+    G4bool IsPosOnPixel(const G4ThreeVector& pos) const;
     
     // Method to save simulation parameters to a log file
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;

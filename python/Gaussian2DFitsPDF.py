@@ -1,13 +1,13 @@
 """
-ROOT File Gaussian Fits Visualization Tool
+ROOT File Gauss s Visualization Tool
 
 This tool reads ROOT output files from the GEANT4 charge sharing simulation
-and creates PDF visualizations of the pre-computed Gaussian fits for row and column projections.
+and creates PDF visualizations of the pre-computed Gauss fits for row and column projections.
 
 Key features:
 1. Reads actual simulation data from ROOT files using uproot
-2. Extracts neighborhood charge distributions and fitted Gaussian parameters  
-3. Plots data points with fitted Gaussian curves and residuals
+2. Extracts neighborhood charge distributions and fitted Gauss parameters  
+3. Plots data points with fitted Gauss curves and residuals
 4. Creates comprehensive PDF reports for analysis verification
 5. NO synthetic data or fitting - only visualization of existing results
 6. OPTIMIZED for parallel processing with multithreading support
@@ -121,7 +121,7 @@ def load_root_data(root_file, max_entries=None):
         # Load essential data
         data = {}
         
-        # Basic position and pixel information
+        # Basic pos and pixel information
         data['TrueX'] = tree['TrueX'].array(library="np", entry_stop=max_entries)
         data['TrueY'] = tree['TrueY'].array(library="np", entry_stop=max_entries)
         data['PixelX'] = tree['PixelX'].array(library="np", entry_stop=max_entries)
@@ -129,31 +129,31 @@ def load_root_data(root_file, max_entries=None):
         data['IsPixelHit'] = tree['IsPixelHit'].array(library="np", entry_stop=max_entries)
         
         # Neighborhood grid data
-        data['GridNeighborhoodCharges'] = tree['GridNeighborhoodCharges'].array(library="np", entry_stop=max_entries)
+        data['NeighborhoodCharges'] = tree['NeighborhoodCharges'].array(library="np", entry_stop=max_entries)
         
-        # Row Gaussian fit results
-        data['GaussFitRowCenter'] = tree['GaussFitRowCenter'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowStdev'] = tree['GaussFitRowStdev'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowAmplitude'] = tree['GaussFitRowAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowVerticalOffset'] = tree['GaussFitRowVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowCenterErr'] = tree['GaussFitRowCenterErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowStdevErr'] = tree['GaussFitRowStdevErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowAmplitudeErr'] = tree['GaussFitRowAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowChi2red'] = tree['GaussFitRowChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowDOF'] = tree['GaussFitRowDOF'].array(library="np", entry_stop=max_entries)
-        data['GaussFitRowChargeUncertainty'] = tree['GaussFitRowChargeUncertainty'].array(library="np", entry_stop=max_entries)
+        # Row Gauss fit results
+        data['GaussRowCenter'] = tree['GaussRowCenter'].array(library="np", entry_stop=max_entries)
+        data['GaussRowSigma'] = tree['GaussRowSigma'].array(library="np", entry_stop=max_entries)
+        data['GaussRowAmp'] = tree['GaussRowAmp'].array(library="np", entry_stop=max_entries)
+        data['GaussRowVertOffset'] = tree['GaussRowVertOffset'].array(library="np", entry_stop=max_entries)
+        data['GaussRowCenterErr'] = tree['GaussRowCenterErr'].array(library="np", entry_stop=max_entries)
+        data['GaussRowSigmaErr'] = tree['GaussRowSigmaErr'].array(library="np", entry_stop=max_entries)
+        data['GaussRowAmpErr'] = tree['GaussRowAmpErr'].array(library="np", entry_stop=max_entries)
+        data['GaussRowChi2red'] = tree['GaussRowChi2red'].array(library="np", entry_stop=max_entries)
+        data['GaussRowDOF'] = tree['GaussRowDOF'].array(library="np", entry_stop=max_entries)
+        data['GaussRowChargeErr'] = tree['GaussRowChargeErr'].array(library="np", entry_stop=max_entries)
         
-        # Column Gaussian fit results
-        data['GaussFitColumnCenter'] = tree['GaussFitColumnCenter'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnStdev'] = tree['GaussFitColumnStdev'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnAmplitude'] = tree['GaussFitColumnAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnVerticalOffset'] = tree['GaussFitColumnVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnCenterErr'] = tree['GaussFitColumnCenterErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnStdevErr'] = tree['GaussFitColumnStdevErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnAmplitudeErr'] = tree['GaussFitColumnAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnChi2red'] = tree['GaussFitColumnChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnDOF'] = tree['GaussFitColumnDOF'].array(library="np", entry_stop=max_entries)
-        data['GaussFitColumnChargeUncertainty'] = tree['GaussFitColumnChargeUncertainty'].array(library="np", entry_stop=max_entries)
+        # Col Gauss fit results
+        data['GaussColCenter'] = tree['GaussColCenter'].array(library="np", entry_stop=max_entries)
+        data['GaussColSigma'] = tree['GaussColSigma'].array(library="np", entry_stop=max_entries)
+        data['GaussColAmp'] = tree['GaussColAmp'].array(library="np", entry_stop=max_entries)
+        data['GaussColVertOffset'] = tree['GaussColVertOffset'].array(library="np", entry_stop=max_entries)
+        data['GaussColCenterErr'] = tree['GaussColCenterErr'].array(library="np", entry_stop=max_entries)
+        data['GaussColSigmaErr'] = tree['GaussColSigmaErr'].array(library="np", entry_stop=max_entries)
+        data['GaussColAmpErr'] = tree['GaussColAmpErr'].array(library="np", entry_stop=max_entries)
+        data['GaussColChi2red'] = tree['GaussColChi2red'].array(library="np", entry_stop=max_entries)
+        data['GaussColDOF'] = tree['GaussColDOF'].array(library="np", entry_stop=max_entries)
+        data['GaussColChargeErr'] = tree['GaussColChargeErr'].array(library="np", entry_stop=max_entries)
         
         # Try to load detector grid parameters from metadata
         try:
@@ -165,7 +165,7 @@ def load_root_data(root_file, max_entries=None):
             data['PixelSpacing'] = 0.5  # Default fallback
         
         n_events = len(data['TrueX'])
-        print(f"Successfully loaded {n_events} events from ROOT file")
+        print(f"Successly loaded {n_events} events from ROOT file")
         
         # Filter for non-pixel hits only
         non_pixel_mask = ~data['IsPixelHit']
@@ -197,18 +197,18 @@ def extract_row_data(event_idx, data, grid_size=None):
         grid_size: Size of neighborhood grid (auto-detected if None)
     
     Returns:
-        x_positions, charges, valid_data_flag
+        x_poss, charges, valid_data_flag
     """
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
             # Single event data (already subset)
-            grid_charges = data['GridNeighborhoodCharges']
+            grid_charges = data['NeighborhoodCharges']
             pixel_x = data['PixelX']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
             # Full dataset - extract for specific event
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_x = data['PixelX'][event_idx]
         else:
             return None, None, False
@@ -222,7 +222,7 @@ def extract_row_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -245,16 +245,16 @@ def extract_row_data(event_idx, data, grid_size=None):
         central_cols = cols[central_row_mask]
         central_charges = grid_charges[central_row_mask]
         
-        # Calculate positions
+        # Calc poss
         offset_x = central_cols - radius
-        x_positions = pixel_x + offset_x * pixel_spacing
+        x_poss = pixel_x + offset_x * pixel_spacing
         
-        # Sort by X position
-        sort_indices = np.argsort(x_positions)
-        x_positions = x_positions[sort_indices]
+        # Sort by X pos
+        sort_indices = np.argsort(x_poss)
+        x_poss = x_poss[sort_indices]
         charges = central_charges[sort_indices]
         
-        return x_positions, charges, True
+        return x_poss, charges, True
         
     except Exception as e:
         return None, None, False
@@ -269,18 +269,18 @@ def extract_column_data(event_idx, data, grid_size=None):
         grid_size: Size of neighborhood grid (auto-detected if None)
     
     Returns:
-        y_positions, charges, valid_data_flag
+        y_poss, charges, valid_data_flag
     """
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
             # Single event data (already subset)
-            grid_charges = data['GridNeighborhoodCharges']
+            grid_charges = data['NeighborhoodCharges']
             pixel_y = data['PixelY']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
             # Full dataset - extract for specific event
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_y = data['PixelY'][event_idx]
         else:
             return None, None, False
@@ -294,7 +294,7 @@ def extract_column_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -317,25 +317,25 @@ def extract_column_data(event_idx, data, grid_size=None):
         central_rows = rows[central_col_mask]
         central_charges = grid_charges[central_col_mask]
         
-        # Calculate positions
+        # Calc poss
         offset_y = central_rows - radius
-        y_positions = pixel_y + offset_y * pixel_spacing
+        y_poss = pixel_y + offset_y * pixel_spacing
         
-        # Sort by Y position
-        sort_indices = np.argsort(y_positions)
-        y_positions = y_positions[sort_indices]
+        # Sort by Y pos
+        sort_indices = np.argsort(y_poss)
+        y_poss = y_poss[sort_indices]
         charges = central_charges[sort_indices]
         
-        return y_positions, charges, True
+        return y_poss, charges, True
         
     except Exception as e:
         return None, None, False
 
-def gaussian_1d(x, amplitude, center, sigma, offset):
+def gauss_1d(x, amp, center, sigma, offset):
     """
-    1D Gaussian function for plotting fitted curves.
+    1D Gauss function for plotting fitted curves.
     """
-    return amplitude * np.exp(-0.5 * ((x - center) / sigma)**2) + offset
+    return amp * np.exp(-0.5 * ((x - center) / sigma)**2) + offset
 
 def get_stored_charge_uncertainties(event_idx, data, direction):
     """
@@ -347,26 +347,26 @@ def get_stored_charge_uncertainties(event_idx, data, direction):
         direction: 'row' or 'column'
     
     Returns:
-        uncertainty: Single uncertainty value (5% of max charge for this event)
+        err: Single err value (5% of max charge for this event)
     """
     if direction.lower() == 'row':
-        uncertainty_data = data['GaussFitRowChargeUncertainty']
+        err_data = data['GaussRowChargeErr']
     elif direction.lower() == 'column':
-        uncertainty_data = data['GaussFitColumnChargeUncertainty']
+        err_data = data['GaussColChargeErr']
     else:
         raise ValueError(f"Invalid direction: {direction}. Must be 'row' or 'column'")
     
     # Handle both single event data and full dataset
-    if np.isscalar(uncertainty_data):
+    if np.isscalar(err_data):
         # Single event data (already subset)
-        uncertainty = uncertainty_data
-    elif hasattr(uncertainty_data, '__len__') and len(uncertainty_data) > event_idx:
+        err = err_data
+    elif hasattr(err_data, '__len__') and len(err_data) > event_idx:
         # Full dataset - extract for specific event
-        uncertainty = uncertainty_data[event_idx]
+        err = err_data[event_idx]
     else:
-        uncertainty = 0.05  # Default fallback
+        err = 0.05  # Default fallback
     
-    return uncertainty
+    return err
 
 def calculate_charge_uncertainties(charges):
     """
@@ -375,16 +375,16 @@ def calculate_charge_uncertainties(charges):
     """
     raise RuntimeError("calculate_charge_uncertainties() is deprecated. Use get_stored_charge_uncertainties() to read from ROOT file.")
 
-def create_row_gaussian_plot(event_idx, data):
+def create_row_gauss_plot(event_idx, data):
     """
-    Create a plot showing the row Gaussian fit for a specific event.
+    Create a plot showing the row Gauss fit for a specific event.
 
     Returns:
         fig, success_flag
     """
     try:
         # Extract row data
-        x_positions, charges, valid_data = extract_row_data(event_idx, data)
+        x_poss, charges, valid_data = extract_row_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -398,66 +398,66 @@ def create_row_gaussian_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['GaussFitRowCenter'], event_idx)
-        fit_sigma = get_param_value(data['GaussFitRowStdev'], event_idx)
-        fit_amplitude = get_param_value(data['GaussFitRowAmplitude'], event_idx)
-        fit_offset = get_param_value(data['GaussFitRowVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['GaussFitRowCenterErr'], event_idx)
-        fit_sigma_err = get_param_value(data['GaussFitRowStdevErr'], event_idx)
-        chi2_red = get_param_value(data['GaussFitRowChi2red'], event_idx)
-        dof = get_param_value(data['GaussFitRowDOF'], event_idx)
+        fit_center = get_param_value(data['GaussRowCenter'], event_idx)
+        fit_sigma = get_param_value(data['GaussRowSigma'], event_idx)
+        fit_amp = get_param_value(data['GaussRowAmp'], event_idx)
+        fit_offset = get_param_value(data['GaussRowVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['GaussRowCenterErr'], event_idx)
+        fit_sigma_err = get_param_value(data['GaussRowSigmaErr'], event_idx)
+        chi2_red = get_param_value(data['GaussRowChi2red'], event_idx)
+        dof = get_param_value(data['GaussRowDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position
+        # Get true pos
         true_x = get_param_value(data['TrueX'], event_idx)
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'row')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = gaussian_1d(x_positions, fit_amplitude, fit_center, fit_sigma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = gauss_1d(x_poss, fit_amp, fit_center, fit_sigma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        x_min, x_max = x_positions.min() - 0.3, x_positions.max() + 0.3
+        x_min, x_max = x_poss.min() - 0.3, x_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(x_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(x_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='red', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(x_min, x_max)
         ax_left.set_xlabel('x_pixel (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Row Gaussian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Row Gauss Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(x_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(x_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Gaussian curve
+        # Plot fitted Gauss curve
         x_fit_range = np.linspace(x_min, x_max, 200)
-        y_fit = gaussian_1d(x_fit_range, fit_amplitude, fit_center, fit_sigma, fit_offset)
-        ax_right.plot(x_fit_range, y_fit, 'r-', linewidth=3, label='Gaussian Fit')
+        y_fit = gauss_1d(x_fit_range, fit_amp, fit_center, fit_sigma, fit_offset)
+        ax_right.plot(x_fit_range, y_fit, 'r-', linewidth=3, label='Gauss ')
         
-        # Mark true and fitted positions
+        # Mark true and fitted poss
         ax_right.axvline(true_x, color='green', linestyle='--', linewidth=3, alpha=0.8, label='x_true')
         ax_right.axvline(fit_center, color='red', linestyle=':', linewidth=3, alpha=0.8, label='x_fit')
         
         ax_right.set_xlim(x_min, x_max)
         ax_right.set_xlabel('x_pixel (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Row Gaussian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Row Gauss ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -482,16 +482,16 @@ def create_row_gaussian_plot(event_idx, data):
         print(f"Error creating row plot for event {event_idx}: {e}")
         return None, False
 
-def create_column_gaussian_plot(event_idx, data):
+def create_column_gauss_plot(event_idx, data):
     """
-    Create a plot showing the column Gaussian fit for a specific event.
+    Create a plot showing the column Gauss fit for a specific event.
     
     Returns:
         fig, success_flag
     """
     try:
         # Extract column data
-        y_positions, charges, valid_data = extract_column_data(event_idx, data)
+        y_poss, charges, valid_data = extract_column_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -505,66 +505,66 @@ def create_column_gaussian_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['GaussFitColumnCenter'], event_idx)
-        fit_sigma = get_param_value(data['GaussFitColumnStdev'], event_idx)
-        fit_amplitude = get_param_value(data['GaussFitColumnAmplitude'], event_idx)
-        fit_offset = get_param_value(data['GaussFitColumnVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['GaussFitColumnCenterErr'], event_idx)
-        fit_sigma_err = get_param_value(data['GaussFitColumnStdevErr'], event_idx)
-        chi2_red = get_param_value(data['GaussFitColumnChi2red'], event_idx)
-        dof = get_param_value(data['GaussFitColumnDOF'], event_idx)
+        fit_center = get_param_value(data['GaussColCenter'], event_idx)
+        fit_sigma = get_param_value(data['GaussColSigma'], event_idx)
+        fit_amp = get_param_value(data['GaussColAmp'], event_idx)
+        fit_offset = get_param_value(data['GaussColVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['GaussColCenterErr'], event_idx)
+        fit_sigma_err = get_param_value(data['GaussColSigmaErr'], event_idx)
+        chi2_red = get_param_value(data['GaussColChi2red'], event_idx)
+        dof = get_param_value(data['GaussColDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position
+        # Get true pos
         true_y = get_param_value(data['TrueY'], event_idx)
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'column')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = gaussian_1d(y_positions, fit_amplitude, fit_center, fit_sigma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = gauss_1d(y_poss, fit_amp, fit_center, fit_sigma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        y_min, y_max = y_positions.min() - 0.3, y_positions.max() + 0.3
+        y_min, y_max = y_poss.min() - 0.3, y_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(y_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(y_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='blue', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(y_min, y_max)
         ax_left.set_xlabel('y_pixel (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Column Gaussian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Col Gauss Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(y_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(y_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Gaussian curve
+        # Plot fitted Gauss curve
         y_fit_range = np.linspace(y_min, y_max, 200)
-        y_fit = gaussian_1d(y_fit_range, fit_amplitude, fit_center, fit_sigma, fit_offset)
-        ax_right.plot(y_fit_range, y_fit, 'b-', linewidth=3, label='Gaussian Fit')
+        y_fit = gauss_1d(y_fit_range, fit_amp, fit_center, fit_sigma, fit_offset)
+        ax_right.plot(y_fit_range, y_fit, 'b-', linewidth=3, label='Gauss ')
         
-        # Mark true and fitted positions
+        # Mark true and fitted poss
         ax_right.axvline(true_y, color='green', linestyle='--', linewidth=3, alpha=0.8, label='y_true')
         ax_right.axvline(fit_center, color='blue', linestyle=':', linewidth=3, alpha=0.8, label='y_fit')
         
         ax_right.set_xlim(y_min, y_max)
         ax_right.set_xlabel('y_pixel (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Column Gaussian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Col Gauss ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -613,9 +613,9 @@ def _create_plot_worker(args):
             data[key] = value
         
         if plot_type == 'row':
-            fig, success = create_row_gaussian_plot(event_idx, data)
+            fig, success = create_row_gauss_plot(event_idx, data)
         elif plot_type == 'column':
-            fig, success = create_column_gaussian_plot(event_idx, data)
+            fig, success = create_column_gauss_plot(event_idx, data)
         else:
             return event_idx, None, False
         
@@ -646,15 +646,15 @@ def _prepare_data_subset(data, event_idx):
     # List of all keys we need for plotting
     keys_needed = [
         'TrueX', 'TrueY', 'PixelX', 'PixelY', 'IsPixelHit',
-        'GridNeighborhoodCharges', 'PixelSpacing',
-        'GaussFitRowCenter', 'GaussFitRowStdev', 'GaussFitRowAmplitude', 
-        'GaussFitRowVerticalOffset', 'GaussFitRowCenterErr', 'GaussFitRowStdevErr',
-        'GaussFitRowAmplitudeErr', 'GaussFitRowChi2red', 'GaussFitRowDOF',
-        'GaussFitRowChargeUncertainty',
-        'GaussFitColumnCenter', 'GaussFitColumnStdev', 'GaussFitColumnAmplitude',
-        'GaussFitColumnVerticalOffset', 'GaussFitColumnCenterErr', 'GaussFitColumnStdevErr',
-        'GaussFitColumnAmplitudeErr', 'GaussFitColumnChi2red', 'GaussFitColumnDOF',
-        'GaussFitColumnChargeUncertainty'
+        'NeighborhoodCharges', 'PixelSpacing',
+        'GaussRowCenter', 'GaussRowSigma', 'GaussRowAmp', 
+        'GaussRowVertOffset', 'GaussRowCenterErr', 'GaussRowSigmaErr',
+        'GaussRowAmpErr', 'GaussRowChi2red', 'GaussRowDOF',
+        'GaussRowChargeErr',
+        'GaussColCenter', 'GaussColSigma', 'GaussColAmp',
+        'GaussColVertOffset', 'GaussColCenterErr', 'GaussColSigmaErr',
+        'GaussColAmpErr', 'GaussColChi2red', 'GaussColDOF',
+        'GaussColChargeErr'
     ]
     
     for key in keys_needed:
@@ -666,9 +666,9 @@ def _prepare_data_subset(data, event_idx):
     
     return subset
 
-def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
+def create_gauss_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
     """
-    Create PDF files with Gaussian fits visualization using parallel processing.
+    Create PDF files with Gauss fits visualization using parallel processing.
     
     Args:
         data: Data dictionary from ROOT file
@@ -693,20 +693,20 @@ def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_worker
     # Set batch size for processing
     batch_size = max(50, n_workers * 10)  # Process in batches to manage memory
     
-    print(f"Creating Gaussian fit visualizations for {n_events} events using {n_workers} workers")
+    print(f"Creating Gauss fit visualizations for {n_events} events using {n_workers} workers")
     
     # Create output paths
-    x_pdf_path = os.path.join(output_dir, "gaussian_fits_row.pdf")
-    y_pdf_path = os.path.join(output_dir, "gaussian_fits_column.pdf")
+    x_pdf_path = os.path.join(output_dir, "gauss_fits_row.pdf")
+    y_pdf_path = os.path.join(output_dir, "gauss_fits_column.pdf")
     
-    # Pre-filter events with successful fits to avoid processing invalid events
+    # Pre-filter events with success fits to avoid processing invalid events
     row_valid_events = []
     col_valid_events = []
     
     for event_idx in range(n_events):
-        if data['GaussFitRowDOF'][event_idx] > 0:
+        if data['GaussRowDOF'][event_idx] > 0:
             row_valid_events.append(event_idx)
-        if data['GaussFitColumnDOF'][event_idx] > 0:
+        if data['GaussColDOF'][event_idx] > 0:
             col_valid_events.append(event_idx)
     
     print(f"Found {len(row_valid_events)} valid row fits and {len(col_valid_events)} valid column fits")
@@ -714,7 +714,7 @@ def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_worker
     # Pre-calculate grid size to avoid repeated calculations
     if len(row_valid_events) > 0 or len(col_valid_events) > 0:
         sample_event = row_valid_events[0] if row_valid_events else col_valid_events[0]
-        sample_grid = np.array(data['GridNeighborhoodCharges'][sample_event])
+        sample_grid = np.array(data['NeighborhoodCharges'][sample_event])
         grid_size = int(np.sqrt(len(sample_grid))) if len(sample_grid) > 0 else 9
         print(f"Detected grid size: {grid_size}x{grid_size}")
     else:
@@ -725,7 +725,7 @@ def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_worker
     
     # Process row fits
     if row_valid_events:
-        print("Creating row Gaussian fits PDF...")
+        print("Creating row Gauss fits PDF...")
         
         # Prepare arguments for parallel processing
         row_args = []
@@ -771,7 +771,7 @@ def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_worker
     
     # Process column fits
     if col_valid_events:
-        print("Creating column Gaussian fits PDF...")
+        print("Creating column Gauss fits PDF...")
         
         # Prepare arguments for parallel processing
         col_args = []
@@ -818,8 +818,8 @@ def create_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_worker
     print(f"PDF generation completed!")
     print(f"  Row fits visualized: {x_success_count}")
     print(f"  Row PDF saved to: {x_pdf_path}")
-    print(f"  Column fits visualized: {y_success_count}")
-    print(f"  Column PDF saved to: {y_pdf_path}")
+    print(f"  Col fits visualized: {y_success_count}")
+    print(f"  Col PDF saved to: {y_pdf_path}")
     
     return x_success_count, y_success_count
 
@@ -838,10 +838,10 @@ def inspect_root_file(root_file):
         
         print(f"\nTree 'Hits' contains {len(branches)} branches:")
         
-        # Show Gaussian fitting branches
-        gaussian_branches = [b for b in branches if 'GaussFit' in b]
-        print(f"\nGaussian fitting branches ({len(gaussian_branches)}):")
-        for i, branch in enumerate(sorted(gaussian_branches)):
+        # Show Gauss fitting branches
+        gauss_branches = [b for b in branches if 'Gauss' in b]
+        print(f"\nGauss fitting branches ({len(gauss_branches)}):")
+        for i, branch in enumerate(sorted(gauss_branches)):
             print(f"  {i+1:2d}: {branch}")
         
         # Show grid data branches
@@ -860,16 +860,16 @@ def inspect_root_file(root_file):
         print(f"  Non-pixel hits: {n_non_pixel} ({100*n_non_pixel/n_events:.1f}%)")
         print(f"  Pixel hits: {n_events - n_non_pixel} ({100*(n_events - n_non_pixel)/n_events:.1f}%)")
         
-        # Check for successful fits
-        if 'GaussFitRowDOF' in branches:
-            row_dof = tree['GaussFitRowDOF'].array(library="np")
-            successful_row_fits = np.sum(row_dof > 0)
-            print(f"  Successful row fits: {successful_row_fits} ({100*successful_row_fits/n_events:.1f}%)")
+        # Check for success fits
+        if 'GaussRowDOF' in branches:
+            row_dof = tree['GaussRowDOF'].array(library="np")
+            success_row_fits = np.sum(row_dof > 0)
+            print(f"  Success row fits: {success_row_fits} ({100*success_row_fits/n_events:.1f}%)")
         
-        if 'GaussFitColumnDOF' in branches:
-            col_dof = tree['GaussFitColumnDOF'].array(library="np")
-            successful_col_fits = np.sum(col_dof > 0)
-            print(f"  Successful column fits: {successful_col_fits} ({100*successful_col_fits/n_events:.1f}%)")
+        if 'GaussColDOF' in branches:
+            col_dof = tree['GaussColDOF'].array(library="np")
+            success_col_fits = np.sum(col_dof > 0)
+            print(f"  Success column fits: {success_col_fits} ({100*success_col_fits/n_events:.1f}%)")
         
     except Exception as e:
         print(f"Error inspecting ROOT file: {e}")
@@ -877,11 +877,11 @@ def inspect_root_file(root_file):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Visualize Gaussian fits from GEANT4 charge sharing simulation ROOT files",
+        description="Visualize Gauss fits from GEANT4 charge sharing simulation ROOT files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("root_file", help="Path to ROOT file from GEANT4 simulation")
-    parser.add_argument("-o", "--output", default="gaussian_fits", 
+    parser.add_argument("-o", "--output", default="gauss_fits", 
                        help="Output directory for PDF files")
     parser.add_argument("-n", "--num_events", type=int, default=None,
                        help="Maximum number of events to process (default: all events)")
@@ -910,20 +910,20 @@ def main():
         print("Failed to load data. Exiting.")
         return 1
     
-    # Check if we have Gaussian fitting data
+    # Check if we have Gauss fitting data
     n_events = len(data['TrueX'])
     if n_events == 0:
         print("No events found in the data!")
         return 1
     
-    # Count successful fits
-    row_successful = np.sum(data['GaussFitRowDOF'] > 0)
-    col_successful = np.sum(data['GaussFitColumnDOF'] > 0)
+    # Count success fits
+    row_success = np.sum(data['GaussRowDOF'] > 0)
+    col_success = np.sum(data['GaussColDOF'] > 0)
     
-    print(f"Found {row_successful} successful row fits and {col_successful} successful column fits")
+    print(f"Found {row_success} success row fits and {col_success} success column fits")
     
-    if row_successful == 0 and col_successful == 0:
-        print("No successful Gaussian fits found in the data!")
+    if row_success == 0 and col_success == 0:
+        print("No success Gauss fits found in the data!")
         return 1
     
     # Create output directory
@@ -931,13 +931,13 @@ def main():
     print(f"Output directory: {args.output}")
     
     # Create PDF visualizations
-    x_success, y_success = create_gaussian_fit_pdfs(
+    x_success, y_success = create_gauss_fit_pdfs(
         data, args.output, args.num_events, args.workers
     )
     
     print(f"\nVisualization completed!")
     print(f"  Row fits visualized: {x_success}")
-    print(f"  Column fits visualized: {y_success}")
+    print(f"  Col fits visualized: {y_success}")
     
     return 0
 

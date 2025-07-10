@@ -1,13 +1,13 @@
 """
-ROOT File Lorentzian Fits Visualization Tool
+ROOT File Lorentz s Visualization Tool
 
 This tool reads ROOT output files from the GEANT4 charge sharing simulation
-and creates PDF visualizations of the pre-computed Lorentzian fits for row and column projections.
+and creates PDF visualizations of the pre-computed Lorentz fits for row and column projections.
 
 Key features:
 1. Reads actual simulation data from ROOT files using uproot
-2. Extracts neighborhood charge distributions and fitted Lorentzian parameters  
-3. Plots data points with fitted Lorentzian curves and residuals
+2. Extracts neighborhood charge distributions and fitted Lorentz parameters  
+3. Plots data points with fitted Lorentz curves and residuals
 4. Creates comprehensive PDF reports for analysis verification
 5. NO synthetic data or fitting - only visualization of existing results
 6. OPTIMIZED for parallel processing with multithreading support
@@ -121,7 +121,7 @@ def load_root_data(root_file, max_entries=None):
         # Load essential data
         data = {}
         
-        # Basic position and pixel information
+        # Basic pos and pixel information
         data['TrueX'] = tree['TrueX'].array(library="np", entry_stop=max_entries)
         data['TrueY'] = tree['TrueY'].array(library="np", entry_stop=max_entries)
         data['PixelX'] = tree['PixelX'].array(library="np", entry_stop=max_entries)
@@ -129,31 +129,31 @@ def load_root_data(root_file, max_entries=None):
         data['IsPixelHit'] = tree['IsPixelHit'].array(library="np", entry_stop=max_entries)
         
         # Neighborhood grid data
-        data['GridNeighborhoodCharges'] = tree['GridNeighborhoodCharges'].array(library="np", entry_stop=max_entries)
+        data['NeighborhoodCharges'] = tree['NeighborhoodCharges'].array(library="np", entry_stop=max_entries)
         
-        # Row Lorentzian fit results
-        data['LorentzFitRowCenter'] = tree['LorentzFitRowCenter'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowGamma'] = tree['LorentzFitRowGamma'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowAmplitude'] = tree['LorentzFitRowAmplitude'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowVerticalOffset'] = tree['LorentzFitRowVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowCenterErr'] = tree['LorentzFitRowCenterErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowGammaErr'] = tree['LorentzFitRowGammaErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowAmplitudeErr'] = tree['LorentzFitRowAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowChi2red'] = tree['LorentzFitRowChi2red'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowDOF'] = tree['LorentzFitRowDOF'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitRowChargeUncertainty'] = tree['LorentzFitRowChargeUncertainty'].array(library="np", entry_stop=max_entries)
+        # Row Lorentz fit results
+        data['LorentzRowCenter'] = tree['LorentzRowCenter'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowGamma'] = tree['LorentzRowGamma'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowAmp'] = tree['LorentzRowAmp'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowVertOffset'] = tree['LorentzRowVertOffset'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowCenterErr'] = tree['LorentzRowCenterErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowGammaErr'] = tree['LorentzRowGammaErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowAmpErr'] = tree['LorentzRowAmpErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowChi2red'] = tree['LorentzRowChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowDOF'] = tree['LorentzRowDOF'].array(library="np", entry_stop=max_entries)
+        data['LorentzRowChargeErr'] = tree['LorentzRowChargeErr'].array(library="np", entry_stop=max_entries)
         
-        # Column Lorentzian fit results
-        data['LorentzFitColumnCenter'] = tree['LorentzFitColumnCenter'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnGamma'] = tree['LorentzFitColumnGamma'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnAmplitude'] = tree['LorentzFitColumnAmplitude'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnVerticalOffset'] = tree['LorentzFitColumnVerticalOffset'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnCenterErr'] = tree['LorentzFitColumnCenterErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnGammaErr'] = tree['LorentzFitColumnGammaErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnAmplitudeErr'] = tree['LorentzFitColumnAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnChi2red'] = tree['LorentzFitColumnChi2red'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnDOF'] = tree['LorentzFitColumnDOF'].array(library="np", entry_stop=max_entries)
-        data['LorentzFitColumnChargeUncertainty'] = tree['LorentzFitColumnChargeUncertainty'].array(library="np", entry_stop=max_entries)
+        # Col Lorentz fit results
+        data['LorentzColCenter'] = tree['LorentzColCenter'].array(library="np", entry_stop=max_entries)
+        data['LorentzColGamma'] = tree['LorentzColGamma'].array(library="np", entry_stop=max_entries)
+        data['LorentzColAmp'] = tree['LorentzColAmp'].array(library="np", entry_stop=max_entries)
+        data['LorentzColVertOffset'] = tree['LorentzColVertOffset'].array(library="np", entry_stop=max_entries)
+        data['LorentzColCenterErr'] = tree['LorentzColCenterErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzColGammaErr'] = tree['LorentzColGammaErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzColAmpErr'] = tree['LorentzColAmpErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzColChi2red'] = tree['LorentzColChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzColDOF'] = tree['LorentzColDOF'].array(library="np", entry_stop=max_entries)
+        data['LorentzColChargeErr'] = tree['LorentzColChargeErr'].array(library="np", entry_stop=max_entries)
         
         # Try to load detector grid parameters from metadata
         try:
@@ -165,7 +165,7 @@ def load_root_data(root_file, max_entries=None):
             data['PixelSpacing'] = 0.5  # Default fallback
         
         n_events = len(data['TrueX'])
-        print(f"Successfully loaded {n_events} events from ROOT file")
+        print(f"Successly loaded {n_events} events from ROOT file")
         
         # Filter for non-pixel hits only
         non_pixel_mask = ~data['IsPixelHit']
@@ -197,18 +197,18 @@ def extract_row_data(event_idx, data, grid_size=None):
         grid_size: Size of neighborhood grid (auto-detected if None)
     
     Returns:
-        x_positions, charges, valid_data_flag
+        x_poss, charges, valid_data_flag
     """
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
             # Single event data (already subset)
-            grid_charges = data['GridNeighborhoodCharges']
+            grid_charges = data['NeighborhoodCharges']
             pixel_x = data['PixelX']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
             # Full dataset - extract for specific event
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_x = data['PixelX'][event_idx]
         else:
             return None, None, False
@@ -222,7 +222,7 @@ def extract_row_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -245,16 +245,16 @@ def extract_row_data(event_idx, data, grid_size=None):
         central_cols = cols[central_row_mask]
         central_charges = grid_charges[central_row_mask]
         
-        # Calculate positions
+        # Calc poss
         offset_x = central_cols - radius
-        x_positions = pixel_x + offset_x * pixel_spacing
+        x_poss = pixel_x + offset_x * pixel_spacing
         
-        # Sort by X position
-        sort_indices = np.argsort(x_positions)
-        x_positions = x_positions[sort_indices]
+        # Sort by X pos
+        sort_indices = np.argsort(x_poss)
+        x_poss = x_poss[sort_indices]
         charges = central_charges[sort_indices]
         
-        return x_positions, charges, True
+        return x_poss, charges, True
         
     except Exception as e:
         return None, None, False
@@ -269,18 +269,18 @@ def extract_column_data(event_idx, data, grid_size=None):
         grid_size: Size of neighborhood grid (auto-detected if None)
     
     Returns:
-        y_positions, charges, valid_data_flag
+        y_poss, charges, valid_data_flag
     """
     try:
         # Get neighborhood data for this event
         # Check if data is already subset to single event or is full dataset
-        if isinstance(data['GridNeighborhoodCharges'], np.ndarray) and data['GridNeighborhoodCharges'].ndim == 1:
+        if isinstance(data['NeighborhoodCharges'], np.ndarray) and data['NeighborhoodCharges'].ndim == 1:
             # Single event data (already subset)
-            grid_charges = data['GridNeighborhoodCharges']
+            grid_charges = data['NeighborhoodCharges']
             pixel_y = data['PixelY']
-        elif hasattr(data['GridNeighborhoodCharges'], '__len__') and len(data['GridNeighborhoodCharges']) > event_idx:
+        elif hasattr(data['NeighborhoodCharges'], '__len__') and len(data['NeighborhoodCharges']) > event_idx:
             # Full dataset - extract for specific event
-            grid_charges = np.array(data['GridNeighborhoodCharges'][event_idx])
+            grid_charges = np.array(data['NeighborhoodCharges'][event_idx])
             pixel_y = data['PixelY'][event_idx]
         else:
             return None, None, False
@@ -294,7 +294,7 @@ def extract_column_data(event_idx, data, grid_size=None):
             if grid_size * grid_size != len(grid_charges):
                 return None, None, False
         
-        # Calculate neighborhood radius from grid size
+        # Calc neighborhood radius from grid size
         radius = grid_size // 2  # For 9x9 grid, radius = 4
         
         pixel_spacing = data['PixelSpacing']
@@ -317,26 +317,26 @@ def extract_column_data(event_idx, data, grid_size=None):
         central_rows = rows[central_col_mask]
         central_charges = grid_charges[central_col_mask]
         
-        # Calculate positions
+        # Calc poss
         offset_y = central_rows - radius
-        y_positions = pixel_y + offset_y * pixel_spacing
+        y_poss = pixel_y + offset_y * pixel_spacing
         
-        # Sort by Y position
-        sort_indices = np.argsort(y_positions)
-        y_positions = y_positions[sort_indices]
+        # Sort by Y pos
+        sort_indices = np.argsort(y_poss)
+        y_poss = y_poss[sort_indices]
         charges = central_charges[sort_indices]
         
-        return y_positions, charges, True
+        return y_poss, charges, True
             
     except Exception as e:
         return None, None, False
 
-def lorentzian_1d(x, amplitude, center, gamma, offset):
+def lorentz_1d(x, amp, center, gamma, offset):
     """
-    1D Lorentzian function for plotting fitted curves.
+    1D Lorentz function for plotting fitted curves.
     """
     safe_gamma = max(abs(gamma), 1e-12)
-    return amplitude / (1 + ((x - center) / safe_gamma)**2) + offset
+    return amp / (1 + ((x - center) / safe_gamma)**2) + offset
 
 def get_stored_charge_uncertainties(event_idx, data, direction):
     """
@@ -348,26 +348,26 @@ def get_stored_charge_uncertainties(event_idx, data, direction):
         direction: 'row' or 'column'
     
     Returns:
-        uncertainty: Single uncertainty value (5% of max charge for this event)
+        err: Single err value (5% of max charge for this event)
     """
     if direction.lower() == 'row':
-        uncertainty_data = data['LorentzFitRowChargeUncertainty']
+        err_data = data['LorentzRowChargeErr']
     elif direction.lower() == 'column':
-        uncertainty_data = data['LorentzFitColumnChargeUncertainty']
+        err_data = data['LorentzColChargeErr']
     else:
         raise ValueError(f"Invalid direction: {direction}. Must be 'row' or 'column'")
     
     # Handle both single event data and full dataset
-    if np.isscalar(uncertainty_data):
+    if np.isscalar(err_data):
         # Single event data (already subset)
-        uncertainty = uncertainty_data
-    elif hasattr(uncertainty_data, '__len__') and len(uncertainty_data) > event_idx:
+        err = err_data
+    elif hasattr(err_data, '__len__') and len(err_data) > event_idx:
         # Full dataset - extract for specific event
-        uncertainty = uncertainty_data[event_idx]
+        err = err_data[event_idx]
     else:
-        uncertainty = 0.05  # Default fallback
+        err = 0.05  # Default fallback
     
-    return uncertainty
+    return err
 
 def calculate_charge_uncertainties(charges):
     """
@@ -376,16 +376,16 @@ def calculate_charge_uncertainties(charges):
     """
     raise RuntimeError("calculate_charge_uncertainties() is deprecated. Use get_stored_charge_uncertainties() to read from ROOT file.")
 
-def create_row_lorentzian_plot(event_idx, data):
+def create_row_lorentz_plot(event_idx, data):
     """
-    Create a plot showing the row Lorentzian fit for a specific event.
+    Create a plot showing the row Lorentz fit for a specific event.
 
     Returns:
         fig, success_flag
     """
     try:
         # Extract row data
-        x_positions, charges, valid_data = extract_row_data(event_idx, data)
+        x_poss, charges, valid_data = extract_row_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -399,66 +399,66 @@ def create_row_lorentzian_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['LorentzFitRowCenter'], event_idx)
-        fit_gamma = get_param_value(data['LorentzFitRowGamma'], event_idx)
-        fit_amplitude = get_param_value(data['LorentzFitRowAmplitude'], event_idx)
-        fit_offset = get_param_value(data['LorentzFitRowVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['LorentzFitRowCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['LorentzFitRowGammaErr'], event_idx)
-        chi2_red = get_param_value(data['LorentzFitRowChi2red'], event_idx)
-        dof = get_param_value(data['LorentzFitRowDOF'], event_idx)
+        fit_center = get_param_value(data['LorentzRowCenter'], event_idx)
+        fit_gamma = get_param_value(data['LorentzRowGamma'], event_idx)
+        fit_amp = get_param_value(data['LorentzRowAmp'], event_idx)
+        fit_offset = get_param_value(data['LorentzRowVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['LorentzRowCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['LorentzRowGammaErr'], event_idx)
+        chi2_red = get_param_value(data['LorentzRowChi2red'], event_idx)
+        dof = get_param_value(data['LorentzRowDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position
+        # Get true pos
         true_x = get_param_value(data['TrueX'], event_idx)
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'row')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = lorentzian_1d(x_positions, fit_amplitude, fit_center, fit_gamma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = lorentz_1d(x_poss, fit_amp, fit_center, fit_gamma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        x_min, x_max = x_positions.min() - 0.3, x_positions.max() + 0.3
+        x_min, x_max = x_poss.min() - 0.3, x_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(x_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(x_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='red', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(x_min, x_max)
         ax_left.set_xlabel('x_pixel (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Row Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Row Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(x_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(x_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Lorentzian curve
+        # Plot fitted Lorentz curve
         x_fit_range = np.linspace(x_min, x_max, 200)
-        y_fit = lorentzian_1d(x_fit_range, fit_amplitude, fit_center, fit_gamma, fit_offset)
-        ax_right.plot(x_fit_range, y_fit, 'r-', linewidth=3, label='Lorentzian Fit')
+        y_fit = lorentz_1d(x_fit_range, fit_amp, fit_center, fit_gamma, fit_offset)
+        ax_right.plot(x_fit_range, y_fit, 'r-', linewidth=3, label='Lorentz ')
         
-        # Mark true and fitted positions
+        # Mark true and fitted poss
         ax_right.axvline(true_x, color='green', linestyle='--', linewidth=3, alpha=0.8, label='x_true')
         ax_right.axvline(fit_center, color='red', linestyle=':', linewidth=3, alpha=0.8, label='x_fit')
         
         ax_right.set_xlim(x_min, x_max)
         ax_right.set_xlabel('x_pixel (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Row Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Row Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -483,16 +483,16 @@ def create_row_lorentzian_plot(event_idx, data):
         print(f"Error creating row plot for event {event_idx}: {e}")
         return None, False
 
-def create_column_lorentzian_plot(event_idx, data):
+def create_column_lorentz_plot(event_idx, data):
     """
-    Create a plot showing the column Lorentzian fit for a specific event.
+    Create a plot showing the column Lorentz fit for a specific event.
     
     Returns:
         fig, success_flag
     """
     try:
         # Extract column data
-        y_positions, charges, valid_data = extract_column_data(event_idx, data)
+        y_poss, charges, valid_data = extract_column_data(event_idx, data)
         
         if not valid_data:
             return None, False
@@ -506,66 +506,66 @@ def create_column_lorentzian_plot(event_idx, data):
             else:
                 return 0.0
         
-        fit_center = get_param_value(data['LorentzFitColumnCenter'], event_idx)
-        fit_gamma = get_param_value(data['LorentzFitColumnGamma'], event_idx)
-        fit_amplitude = get_param_value(data['LorentzFitColumnAmplitude'], event_idx)
-        fit_offset = get_param_value(data['LorentzFitColumnVerticalOffset'], event_idx)
-        fit_center_err = get_param_value(data['LorentzFitColumnCenterErr'], event_idx)
-        fit_gamma_err = get_param_value(data['LorentzFitColumnGammaErr'], event_idx)
-        chi2_red = get_param_value(data['LorentzFitColumnChi2red'], event_idx)
-        dof = get_param_value(data['LorentzFitColumnDOF'], event_idx)
+        fit_center = get_param_value(data['LorentzColCenter'], event_idx)
+        fit_gamma = get_param_value(data['LorentzColGamma'], event_idx)
+        fit_amp = get_param_value(data['LorentzColAmp'], event_idx)
+        fit_offset = get_param_value(data['LorentzColVertOffset'], event_idx)
+        fit_center_err = get_param_value(data['LorentzColCenterErr'], event_idx)
+        fit_gamma_err = get_param_value(data['LorentzColGammaErr'], event_idx)
+        chi2_red = get_param_value(data['LorentzColChi2red'], event_idx)
+        dof = get_param_value(data['LorentzColDOF'], event_idx)
         
-        # Check if fit was successful (DOF > 0 indicates successful fit)
+        # Check if fit was success (DOF > 0 indicates success fit)
         if dof <= 0:
             return None, False
         
-        # Get true position
+        # Get true pos
         true_y = get_param_value(data['TrueY'], event_idx)
         
-        # Calculate uncertainties
+        # Calc uncertainties
         uncertainties = get_stored_charge_uncertainties(event_idx, data, 'column')
         # Create array of uncertainties - same value for all data points
         uncertainties = np.full_like(charges, uncertainties)
         
-        # Calculate fitted curve and residuals
-        fitted_charges = lorentzian_1d(y_positions, fit_amplitude, fit_center, fit_gamma, fit_offset)
+        # Calc fitted curve and residuals
+        fitted_charges = lorentz_1d(y_poss, fit_amp, fit_center, fit_gamma, fit_offset)
         residuals = charges - fitted_charges
         
         # Create figure with two panels
         fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6))
         
         # Determine plot range
-        y_min, y_max = y_positions.min() - 0.3, y_positions.max() + 0.3
+        y_min, y_max = y_poss.min() - 0.3, y_poss.max() + 0.3
         
         # LEFT PANEL: Residuals
-        ax_left.errorbar(y_positions, residuals, yerr=uncertainties,
+        ax_left.errorbar(y_poss, residuals, yerr=uncertainties,
                         fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                         elinewidth=1.5, alpha=0.8, label='Data')
         ax_left.axhline(y=0, color='blue', linestyle='--', linewidth=2, alpha=0.8)
         ax_left.set_xlim(y_min, y_max)
         ax_left.set_xlabel('y_pixel (mm)', fontsize=14)
         ax_left.set_ylabel('Q_pixel - Q_fit (C)', fontsize=14)
-        ax_left.set_title(f'Event {event_idx}: Column Lorentzian Residuals', fontsize=14, pad=20)
+        ax_left.set_title(f'Event {event_idx}: Col Lorentz Residuals', fontsize=14, pad=20)
         ax_left.grid(True, alpha=0.3, linewidth=0.8)
         
         # RIGHT PANEL: Data and fitted curve
-        ax_right.errorbar(y_positions, charges, yerr=uncertainties,
+        ax_right.errorbar(y_poss, charges, yerr=uncertainties,
                          fmt='ko', markersize=8, capsize=4, capthick=1.5, 
                          elinewidth=1.5, alpha=0.8, label='Data Points')
         
-        # Plot fitted Lorentzian curve
+        # Plot fitted Lorentz curve
         y_fit_range = np.linspace(y_min, y_max, 200)
-        y_fit = lorentzian_1d(y_fit_range, fit_amplitude, fit_center, fit_gamma, fit_offset)
-        ax_right.plot(y_fit_range, y_fit, 'b-', linewidth=3, label='Lorentzian Fit')
+        y_fit = lorentz_1d(y_fit_range, fit_amp, fit_center, fit_gamma, fit_offset)
+        ax_right.plot(y_fit_range, y_fit, 'b-', linewidth=3, label='Lorentz ')
         
-        # Mark true and fitted positions
+        # Mark true and fitted poss
         ax_right.axvline(true_y, color='green', linestyle='--', linewidth=3, alpha=0.8, label='y_true')
         ax_right.axvline(fit_center, color='blue', linestyle=':', linewidth=3, alpha=0.8, label='y_fit')
         
         ax_right.set_xlim(y_min, y_max)
         ax_right.set_xlabel('y_pixel (mm)', fontsize=14)
         ax_right.set_ylabel('Q_pixel (C)', fontsize=14)
-        ax_right.set_title(f'Event {event_idx}: Column Lorentzian Fit', fontsize=14, pad=20)
+        ax_right.set_title(f'Event {event_idx}: Col Lorentz ', fontsize=14, pad=20)
         ax_right.grid(True, alpha=0.3, linewidth=0.8)
         
         # Add fit information as text box
@@ -614,9 +614,9 @@ def _create_plot_worker(args):
             data[key] = value
         
         if plot_type == 'row':
-            fig, success = create_row_lorentzian_plot(event_idx, data)
+            fig, success = create_row_lorentz_plot(event_idx, data)
         elif plot_type == 'column':
-            fig, success = create_column_lorentzian_plot(event_idx, data)
+            fig, success = create_column_lorentz_plot(event_idx, data)
         else:
             return event_idx, None, False
         
@@ -647,15 +647,15 @@ def _prepare_data_subset(data, event_idx):
     # List of all keys we need for plotting
     keys_needed = [
         'TrueX', 'TrueY', 'PixelX', 'PixelY', 'IsPixelHit',
-        'GridNeighborhoodCharges', 'PixelSpacing',
-        'LorentzFitRowCenter', 'LorentzFitRowGamma', 'LorentzFitRowAmplitude', 
-        'LorentzFitRowVerticalOffset', 'LorentzFitRowCenterErr', 'LorentzFitRowGammaErr',
-        'LorentzFitRowAmplitudeErr', 'LorentzFitRowChi2red', 'LorentzFitRowDOF',
-        'LorentzFitRowChargeUncertainty',
-        'LorentzFitColumnCenter', 'LorentzFitColumnGamma', 'LorentzFitColumnAmplitude',
-        'LorentzFitColumnVerticalOffset', 'LorentzFitColumnCenterErr', 'LorentzFitColumnGammaErr',
-        'LorentzFitColumnAmplitudeErr', 'LorentzFitColumnChi2red', 'LorentzFitColumnDOF',
-        'LorentzFitColumnChargeUncertainty'
+        'NeighborhoodCharges', 'PixelSpacing',
+        'LorentzRowCenter', 'LorentzRowGamma', 'LorentzRowAmp', 
+        'LorentzRowVertOffset', 'LorentzRowCenterErr', 'LorentzRowGammaErr',
+        'LorentzRowAmpErr', 'LorentzRowChi2red', 'LorentzRowDOF',
+        'LorentzRowChargeErr',
+        'LorentzColCenter', 'LorentzColGamma', 'LorentzColAmp',
+        'LorentzColVertOffset', 'LorentzColCenterErr', 'LorentzColGammaErr',
+        'LorentzColAmpErr', 'LorentzColChi2red', 'LorentzColDOF',
+        'LorentzColChargeErr'
     ]
     
     for key in keys_needed:
@@ -667,9 +667,9 @@ def _prepare_data_subset(data, event_idx):
     
     return subset
 
-def create_lorentzian_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
+def create_lorentz_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
     """
-    Create PDF files with Gaussian fits visualization using parallel processing.
+    Create PDF files with Gauss fits visualization using parallel processing.
     
     Args:
         data: Data dictionary from ROOT file
@@ -694,20 +694,20 @@ def create_lorentzian_fit_pdfs(data, output_dir="plots", max_events=None, n_work
     # Set batch size for processing
     batch_size = max(50, n_workers * 10)  # Process in batches to manage memory
     
-    print(f"Creating Lorentzian fit visualizations for {n_events} events using {n_workers} workers")
+    print(f"Creating Lorentz fit visualizations for {n_events} events using {n_workers} workers")
     
     # Create output paths
-    x_pdf_path = os.path.join(output_dir, "lorentzian_fits_row.pdf")
-    y_pdf_path = os.path.join(output_dir, "lorentzian_fits_column.pdf")
+    x_pdf_path = os.path.join(output_dir, "lorentz_fits_row.pdf")
+    y_pdf_path = os.path.join(output_dir, "lorentz_fits_column.pdf")
     
-    # Pre-filter events with successful fits to avoid processing invalid events
+    # Pre-filter events with success fits to avoid processing invalid events
     row_valid_events = []
     col_valid_events = []
     
     for event_idx in range(n_events):
-        if data['LorentzFitRowDOF'][event_idx] > 0:
+        if data['LorentzRowDOF'][event_idx] > 0:
             row_valid_events.append(event_idx)
-        if data['LorentzFitColumnDOF'][event_idx] > 0:
+        if data['LorentzColDOF'][event_idx] > 0:
             col_valid_events.append(event_idx)
     
     print(f"Found {len(row_valid_events)} valid row fits and {len(col_valid_events)} valid column fits")
@@ -715,7 +715,7 @@ def create_lorentzian_fit_pdfs(data, output_dir="plots", max_events=None, n_work
     # Pre-calculate grid size to avoid repeated calculations
     if len(row_valid_events) > 0 or len(col_valid_events) > 0:
         sample_event = row_valid_events[0] if row_valid_events else col_valid_events[0]
-        sample_grid = np.array(data['GridNeighborhoodCharges'][sample_event])
+        sample_grid = np.array(data['NeighborhoodCharges'][sample_event])
         grid_size = int(np.sqrt(len(sample_grid))) if len(sample_grid) > 0 else 9
         print(f"Detected grid size: {grid_size}x{grid_size}")
     else:
@@ -726,7 +726,7 @@ def create_lorentzian_fit_pdfs(data, output_dir="plots", max_events=None, n_work
     
     # Process row fits
     if row_valid_events:
-        print("Creating row Lorentzian fits PDF...")
+        print("Creating row Lorentz fits PDF...")
         
         # Prepare arguments for parallel processing
         row_args = []
@@ -772,7 +772,7 @@ def create_lorentzian_fit_pdfs(data, output_dir="plots", max_events=None, n_work
     
     # Process column fits
     if col_valid_events:
-        print("Creating column Lorentzian fits PDF...")
+        print("Creating column Lorentz fits PDF...")
         
         # Prepare arguments for parallel processing
         col_args = []
@@ -819,8 +819,8 @@ def create_lorentzian_fit_pdfs(data, output_dir="plots", max_events=None, n_work
     print(f"PDF generation completed!")
     print(f"  Row fits visualized: {x_success_count}")
     print(f"  Row PDF saved to: {x_pdf_path}")
-    print(f"  Column fits visualized: {y_success_count}")
-    print(f"  Column PDF saved to: {y_pdf_path}")
+    print(f"  Col fits visualized: {y_success_count}")
+    print(f"  Col PDF saved to: {y_pdf_path}")
     
     return x_success_count, y_success_count
 
@@ -839,10 +839,10 @@ def inspect_root_file(root_file):
         
         print(f"\nTree 'Hits' contains {len(branches)} branches:")
         
-        # Show Gaussian fitting branches
-        gaussian_branches = [b for b in branches if 'GaussFit' in b]
-        print(f"\nGaussian fitting branches ({len(gaussian_branches)}):")
-        for i, branch in enumerate(sorted(gaussian_branches)):
+        # Show Gauss fitting branches
+        gauss_branches = [b for b in branches if 'Gauss' in b]
+        print(f"\nGauss fitting branches ({len(gauss_branches)}):")
+        for i, branch in enumerate(sorted(gauss_branches)):
             print(f"  {i+1:2d}: {branch}")
         
         # Show grid data branches
@@ -861,16 +861,16 @@ def inspect_root_file(root_file):
         print(f"  Non-pixel hits: {n_non_pixel} ({100*n_non_pixel/n_events:.1f}%)")
         print(f"  Pixel hits: {n_events - n_non_pixel} ({100*(n_events - n_non_pixel)/n_events:.1f}%)")
         
-        # Check for successful fits
-        if 'LorentzFitRowDOF' in branches:
-            row_dof = tree['LorentzFitRowDOF'].array(library="np")
-            successful_row_fits = np.sum(row_dof > 0)
-            print(f"  Successful row fits: {successful_row_fits} ({100*successful_row_fits/n_events:.1f}%)")
+        # Check for success fits
+        if 'LorentzRowDOF' in branches:
+            row_dof = tree['LorentzRowDOF'].array(library="np")
+            success_row_fits = np.sum(row_dof > 0)
+            print(f"  Success row fits: {success_row_fits} ({100*success_row_fits/n_events:.1f}%)")
         
-        if 'LorentzFitColumnDOF' in branches:
-            col_dof = tree['LorentzFitColumnDOF'].array(library="np")
-            successful_col_fits = np.sum(col_dof > 0)
-            print(f"  Successful column fits: {successful_col_fits} ({100*successful_col_fits/n_events:.1f}%)")
+        if 'LorentzColDOF' in branches:
+            col_dof = tree['LorentzColDOF'].array(library="np")
+            success_col_fits = np.sum(col_dof > 0)
+            print(f"  Success column fits: {success_col_fits} ({100*success_col_fits/n_events:.1f}%)")
         
     except Exception as e:
         print(f"Error inspecting ROOT file: {e}")
@@ -878,11 +878,11 @@ def inspect_root_file(root_file):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Visualize Lorentzian fits from GEANT4 charge sharing simulation ROOT files",
+        description="Visualize Lorentz fits from GEANT4 charge sharing simulation ROOT files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("root_file", help="Path to ROOT file from GEANT4 simulation")
-    parser.add_argument("-o", "--output", default="lorentzian_fits", 
+    parser.add_argument("-o", "--output", default="lorentz_fits", 
                        help="Output directory for PDF files")
     parser.add_argument("-n", "--num_events", type=int, default=None,
                        help="Maximum number of events to process (default: all events)")
@@ -911,20 +911,20 @@ def main():
         print("Failed to load data. Exiting.")
         return 1
     
-    # Check if we have Lorentzian fitting data
+    # Check if we have Lorentz fitting data
     n_events = len(data['TrueX'])
     if n_events == 0:
         print("No events found in the data!")
         return 1
     
-    # Count successful fits
-    row_successful = np.sum(data['LorentzFitRowDOF'] > 0)
-    col_successful = np.sum(data['LorentzFitColumnDOF'] > 0)
+    # Count success fits
+    row_success = np.sum(data['LorentzRowDOF'] > 0)
+    col_success = np.sum(data['LorentzColDOF'] > 0)
     
-    print(f"Found {row_successful} successful row fits and {col_successful} successful column fits")
+    print(f"Found {row_success} success row fits and {col_success} success column fits")
     
-    if row_successful == 0 and col_successful == 0:
-        print("No successful Lorentzian fits found in the data!")
+    if row_success == 0 and col_success == 0:
+        print("No success Lorentz fits found in the data!")
         return 1
     
     # Create output directory
@@ -932,13 +932,13 @@ def main():
     print(f"Output directory: {args.output}")
     
     # Create PDF visualizations
-    x_success, y_success = create_lorentzian_fit_pdfs(
+    x_success, y_success = create_lorentz_fit_pdfs(
         data, args.output, args.num_events, args.workers
     )
     
     print(f"\nVisualization completed!")
     print(f"  Row fits visualized: {x_success}")
-    print(f"  Column fits visualized: {y_success}")
+    print(f"  Col fits visualized: {y_success}")
     
     return 0
 

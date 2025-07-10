@@ -50,25 +50,25 @@ def modify_constants_file(enable_uncertainties=True):
         content = f.read()
     
     # Replace the line
-    old_line = "const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = true;"
-    new_line = f"const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = {'true' if enable_uncertainties else 'false'};"
+    old_line = "const G4bool ENABLE_VERT_CHARGE_ERR = true;"
+    new_line = f"const G4bool ENABLE_VERT_CHARGE_ERR = {'true' if enable_uncertainties else 'false'};"
     
     if old_line in content:
         content = content.replace(old_line, new_line)
     else:
         # Try the false version too
-        old_line_false = "const G4bool ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = false;"
+        old_line_false = "const G4bool ENABLE_VERT_CHARGE_ERR = false;"
         if old_line_false in content:
             content = content.replace(old_line_false, new_line)
         else:
-            print("Error: Could not find ENABLE_VERTICAL_CHARGE_UNCERTAINTIES line to modify!")
+            print("Error: Could not find ENABLE_VERT_CHARGE_ERR line to modify!")
             return False
     
     # Write back
     with open(constants_file, 'w') as f:
         f.write(content)
     
-    print(f"✓ Set ENABLE_VERTICAL_CHARGE_UNCERTAINTIES = {'true' if enable_uncertainties else 'false'}")
+    print(f"✓ Set ENABLE_VERT_CHARGE_ERR = {'true' if enable_uncertainties else 'false'}")
     return True
 
 def build_project():
@@ -98,7 +98,7 @@ def build_project():
             print(f"Make failed: {result.stderr}")
             return False
         
-        print("✓ Build successful")
+        print("✓ Build success")
         return True
         
     except Exception as e:
@@ -153,7 +153,7 @@ def run_simulation(output_dir, macro_file=None):
         print(f"Simulation completed in {duration:.1f} seconds")
         
         if result.returncode == 0:
-            print("✓ Simulation successful")
+            print("✓ Simulation success")
             return True
         else:
             print(f"✗ Simulation failed with return code {result.returncode}")
