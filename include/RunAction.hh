@@ -44,7 +44,7 @@ public:
     void PerformAutoSave();
     
     // Variables for the branch (edep [MeV], positions [mm])
-    void SetEventData(G4double edep, G4double x, G4double y);
+    void SetEventData(G4double edep, G4double x, G4double y, G4double z);
     
     // Method to set initial particle gun position [mm]
     void SetInitialPosition(G4double x, G4double y, G4double z);

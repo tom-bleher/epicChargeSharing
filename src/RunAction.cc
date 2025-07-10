@@ -1233,12 +1233,11 @@ void RunAction::SetInitialPosition(G4double x, G4double y, G4double z)
     fInitZ = z;
 }
 
-void RunAction::SetNearestPixelPosition(G4double x, G4double y, G4double z) 
+void RunAction::SetNearestPixelPosition(G4double x, G4double y) 
 {
     // Store positions in mm (Geant4 internal length unit is mm)
     fPixelX = x;
     fPixelY = y;
-    fPixelZ = z;
 }
 
 void RunAction::SetInitialEnergy(G4double energy) 
