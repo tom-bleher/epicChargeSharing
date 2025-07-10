@@ -129,11 +129,8 @@ void EventAction::EndOfEventAction(const G4Event* event)
   G4double finalEdep = fEdep;
   if (isPixelHit) {
     finalEdep = 0.0; // Set to zero for pixel hits (per user requirement)
-    // G4cout << "EventAction: Setting energy deposition to zero for pixel hit (event " << eventID << ")" << G4endl;
   } else {
     // For non-pixel hits, use the energy deposited inside the detector (already accumulated in fEdep from SteppingAction)
-    // G4cout << "EventAction: Using detector energy deposition " << finalEdep/MeV 
-    //        << " MeV for non-pixel hit (event " << eventID << ")" << G4endl;
   }
   
   // Pass classification data to RunAction
@@ -234,7 +231,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
         false); // enable_outlier_filtering
       
       if (fitResults.fit_success) {
-        // Removed verbose debug output for cleaner simulation logs
       }
       
       // Pass 2D fit results to RunAction
@@ -267,7 +263,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // enable_outlier_filtering
         
         if (diagResults.fit_success) {
-          // Removed verbose debug output for cleaner simulation logs
         }
         
         // Pass diagonal fit results to RunAction
@@ -314,7 +309,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // enable_outlier_filtering
         
         if (lorentzResults.fit_success) {
-          // Removed verbose debug output for cleaner simulation logs
         }
         
         // Pass 2D Lorentz fit results to RunAction
@@ -349,7 +343,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // enable_outlier_filtering
         
         if (lorentzDiagResults.fit_success) {
-          // Removed verbose debug output for cleaner simulation logs
         }
         
         // Pass diagonal Lorentz fit results to RunAction
@@ -417,7 +410,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // enable_outlier_filtering
         
         if (powerLorentzResults.fit_success) {
-          // Removed verbose debug output for cleaner simulation logs
         }
         
         // Pass 2D Power-Law Lorentz fit results to RunAction
@@ -450,7 +442,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // enable_outlier_filtering
         
         if (powerLorentzDiagResults.fit_success) {
-          // Removed verbose debug output for cleaner simulation logs
         }
         
         // Pass diagonal Power-Law Lorentz fit results to RunAction
@@ -517,7 +508,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // enable_outlier_filtering
         
         if (lorentz3DResults.fit_success) {
-          // Removed verbose debug output for cleaner simulation logs
         }
         
         // Pass 3D Lorentz fit results to RunAction
@@ -565,7 +555,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // enable_outlier_filtering
         
         if (gauss3DResults.fit_success) {
-          // Removed verbose debug output for cleaner simulation logs
         }
         
         // Pass 3D Gauss fit results to RunAction
@@ -613,7 +602,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
           false); // enable_outlier_filtering
         
         if (powerLorentz3DResults.fit_success) {
-          // Removed verbose debug output for cleaner simulation logs
         }
         
         // Pass 3D Power-Law Lorentz fit results to RunAction
@@ -687,9 +675,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
   } else {
     // Skip fitting due to conditions not met
     if (isPixelHit) {
-      // Removed verbose debug output for cleaner simulation logs
     } else if (fNeighborhoodChargeFractions.empty()) {
-      // Removed verbose debug output for cleaner simulation logs
     }
     
     // Set default values (no fitting performed or fitting is disabled)
