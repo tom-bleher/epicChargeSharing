@@ -55,9 +55,6 @@ public:
         fMaxAutoRadius = maxRadius; 
     }
     
-    // NEW METHOD: Find pixel with maximum charge in a larger neighborhood
-    std::pair<G4int, G4int> FindMaximumChargePixel(const G4ThreeVector& hitPosition, G4int searchRadius);
-    
 private:
     RunAction* fRunAction;
     DetectorConstruction* fDetector;

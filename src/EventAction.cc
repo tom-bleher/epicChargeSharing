@@ -113,7 +113,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
   }
   
-  // Calculate and store nearest pixel position FIRST (this calculates fActualPixelDistance)
+  // Calculate and store nearest pixel position (this calculates fActualPixelDistance)
   G4ThreeVector nearestPixel = CalculateNearestPixel(fPosition);
   
   // Calculate and pass pixel angular size to RunAction
@@ -141,8 +141,11 @@ void EventAction::EndOfEventAction(const G4Event* event)
   fRunAction->SetPixelHitStatus(isPixelHit);
   
   // Update the event data with the corrected energy deposition
-  fRunAction->SetEventData(finalEdep, fPosition.x(), fPosition.y());
+  fRunAction->SetEventData(finalEdep, fPosition.x(), fPosition.y(), fPosition.z());
   fRunAction->SetInitialPosition(fInitialPosition.x(), fInitialPosition.y(), fInitialPosition.z());
+  
+  // Set nearest pixel position in RunAction  
+  fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y());
   
   // Only calculate and store pixel-specific data for pixel hits (on pixel surface)
   if (isPixelHit) {
@@ -153,36 +156,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     fNonPixel_GridNeighborhoodDistances.clear();
     fNonPixel_GridNeighborhoodCharge.clear();
   } else {
-    // Non-pixel hit: Find maximum charge pixel and use it as neighborhood center
-    G4int searchRadius = fNeighborhoodRadius + 2; // Search in a larger area
-    std::pair<G4int, G4int> maxChargePixel = FindMaximumChargePixel(fPosition, searchRadius);
-    
-    // Update the pixel indices to use the maximum charge pixel as center
-    fPixelIndexI = maxChargePixel.first;
-    fPixelIndexJ = maxChargePixel.second;
-    
-    // Recalculate the nearest pixel position based on the new center
-    G4double pixelSize = fDetector->GetPixelSize();
-    G4double pixelSpacing = fDetector->GetPixelSpacing();
-    G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
-    G4double detSize = fDetector->GetDetSize();
-    G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
-    
-    G4double newPixelX = firstPixelPos + fPixelIndexI * pixelSpacing;
-    G4double newPixelY = firstPixelPos + fPixelIndexJ * pixelSpacing;
-    G4ThreeVector detectorPosition = fDetector->GetDetectorPosition();
-    
-    // Update nearestPixel to the new center
-    nearestPixel = G4ThreeVector(newPixelX, newPixelY);
-    
-    // Recalculate distances and deltas based on the new center
-    G4double dx = fPosition.x() - newPixelX;
-    G4double dy = fPosition.y() - newPixelY;
-    fActualPixelDistance = std::sqrt(dx*dx + dy*dy);
-    fPixelTrueDeltaX = newPixelX - fPosition.x();
-    fPixelTrueDeltaY = newPixelY - fPosition.y();
-    
-    // Determine optimal radius and calculate neighborhood grid data
+    // Non-pixel hit: determine optimal radius and calculate neighborhood grid data
     if (fAutoRadiusEnabled) {
       // Perform automatic radius selection based on fit quality
       fSelectedRadius = SelectOptimalRadius(fPosition, fPixelIndexI, fPixelIndexJ);
@@ -196,7 +170,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       fSelectedFitQuality = 0.0; // Not evaluated
     }
     
-    // Calculate neighborhood grid data with selected radius around the maximum charge pixel
+    // Calculate neighborhood grid data with selected radius
     CalculateNeighborhoodGridAngles(fPosition, fPixelIndexI, fPixelIndexJ);
     CalculateNeighborhoodChargeSharing();
   }
@@ -207,9 +181,6 @@ void EventAction::EndOfEventAction(const G4Event* event)
   
   // Pass automatic radius selection results to RunAction
   fRunAction->SetAutoRadiusResults(fSelectedRadius);
-  
-  // Set nearest pixel position in RunAction (updated to use maximum charge pixel center)
-  fRunAction->SetNearestPixelPosition(nearestPixel.x(), nearestPixel.y());
   
   // Perform 2D Gaussian fitting on charge distribution data (central row and column)
   // Only fit for non-pixel hits (not on pixel surface)
@@ -1364,117 +1335,4 @@ G4double EventAction::EvaluateFitQuality(G4int radius, const G4ThreeVector& hitP
   fNonPixel_GridNeighborhoodCharge = tempCharge;
   
   return fitQuality;
-}
-
-// Find pixel with maximum charge in a larger neighborhood around the hit
-std::pair<G4int, G4int> EventAction::FindMaximumChargePixel(const G4ThreeVector& hitPosition, G4int searchRadius)
-{
-  // Check if no energy was deposited
-  if (fEdep <= 0) {
-    // Return the closest pixel if no energy
-    return std::make_pair(fPixelIndexI, fPixelIndexJ);
-  }
-  
-  // Check if hit is inside a pixel - if so, return the hit pixel
-  G4bool isInsidePixel = fDetector->IsPositionOnPixel(hitPosition);
-  if (isInsidePixel) {
-    return std::make_pair(fPixelIndexI, fPixelIndexJ);
-  }
-  
-  // Convert energy deposit to number of electrons and apply amplification
-  G4double edepInEV = fEdep * MeV / eV;
-  G4double numElectrons = edepInEV / fIonizationEnergy;
-  G4double totalCharge = numElectrons * fAmplificationFactor;
-  
-  // Get detector parameters
-  G4double pixelSize = fDetector->GetPixelSize();
-  G4double pixelSpacing = fDetector->GetPixelSpacing();
-  G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
-  G4double detSize = fDetector->GetDetSize();
-  G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
-  
-  // Calculate the first pixel position (corner)
-  G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
-  
-  // D0 constant for charge sharing formula
-  G4double d0_mm = fD0 * micrometer / mm;
-  
-  // Variables to track maximum charge and its pixel
-  G4double maxCharge = 0.0;
-  G4int maxChargePixelI = fPixelIndexI;
-  G4int maxChargePixelJ = fPixelIndexJ;
-  
-  // First pass: collect weights for all pixels in the search radius
-  std::vector<G4double> weights;
-  std::vector<G4int> pixelIs;
-  std::vector<G4int> pixelJs;
-  
-  for (G4int di = -searchRadius; di <= searchRadius; di++) {
-    for (G4int dj = -searchRadius; dj <= searchRadius; dj++) {
-      G4int gridPixelI = fPixelIndexI + di;
-      G4int gridPixelJ = fPixelIndexJ + dj;
-      
-      // Check if this pixel is within the detector bounds
-      if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
-          gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
-        continue;
-      }
-      
-      // Calculate the center position of this grid pixel
-      G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
-      G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
-      
-      // Calculate the distance from the hit to the pixel center
-      G4double dx = hitPosition.x() - pixelCenterX;
-      G4double dy = hitPosition.y() - pixelCenterY;
-      G4double distance = std::sqrt(dx*dx + dy*dy);
-      
-      // Calculate the alpha angle for this pixel
-      G4double alpha = CalculatePixelAlphaSubtended(hitPosition.x(), hitPosition.y(), 
-                                                   pixelCenterX, pixelCenterY, 
-                                                   pixelSize, pixelSize);
-      
-      // Calculate weight according to the charge sharing formula
-      G4double weight = 0.0;
-      if (distance > d0_mm) {
-        G4double logArg = distance / d0_mm;
-        G4double logValue = std::log(logArg);
-        logValue = std::max(logValue, Constants::MIN_LOG_VALUE);
-        weight = alpha * (1.0 / logValue);
-      } else if (distance > 0) {
-        weight = alpha * Constants::ALPHA_WEIGHT_MULTIPLIER;
-      } else {
-        weight = alpha * Constants::ALPHA_WEIGHT_MULTIPLIER;
-      }
-      
-      weights.push_back(weight);
-      pixelIs.push_back(gridPixelI);
-      pixelJs.push_back(gridPixelJ);
-    }
-  }
-  
-  // Calculate total weight
-  G4double totalWeight = 0.0;
-  for (G4double weight : weights) {
-    totalWeight += weight;
-  }
-  
-  // Second pass: calculate charge for each pixel and find maximum
-  if (totalWeight > 0) {
-    for (size_t i = 0; i < weights.size(); ++i) {
-      G4double chargeFraction = weights[i] / totalWeight;
-      G4double chargeValue = chargeFraction * totalCharge;
-      
-      if (chargeValue > maxCharge) {
-        maxCharge = chargeValue;
-        maxChargePixelI = pixelIs[i];
-        maxChargePixelJ = pixelJs[i];
-      }
-    }
-  }
-  
-  G4cout << "EventAction: Maximum charge pixel found at (" << maxChargePixelI << ", " << maxChargePixelJ << ") "
-         << "with charge " << maxCharge * fElementaryCharge << " C (original center was (" << fPixelIndexI << ", " << fPixelIndexJ << "))" << G4endl;
-  
-  return std::make_pair(maxChargePixelI, maxChargePixelJ);
 }
