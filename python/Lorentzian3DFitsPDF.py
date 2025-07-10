@@ -1,13 +1,13 @@
 """
-ROOT File 3D Gaussian Fits Visualization Tool
+ROOT File 3D Lorentzian Fits Visualization Tool
 
 This tool reads ROOT output files from the GEANT4 charge sharing simulation
-and creates PDF visualizations of the pre-computed 3D Gaussian surface fits.
+and creates PDF visualizations of the pre-computed 3D Lorentzian surface fits.
 
 Key features:
 1. Reads actual simulation data from ROOT files using uproot
-2. Extracts neighborhood charge distributions and fitted 3D Gaussian parameters  
-3. Creates 3D surface plots with fitted Gaussian surfaces and residuals
+2. Extracts neighborhood charge distributions and fitted 3D Lorentzian parameters  
+3. Creates 3D surface plots with fitted Lorentzian surfaces and residuals
 4. Creates comprehensive PDF reports for analysis verification
 5. NO synthetic data or fitting - only visualization of existing results
 6. OPTIMIZED for parallel processing with multithreading support
@@ -133,26 +133,26 @@ def load_root_data(root_file, max_entries=None):
         # Neighborhood grid data
         data['GridNeighborhoodCharges'] = tree['GridNeighborhoodCharges'].array(library="np", entry_stop=max_entries)
         
-        # 3D Gaussian fit results
-        data['GaussFit3DAmplitude'] = tree['3DGaussianFitAmplitude'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DCenterX'] = tree['3DGaussianFitCenterX'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DCenterY'] = tree['3DGaussianFitCenterY'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DSigmaX'] = tree['3DGaussianFitSigmaX'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DSigmaY'] = tree['3DGaussianFitSigmaY'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DVerticalOffset'] = tree['3DGaussianFitVerticalOffset'].array(library="np", entry_stop=max_entries)
+        # 3D Lorentzian fit results
+        data['LorentzFit3DAmplitude'] = tree['3DLorentzianFitAmplitude'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DCenterX'] = tree['3DLorentzianFitCenterX'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DCenterY'] = tree['3DLorentzianFitCenterY'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DGammaX'] = tree['3DLorentzianFitGammaX'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DGammaY'] = tree['3DLorentzianFitGammaY'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DVerticalOffset'] = tree['3DLorentzianFitVerticalOffset'].array(library="np", entry_stop=max_entries)
         
         # Error estimates
-        data['GaussFit3DAmplitudeErr'] = tree['3DGaussianFitAmplitudeErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DCenterXErr'] = tree['3DGaussianFitCenterXErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DCenterYErr'] = tree['3DGaussianFitCenterYErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DSigmaXErr'] = tree['3DGaussianFitSigmaXErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DSigmaYErr'] = tree['3DGaussianFitSigmaYErr'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DVerticalOffsetErr'] = tree['3DGaussianFitVerticalOffsetErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DAmplitudeErr'] = tree['3DLorentzianFitAmplitudeErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DCenterXErr'] = tree['3DLorentzianFitCenterXErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DCenterYErr'] = tree['3DLorentzianFitCenterYErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DGammaXErr'] = tree['3DLorentzianFitGammaXErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DGammaYErr'] = tree['3DLorentzianFitGammaYErr'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DVerticalOffsetErr'] = tree['3DLorentzianFitVerticalOffsetErr'].array(library="np", entry_stop=max_entries)
         
         # Fit quality metrics
-        data['GaussFit3DChi2red'] = tree['3DGaussianFitChi2red'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DDOF'] = tree['3DGaussianFitDOF'].array(library="np", entry_stop=max_entries)
-        data['GaussFit3DChargeUncertainty'] = tree['3DGaussianFitChargeUncertainty'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DChi2red'] = tree['3DLorentzianFitChi2red'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DDOF'] = tree['3DLorentzianFitDOF'].array(library="np", entry_stop=max_entries)
+        data['LorentzFit3DChargeUncertainty'] = tree['3DLorentzianFitChargeUncertainty'].array(library="np", entry_stop=max_entries)
         
         # Try to load detector grid parameters from metadata
         try:
@@ -191,7 +191,7 @@ def extract_3d_data(event_idx, data, grid_size=None):
     Extract 3D surface data for a specific event.
     
     Args:
-        event_idx: Event index (ignored if data is already subset)
+        event_idx: Event index (0 if data is already subset to single event)
         data: Full data dictionary or single-event data subset
         grid_size: Size of neighborhood grid (auto-detected if None)
     
@@ -200,29 +200,32 @@ def extract_3d_data(event_idx, data, grid_size=None):
     """
     try:
         # Get neighborhood data for this event
-        # Check if data is already subset to single event or is full dataset
         grid_data = data['GridNeighborhoodCharges']
         
-        # Check the data structure
-        if hasattr(grid_data, '__len__') and len(grid_data) > event_idx:
-            # This should be the full dataset case
-            raw_grid = grid_data[event_idx]
-            
-            # Convert to numpy array if needed
-            if hasattr(raw_grid, '__len__'):
-                grid_charges = np.array(raw_grid)
+        # Detect if this is subset data (scalar/single values) or full dataset (arrays)
+        pixel_x_data = data['PixelX']
+        is_subset_data = np.isscalar(pixel_x_data) or (hasattr(pixel_x_data, '__len__') and len(pixel_x_data) == 1)
+        
+        if is_subset_data:
+            # Single event data (already subset) - use scalar values directly
+            if hasattr(grid_data, '__len__'):
+                grid_charges = np.array(grid_data)
             else:
                 return None, None, None, False
-                
-            pixel_x = data['PixelX'][event_idx]
-            pixel_y = data['PixelY'][event_idx]
-        elif isinstance(grid_data, np.ndarray) and grid_data.ndim == 1:
-            # Single event data (already subset)
-            grid_charges = grid_data
-            pixel_x = data['PixelX']
-            pixel_y = data['PixelY']
+            pixel_x = float(pixel_x_data) if np.isscalar(pixel_x_data) else float(pixel_x_data[0])
+            pixel_y = float(data['PixelY']) if np.isscalar(data['PixelY']) else float(data['PixelY'][0])
         else:
-            return None, None, None, False
+            # Full dataset case - index with event_idx
+            if hasattr(grid_data, '__len__') and len(grid_data) > event_idx:
+                raw_grid = grid_data[event_idx]
+                if hasattr(raw_grid, '__len__'):
+                    grid_charges = np.array(raw_grid)
+                else:
+                    return None, None, None, False
+                pixel_x = data['PixelX'][event_idx]
+                pixel_y = data['PixelY'][event_idx]
+            else:
+                return None, None, None, False
         
         if len(grid_charges) == 0:
             return None, None, None, False
@@ -265,15 +268,17 @@ def extract_3d_data(event_idx, data, grid_size=None):
     except Exception as e:
         return None, None, None, False
 
-def gaussian_3d(x, y, amplitude, center_x, center_y, sigma_x, sigma_y, offset):
+def lorentzian_3d(x, y, amplitude, center_x, center_y, gamma_x, gamma_y, offset):
     """
-    3D Gaussian function for plotting fitted surfaces.
-    z(x,y) = A * exp(-((x - mx)^2 / (2 * σx^2) + (y - my)^2 / (2 * σy^2))) + B
+    3D Lorentzian function for plotting fitted surfaces.
+    z(x,y) = A / (1 + ((x - mx) / γx)^2 + ((y - my) / γy)^2) + B
     """
     dx = x - center_x
     dy = y - center_y
-    exponent = -((dx**2) / (2 * sigma_x**2) + (dy**2) / (2 * sigma_y**2))
-    return amplitude * np.exp(exponent) + offset
+    normalized_dx = dx / gamma_x
+    normalized_dy = dy / gamma_y
+    denominator = 1.0 + normalized_dx**2 + normalized_dy**2
+    return amplitude / denominator + offset
 
 def get_stored_3d_charge_uncertainties(event_idx, data):
     """
@@ -286,7 +291,7 @@ def get_stored_3d_charge_uncertainties(event_idx, data):
     Returns:
         uncertainty: Single uncertainty value (5% of max charge for this event)
     """
-    uncertainty_data = data['GaussFit3DChargeUncertainty']
+    uncertainty_data = data['LorentzFit3DChargeUncertainty']
     
     # Handle both single event data and full dataset
     if np.isscalar(uncertainty_data):
@@ -300,14 +305,14 @@ def get_stored_3d_charge_uncertainties(event_idx, data):
     
     return uncertainty
 
-def create_3d_gaussian_plot(event_idx, data):
+def create_3d_lorentzian_plot(event_idx, data):
     """
-    Create a compact visualization of the 3D Gaussian fit for one event.
+    Create a compact visualization of the 3D Lorentzian fit for one event.
 
     The figure now contains ONLY TWO panels (vs. previous 4):
       1. Left  – 2-D scatter of residuals (Data − Fit) coloured by value,
                  making it immediately obvious where the fit under/over-estimates.
-      2. Right – 3-D surface plot of the fitted Gaussian overlaid with the
+      2. Right – 3-D surface plot of the fitted Lorentzian overlaid with the
                  measured charge distribution and markers for the true and
                  fitted hit positions.
 
@@ -326,29 +331,40 @@ def create_3d_gaussian_plot(event_idx, data):
             return None, False
         
         # Helper to seamlessly pick scalar or array value
+        # For subset data, param will be scalar. For full data, param will be array.
         def _get(param, idx, default=0.0):
             try:
                 if np.isscalar(param):
                     return float(param)
-                return float(param[idx]) if (hasattr(param, '__len__') and len(param) > idx) else default
+                elif hasattr(param, '__len__'):
+                    if len(param) == 1:
+                        # Single-element array from subset data
+                        return float(param[0])
+                    elif len(param) > idx:
+                        # Multi-element array from full dataset
+                        return float(param[idx])
+                    else:
+                        return default
+                else:
+                    return default
             except (TypeError, ValueError, IndexError):
                 return default
 
-        fit_amp = _get(data['GaussFit3DAmplitude'], event_idx)
-        fit_cx  = _get(data['GaussFit3DCenterX'],   event_idx)
-        fit_cy  = _get(data['GaussFit3DCenterY'],   event_idx)
-        fit_sx  = _get(data['GaussFit3DSigmaX'],    event_idx)
-        fit_sy  = _get(data['GaussFit3DSigmaY'],    event_idx)
-        fit_off = _get(data['GaussFit3DVerticalOffset'], event_idx)
+        fit_amp = _get(data['LorentzFit3DAmplitude'], event_idx)
+        fit_cx  = _get(data['LorentzFit3DCenterX'],   event_idx)
+        fit_cy  = _get(data['LorentzFit3DCenterY'],   event_idx)
+        fit_gx  = _get(data['LorentzFit3DGammaX'],    event_idx)
+        fit_gy  = _get(data['LorentzFit3DGammaY'],    event_idx)
+        fit_off = _get(data['LorentzFit3DVerticalOffset'], event_idx)
 
         # Retrieve uncertainties for displaying
-        fit_cx_err = _get(data['GaussFit3DCenterXErr'], event_idx)
-        fit_cy_err = _get(data['GaussFit3DCenterYErr'], event_idx)
-        fit_sx_err = _get(data['GaussFit3DSigmaXErr'],  event_idx)
-        fit_sy_err = _get(data['GaussFit3DSigmaYErr'],  event_idx)
+        fit_cx_err = _get(data['LorentzFit3DCenterXErr'], event_idx)
+        fit_cy_err = _get(data['LorentzFit3DCenterYErr'], event_idx)
+        fit_gx_err = _get(data['LorentzFit3DGammaXErr'],  event_idx)
+        fit_gy_err = _get(data['LorentzFit3DGammaYErr'],  event_idx)
         
-        chi2_red = _get(data['GaussFit3DChi2red'], event_idx)
-        dof      = _get(data['GaussFit3DDOF'],     event_idx)
+        chi2_red = _get(data['LorentzFit3DChi2red'], event_idx)
+        dof      = _get(data['LorentzFit3DDOF'],     event_idx)
         
         if dof <= 0:  # unsuccessful fit according to stored metadata
             return None, False
@@ -358,8 +374,8 @@ def create_3d_gaussian_plot(event_idx, data):
         true_y = _get(data['TrueY'], event_idx)
 
         # ----------------------------- Fit evaluation -----------------------------
-        fitted_charges = gaussian_3d(x_coords, y_coords,
-                                      fit_amp, fit_cx, fit_cy, fit_sx, fit_sy, fit_off)
+        fitted_charges = lorentzian_3d(x_coords, y_coords,
+                                        fit_amp, fit_cx, fit_cy, fit_gx, fit_gy, fit_off)
         residuals = charges - fitted_charges
         rms_res   = np.sqrt(np.mean(residuals**2))
 
@@ -416,7 +432,7 @@ def create_3d_gaussian_plot(event_idx, data):
         
         Xg, Yg = np.meshgrid(np.linspace(x_min, x_max, 60),
                              np.linspace(y_min, y_max, 60))
-        Zg = gaussian_3d(Xg, Yg, fit_amp, fit_cx, fit_cy, fit_sx, fit_sy, fit_off)
+        Zg = lorentzian_3d(Xg, Yg, fit_amp, fit_cx, fit_cy, fit_gx, fit_gy, fit_off)
         surf = ax_fit.plot_surface(Xg, Yg, Zg, cmap='viridis', alpha=0.6, linewidth=0)
         # Apply the same symmetric limits to the axes so the rendered view
         # exactly matches the generated grid extents.
@@ -440,7 +456,7 @@ def create_3d_gaussian_plot(event_idx, data):
         ax_fit.set_xlabel('X Position (mm)', fontsize=12)
         ax_fit.set_ylabel('Y Position (mm)', fontsize=12)
         ax_fit.set_zlabel('Charge (C)', fontsize=12)
-        ax_fit.set_title(f'Event {event_idx}: 3D Gaussian Surface Fit', fontsize=14, pad=15)
+        ax_fit.set_title(f'Event {event_idx}: 3D Lorentzian Surface Fit', fontsize=14, pad=15)
         # Use equal XY aspect and a balanced Z aspect for visual symmetry
         try:
             # Increase Z aspect so the 3-D axis occupies more vertical space.
@@ -462,11 +478,11 @@ def create_3d_gaussian_plot(event_idx, data):
             f"x_true = {true_x:.3f} mm\n"
             f"x_fit = {fit_cx:.3f} ± {fit_cx_err:.3f} mm\n"
             f"Δx = x_fit - x_true = {delta_x:.3f} mm\n"
-            f"σ_x = {fit_sx:.3f} ± {fit_sx_err:.3f} mm\n"
+            f"γ_x = {fit_gx:.3f} ± {fit_gx_err:.3f} mm\n"
             f"y_true = {true_y:.3f} mm\n"
             f"y_fit = {fit_cy:.3f} ± {fit_cy_err:.3f} mm\n"
             f"Δy = y_fit - y_true = {delta_y:.3f} mm\n"
-            f"σ_y = {fit_sy:.3f} ± {fit_sy_err:.3f} mm\n"
+            f"γ_y = {fit_gy:.3f} ± {fit_gy_err:.3f} mm\n"
             f"χ²/DOF = {chi2_red:.3f}\n"
             f"DOF = {dof}"
         )
@@ -481,12 +497,12 @@ def create_3d_gaussian_plot(event_idx, data):
         return fig, True
         
     except Exception as e:
-        print(f"Error creating 3D plot for event {event_idx}: {e}")
+        print(f"Error creating 3D Lorentzian plot for event {event_idx}: {e}")
         return None, False
 
-def _create_3d_plot_worker(args):
+def _create_3d_lorentzian_plot_worker(args):
     """
-    Worker function for parallel 3D plot generation.
+    Worker function for parallel 3D Lorentzian plot generation.
     
     Args:
         args: Tuple of (event_idx, data_subset)
@@ -507,7 +523,8 @@ def _create_3d_plot_worker(args):
         for key, value in data_subset.items():
             data[key] = value
         
-        fig, success = create_3d_gaussian_plot(event_idx, data)
+        # Use event_idx=0 since data is already subset to single event
+        fig, success = create_3d_lorentzian_plot(0, data)
         
         if success and fig is not None:
             return event_idx, fig, True
@@ -517,10 +534,12 @@ def _create_3d_plot_worker(args):
             return event_idx, None, False
             
     except Exception as e:
-        print(f"Error in 3D worker for event {event_idx}: {e}")
+        print(f"Error in 3D Lorentzian worker for event {event_idx}: {e}")
+        import traceback
+        traceback.print_exc()
         return event_idx, None, False
 
-def _prepare_3d_data_subset(data, event_idx):
+def _prepare_3d_lorentzian_data_subset(data, event_idx):
     """
     Prepare a minimal data subset for a single event to reduce memory overhead.
     
@@ -533,15 +552,15 @@ def _prepare_3d_data_subset(data, event_idx):
     """
     subset = {}
     
-    # List of all keys we need for 3D plotting
+    # List of all keys we need for 3D Lorentzian plotting
     keys_needed = [
         'TrueX', 'TrueY', 'PixelX', 'PixelY', 'IsPixelHit',
         'GridNeighborhoodCharges', 'PixelSpacing',
-        'GaussFit3DAmplitude', 'GaussFit3DCenterX', 'GaussFit3DCenterY',
-        'GaussFit3DSigmaX', 'GaussFit3DSigmaY', 'GaussFit3DVerticalOffset',
-        'GaussFit3DAmplitudeErr', 'GaussFit3DCenterXErr', 'GaussFit3DCenterYErr',
-        'GaussFit3DSigmaXErr', 'GaussFit3DSigmaYErr', 'GaussFit3DVerticalOffsetErr',
-        'GaussFit3DChi2red', 'GaussFit3DDOF', 'GaussFit3DChargeUncertainty'
+        'LorentzFit3DAmplitude', 'LorentzFit3DCenterX', 'LorentzFit3DCenterY',
+        'LorentzFit3DGammaX', 'LorentzFit3DGammaY', 'LorentzFit3DVerticalOffset',
+        'LorentzFit3DAmplitudeErr', 'LorentzFit3DCenterXErr', 'LorentzFit3DCenterYErr',
+        'LorentzFit3DGammaXErr', 'LorentzFit3DGammaYErr', 'LorentzFit3DVerticalOffsetErr',
+        'LorentzFit3DChi2red', 'LorentzFit3DDOF', 'LorentzFit3DChargeUncertainty'
     ]
     
     for key in keys_needed:
@@ -556,9 +575,9 @@ def _prepare_3d_data_subset(data, event_idx):
     
     return subset
 
-def create_3d_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
+def create_3d_lorentzian_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=None):
     """
-    Create PDF files with 3D Gaussian fits visualization using parallel processing.
+    Create PDF files with 3D Lorentzian fits visualization using parallel processing.
     
     Args:
         data: Data dictionary from ROOT file
@@ -580,22 +599,22 @@ def create_3d_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_wor
     if n_workers is None:
         n_workers = min(mp.cpu_count(), 8)  # Cap at 8 to avoid memory issues
     
-    print(f"Creating 3D Gaussian fit visualizations for {n_events} events using {n_workers} workers")
+    print(f"Creating 3D Lorentzian fit visualizations for {n_events} events using {n_workers} workers")
     
     # Create output path
-    pdf_path = os.path.join(output_dir, "gaussian_3d_fits.pdf")
+    pdf_path = os.path.join(output_dir, "lorentzian_3d_fits.pdf")
     
     # Pre-filter events with successful fits to avoid processing invalid events
     valid_events = []
     
     for event_idx in range(n_events):
-        if data['GaussFit3DDOF'][event_idx] > 0:
+        if data['LorentzFit3DDOF'][event_idx] > 0:
             valid_events.append(event_idx)
     
-    print(f"Found {len(valid_events)} valid 3D fits")
+    print(f"Found {len(valid_events)} valid 3D Lorentzian fits")
     
     if not valid_events:
-        print("No valid 3D fits found!")
+        print("No valid 3D Lorentzian fits found!")
         return 0
     
     # Pre-calculate grid size to avoid repeated calculations
@@ -606,23 +625,23 @@ def create_3d_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_wor
     
     success_count = 0
     
-    print("Creating 3D Gaussian fits PDF...")
+    print("Creating 3D Lorentzian fits PDF...")
     
     # Prepare arguments for parallel processing
     args_list = []
     for event_idx in valid_events:
-        data_subset = _prepare_3d_data_subset(data, event_idx)
+        data_subset = _prepare_3d_lorentzian_data_subset(data, event_idx)
         args_list.append((event_idx, data_subset))
     
     # Process in parallel with progress bar using threading
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         # Submit all jobs
-        future_to_event = {executor.submit(_create_3d_plot_worker, args): args[0] 
+        future_to_event = {executor.submit(_create_3d_lorentzian_plot_worker, args): args[0] 
                          for args in args_list}
         
         # Collect results with progress bar
         results = {}
-        with tqdm(total=len(args_list), desc="Generating 3D plots") as pbar:
+        with tqdm(total=len(args_list), desc="Generating 3D Lorentzian plots") as pbar:
             for future in as_completed(future_to_event):
                 event_idx = future_to_event[future]
                 try:
@@ -650,8 +669,8 @@ def create_3d_gaussian_fit_pdfs(data, output_dir="plots", max_events=None, n_wor
     del args_list
     gc.collect()
     
-    print(f"3D PDF generation completed!")
-    print(f"  3D fits visualized: {success_count}")
+    print(f"3D Lorentzian PDF generation completed!")
+    print(f"  3D Lorentzian fits visualized: {success_count}")
     print(f"  PDF saved to: {pdf_path}")
     
     return success_count
@@ -671,12 +690,12 @@ def export_single_event_svg(data, event_idx, output_path):
     print(f"Exporting event {event_idx} as SVG...")
     
     # Check if the event has a valid fit
-    if data['GaussFit3DDOF'][event_idx] <= 0:
-        print(f"Event {event_idx} does not have a valid 3D fit (DOF = {data['GaussFit3DDOF'][event_idx]})")
+    if data['LorentzFit3DDOF'][event_idx] <= 0:
+        print(f"Event {event_idx} does not have a valid 3D Lorentzian fit (DOF = {data['LorentzFit3DDOF'][event_idx]})")
         return False
     
     # Create the plot using full dataset (don't subset for single event export)
-    fig, success = create_3d_gaussian_plot(event_idx, data)
+    fig, success = create_3d_lorentzian_plot(event_idx, data)
     
     if success and fig is not None:
         # Save as SVG
@@ -705,10 +724,10 @@ def inspect_root_file(root_file):
         
         print(f"\nTree 'Hits' contains {len(branches)} branches:")
         
-        # Show 3D Gaussian fitting branches
-        gaussian_3d_branches = [b for b in branches if '3DGaussianFit' in b]
-        print(f"\n3D Gaussian fitting branches ({len(gaussian_3d_branches)}):")
-        for i, branch in enumerate(sorted(gaussian_3d_branches)):
+        # Show 3D Lorentzian fitting branches
+        lorentzian_3d_branches = [b for b in branches if '3DLorentzianFit' in b]
+        print(f"\n3D Lorentzian fitting branches ({len(lorentzian_3d_branches)}):")
+        for i, branch in enumerate(sorted(lorentzian_3d_branches)):
             print(f"  {i+1:2d}: {branch}")
         
         # Show grid data branches
@@ -727,11 +746,11 @@ def inspect_root_file(root_file):
         print(f"  Non-pixel hits: {n_non_pixel} ({100*n_non_pixel/n_events:.1f}%)")
         print(f"  Pixel hits: {n_events - n_non_pixel} ({100*(n_events - n_non_pixel)/n_events:.1f}%)")
         
-        # Check for successful 3D fits
-        if '3DGaussianFitDOF' in branches:
-            fit_3d_dof = tree['3DGaussianFitDOF'].array(library="np")
+        # Check for successful 3D Lorentzian fits
+        if '3DLorentzianFitDOF' in branches:
+            fit_3d_dof = tree['3DLorentzianFitDOF'].array(library="np")
             successful_3d_fits = np.sum(fit_3d_dof > 0)
-            print(f"  Successful 3D fits: {successful_3d_fits} ({100*successful_3d_fits/n_events:.1f}%)")
+            print(f"  Successful 3D Lorentzian fits: {successful_3d_fits} ({100*successful_3d_fits/n_events:.1f}%)")
         
     except Exception as e:
         print(f"Error inspecting ROOT file: {e}")
@@ -739,11 +758,11 @@ def inspect_root_file(root_file):
 def main():
     """Main function for command line execution."""
     parser = argparse.ArgumentParser(
-        description="Visualize 3D Gaussian fits from GEANT4 charge sharing simulation ROOT files",
+        description="Visualize 3D Lorentzian fits from GEANT4 charge sharing simulation ROOT files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("root_file", help="Path to ROOT file from GEANT4 simulation")
-    parser.add_argument("-o", "--output", default="gaussian_3d_fits", 
+    parser.add_argument("-o", "--output", default="lorentzian_3d_fits", 
                        help="Output directory for PDF files")
     parser.add_argument("-n", "--num_events", type=int, default=None,
                        help="Maximum number of events to process (default: all events)")
@@ -755,7 +774,7 @@ def main():
                        help="Inspect ROOT file contents and exit")
     parser.add_argument("--svg_event", type=int, default=None,
                        help="Export single event as SVG (specify event index)")
-    parser.add_argument("--svg_output", default="event_3d_fit.svg",
+    parser.add_argument("--svg_output", default="event_3d_lorentzian_fit.svg",
                        help="Output filename for SVG export")
     
     args = parser.parse_args()
@@ -776,19 +795,19 @@ def main():
         print("Failed to load data. Exiting.")
         return 1
     
-    # Check if we have 3D Gaussian fitting data
+    # Check if we have 3D Lorentzian fitting data
     n_events = len(data['TrueX'])
     if n_events == 0:
         print("No events found in the data!")
         return 1
     
-    # Count successful 3D fits
-    successful_3d = np.sum(data['GaussFit3DDOF'] > 0)
+    # Count successful 3D Lorentzian fits
+    successful_3d = np.sum(data['LorentzFit3DDOF'] > 0)
     
-    print(f"Found {successful_3d} successful 3D fits")
+    print(f"Found {successful_3d} successful 3D Lorentzian fits")
     
     if successful_3d == 0:
-        print("No successful 3D Gaussian fits found in the data!")
+        print("No successful 3D Lorentzian fits found in the data!")
         return 1
     
     # SVG export mode
@@ -810,14 +829,14 @@ def main():
     print(f"Output directory: {args.output}")
     
     # Create PDF visualizations
-    success_count = create_3d_gaussian_fit_pdfs(
+    success_count = create_3d_lorentzian_fit_pdfs(
         data, args.output, args.num_events, args.workers
     )
     
-    print(f"\n3D Visualization completed!")
-    print(f"  3D fits visualized: {success_count}")
+    print(f"\n3D Lorentzian Visualization completed!")
+    print(f"  3D Lorentzian fits visualized: {success_count}")
     
     return 0
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main()) 
