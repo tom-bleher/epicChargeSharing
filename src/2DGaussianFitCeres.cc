@@ -679,8 +679,7 @@ bool FitGaussianCeres(
             }
             
             // HIERARCHICAL DECISION: Only add perturbations if χ²ᵣ > 0.3 (OPTIMIZED)
-            // Lowered threshold from 0.5 to 0.3 based on resolution analysis data
-            if (any_success && best_chi2_reduced > 0.3) {
+            if (any_success && best_chi2_reduced > 0.2) {
                 if (verbose) {
                     std::cout << "Base Gaussian fit χ²ᵣ=" << best_chi2_reduced << " > 0.3, trying 2 perturbations..." << std::endl;
                 }

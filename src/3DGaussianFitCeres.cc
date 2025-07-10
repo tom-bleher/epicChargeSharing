@@ -665,7 +665,7 @@ bool Fit3DGaussianCeres(
             }
             
             // HIERARCHICAL DECISION: Only add perturbations if χ²ᵣ > 0.3
-            if (any_success && best_chi2_reduced > 0.3) {
+            if (any_success && best_chi2_reduced > 0.2) {
                 if (verbose) {
                     std::cout << "Base 3D Gaussian fit χ²ᵣ=" << best_chi2_reduced << " > 0.3, trying 2 perturbations..." << std::endl;
                 }
@@ -922,4 +922,4 @@ GaussianFit3DResultsCeres Fit3DGaussianCeres(
     }
     
     return result;
-}
+} 
