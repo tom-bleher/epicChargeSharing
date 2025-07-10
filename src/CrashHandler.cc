@@ -331,21 +331,10 @@ void CrashHandler::PerformAutoSave() {
             rootFile->Write();
             
             auto now = std::chrono::steady_clock::now();
-            auto totalMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now - fLastSaveTime).count();
-            auto totalSeconds = totalMilliseconds / 1000;
-            auto milliseconds = totalMilliseconds % 1000;
-            auto minutes = totalSeconds / 60;
-            auto seconds = totalSeconds % 60;
+            auto timeSinceLastSave = std::chrono::duration_cast<std::chrono::minutes>(now - fLastSaveTime).count();
             
-            G4cout << "Auto-save completed (event " << fCurrentEvent.load();
-            if (minutes > 0) {
-                G4cout << ", " << minutes << " min " << seconds << " sec since last save)";
-            } else if (seconds > 0) {
-                G4cout << ", " << seconds << " sec since last save)";
-            } else {
-                G4cout << ", " << milliseconds << " ms since last save)";
-            }
-            G4cout << G4endl;
+            G4cout << "Auto-save completed (event " << fCurrentEvent.load() 
+                   << ", " << timeSinceLastSave << " min since last save)" << G4endl;
             
             fLastSavedEvent = fCurrentEvent.load();
             fLastSaveTime = now;
