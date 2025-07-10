@@ -171,7 +171,8 @@ int main(int argc, char** argv)
     crashHandler.Initialize(runManager);
     
     // Configure crash handler
-    crashHandler.SetAutoSaveEnabled(true, 1000);  // Auto-save every 1000 events
+    // Disable periodic crash-handler backups unless explicitly enabled by UI
+    crashHandler.SetAutoSaveEnabled(false, 0);
     crashHandler.SetBackupDirectory("crash_recovery");
     
     G4cout << "Crash recovery system initialized successfully" << G4endl;
