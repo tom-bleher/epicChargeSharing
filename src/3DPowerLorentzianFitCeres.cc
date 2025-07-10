@@ -363,11 +363,11 @@ bool Fit3DPowerLorentzianCeres(
             }
         }
         
-        // HIERARCHICAL DECISION: Only add perturbations if χ²ᵣ > 0.5
-        // Updated threshold based on actual data: χ²ᵣ > 0.5 (around median-to-P75 range)
-        if (any_success && best_chi2_reduced > 0.5) {
+        // HIERARCHICAL DECISION: Only add perturbations if χ²ᵣ > 0.3
+        // Updated threshold based on actual data: χ²ᵣ > 0.3 (around median-to-P75 range)
+        if (any_success && best_chi2_reduced > 0.2) {
             if (verbose) {
-                std::cout << "Base 3D Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << " > 0.5, trying 2 perturbations..." << std::endl;
+                std::cout << "Base 3D Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << " > 0.3, trying 2 perturbations..." << std::endl;
             }
             
             // Add exactly 2 perturbations for 3D Power Lorentzian case
