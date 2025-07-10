@@ -4,7 +4,6 @@
 #include "RunAction.hh"
 #include "Constants.hh"
 #include "G4RunManager.hh"
-#include "Randomize.hh"
 #include <fstream>
 #include <iomanip>
 #include <ctime>
@@ -12,8 +11,6 @@
 #include <string>
 #include <filesystem>  // For portable directory creation
 #include <memory>      // For std::unique_ptr
-#include <algorithm>   // For std::random_shuffle
-#include <vector>      // For std::vector
 
 // Add step limiter includes
 #include "G4UserLimits.hh"
@@ -30,9 +27,7 @@ DetectorConstruction::DetectorConstruction()
       fCheckOverlaps(true),
       fEventAction(nullptr),   // Initialize EventAction pointer
       fDetectorMessenger(nullptr),
-      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),   // Default neighborhood radius for 9x9 grid
-      fDefectPixelFraction(Constants::DEFECT_PIXEL_FRACTION), // Initialize defect pixel fraction
-      fDefectivePixelsGenerated(false)  // Initialize defective pixels generation flag
+      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS)   // Default neighborhood radius for 9x9 grid
 {
     // Values for pixel grid set at constants.hh
     
@@ -181,11 +176,6 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     
     G4cout << "✓ Step limiting enabled: maximum step size = 10 micrometers" << G4endl;
     
-    // Generate defective pixels if enabled
-    if (Constants::ENABLE_DEFECT_PIXELS && !fDefectivePixelsGenerated) {
-        GenerateDefectivePixels();
-    }
-    
     // Place pixels on the detector surface (front face)
     G4int copyNo = 0;
     G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
@@ -195,11 +185,6 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
         for (G4int j = 0; j < fNumBlocksPerSide; j++) {
-            // Skip defective pixels
-            if (Constants::ENABLE_DEFECT_PIXELS && IsPixelDefective(i, j)) {
-                continue;  // Skip placing this pixel
-            }
-            
             G4double pixelX = firstPixelPos + i * fPixelSpacing;
             G4double pixelY = firstPixelPos + j * fPixelSpacing;
             
@@ -220,15 +205,6 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4double detectorArea = fDetSize * fDetSize;
     G4double pixelAreaRatio = totalPixelArea / detectorArea;
     
-    // Calculate effective pixel area (excluding defective pixels)
-    G4int totalPixels = fNumBlocksPerSide * fNumBlocksPerSide;
-    G4int effectivePixels = totalPixels;
-    if (Constants::ENABLE_DEFECT_PIXELS) {
-        effectivePixels = totalPixels - fDefectivePixels.size();
-    }
-    G4double effectivePixelArea = effectivePixels * fPixelSize * fPixelSize;
-    G4double effectivePixelAreaRatio = effectivePixelArea / detectorArea;
-    
     G4cout << "\n=== FINAL DETECTOR CONFIGURATION ===" << G4endl;
     G4cout << "Detector Statistics:" << G4endl;
     G4cout << "  Final detector size: " << fDetSize/mm << " mm × " << fDetSize/mm << " mm" << G4endl;
@@ -236,31 +212,16 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         G4cout << "  (Adjusted from original: " << originalDetSize/mm << " mm)" << G4endl;
     }
     G4cout << "  Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm" << G4endl;
-    G4cout << "  Total number of pixels (designed): " << totalPixels << G4endl;
+    G4cout << "  Total number of pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << G4endl;
     G4cout << "  Pixel grid: " << fNumBlocksPerSide << " × " << fNumBlocksPerSide << G4endl;
-    
-    // Defective pixels information
-    if (Constants::ENABLE_DEFECT_PIXELS) {
-        G4cout << "  Defective pixels enabled: YES" << G4endl;
-        G4cout << "  Defect fraction: " << fDefectPixelFraction << G4endl;
-        G4cout << "  Number of defective pixels: " << fDefectivePixels.size() << G4endl;
-        G4cout << "  Effective number of pixels: " << effectivePixels << G4endl;
-        G4cout << "  Pixel removal rate: " << (100.0 * fDefectivePixels.size() / totalPixels) << " %" << G4endl;
-    } else {
-        G4cout << "  Defective pixels enabled: NO" << G4endl;
-        G4cout << "  Effective number of pixels: " << effectivePixels << " (all functional)" << G4endl;
-    }
-    
     G4cout << "  Single pixel area: " << fPixelSize * fPixelSize / (mm*mm) << " mm²" << G4endl;
-    G4cout << "  Total pixel area (designed): " << totalPixelArea / (mm*mm) << " mm²" << G4endl;
-    G4cout << "  Effective pixel area: " << effectivePixelArea / (mm*mm) << " mm²" << G4endl;
+    G4cout << "  Total pixel area: " << totalPixelArea / (mm*mm) << " mm²" << G4endl;
     G4cout << "  Detector area: " << detectorArea / (mm*mm) << " mm²" << G4endl;
-    G4cout << "  Designed pixel area / Detector area ratio: " << pixelAreaRatio << G4endl;
-    G4cout << "  Effective pixel area / Detector area ratio: " << effectivePixelAreaRatio << G4endl;
+    G4cout << "  Pixel area / Detector area ratio: " << pixelAreaRatio << G4endl;
     G4cout << "====================================" << G4endl;
 
     // Save all simulation parameters to a log file
-    SaveSimulationParameters(effectivePixelArea, detectorArea, effectivePixelAreaRatio);
+    SaveSimulationParameters(totalPixelArea, detectorArea, pixelAreaRatio);
 
     // Update RunAction with the final grid parameters after geometry construction
     // This ensures the ROOT metadata contains the actual values used for pixel placement
@@ -322,11 +283,6 @@ G4bool DetectorConstruction::IsPositionOnPixel(const G4ThreeVector& position) co
     // Check if indices are within valid range
     if (i < 0 || i >= fNumBlocksPerSide || j < 0 || j >= fNumBlocksPerSide) {
         return false; // Outside pixel grid
-    }
-    
-    // Check if pixel is defective
-    if (Constants::ENABLE_DEFECT_PIXELS && IsPixelDefective(i, j)) {
-        return false; // Defective pixel behaves as if no pixel exists
     }
     
     // Calculate the actual pixel center position
@@ -392,38 +348,16 @@ void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4d
         paramFile << "Pixel Spacing (center-to-center): " << fPixelSpacing/mm << " mm" << std::endl;
         paramFile << "Pixel Corner Offset: " << fPixelCornerOffset/mm << " mm" << std::endl;
         paramFile << "Number of Pixels per Side: " << fNumBlocksPerSide << std::endl;
-        paramFile << "Total Number of Pixels (designed): " << fNumBlocksPerSide * fNumBlocksPerSide << std::endl;
-        
-        // Defective pixels information
-        if (Constants::ENABLE_DEFECT_PIXELS) {
-            paramFile << std::endl << "DEFECTIVE PIXELS" << std::endl;
-            paramFile << "---------------" << std::endl;
-            paramFile << "Defective Pixels Enabled: YES" << std::endl;
-            paramFile << "Defect Pixel Fraction: " << fDefectPixelFraction << std::endl;
-            paramFile << "Number of Defective Pixels: " << fDefectivePixels.size() << std::endl;
-            paramFile << "Effective Number of Pixels: " << (fNumBlocksPerSide * fNumBlocksPerSide - fDefectivePixels.size()) << std::endl;
-            paramFile << "Pixel Removal Rate: " << (100.0 * fDefectivePixels.size() / (fNumBlocksPerSide * fNumBlocksPerSide)) << " %" << std::endl;
-        } else {
-            paramFile << std::endl << "DEFECTIVE PIXELS" << std::endl;
-            paramFile << "---------------" << std::endl;
-            paramFile << "Defective Pixels Enabled: NO" << std::endl;
-            paramFile << "Effective Number of Pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << " (all functional)" << std::endl;
-        }
-        
-        paramFile << std::endl << "Single Pixel Area: " << (fPixelSize * fPixelSize)/(mm*mm) << " mm²" << std::endl;
-        G4double designedPixelArea = fNumBlocksPerSide * fNumBlocksPerSide * fPixelSize * fPixelSize;
-        paramFile << "Total Pixel Area (designed): " << designedPixelArea/(mm*mm) << " mm²" << std::endl;
-        paramFile << "Effective Pixel Area: " << totalPixelArea/(mm*mm) << " mm²" << std::endl << std::endl;
+        paramFile << "Total Number of Pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << std::endl;
+        paramFile << "Single Pixel Area: " << (fPixelSize * fPixelSize)/(mm*mm) << " mm²" << std::endl;
+        paramFile << "Total Pixel Area: " << totalPixelArea/(mm*mm) << " mm²" << std::endl << std::endl;
         
         // Write detector statistics
         paramFile << "DETECTOR STATISTICS" << std::endl;
         paramFile << "------------------" << std::endl;
-        G4double designedPixelAreaRatio = designedPixelArea / detectorArea;
-        paramFile << "Designed Pixel Area / Detector Area Ratio: " << designedPixelAreaRatio << std::endl;
-        paramFile << "Designed Pixel Coverage Percentage: " << designedPixelAreaRatio * 100.0 << " %" << std::endl;
-        paramFile << "Effective Pixel Area / Detector Area Ratio: " << pixelAreaRatio << std::endl;
-        paramFile << "Effective Pixel Coverage Percentage: " << pixelAreaRatio * 100.0 << " %" << std::endl;
-        paramFile << "Pixel Area Fraction (effective): " << pixelAreaRatio << std::endl;
+        paramFile << "Pixel Area / Detector Area Ratio: " << pixelAreaRatio << std::endl;
+        paramFile << "Pixel Coverage Percentage: " << pixelAreaRatio * 100.0 << " %" << std::endl;
+        paramFile << "Pixel Area Fraction: " << pixelAreaRatio << std::endl;
         
         // Write footer
         paramFile << std::endl;
@@ -498,125 +432,3 @@ void DetectorConstruction::SetMaxAutoRadius(G4int maxRadius)
         G4cout << "EventAction not yet available - maximum auto radius will be set when EventAction is connected" << G4endl;
     }
 }
-
-// =============================================
-// DEFECTIVE PIXELS IMPLEMENTATION
-// =============================================
-
-void DetectorConstruction::GenerateDefectivePixels()
-{
-    if (fDefectivePixelsGenerated) {
-        G4cout << "DetectorConstruction: Defective pixels already generated, skipping." << G4endl;
-        return;
-    }
-    
-    fDefectivePixels.clear();
-    
-    if (!Constants::ENABLE_DEFECT_PIXELS) {
-        G4cout << "DetectorConstruction: Defect pixels functionality is disabled." << G4endl;
-        return;
-    }
-    
-    if (fDefectPixelFraction <= 0.0) {
-        G4cout << "DetectorConstruction: Defect pixel fraction is 0, no defective pixels generated." << G4endl;
-        fDefectivePixelsGenerated = true;
-        return;
-    }
-    
-    // Set random seed for reproducible results
-    if (Constants::DEFECT_PIXELS_RANDOM_SEED != 0) {
-        CLHEP::HepRandom::setTheSeed(Constants::DEFECT_PIXELS_RANDOM_SEED);
-    }
-    
-    G4int totalPixels = fNumBlocksPerSide * fNumBlocksPerSide;
-    G4int numDefectivePixels = static_cast<G4int>(std::round(fDefectPixelFraction * totalPixels));
-    
-    // Clamp to valid range
-    numDefectivePixels = std::min(numDefectivePixels, totalPixels);
-    numDefectivePixels = std::max(numDefectivePixels, 0);
-    
-    G4cout << "\n=== GENERATING DEFECTIVE PIXELS ===" << G4endl;
-    G4cout << "Total pixels: " << totalPixels << G4endl;
-    G4cout << "Defect fraction: " << fDefectPixelFraction << G4endl;
-    G4cout << "Number of defective pixels: " << numDefectivePixels << G4endl;
-    
-    if (numDefectivePixels == 0) {
-        G4cout << "No defective pixels to generate." << G4endl;
-        fDefectivePixelsGenerated = true;
-        return;
-    }
-    
-    // Create a vector of all possible pixel indices
-    std::vector<std::pair<G4int, G4int>> allPixels;
-    for (G4int i = 0; i < fNumBlocksPerSide; i++) {
-        for (G4int j = 0; j < fNumBlocksPerSide; j++) {
-            allPixels.emplace_back(i, j);
-        }
-    }
-    
-    // Randomly shuffle the vector
-    std::random_shuffle(allPixels.begin(), allPixels.end());
-    
-    // Select the first numDefectivePixels as defective
-    for (G4int k = 0; k < numDefectivePixels; k++) {
-        fDefectivePixels.insert(allPixels[k]);
-    }
-    
-    fDefectivePixelsGenerated = true;
-    
-    G4cout << "Successfully generated " << fDefectivePixels.size() << " defective pixels." << G4endl;
-    G4cout << "====================================" << G4endl;
-    
-    // Print defective pixels info if verbose
-    PrintDefectivePixelsInfo();
-}
-
-G4bool DetectorConstruction::IsPixelDefective(G4int pixelI, G4int pixelJ) const
-{
-    if (!Constants::ENABLE_DEFECT_PIXELS) {
-        return false;
-    }
-    
-    return fDefectivePixels.find(std::make_pair(pixelI, pixelJ)) != fDefectivePixels.end();
-}
-
-void DetectorConstruction::SetDefectPixelFraction(G4double fraction)
-{
-    if (fraction < 0.0 || fraction > 1.0) {
-        G4cerr << "DetectorConstruction: Error - Defect pixel fraction must be between 0.0 and 1.0" << G4endl;
-        return;
-    }
-    
-    fDefectPixelFraction = fraction;
-    fDefectivePixelsGenerated = false;  // Force regeneration with new fraction
-    
-    G4cout << "DetectorConstruction: Defect pixel fraction set to " << fraction << G4endl;
-    G4cout << "Defective pixels will be regenerated on next geometry construction." << G4endl;
-}
-
-void DetectorConstruction::PrintDefectivePixelsInfo() const
-{
-    if (!Constants::ENABLE_DEFECT_PIXELS || fDefectivePixels.empty()) {
-        return;
-    }
-    
-    G4cout << "\n=== DEFECTIVE PIXELS INFORMATION ===" << G4endl;
-    G4cout << "Total defective pixels: " << fDefectivePixels.size() << G4endl;
-    G4cout << "Defective pixel indices (i,j):" << G4endl;
-    
-    G4int count = 0;
-    for (const auto& pixel : fDefectivePixels) {
-        G4cout << "(" << pixel.first << "," << pixel.second << ")";
-        count++;
-        if (count % 10 == 0) {
-            G4cout << G4endl;  // New line every 10 pixels
-        } else if (count < fDefectivePixels.size()) {
-            G4cout << ", ";
-        }
-    }
-    if (count % 10 != 0) {
-        G4cout << G4endl;
-    }
-    G4cout << "====================================" << G4endl;
-}
-
