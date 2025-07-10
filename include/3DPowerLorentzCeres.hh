@@ -1,21 +1,21 @@
-#ifndef POWERLORENTZIANFITCERES3D_HH
-#define POWERLORENTZIANFITCERES3D_HH
+#ifndef POWERLORENTZCERES3D_HH
+#define POWERLORENTZCERES3D_HH
 
 #include <vector>
 #include "globals.hh"
 
-// Structure to hold 3D Power-Law Lorentzian fit results for entire neighborhood surface
+// Structure to hold 3D Power-Law Lorentz fit results for entire neighborhood surface
 // Function form: z(x,y) = A / (1 + ((x - mx) / γx)^2 + ((y - my) / γy)^2)^β + B
-// where mx, my = center coordinates, γx, γy = widths, β = power exponent, A = amplitude, B = baseline
-struct PowerLorentzianFit3DResultsCeres {
+// where mx, my = center coordinates, γx, γy = widths, β = power exponent, A = amp, B = baseline
+struct PowerLorentz3DResultsCeres {
     // 3D surface fit parameters
     G4double center_x;           // mx parameter (X center)
     G4double center_y;           // my parameter (Y center)
     G4double gamma_x;            // γx parameter (X width)
     G4double gamma_y;            // γy parameter (Y width)
     G4double beta;               // β parameter (power exponent)
-    G4double amplitude;          // A parameter (peak amplitude)
-    G4double vertical_offset;    // B parameter (baseline offset)
+    G4double amp;          // A parameter (peak amp)
+    G4double vert_offset;    // B parameter (baseline offset)
     
     // Parameter uncertainties
     G4double center_x_err;
@@ -23,10 +23,10 @@ struct PowerLorentzianFit3DResultsCeres {
     G4double gamma_x_err;
     G4double gamma_y_err;
     G4double beta_err;
-    G4double amplitude_err;
-    G4double vertical_offset_err;
+    G4double amp_err;
+    G4double vert_offset_err;
     
-    // Fit quality metrics
+    //  quality metrics
     G4double chi2red;            // Reduced chi-squared
     G4double pp;                 // P-value (goodness of fit)
     G4int dof;                   // Degrees of freedom
@@ -37,28 +37,28 @@ struct PowerLorentzianFit3DResultsCeres {
     std::vector<double> charge_values;   // Charge values for all fitted pixels
     std::vector<double> charge_errors;   // Charge uncertainties for all fitted pixels
     
-    // Charge uncertainty (5% of max charge in neighborhood if enabled)
-    G4double charge_uncertainty;
+    // Charge err (5% of max charge in neighborhood if enabled)
+    G4double charge_err;
     
     // Overall success status
-    G4bool fit_successful;
+    G4bool fit_success;
     
     // Constructor with default values
-    PowerLorentzianFit3DResultsCeres() : 
-        center_x(0), center_y(0), gamma_x(1), gamma_y(1), beta(1), amplitude(0), vertical_offset(0),
+    PowerLorentz3DResultsCeres() : 
+        center_x(0), center_y(0), gamma_x(1), gamma_y(1), beta(1), amp(0), vert_offset(0),
         center_x_err(0), center_y_err(0), gamma_x_err(0), gamma_y_err(0), beta_err(0),
-        amplitude_err(0), vertical_offset_err(0),
+        amp_err(0), vert_offset_err(0),
         chi2red(0), pp(0), dof(0),
-        charge_uncertainty(0),
-        fit_successful(false) {}
+        charge_err(0),
+        fit_success(false) {}
 };
 
-// Function to perform 3D Power-Law Lorentzian fitting using Ceres Solver with robust optimization
-// Fits entire neighborhood surface with 3D Power-Law Lorentzian function
+// Function to perform 3D Power-Law Lorentz fitting using Ceres Solver with robust optimization
+// s entire neighborhood surface with 3D Power-Law Lorentz function
 // Function form: z(x,y) = A / (1 + ((x - mx) / γx)^2 + ((y - my) / γy)^2)^β + B
-// where mx, my = center coordinates, γx, γy = widths, β = power exponent, A = amplitude, B = baseline
+// where mx, my = center coordinates, γx, γy = widths, β = power exponent, A = amp, B = baseline
 // Uses most robust Ceres settings regardless of computation time
-PowerLorentzianFit3DResultsCeres Fit3DPowerLorentzianCeres(
+PowerLorentz3DResultsCeres PowerLorentzCeres3D(
     const std::vector<double>& x_coords,
     const std::vector<double>& y_coords, 
     const std::vector<double>& charge_values,
@@ -69,4 +69,4 @@ PowerLorentzianFit3DResultsCeres Fit3DPowerLorentzianCeres(
     bool enable_outlier_filtering = false
 );
 
-#endif // POWERLORENTZIANFITCERES3D_HH 
+#endif // POWERLORENTZCERES3D_HH 
