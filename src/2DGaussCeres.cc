@@ -1,4 +1,4 @@
-#include "2DGaussianFitCeres.hh"
+#include "2DGaussCeres.hh"
 #include "CeresLoggingInit.hh"
 #include "Constants.hh"
 #include "G4SystemOfUnits.hh"
@@ -16,34 +16,34 @@
 #include "glog/logging.h"
 
 // Thread counter for debugging (removed mutex for better parallelization)
-static std::atomic<int> gGlobalCeresFitCounter{0};
+static std::atomic<int> gGlobalCeresCounter{0};
 
 // Use shared Google logging initialization
 void InitializeCeres() {
     CeresLoggingInitializer::InitializeOnce();
 }
 
-// Calculate uncertainty as 5% of max charge in line (if enabled)
-double CalculateUncertainty(double max_charge_in_line) {
-    if (!Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+// Calc err as 5% of max charge in line (if enabled)
+double CalcErr(double max_charge_in_line) {
+    if (!Constants::ENABLE_VERT_CHARGE_ERR) {
         return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
-    // Uncertainty = 5% of max charge when enabled
-    double uncertainty = 0.05 * max_charge_in_line;
-    if (uncertainty < Constants::MIN_UNCERTAINTY_VALUE) uncertainty = Constants::MIN_UNCERTAINTY_VALUE; // Prevent division by zero
-    return uncertainty;
+    // Err = 5% of max charge when enabled
+    double err = 0.05 * max_charge_in_line;
+    if (err < Constants::MIN_UNCERTAINTY_VALUE) err = Constants::MIN_UNCERTAINTY_VALUE; // Prevent division by zero
+    return err;
 }
 
-// Gaussian cost function with uncertainty (5% of max charge)
+// Gauss cost function with err (5% of max charge)
 // Function form: y(x) = A * exp(-(x - m)^2 / (2 * σ^2)) + B
-struct GaussianCostFunction {
-    GaussianCostFunction(double x, double y, double uncertainty) 
-        : x_(x), y_(y), uncertainty_(uncertainty) {}
+struct GaussCostFunction {
+    GaussCostFunction(double x, double y, double err) 
+        : x_(x), y_(y), err_(err) {}
     
     template <typename T>
     bool operator()(const T* const params, T* residual) const {
-        // params[0] = A (amplitude)
+        // params[0] = A (amp)
         // params[1] = m (center)
         // params[2] = sigma (width)
         // params[3] = B (offset)
@@ -59,7 +59,7 @@ struct GaussianCostFunction {
             safe_sigma = T(Constants::MIN_SAFE_PARAMETER);
         }
         
-        // Gaussian function with robust exponent calculation
+        // Gauss function with robust exponent calculation
         T dx = x_ - m;
         T exponent = -(dx * dx) / (T(2.0) * safe_sigma * safe_sigma);
         
@@ -72,35 +72,35 @@ struct GaussianCostFunction {
         
         T predicted = A * ceres::exp(exponent) + B;
         
-        // Residual divided by uncertainty (standard weighted least squares)
-        residual[0] = (predicted - T(y_)) / T(uncertainty_);
+        // Residual divided by err (standard weighted least squares)
+        residual[0] = (predicted - T(y_)) / T(err_);
         
         return true;
     }
     
-    static ceres::CostFunction* Create(double x, double y, double uncertainty) {
-        return (new ceres::AutoDiffCostFunction<GaussianCostFunction, 1, 4>(
-            new GaussianCostFunction(x, y, uncertainty)));
+    static ceres::CostFunction* Create(double x, double y, double err) {
+        return (new ceres::AutoDiffCostFunction<GaussCostFunction, 1, 4>(
+            new GaussCostFunction(x, y, err)));
     }
     
 private:
     const double x_;
     const double y_;
-    const double uncertainty_;
+    const double err_;
 };
 
 // Advanced parameter estimation with physics-based initialization
 struct ParameterEstimates {
-    double amplitude;
+    double amp;
     double center;
     double sigma;
     double offset;
-    double amplitude_err;
+    double amp_err;
     double center_err;
     double sigma_err;
     double offset_err;
     bool valid;
-    int method_used; // Track which estimation method was successful
+    int method_used; // Track which estimation method was success
 };
 
 // Robust statistics calculations
@@ -117,7 +117,7 @@ struct DataStatistics {
     bool valid;
 };
 
-DataStatistics CalculateRobustStatistics(const std::vector<double>& x_vals, 
+DataStatistics CalcRobustStatistics(const std::vector<double>& x_vals, 
                                         const std::vector<double>& y_vals) {
     DataStatistics stats;
     stats.valid = false;
@@ -184,7 +184,7 @@ DataStatistics CalculateRobustStatistics(const std::vector<double>& x_vals,
                     stats.std_dev : 1e-12;
     }
     
-    // Weighted statistics (weight by charge value for position estimation)
+    // Weighted statistics (weight by charge value for pos estimation)
     stats.weighted_mean = 0.0;
     stats.total_weight = 0.0;
     
@@ -209,7 +209,7 @@ DataStatistics CalculateRobustStatistics(const std::vector<double>& x_vals,
 }
 
 // Multiple parameter estimation strategies
-ParameterEstimates EstimateGaussianParameters(
+ParameterEstimates EstimateGaussParameters(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     double center_estimate,
@@ -224,8 +224,8 @@ ParameterEstimates EstimateGaussianParameters(
         return estimates;
     }
     
-    // Calculate robust statistics
-    DataStatistics stats = CalculateRobustStatistics(x_vals, y_vals);
+    // Calc robust statistics
+    DataStatistics stats = CalcRobustStatistics(x_vals, y_vals);
     if (!stats.valid) {
         return estimates;
     }
@@ -240,7 +240,7 @@ ParameterEstimates EstimateGaussianParameters(
     // For LGAD charge sharing, the peak should be near the weighted centroid
     estimates.center = stats.weighted_mean;
     estimates.offset = std::min(stats.min_val, stats.q25); // Use conservative offset
-    estimates.amplitude = stats.max_val - estimates.offset;
+    estimates.amp = stats.max_val - estimates.offset;
     
     // Physics-based sigma estimation: charge spread should be related to pixel spacing
     // For LGAD detectors, typical charge spread is 0.3-0.8 pixel spacings
@@ -249,7 +249,7 @@ ParameterEstimates EstimateGaussianParameters(
     
     for (size_t i = 0; i < x_vals.size(); ++i) {
         double weight = std::max(0.0, y_vals[i] - estimates.offset);
-        if (weight > 0.1 * estimates.amplitude) { // Only use significant charges
+        if (weight > 0.1 * estimates.amp) { // Only use significant charges
             double dx = x_vals[i] - estimates.center;
             distance_spread += weight * dx * dx;
             weight_sum += weight;
@@ -264,17 +264,17 @@ ParameterEstimates EstimateGaussianParameters(
     
     // Apply physics-based bounds
     estimates.sigma = std::max(pixel_spacing * 0.2, std::min(pixel_spacing * 2.0, estimates.sigma));
-    estimates.amplitude = std::max(estimates.amplitude, (stats.max_val - stats.min_val) * 0.1);
+    estimates.amp = std::max(estimates.amp, (stats.max_val - stats.min_val) * 0.1);
     
     // Validate Method 1
-    if (estimates.amplitude > 0 && estimates.sigma > 0 && 
-        !std::isnan(estimates.center) && !std::isnan(estimates.amplitude) && 
+    if (estimates.amp > 0 && estimates.sigma > 0 && 
+        !std::isnan(estimates.center) && !std::isnan(estimates.amp) && 
         !std::isnan(estimates.sigma) && !std::isnan(estimates.offset)) {
         estimates.method_used = 1;
         estimates.valid = true;
         
         if (verbose) {
-            std::cout << "Method 1 (Physics-based): A=" << estimates.amplitude 
+            std::cout << "Method 1 (Physics-based): A=" << estimates.amp 
                      << ", m=" << estimates.center << ", sigma=" << estimates.sigma 
                      << ", B=" << estimates.offset << std::endl;
         }
@@ -284,15 +284,15 @@ ParameterEstimates EstimateGaussianParameters(
     // Method 2: Robust statistical estimation
     estimates.center = stats.median; // More robust than weighted mean
     estimates.offset = stats.q25;
-    estimates.amplitude = stats.q75 - stats.q25; // Inter-quartile range
+    estimates.amp = stats.q75 - stats.q25; // Inter-quartile range
     estimates.sigma = std::max(stats.mad, pixel_spacing * 0.3);
     
-    if (estimates.amplitude > 0 && estimates.sigma > 0) {
+    if (estimates.amp > 0 && estimates.sigma > 0) {
         estimates.method_used = 2;
         estimates.valid = true;
         
         if (verbose) {
-            std::cout << "Method 2 (Robust statistical): A=" << estimates.amplitude 
+            std::cout << "Method 2 (Robust statistical): A=" << estimates.amp 
                      << ", m=" << estimates.center << ", sigma=" << estimates.sigma 
                      << ", B=" << estimates.offset << std::endl;
         }
@@ -302,13 +302,13 @@ ParameterEstimates EstimateGaussianParameters(
     // Method 3: Conservative fallback
     estimates.center = center_estimate;
     estimates.offset = 0.0;
-    estimates.amplitude = stats.max_val;
+    estimates.amp = stats.max_val;
     estimates.sigma = pixel_spacing * 0.5;
     estimates.method_used = 3;
     estimates.valid = true;
     
     if (verbose) {
-        std::cout << "Method 3 (Conservative fallback): A=" << estimates.amplitude 
+        std::cout << "Method 3 (Conservative fallback): A=" << estimates.amp 
                  << ", m=" << estimates.center << ", sigma=" << estimates.sigma 
                  << ", B=" << estimates.offset << std::endl;
     }
@@ -329,7 +329,7 @@ std::pair<std::vector<double>, std::vector<double>> FilterOutliers(
         return std::make_pair(filtered_x, filtered_y);
     }
     
-    DataStatistics stats = CalculateRobustStatistics(x_vals, y_vals);
+    DataStatistics stats = CalcRobustStatistics(x_vals, y_vals);
     if (!stats.valid) {
         return std::make_pair(x_vals, y_vals); // Return original if stats fail
     }
@@ -393,21 +393,21 @@ std::pair<std::vector<double>, std::vector<double>> FilterOutliers(
 
 
 // ========================================================================================================
-// HORIZONTAL ERROR TECHNIQUES IMPLEMENTATION - Core Gaussian fitting function using Ceres Solver
+// HORIZONTAL ERROR TECHNIQUES IMPLEMENTATION - Core Gauss fitting function using Ceres Solver
 // ========================================================================================================
 // 
-// This function implements the five core horizontal error techniques for spatial uncertainty reduction:
+// This function implements the five core horizontal error techniques for spatial err reduction:
 // 
 // 1. CENTRAL PIXEL DOWNWEIGHTING
-//    - Reduces central pixel weight to 8% (most aggressive for sharp Gaussian peaks)
+//    - Reduces central pixel weight to 8% (most aggressive for sharp Gauss peaks)
 //    - Uses adaptive thresholds based on charge concentration (threshold: 2.0)
 //    - Implements ScaledLoss for maximum central pixel suppression
-//    - Prevents highest-charge pixel from dominating position reconstruction
+//    - Prevents highest-charge pixel from dominating pos reconstruction
 // 
 // 2. DISTANCE-BASED WEIGHTING
 //    - Formula: w_i ∝ 1/(1 + d_i/d₀) where d₀ = 10μm (physics d₀ value)
 //    - Gives more weight to pixels closer to current center estimate
-//    - Stabilizes convergence while allowing position refinement
+//    - Stabilizes convergence while allowing pos refinement
 //    - Caps maximum weight at 8x to prevent extreme values
 // 
 // 3. ROBUST LOSS FUNCTIONS
@@ -418,35 +418,35 @@ std::pair<std::vector<double>, std::vector<double>> FilterOutliers(
 // 
 // 4. PIXEL INTEGRATION MODEL
 //    - Analytical integration using error function: A*σ_eff*√(2π)*[erf(right)-erf(left)]/2
-//    - Includes horizontal uncertainty in effective sigma: σ_eff = √(σ² + σ_h²)
+//    - Includes horizontal err in effective sigma: σ_eff = √(σ² + σ_h²)
 //    - Models pixel response over finite area instead of point sampling
 //    - Horizontal error scale: 60% of pixel size
 // 
 // 5. SPATIAL ERROR MAPS
-//    - Position-dependent weighting based on systematic error patterns
+//    - Pos-dependent weighting based on systematic error patterns
 //    - Quadratic error increase near pixel edges due to charge sharing
 //    - Linear error growth for pixels beyond immediate neighbors
-//    - Bias correction scale: 25% optimized for Gaussian distributions
+//    - Bias correction scale: 25% optimized for Gauss distributions
 // 
 // ADVANCED FEATURES:
-// - Edge pixel upweighting (2.0x boost) for better position sensitivity
-// - Charge-weighted uncertainty (higher charge = more precise position)
+// - Edge pixel upweighting (2.0x boost) for better pos sensitivity
+// - Charge-weighted err (higher charge = more precise pos)
 // - Inter-pixel correlation weighting (radius: 1.5 pixels)
 // - Systematic bias correction (strength: 40%)
 // - Multi-strategy outlier filtering with progressive fallbacks
 // - Thread-safe implementation with comprehensive error handling
 //
-// Ultra-robust Gaussian fitting with multiple strategies
-bool FitGaussianCeres(
+// Ultra-robust Gauss fitting with multiple strategies
+bool GaussCeres(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     double center_estimate,
     double pixel_spacing,
-    double& fit_amplitude,
+    double& fit_amp,
     double& fit_center,
     double& fit_sigma,
     double& fit_offset,
-    double& fit_amplitude_err,
+    double& fit_amp_err,
     double& fit_center_err,
     double& fit_sigma_err,
     double& fit_offset_err,
@@ -456,7 +456,7 @@ bool FitGaussianCeres(
     
     if (x_vals.size() != y_vals.size() || x_vals.size() < 4) {
         if (verbose) {
-            std::cout << "Insufficient data points for Gaussian fitting" << std::endl;
+            std::cout << "Insufficient data points for Gauss fitting" << std::endl;
         }
         return false;
     }
@@ -498,7 +498,7 @@ bool FitGaussianCeres(
         }
         
         // Get parameter estimates
-        ParameterEstimates estimates = EstimateGaussianParameters(clean_x, clean_y, center_estimate, pixel_spacing, verbose);
+        ParameterEstimates estimates = EstimateGaussParameters(clean_x, clean_y, center_estimate, pixel_spacing, verbose);
         if (!estimates.valid) {
             if (verbose) {
                 std::cout << "Parameter estimation failed for dataset " << dataset_idx << std::endl;
@@ -506,15 +506,15 @@ bool FitGaussianCeres(
             continue;
         }
         
-        // Calculate uncertainty as 5% of max charge
+        // Calc err as 5% of max charge
         double max_charge = *std::max_element(clean_y.begin(), clean_y.end());
-        double uncertainty = CalculateUncertainty(max_charge);
+        double err = CalcErr(max_charge);
         
         // OPTIMIZED: Cheap config first with early exit based on quality (Step 1 from optimize.md)
         // Start with DENSE_NORMAL_CHOLESKY, 1e-10 tolerances, 400 iterations
         // Only escalate if χ²ᵣ > 3 or !converged (5-6x speed-up expected)
         
-        struct FittingConfig {
+        struct tingConfig {
             ceres::LinearSolverType linear_solver;
             ceres::TrustRegionStrategyType trust_region;
             double function_tolerance;
@@ -525,20 +525,20 @@ bool FitGaussianCeres(
         };
         
         // Stage 1: Cheap configuration (as per optimize.md section 4.1)
-        FittingConfig cheap_config = {
+        tingConfig cheap_config = {
             ceres::DENSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 
             1e-10, 1e-10, 400, "NONE", 0.0
         };
         
         // Stage 2: Expensive fallback configurations (only if needed)
-        const std::vector<FittingConfig> expensive_configs = {
-            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amplitude * 0.1},
-            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amplitude * 0.18},
-            {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amplitude * 0.25}
+        const std::vector<tingConfig> expensive_configs = {
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amp * 0.1},
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amp * 0.18},
+            {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amp * 0.25}
         };
         
         // Try cheap config first
-        auto try_config = [&](const FittingConfig& config, const std::string& stage_name) -> bool {
+        auto try_config = [&](const tingConfig& config, const std::string& stage_name) -> bool {
             if (verbose) {
                 std::cout << "Trying " << stage_name << " configuration..." << std::endl;
             }
@@ -556,7 +556,7 @@ bool FitGaussianCeres(
             
             // ALWAYS start with base estimate first
             ParameterSet base_set;
-            base_set.params[0] = estimates.amplitude;
+            base_set.params[0] = estimates.amp;
             base_set.params[1] = estimates.center;
             base_set.params[2] = estimates.sigma;
             base_set.params[3] = estimates.offset;
@@ -570,7 +570,7 @@ bool FitGaussianCeres(
             double best_chi2_reduced = std::numeric_limits<double>::max();
             
             // Data characteristics for adaptive bounds
-            DataStatistics data_stats = CalculateRobustStatistics(clean_x, clean_y);
+            DataStatistics data_stats = CalcRobustStatistics(clean_x, clean_y);
             double data_spread = *std::max_element(clean_x.begin(), clean_x.end()) - 
                                *std::min_element(clean_x.begin(), clean_x.end());
             double outlier_ratio = 0.0;
@@ -595,8 +595,8 @@ bool FitGaussianCeres(
                 ceres::Problem problem;
                 
                 for (size_t i = 0; i < clean_x.size(); ++i) {
-                    ceres::CostFunction* cost_function = GaussianCostFunction::Create(
-                        clean_x[i], clean_y[i], uncertainty);
+                    ceres::CostFunction* cost_function = GaussCostFunction::Create(
+                        clean_x[i], clean_y[i], err);
                     problem.AddResidualBlock(cost_function, nullptr, parameters);
                 }
                 
@@ -651,13 +651,13 @@ bool FitGaussianCeres(
                 ceres::Solve(options, &problem, &summary);
                 
                 // Validation
-                bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
+                bool fit_success = (summary.termination_type == ceres::CONVERGENCE ||
                                       summary.termination_type == ceres::USER_SUCCESS) &&
                                      parameters[0] > 0 && parameters[2] > 0 &&
                                      !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
                                      !std::isnan(parameters[2]) && !std::isnan(parameters[3]);
                 
-                if (fit_successful) {
+                if (fit_success) {
                     double cost = summary.final_cost;
                     double chi2 = cost * 2.0;
                     int dof = std::max(1, static_cast<int>(clean_x.size()) - 4);
@@ -671,7 +671,7 @@ bool FitGaussianCeres(
                         any_success = true;
                         
                         if (verbose) {
-                            std::cout << "New best Gaussian result from " << guess.description 
+                            std::cout << "New best Gauss result from " << guess.description 
                                      << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
                         }
                     }
@@ -686,7 +686,7 @@ bool FitGaussianCeres(
             // ALWAYS add perturbations regardless of chi-squared quality
             if (any_success) {
                 if (verbose) {
-                    std::cout << "Base Gaussian fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
+                    std::cout << "Base Gauss fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
                 }
                 
                 // Add exactly 2 perturbations to reduce multi-start budget
@@ -694,7 +694,7 @@ bool FitGaussianCeres(
                 
                 for (double factor : perturbation_factors) {
                     ParameterSet perturbed_set;
-                    perturbed_set.params[0] = estimates.amplitude * factor;
+                    perturbed_set.params[0] = estimates.amp * factor;
                     perturbed_set.params[1] = estimates.center + (factor - 1.0) * pixel_spacing * 0.3;
                     perturbed_set.params[2] = estimates.sigma * std::sqrt(factor);
                     perturbed_set.params[3] = estimates.offset * (0.8 + 0.4 * factor);
@@ -710,8 +710,8 @@ bool FitGaussianCeres(
                     ceres::Problem problem;
                     
                     for (size_t i = 0; i < clean_x.size(); ++i) {
-                        ceres::CostFunction* cost_function = GaussianCostFunction::Create(
-                            clean_x[i], clean_y[i], uncertainty);
+                        ceres::CostFunction* cost_function = GaussCostFunction::Create(
+                            clean_x[i], clean_y[i], err);
                         problem.AddResidualBlock(cost_function, nullptr, parameters);
                     }
                     
@@ -763,13 +763,13 @@ bool FitGaussianCeres(
                     ceres::Solver::Summary summary;
                     ceres::Solve(options, &problem, &summary);
                     
-                    bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
+                    bool fit_success = (summary.termination_type == ceres::CONVERGENCE ||
                                           summary.termination_type == ceres::USER_SUCCESS) &&
                                          parameters[0] > 0 && parameters[2] > 0 &&
                                          !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
                                          !std::isnan(parameters[2]) && !std::isnan(parameters[3]);
                     
-                    if (fit_successful) {
+                    if (fit_success) {
                         double cost = summary.final_cost;
                         double chi2 = cost * 2.0;
                         int dof = std::max(1, static_cast<int>(clean_x.size()) - 4);
@@ -792,13 +792,13 @@ bool FitGaussianCeres(
             
             if (any_success) {
                 // Extract results from best attempt
-                fit_amplitude = best_parameters[0];
+                fit_amp = best_parameters[0];
                 fit_center = best_parameters[1];
                 fit_sigma = std::abs(best_parameters[2]);
                 fit_offset = best_parameters[3];
                 
-                // Simple fallback uncertainty estimation
-                fit_amplitude_err = std::max(0.02 * fit_amplitude, 0.1 * data_stats.mad);
+                // Simple fallback err estimation
+                fit_amp_err = std::max(0.02 * fit_amp, 0.1 * data_stats.mad);
                 fit_center_err = std::max(0.02 * pixel_spacing, fit_sigma / 10.0);
                 fit_sigma_err = std::max(0.05 * fit_sigma, 0.01 * pixel_spacing);
                 fit_offset_err = std::max(0.1 * std::abs(fit_offset), 0.05 * data_stats.mad);
@@ -806,9 +806,9 @@ bool FitGaussianCeres(
                 chi2_reduced = best_chi2_reduced;
                 
                 if (verbose) {
-                    std::cout << "Successful Gaussian fit with " << stage_name 
+                    std::cout << "Success Gauss fit with " << stage_name 
                              << ", dataset " << dataset_idx << ", best init: " << best_description
-                             << ": A=" << fit_amplitude << "±" << fit_amplitude_err
+                             << ": A=" << fit_amp << "±" << fit_amp_err
                              << ", m=" << fit_center << "±" << fit_center_err
                              << ", sigma=" << fit_sigma << "±" << fit_sigma_err
                              << ", B=" << fit_offset << "±" << fit_offset_err
@@ -853,7 +853,7 @@ bool FitGaussianCeres(
         
         if (best_success) {
             if (verbose) {
-                std::cout << "Best Gaussian fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
+                std::cout << "Best Gauss fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
             }
             return true;
         }
@@ -865,7 +865,7 @@ bool FitGaussianCeres(
     return false;
 }
 
-GaussianFit2DResultsCeres Fit2DGaussianCeres(
+Gauss2DResultsCeres GaussCeres2D(
     const std::vector<double>& x_coords,
     const std::vector<double>& y_coords, 
     const std::vector<double>& charge_values,
@@ -875,27 +875,27 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
     bool verbose,
     bool enable_outlier_filtering)
 {
-    GaussianFit2DResultsCeres result;
+    Gauss2DResultsCeres result;
     
     // Initialize Ceres logging (removed mutex for better parallelization)
     InitializeCeres();
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
         if (verbose) {
-            std::cout << "Fit2DGaussianCeres: Error - coordinate and charge vector sizes don't match" << std::endl;
+            std::cout << "GaussCeres2D: Error - coordinate and charge vector sizes don't match" << std::endl;
         }
         return result;
     }
     
     if (x_coords.size() < 4) {
         if (verbose) {
-            std::cout << "Fit2DGaussianCeres: Error - need at least 4 data points for fitting" << std::endl;
+            std::cout << "GaussCeres2D: Error - need at least 4 data points for fitting" << std::endl;
         }
         return result;
     }
     
     if (verbose) {
-        std::cout << "Starting 2D Gaussian fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
+        std::cout << "Starting 2D Gauss fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
     // Create maps to group data by rows and columns
@@ -963,7 +963,7 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
     bool x_fit_success = false;
     bool y_fit_success = false;
     
-    // Fit X direction (central row)
+    //  X direction (central row)
     if (rows_data.find(best_row_y) != rows_data.end() && rows_data[best_row_y].size() >= 4) {
         auto& row_data = rows_data[best_row_y];
         
@@ -978,21 +978,21 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
         }
         
         if (verbose) {
-            std::cout << "Fitting X direction with " << x_vals.size() << " points" << std::endl;
+            std::cout << "ting X direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        x_fit_success = FitGaussianCeres(
+        x_fit_success = GaussCeres(
             x_vals, y_vals, center_x_estimate, pixel_spacing,
-            result.x_amplitude, result.x_center, result.x_sigma, result.x_vertical_offset,
-            result.x_amplitude_err, result.x_center_err, result.x_sigma_err, result.x_vertical_offset_err,
+            result.x_amp, result.x_center, result.x_sigma, result.x_vert_offset,
+            result.x_amp_err, result.x_center_err, result.x_sigma_err, result.x_vert_offset_err,
             result.x_chi2red, verbose, enable_outlier_filtering);
         
-        // Calculate DOF and p-value
+        // Calc DOF and p-value
         result.x_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
         result.x_pp = (result.x_chi2red > 0) ? 1.0 - std::min(1.0, result.x_chi2red / 10.0) : 0.0; // Simple p-value approximation
     }
     
-    // Fit Y direction (central column)
+    //  Y direction (central column)
     if (cols_data.find(best_col_x) != cols_data.end() && cols_data[best_col_x].size() >= 4) {
         auto& col_data = cols_data[best_col_x];
         
@@ -1007,32 +1007,32 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
         }
         
         if (verbose) {
-            std::cout << "Fitting Y direction with " << x_vals.size() << " points" << std::endl;
+            std::cout << "ting Y direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        y_fit_success = FitGaussianCeres(
+        y_fit_success = GaussCeres(
             x_vals, y_vals, center_y_estimate, pixel_spacing,
-            result.y_amplitude, result.y_center, result.y_sigma, result.y_vertical_offset,
-            result.y_amplitude_err, result.y_center_err, result.y_sigma_err, result.y_vertical_offset_err,
+            result.y_amp, result.y_center, result.y_sigma, result.y_vert_offset,
+            result.y_amp_err, result.y_center_err, result.y_sigma_err, result.y_vert_offset_err,
             result.y_chi2red, verbose, enable_outlier_filtering);
         
-        // Calculate DOF and p-value
+        // Calc DOF and p-value
         result.y_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
         result.y_pp = (result.y_chi2red > 0) ? 1.0 - std::min(1.0, result.y_chi2red / 10.0) : 0.0; // Simple p-value approximation
     }
     
     // Set overall success status
-    result.fit_successful = x_fit_success && y_fit_success;
+    result.fit_success = x_fit_success && y_fit_success;
     
-    // Calculate and store charge uncertainties (5% of max charge for each direction) only if enabled
-    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+    // Calc and store charge uncertainties (5% of max charge for each direction) only if enabled
+    if (Constants::ENABLE_VERT_CHARGE_ERR) {
         if (x_fit_success && rows_data.find(best_row_y) != rows_data.end()) {
             auto& row_data = rows_data[best_row_y];
             double max_charge_x = 0.0;
             for (const auto& point : row_data) {
                 max_charge_x = std::max(max_charge_x, point.second);
             }
-            result.x_charge_uncertainty = 0.05 * max_charge_x;
+            result.x_charge_err = 0.05 * max_charge_x;
         }
         
         if (y_fit_success && cols_data.find(best_col_x) != cols_data.end()) {
@@ -1041,15 +1041,15 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
             for (const auto& point : col_data) {
                 max_charge_y = std::max(max_charge_y, point.second);
             }
-            result.y_charge_uncertainty = 0.05 * max_charge_y;
+            result.y_charge_err = 0.05 * max_charge_y;
         }
     } else {
-        result.x_charge_uncertainty = 0.0;
-        result.y_charge_uncertainty = 0.0;
+        result.x_charge_err = 0.0;
+        result.y_charge_err = 0.0;
     }
     
     if (verbose) {
-        std::cout << "2D Gaussian fit (Ceres) " << (result.fit_successful ? "successful" : "failed") 
+        std::cout << "2D Gauss fit (Ceres) " << (result.fit_success ? "success" : "failed") 
                  << " (X: " << (x_fit_success ? "OK" : "FAIL") 
                  << ", Y: " << (y_fit_success ? "OK" : "FAIL") << ")" << std::endl;
     }
@@ -1057,7 +1057,7 @@ GaussianFit2DResultsCeres Fit2DGaussianCeres(
     return result;
 }
 
-DiagonalFitResultsCeres FitDiagonalGaussianCeres(
+DiagResultsCeres DiagGaussCeres(
     const std::vector<double>& x_coords,
     const std::vector<double>& y_coords, 
     const std::vector<double>& charge_values,
@@ -1067,36 +1067,36 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
     bool verbose,
     bool enable_outlier_filtering)
 {
-    DiagonalFitResultsCeres result;
+    DiagResultsCeres result;
     
     // Initialize Ceres logging (removed mutex for better parallelization)
     InitializeCeres();
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size() || x_coords.size() < 4) {
         if (verbose) {
-            std::cout << "Diagonal Gaussian fit (Ceres): Invalid input data size" << std::endl;
+            std::cout << "Diag Gauss fit (Ceres): Invalid input data size" << std::endl;
         }
         return result;
     }
     
     if (verbose) {
-        std::cout << "Starting Diagonal Gaussian fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
+        std::cout << "Starting Diag Gauss fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
-    // FIXED DIAGONAL APPROACH:
+    // FIXED DIAG APPROACH:
     // 1. Use spatial binning instead of exact coordinate matching
     // 2. Correct coordinate transformations for ±45° rotations
     // 3. Proper pixel spacing for diagonal geometry
     
-    // Diagonal bin width - wider than row/column to capture more pixels
+    // Diag bin width - wider than row/column to capture more pixels
     const double bin_width = pixel_spacing * 0.5; // 50% of pixel spacing for better coverage
     
     // Correct diagonal pixel spacing (actual distance between diagonal neighbors)
     const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // √2, no calibration factor
     
     // Maps: binned diagonal coordinate → [(distance_along_diagonal, charge), ...]
-    std::map<int, std::vector<std::pair<double, double>>> main_diagonal_bins; // +45° direction
-    std::map<int, std::vector<std::pair<double, double>>> sec_diagonal_bins;  // -45° direction
+    std::map<int, std::vector<std::pair<double, double>>> main_diag_bins; // +45° direction
+    std::map<int, std::vector<std::pair<double, double>>> sec_diag_bins;  // -45° direction
     
     for (size_t i = 0; i < x_coords.size(); ++i) {
         double x = x_coords[i];
@@ -1111,27 +1111,27 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
         // CORRECTED COORDINATE TRANSFORMATIONS:
         // Main diagonal (+45°): pixels where x-coordinate increases as y-coordinate increases
         // We rotate by -45° to align with X-axis: (x',y') = ((dx+dy)/√2, (dy-dx)/√2)
-        // The diagonal runs along constant (dy-dx), and position along diagonal is (dx+dy)/√2
+        // The diagonal runs along constant (dy-dx), and pos along diagonal is (dx+dy)/√2
         double main_diag_id = dy - dx;                    // Perpendicular distance to +45° line
-        double main_diag_pos = (dx + dy) / 1.41421356237; // Position along +45° diagonal
+        double main_diag_pos = (dx + dy) / 1.41421356237; // Pos along +45° diagonal
         
         // Secondary diagonal (-45°): pixels where x-coordinate increases as y-coordinate decreases  
         // We rotate by +45° to align with X-axis: (x',y') = ((dx-dy)/√2, (dx+dy)/√2)
-        // The diagonal runs along constant (dx+dy), and position along diagonal is (dx-dy)/√2
+        // The diagonal runs along constant (dx+dy), and pos along diagonal is (dx-dy)/√2
         double sec_diag_id = dx + dy;                     // Perpendicular distance to -45° line
-        double sec_diag_pos = (dx - dy) / 1.41421356237; // Position along -45° diagonal
+        double sec_diag_pos = (dx - dy) / 1.41421356237; // Pos along -45° diagonal
         
         // Bin the diagonal identifiers for spatial grouping
         int main_bin = static_cast<int>(std::round(main_diag_id / bin_width));
         int sec_bin = static_cast<int>(std::round(sec_diag_id / bin_width));
         
-        main_diagonal_bins[main_bin].emplace_back(main_diag_pos, charge);
-        sec_diagonal_bins[sec_bin].emplace_back(sec_diag_pos, charge);
+        main_diag_bins[main_bin].emplace_back(main_diag_pos, charge);
+        sec_diag_bins[sec_bin].emplace_back(sec_diag_pos, charge);
     }
     
     if (verbose) {
-        std::cout << "Found " << main_diagonal_bins.size() << " main diagonal bins and " 
-                 << sec_diagonal_bins.size() << " secondary diagonal bins" << std::endl;
+        std::cout << "Found " << main_diag_bins.size() << " main diagonal bins and " 
+                 << sec_diag_bins.size() << " secondary diagonal bins" << std::endl;
     }
     
     // Find the best bins (those with most pixels near the center)
@@ -1153,105 +1153,105 @@ DiagonalFitResultsCeres FitDiagonalGaussianCeres(
         return best_bin;
     };
     
-    int best_main_bin = find_best_bin(main_diagonal_bins, "main");
-    int best_sec_bin = find_best_bin(sec_diagonal_bins, "secondary");
+    int best_main_bin = find_best_bin(main_diag_bins, "main");
+    int best_sec_bin = find_best_bin(sec_diag_bins, "secondary");
     
     bool main_diag_success = false;
     bool sec_diag_success = false;
     
-    // Fit main diagonal (+45° direction)
-    if (main_diagonal_bins.find(best_main_bin) != main_diagonal_bins.end() && 
-        main_diagonal_bins[best_main_bin].size() >= 4) {
+    //  main diagonal (+45° direction)
+    if (main_diag_bins.find(best_main_bin) != main_diag_bins.end() && 
+        main_diag_bins[best_main_bin].size() >= 4) {
         
-        auto& main_data = main_diagonal_bins[best_main_bin];
+        auto& main_data = main_diag_bins[best_main_bin];
         
-        // Sort by position along diagonal
+        // Sort by pos along diagonal
         std::sort(main_data.begin(), main_data.end());
         
-        std::vector<double> positions, charges;
+        std::vector<double> poss, charges;
         for (const auto& point : main_data) {
-            positions.push_back(point.first);
+            poss.push_back(point.first);
             charges.push_back(point.second);
         }
         
         if (verbose) {
-            std::cout << "Fitting main diagonal (+45°) with " << positions.size() << " points" << std::endl;
+            std::cout << "ting main diagonal (+45°) with " << poss.size() << " points" << std::endl;
         }
         
-        main_diag_success = FitGaussianCeres(
-            positions, charges, 0.0, diag_pixel_spacing,
-            result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_sigma, result.main_diag_x_vertical_offset,
-            result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_sigma_err, result.main_diag_x_vertical_offset_err,
+        main_diag_success = GaussCeres(
+            poss, charges, 0.0, diag_pixel_spacing,
+            result.main_diag_x_amp, result.main_diag_x_center, result.main_diag_x_sigma, result.main_diag_x_vert_offset,
+            result.main_diag_x_amp_err, result.main_diag_x_center_err, result.main_diag_x_sigma_err, result.main_diag_x_vert_offset_err,
             result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
         
-        result.main_diag_x_dof = std::max(1, static_cast<int>(positions.size()) - 4);
+        result.main_diag_x_dof = std::max(1, static_cast<int>(poss.size()) - 4);
         result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
-        result.main_diag_x_fit_successful = main_diag_success;
+        result.main_diag_x_fit_success = main_diag_success;
         
         // For symmetry, copy results to Y (since we only have one diagonal measurement)
-        result.main_diag_y_amplitude = result.main_diag_x_amplitude;
+        result.main_diag_y_amp = result.main_diag_x_amp;
         result.main_diag_y_center = result.main_diag_x_center;
         result.main_diag_y_sigma = result.main_diag_x_sigma;
-        result.main_diag_y_vertical_offset = result.main_diag_x_vertical_offset;
-        result.main_diag_y_amplitude_err = result.main_diag_x_amplitude_err;
+        result.main_diag_y_vert_offset = result.main_diag_x_vert_offset;
+        result.main_diag_y_amp_err = result.main_diag_x_amp_err;
         result.main_diag_y_center_err = result.main_diag_x_center_err;
         result.main_diag_y_sigma_err = result.main_diag_x_sigma_err;
-        result.main_diag_y_vertical_offset_err = result.main_diag_x_vertical_offset_err;
+        result.main_diag_y_vert_offset_err = result.main_diag_x_vert_offset_err;
         result.main_diag_y_chi2red = result.main_diag_x_chi2red;
         result.main_diag_y_dof = result.main_diag_x_dof;
         result.main_diag_y_pp = result.main_diag_x_pp;
-        result.main_diag_y_fit_successful = main_diag_success;
+        result.main_diag_y_fit_success = main_diag_success;
     }
     
-    // Fit secondary diagonal (-45° direction)
-    if (sec_diagonal_bins.find(best_sec_bin) != sec_diagonal_bins.end() && 
-        sec_diagonal_bins[best_sec_bin].size() >= 4) {
+    //  secondary diagonal (-45° direction)
+    if (sec_diag_bins.find(best_sec_bin) != sec_diag_bins.end() && 
+        sec_diag_bins[best_sec_bin].size() >= 4) {
         
-        auto& sec_data = sec_diagonal_bins[best_sec_bin];
+        auto& sec_data = sec_diag_bins[best_sec_bin];
         
-        // Sort by position along diagonal
+        // Sort by pos along diagonal
         std::sort(sec_data.begin(), sec_data.end());
         
-        std::vector<double> positions, charges;
+        std::vector<double> poss, charges;
         for (const auto& point : sec_data) {
-            positions.push_back(point.first);
+            poss.push_back(point.first);
             charges.push_back(point.second);
         }
         
         if (verbose) {
-            std::cout << "Fitting secondary diagonal (-45°) with " << positions.size() << " points" << std::endl;
+            std::cout << "ting secondary diagonal (-45°) with " << poss.size() << " points" << std::endl;
         }
         
-        sec_diag_success = FitGaussianCeres(
-            positions, charges, 0.0, diag_pixel_spacing,
-            result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_sigma, result.sec_diag_x_vertical_offset,
-            result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_sigma_err, result.sec_diag_x_vertical_offset_err,
+        sec_diag_success = GaussCeres(
+            poss, charges, 0.0, diag_pixel_spacing,
+            result.sec_diag_x_amp, result.sec_diag_x_center, result.sec_diag_x_sigma, result.sec_diag_x_vert_offset,
+            result.sec_diag_x_amp_err, result.sec_diag_x_center_err, result.sec_diag_x_sigma_err, result.sec_diag_x_vert_offset_err,
             result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
         
-        result.sec_diag_x_dof = std::max(1, static_cast<int>(positions.size()) - 4);
+        result.sec_diag_x_dof = std::max(1, static_cast<int>(poss.size()) - 4);
         result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
-        result.sec_diag_x_fit_successful = sec_diag_success;
+        result.sec_diag_x_fit_success = sec_diag_success;
         
         // For symmetry, copy results to Y
-        result.sec_diag_y_amplitude = result.sec_diag_x_amplitude;
+        result.sec_diag_y_amp = result.sec_diag_x_amp;
         result.sec_diag_y_center = result.sec_diag_x_center;
         result.sec_diag_y_sigma = result.sec_diag_x_sigma;
-        result.sec_diag_y_vertical_offset = result.sec_diag_x_vertical_offset;
-        result.sec_diag_y_amplitude_err = result.sec_diag_x_amplitude_err;
+        result.sec_diag_y_vert_offset = result.sec_diag_x_vert_offset;
+        result.sec_diag_y_amp_err = result.sec_diag_x_amp_err;
         result.sec_diag_y_center_err = result.sec_diag_x_center_err;
         result.sec_diag_y_sigma_err = result.sec_diag_x_sigma_err;
-        result.sec_diag_y_vertical_offset_err = result.sec_diag_x_vertical_offset_err;
+        result.sec_diag_y_vert_offset_err = result.sec_diag_x_vert_offset_err;
         result.sec_diag_y_chi2red = result.sec_diag_x_chi2red;
         result.sec_diag_y_dof = result.sec_diag_x_dof;
         result.sec_diag_y_pp = result.sec_diag_x_pp;
-        result.sec_diag_y_fit_successful = sec_diag_success;
+        result.sec_diag_y_fit_success = sec_diag_success;
     }
     
     // Set overall success status
-    result.fit_successful = main_diag_success && sec_diag_success;
+    result.fit_success = main_diag_success && sec_diag_success;
     
     if (verbose) {
-        std::cout << "Diagonal Gaussian fit (Ceres) " << (result.fit_successful ? "successful" : "failed") 
+        std::cout << "Diag Gauss fit (Ceres) " << (result.fit_success ? "success" : "failed") 
                  << " (Main +45°: " << (main_diag_success ? "OK" : "FAIL") 
                  << ", Secondary -45°: " << (sec_diag_success ? "OK" : "FAIL") << ")" << std::endl;
     }

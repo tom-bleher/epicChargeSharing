@@ -1,4 +1,4 @@
-#include "2DLorentzianFitCeres.hh"
+#include "2DLorentzCeres.hh"
 #include "CeresLoggingInit.hh"
 #include "Constants.hh"
 #include "G4SystemOfUnits.hh"
@@ -17,34 +17,34 @@
 #include "glog/logging.h"
 
 // Thread counter for debugging (removed mutex for better parallelization)
-static std::atomic<int> gGlobalCeresLorentzianFitCounter{0};
+static std::atomic<int> gGlobalCeresLorentzCounter{0};
 
 // Use shared Google logging initialization
-void InitializeCeresLorentzian() {
+void InitializeCeresLorentz() {
     CeresLoggingInitializer::InitializeOnce();
 }
 
-// Calculate uncertainty as 5% of max charge in line (if enabled)
-double CalculateLorentzianUncertainty(double max_charge_in_line) {
-    if (!Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+// Calc err as 5% of max charge in line (if enabled)
+double CalcLorentzErr(double max_charge_in_line) {
+    if (!Constants::ENABLE_VERT_CHARGE_ERR) {
         return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
-    // Uncertainty = 5% of max charge when enabled
-    double uncertainty = 0.05 * max_charge_in_line;
-    if (uncertainty < Constants::MIN_UNCERTAINTY_VALUE) uncertainty = Constants::MIN_UNCERTAINTY_VALUE; // Prevent division by zero
-    return uncertainty;
+    // Err = 5% of max charge when enabled
+    double err = 0.05 * max_charge_in_line;
+    if (err < Constants::MIN_UNCERTAINTY_VALUE) err = Constants::MIN_UNCERTAINTY_VALUE; // Prevent division by zero
+    return err;
 }
 
-// Lorentzian cost function with uncertainty (5% of max charge)
+// Lorentz cost function with err (5% of max charge)
 // Function form: y(x) = A / (1 + ((x - m) / γ)^2) + B  
-struct LorentzianCostFunction {
-    LorentzianCostFunction(double x, double y, double uncertainty) 
-        : x_(x), y_(y), uncertainty_(uncertainty) {}
+struct LorentzCostFunction {
+    LorentzCostFunction(double x, double y, double err) 
+        : x_(x), y_(y), err_(err) {}
     
     template <typename T>
     bool operator()(const T* const params, T* residual) const {
-        // params[0] = A (amplitude)
+        // params[0] = A (amp)
         // params[1] = m (center)
         // params[2] = gamma (HWHM)
         // params[3] = B (baseline)
@@ -60,7 +60,7 @@ struct LorentzianCostFunction {
             safe_gamma = T(Constants::MIN_SAFE_PARAMETER);
         }
         
-        // Lorentzian function: y(x) = A / (1 + ((x - m) / γ)^2) + B
+        // Lorentz function: y(x) = A / (1 + ((x - m) / γ)^2) + B
         T dx = x_ - m;
         T normalized_dx = dx / safe_gamma;
         T denominator = T(1.0) + normalized_dx * normalized_dx;
@@ -72,30 +72,30 @@ struct LorentzianCostFunction {
         
         T predicted = A / denominator + B;
         
-        // Residual divided by uncertainty (standard weighted least squares)
-        residual[0] = (predicted - T(y_)) / T(uncertainty_);
+        // Residual divided by err (standard weighted least squares)
+        residual[0] = (predicted - T(y_)) / T(err_);
         
         return true;
     }
     
-    static ceres::CostFunction* Create(double x, double y, double uncertainty) {
-        return (new ceres::AutoDiffCostFunction<LorentzianCostFunction, 1, 4>(
-            new LorentzianCostFunction(x, y, uncertainty)));
+    static ceres::CostFunction* Create(double x, double y, double err) {
+        return (new ceres::AutoDiffCostFunction<LorentzCostFunction, 1, 4>(
+            new LorentzCostFunction(x, y, err)));
     }
     
 private:
     const double x_;
     const double y_;
-    const double uncertainty_;
+    const double err_;
 };
 
-// Parameter estimation structures for Lorentzian
-struct LorentzianParameterEstimates {
-    double amplitude;
+// Parameter estimation structures for Lorentz
+struct LorentzParameterEstimates {
+    double amp;
     double center;
     double gamma;
     double baseline;
-    double amplitude_err;
+    double amp_err;
     double center_err;
     double gamma_err;
     double baseline_err;
@@ -103,7 +103,7 @@ struct LorentzianParameterEstimates {
     int method_used;
 };
 
-// Robust statistics calculations (reusing from Gaussian implementation)
+// Robust statistics calculations (reusing from Gauss implementation)
 struct DataStatistics {
     double mean;
     double median;
@@ -117,7 +117,7 @@ struct DataStatistics {
     bool valid;
 };
 
-DataStatistics CalculateRobustStatisticsLorentzian(const std::vector<double>& x_vals, 
+DataStatistics CalcRobustStatisticsLorentz(const std::vector<double>& x_vals, 
                                                    const std::vector<double>& y_vals) {
     DataStatistics stats;
     stats.valid = false;
@@ -196,15 +196,15 @@ DataStatistics CalculateRobustStatisticsLorentzian(const std::vector<double>& x_
     return stats;
 } 
 
-// Parameter estimation for Lorentzian distributions
-LorentzianParameterEstimates EstimateLorentzianParameters(
+// Parameter estimation for Lorentz distributions
+LorentzParameterEstimates EstimateLorentzParameters(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     double center_estimate,
     double pixel_spacing,
     bool verbose = false) {
     
-    LorentzianParameterEstimates estimates;
+    LorentzParameterEstimates estimates;
     estimates.valid = false;
     estimates.method_used = 0;
     
@@ -212,29 +212,29 @@ LorentzianParameterEstimates EstimateLorentzianParameters(
         return estimates;
     }
     
-    DataStatistics stats = CalculateRobustStatisticsLorentzian(x_vals, y_vals);
+    DataStatistics stats = CalcRobustStatisticsLorentz(x_vals, y_vals);
     if (!stats.valid) {
         return estimates;
     }
     
     if (verbose) {
-        std::cout << "Lorentzian data statistics: min=" << stats.min_val << ", max=" << stats.max_val 
+        std::cout << "Lorentz data statistics: min=" << stats.min_val << ", max=" << stats.max_val 
                  << ", median=" << stats.median << ", weighted_mean=" << stats.weighted_mean << std::endl;
     }
     
     // Method 1: Physics-based estimation for charge distributions
     estimates.center = stats.weighted_mean;
     estimates.baseline = std::min(stats.min_val, stats.q25);
-    estimates.amplitude = stats.max_val - estimates.baseline;
+    estimates.amp = stats.max_val - estimates.baseline;
     
-    // For Lorentzian: gamma (HWHM) estimation based on charge spread
-    // Lorentzian tails are wider than Gaussian, so use larger initial gamma
+    // For Lorentz: gamma (HWHM) estimation based on charge spread
+    // Lorentz tails are wider than Gauss, so use larger initial gamma
     double distance_spread = 0.0;
     double weight_sum = 0.0;
     
     for (size_t i = 0; i < x_vals.size(); ++i) {
         double weight = std::max(0.0, y_vals[i] - estimates.baseline);
-        if (weight > 0.1 * estimates.amplitude) {
+        if (weight > 0.1 * estimates.amp) {
             double dx = x_vals[i] - estimates.center;
             distance_spread += weight * dx * dx;
             weight_sum += weight;
@@ -242,25 +242,25 @@ LorentzianParameterEstimates EstimateLorentzianParameters(
     }
     
     if (weight_sum > 0) {
-        // For Lorentzian, gamma ≈ sqrt(2*sigma^2) where sigma is from Gaussian equivalent
+        // For Lorentz, gamma ≈ sqrt(2*sigma^2) where sigma is from Gauss equivalent
         estimates.gamma = std::sqrt(2.0 * distance_spread / weight_sum);
     } else {
-        estimates.gamma = pixel_spacing * 0.7; // Larger default for Lorentzian
+        estimates.gamma = pixel_spacing * 0.7; // Larger default for Lorentz
     }
     
-    // Apply physics-based bounds (Lorentzian has wider tails)
+    // Apply physics-based bounds (Lorentz has wider tails)
     estimates.gamma = std::max(pixel_spacing * 0.3, std::min(pixel_spacing * 3.0, estimates.gamma));
-    estimates.amplitude = std::max(estimates.amplitude, (stats.max_val - stats.min_val) * 0.1);
+    estimates.amp = std::max(estimates.amp, (stats.max_val - stats.min_val) * 0.1);
     
     // Validate Method 1
-    if (estimates.amplitude > 0 && estimates.gamma > 0 && 
-        !std::isnan(estimates.center) && !std::isnan(estimates.amplitude) && 
+    if (estimates.amp > 0 && estimates.gamma > 0 && 
+        !std::isnan(estimates.center) && !std::isnan(estimates.amp) && 
         !std::isnan(estimates.gamma) && !std::isnan(estimates.baseline)) {
         estimates.method_used = 1;
         estimates.valid = true;
         
         if (verbose) {
-            std::cout << "Lorentzian Method 1 (Physics-based): A=" << estimates.amplitude 
+            std::cout << "Lorentz Method 1 (Physics-based): A=" << estimates.amp 
                      << ", m=" << estimates.center << ", gamma=" << estimates.gamma 
                      << ", B=" << estimates.baseline << std::endl;
         }
@@ -270,15 +270,15 @@ LorentzianParameterEstimates EstimateLorentzianParameters(
     // Method 2: Robust statistical estimation
     estimates.center = stats.median;
     estimates.baseline = stats.q25;
-    estimates.amplitude = stats.q75 - stats.q25;
+    estimates.amp = stats.q75 - stats.q25;
     estimates.gamma = std::max(stats.mad, pixel_spacing * 0.5);
     
-    if (estimates.amplitude > 0 && estimates.gamma > 0) {
+    if (estimates.amp > 0 && estimates.gamma > 0) {
         estimates.method_used = 2;
         estimates.valid = true;
         
         if (verbose) {
-            std::cout << "Lorentzian Method 2 (Robust statistical): A=" << estimates.amplitude 
+            std::cout << "Lorentz Method 2 (Robust statistical): A=" << estimates.amp 
                      << ", m=" << estimates.center << ", gamma=" << estimates.gamma 
                      << ", B=" << estimates.baseline << std::endl;
         }
@@ -288,13 +288,13 @@ LorentzianParameterEstimates EstimateLorentzianParameters(
     // Method 3: Conservative fallback
     estimates.center = center_estimate;
     estimates.baseline = 0.0;
-    estimates.amplitude = stats.max_val;
+    estimates.amp = stats.max_val;
     estimates.gamma = pixel_spacing * 0.7;
     estimates.method_used = 3;
     estimates.valid = true;
     
     if (verbose) {
-        std::cout << "Lorentzian Method 3 (Conservative fallback): A=" << estimates.amplitude 
+        std::cout << "Lorentz Method 3 (Conservative fallback): A=" << estimates.amp 
                  << ", m=" << estimates.center << ", gamma=" << estimates.gamma 
                  << ", B=" << estimates.baseline << std::endl;
     }
@@ -306,8 +306,8 @@ LorentzianParameterEstimates EstimateLorentzianParameters(
 
  
 
-// Outlier filtering for Lorentzian fitting (adapted from Gaussian version)
-std::pair<std::vector<double>, std::vector<double>> FilterLorentzianOutliers(
+// Outlier filtering for Lorentz fitting (adapted from Gauss version)
+std::pair<std::vector<double>, std::vector<double>> FilterLorentzOutliers(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     double sigma_threshold = 2.5,
@@ -319,7 +319,7 @@ std::pair<std::vector<double>, std::vector<double>> FilterLorentzianOutliers(
         return std::make_pair(filtered_x, filtered_y);
     }
     
-    DataStatistics stats = CalculateRobustStatisticsLorentzian(x_vals, y_vals);
+    DataStatistics stats = CalcRobustStatisticsLorentz(x_vals, y_vals);
     if (!stats.valid) {
         return std::make_pair(x_vals, y_vals);
     }
@@ -341,7 +341,7 @@ std::pair<std::vector<double>, std::vector<double>> FilterLorentzianOutliers(
     // Use lenient filtering if too many outliers removed
     if (filtered_x.size() < x_vals.size() / 2) {
         if (verbose) {
-            std::cout << "Too many Lorentzian outliers detected (" << outliers_removed 
+            std::cout << "Too many Lorentz outliers detected (" << outliers_removed 
                      << "), using lenient filtering" << std::endl;
         }
         
@@ -361,41 +361,41 @@ std::pair<std::vector<double>, std::vector<double>> FilterLorentzianOutliers(
     
     if (filtered_x.size() < 4) {
         if (verbose) {
-            std::cout << "Warning: After Lorentzian outlier filtering, only " << filtered_x.size() 
+            std::cout << "Warning: After Lorentz outlier filtering, only " << filtered_x.size() 
                      << " points remain" << std::endl;
         }
         return std::make_pair(x_vals, y_vals);
     }
     
     if (verbose && outliers_removed > 0) {
-        std::cout << "Removed " << outliers_removed << " Lorentzian outliers, " 
+        std::cout << "Removed " << outliers_removed << " Lorentz outliers, " 
                  << filtered_x.size() << " points remaining" << std::endl;
     }
     
     return std::make_pair(filtered_x, filtered_y);
 }
 
-// Core Lorentzian fitting function using Ceres Solver
-bool FitLorentzianCeres(
+// Core Lorentz fitting function using Ceres Solver
+bool LorentzCeres(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     double center_estimate,
     double pixel_spacing,
-    double& fit_amplitude,
+    double& fit_amp,
     double& fit_center,
     double& fit_gamma,
-    double& fit_vertical_offset,
-    double& fit_amplitude_err,
+    double& fit_vert_offset,
+    double& fit_amp_err,
     double& fit_center_err,
     double& fit_gamma_err,
-    double& fit_vertical_offset_err,
+    double& fit_vert_offset_err,
     double& chi2_reduced,
     bool verbose,
     bool enable_outlier_filtering) {
     
     if (x_vals.size() != y_vals.size() || x_vals.size() < 4) {
         if (verbose) {
-            std::cout << "Insufficient data points for Lorentzian fitting" << std::endl;
+            std::cout << "Insufficient data points for Lorentz fitting" << std::endl;
         }
         return false;
     }
@@ -404,12 +404,12 @@ bool FitLorentzianCeres(
     std::vector<std::pair<std::vector<double>, std::vector<double>>> filtered_datasets;
     
     if (enable_outlier_filtering) {
-        auto conservative_data = FilterLorentzianOutliers(x_vals, y_vals, 2.5, verbose);
+        auto conservative_data = FilterLorentzOutliers(x_vals, y_vals, 2.5, verbose);
         if (conservative_data.first.size() >= 4) {
             filtered_datasets.push_back(conservative_data);
         }
         
-        auto lenient_data = FilterLorentzianOutliers(x_vals, y_vals, 3.0, verbose);
+        auto lenient_data = FilterLorentzOutliers(x_vals, y_vals, 3.0, verbose);
         if (lenient_data.first.size() >= 4) {
             filtered_datasets.push_back(lenient_data);
         }
@@ -419,7 +419,7 @@ bool FitLorentzianCeres(
     filtered_datasets.push_back(std::make_pair(x_vals, y_vals));
     
     if (verbose) {
-        std::cout << "Lorentzian outlier filtering " << (enable_outlier_filtering ? "enabled" : "disabled") 
+        std::cout << "Lorentz outlier filtering " << (enable_outlier_filtering ? "enabled" : "disabled") 
                  << ", testing " << filtered_datasets.size() << " datasets" << std::endl;
     }
     
@@ -431,24 +431,24 @@ bool FitLorentzianCeres(
         if (clean_x.size() < 4) continue;
         
         if (verbose) {
-            std::cout << "Trying Lorentzian dataset " << dataset_idx << " with " << clean_x.size() << " points" << std::endl;
+            std::cout << "Trying Lorentz dataset " << dataset_idx << " with " << clean_x.size() << " points" << std::endl;
         }
         
         // Get parameter estimates
-        LorentzianParameterEstimates estimates = EstimateLorentzianParameters(clean_x, clean_y, center_estimate, pixel_spacing, verbose);
+        LorentzParameterEstimates estimates = EstimateLorentzParameters(clean_x, clean_y, center_estimate, pixel_spacing, verbose);
         if (!estimates.valid) {
             if (verbose) {
-                std::cout << "Lorentzian parameter estimation failed for dataset " << dataset_idx << std::endl;
+                std::cout << "Lorentz parameter estimation failed for dataset " << dataset_idx << std::endl;
             }
             continue;
         }
         
-        // Calculate uncertainty as 5% of max charge
+        // Calc err as 5% of max charge
         double max_charge = *std::max_element(clean_y.begin(), clean_y.end());
-        double uncertainty = CalculateLorentzianUncertainty(max_charge);
+        double err = CalcLorentzErr(max_charge);
         
         // OPTIMIZED: Cheap config first with early exit based on quality (Step 1 from optimize.md)
-        struct LorentzianFittingConfig {
+        struct LorentztingConfig {
             ceres::LinearSolverType linear_solver;
             ceres::TrustRegionStrategyType trust_region;
             double function_tolerance;
@@ -459,24 +459,24 @@ bool FitLorentzianCeres(
         };
         
         // Stage 1: Cheap configuration
-        LorentzianFittingConfig cheap_config = {
+        LorentztingConfig cheap_config = {
             ceres::DENSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 
             1e-10, 1e-10, 400, "NONE", 0.0
         };
         
         // Stage 2: Expensive fallback configurations
-        const std::vector<LorentzianFittingConfig> expensive_configs = {
-            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amplitude * 0.1},
-            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amplitude * 0.16},
-            {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amplitude * 0.22}
+        const std::vector<LorentztingConfig> expensive_configs = {
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amp * 0.1},
+            {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amp * 0.16},
+            {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amp * 0.22}
         };
         
         // Try cheap config first
-        auto try_config = [&](const LorentzianFittingConfig& config, const std::string& stage_name) -> bool {
+        auto try_config = [&](const LorentztingConfig& config, const std::string& stage_name) -> bool {
             if (verbose) {
-                std::cout << "Trying Lorentzian " << stage_name << " configuration..." << std::endl;
+                std::cout << "Trying Lorentz " << stage_name << " configuration..." << std::endl;
             }
-            // STEP 2 OPTIMIZATION: Hierarchical multi-start budget for Lorentzian
+            // STEP 2 OPTIMIZATION: Hierarchical multi-start budget for Lorentz
             // Start with base estimate, only add 2 perturbations if χ²ᵣ > 2.0
             // Expected: ×4-5 speed-up, average #Ceres solves/fit ≤10
             
@@ -489,7 +489,7 @@ bool FitLorentzianCeres(
             
             // ALWAYS start with base estimate first
             ParameterSet base_set;
-            base_set.params[0] = estimates.amplitude;
+            base_set.params[0] = estimates.amp;
             base_set.params[1] = estimates.center;
             base_set.params[2] = estimates.gamma;
             base_set.params[3] = estimates.baseline;
@@ -503,7 +503,7 @@ bool FitLorentzianCeres(
             double best_chi2_reduced = std::numeric_limits<double>::max();
             
             // Data characteristics for adaptive bounds
-            DataStatistics data_stats = CalculateRobustStatisticsLorentzian(clean_x, clean_y);
+            DataStatistics data_stats = CalcRobustStatisticsLorentz(clean_x, clean_y);
             double data_spread = *std::max_element(clean_x.begin(), clean_x.end()) - 
                                *std::min_element(clean_x.begin(), clean_x.end());
             double outlier_ratio = 0.0;
@@ -527,8 +527,8 @@ bool FitLorentzianCeres(
                 ceres::Problem problem;
                 
                 for (size_t i = 0; i < clean_x.size(); ++i) {
-                    ceres::CostFunction* cost_function = LorentzianCostFunction::Create(
-                        clean_x[i], clean_y[i], uncertainty);
+                    ceres::CostFunction* cost_function = LorentzCostFunction::Create(
+                        clean_x[i], clean_y[i], err);
                     problem.AddResidualBlock(cost_function, nullptr, parameters);
                 }
                 
@@ -573,13 +573,13 @@ bool FitLorentzianCeres(
                 ceres::Solver::Summary summary;
                 ceres::Solve(options, &problem, &summary);
                 
-                bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
+                bool fit_success = (summary.termination_type == ceres::CONVERGENCE ||
                                       summary.termination_type == ceres::USER_SUCCESS) &&
                                      parameters[0] > 0 && parameters[2] > 0 &&
                                      !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
                                      !std::isnan(parameters[2]) && !std::isnan(parameters[3]);
                 
-                if (fit_successful) {
+                if (fit_success) {
                     double cost = summary.final_cost;
                     double chi2 = cost * 2.0;
                     int dof = std::max(1, static_cast<int>(clean_x.size()) - 4);
@@ -593,7 +593,7 @@ bool FitLorentzianCeres(
                         any_success = true;
                         
                         if (verbose) {
-                            std::cout << "New best Lorentzian result from " << guess.description 
+                            std::cout << "New best Lorentz result from " << guess.description 
                                      << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
                         }
                     }
@@ -603,7 +603,7 @@ bool FitLorentzianCeres(
             // ALWAYS add perturbations regardless of chi-squared quality
             if (any_success) {
                 if (verbose) {
-                    std::cout << "Base Lorentzian fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
+                    std::cout << "Base Lorentz fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
                 }
                 
                 // Add exactly 2 perturbations to reduce multi-start budget
@@ -611,7 +611,7 @@ bool FitLorentzianCeres(
                 
                 for (double factor : perturbation_factors) {
                     ParameterSet perturbed_set;
-                    perturbed_set.params[0] = estimates.amplitude * factor;
+                    perturbed_set.params[0] = estimates.amp * factor;
                     perturbed_set.params[1] = estimates.center + (factor - 1.0) * pixel_spacing * 0.3;
                     perturbed_set.params[2] = estimates.gamma * std::sqrt(factor);
                     perturbed_set.params[3] = estimates.baseline * (0.8 + 0.4 * factor);
@@ -627,8 +627,8 @@ bool FitLorentzianCeres(
                     ceres::Problem problem;
                     
                     for (size_t i = 0; i < clean_x.size(); ++i) {
-                        ceres::CostFunction* cost_function = LorentzianCostFunction::Create(
-                            clean_x[i], clean_y[i], uncertainty);
+                        ceres::CostFunction* cost_function = LorentzCostFunction::Create(
+                            clean_x[i], clean_y[i], err);
                         problem.AddResidualBlock(cost_function, nullptr, parameters);
                     }
                     
@@ -673,13 +673,13 @@ bool FitLorentzianCeres(
                     ceres::Solver::Summary summary;
                     ceres::Solve(options, &problem, &summary);
                     
-                    bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
+                    bool fit_success = (summary.termination_type == ceres::CONVERGENCE ||
                                           summary.termination_type == ceres::USER_SUCCESS) &&
                                          parameters[0] > 0 && parameters[2] > 0 &&
                                          !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
                                          !std::isnan(parameters[2]) && !std::isnan(parameters[3]);
                     
-                    if (fit_successful) {
+                    if (fit_success) {
                         double cost = summary.final_cost;
                         double chi2 = cost * 2.0;
                         int dof = std::max(1, static_cast<int>(clean_x.size()) - 4);
@@ -699,31 +699,31 @@ bool FitLorentzianCeres(
                     }
                 }
             } else if (verbose && any_success) {
-                std::cout << "Base Lorentzian fit χ²ᵣ=" << best_chi2_reduced << " ≤ 0.3, skipping perturbations (hierarchical multi-start)" << std::endl;
+                std::cout << "Base Lorentz fit χ²ᵣ=" << best_chi2_reduced << " ≤ 0.3, skipping perturbations (hierarchical multi-start)" << std::endl;
             }
             
             if (any_success) {
                 // Extract results from best attempt
-                fit_amplitude = best_parameters[0];
+                fit_amp = best_parameters[0];
                 fit_center = best_parameters[1];
                 fit_gamma = std::abs(best_parameters[2]);
-                fit_vertical_offset = best_parameters[3];
+                fit_vert_offset = best_parameters[3];
                 
-                // Simple fallback uncertainty estimation
-                fit_amplitude_err = std::max(0.02 * fit_amplitude, 0.1 * data_stats.mad);
+                // Simple fallback err estimation
+                fit_amp_err = std::max(0.02 * fit_amp, 0.1 * data_stats.mad);
                 fit_center_err = std::max(0.02 * pixel_spacing, fit_gamma / 10.0);
                 fit_gamma_err = std::max(0.05 * fit_gamma, 0.01 * pixel_spacing);
-                fit_vertical_offset_err = std::max(0.1 * std::abs(fit_vertical_offset), 0.05 * data_stats.mad);
+                fit_vert_offset_err = std::max(0.1 * std::abs(fit_vert_offset), 0.05 * data_stats.mad);
                 
                 chi2_reduced = best_chi2_reduced;
                 
                 if (verbose) {
-                    std::cout << "Successful Lorentzian fit with " << stage_name 
+                    std::cout << "Success Lorentz fit with " << stage_name 
                              << ", dataset " << dataset_idx << ", best init: " << best_description
-                             << ": A=" << fit_amplitude << "±" << fit_amplitude_err
+                             << ": A=" << fit_amp << "±" << fit_amp_err
                              << ", m=" << fit_center << "±" << fit_center_err
                              << ", gamma=" << fit_gamma << "±" << fit_gamma_err
-                             << ", B=" << fit_vertical_offset << "±" << fit_vertical_offset_err
+                             << ", B=" << fit_vert_offset << "±" << fit_vert_offset_err
                              << ", chi2red=" << chi2_reduced << std::endl;
                 }
                 
@@ -738,14 +738,14 @@ bool FitLorentzianCeres(
         double best_chi2 = chi2_reduced;
         
         if (verbose) {
-            std::cout << "Cheap Lorentzian config " << (success ? "succeeded" : "failed") 
+            std::cout << "Cheap Lorentz config " << (success ? "succeeded" : "failed") 
                      << " with χ²ᵣ=" << chi2_reduced << std::endl;
         }
         
         // Always try ALL expensive configurations regardless of cheap config result
         if (verbose) {
             std::cout << "Trying all " << expensive_configs.size() 
-                     << " expensive Lorentzian configurations..." << std::endl;
+                     << " expensive Lorentz configurations..." << std::endl;
         }
         
         for (size_t i = 0; i < expensive_configs.size(); ++i) {
@@ -757,7 +757,7 @@ bool FitLorentzianCeres(
             }
             
             if (verbose) {
-                std::cout << "Expensive Lorentzian config " << (i+1) << " " 
+                std::cout << "Expensive Lorentz config " << (i+1) << " " 
                          << (config_success ? "succeeded" : "failed") 
                          << " with χ²ᵣ=" << chi2_reduced << std::endl;
             }
@@ -765,19 +765,19 @@ bool FitLorentzianCeres(
         
         if (best_success) {
             if (verbose) {
-                std::cout << "Best Lorentzian fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
+                std::cout << "Best Lorentz fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
             }
             return true;
         }
     }
     
     if (verbose) {
-        std::cout << "All Lorentzian fitting strategies failed" << std::endl;
+        std::cout << "All Lorentz fitting strategies failed" << std::endl;
     }
     return false;
 } 
 
-LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
+Lorentz2DResultsCeres LorentzCeres2D(
     const std::vector<double>& x_coords,
     const std::vector<double>& y_coords, 
     const std::vector<double>& charge_values,
@@ -787,27 +787,27 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
     bool verbose,
     bool enable_outlier_filtering)
 {
-    LorentzianFit2DResultsCeres result;
+    Lorentz2DResultsCeres result;
     
     // Initialize Ceres logging (removed mutex for better parallelization)
-    InitializeCeresLorentzian();
+    InitializeCeresLorentz();
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
         if (verbose) {
-            std::cout << "Fit2DLorentzianCeres: Error - coordinate and charge vector sizes don't match" << std::endl;
+            std::cout << "LorentzCeres2D: Error - coordinate and charge vector sizes don't match" << std::endl;
         }
         return result;
     }
     
     if (x_coords.size() < 4) {
         if (verbose) {
-            std::cout << "Fit2DLorentzianCeres: Error - need at least 4 data points for fitting" << std::endl;
+            std::cout << "LorentzCeres2D: Error - need at least 4 data points for fitting" << std::endl;
         }
         return result;
     }
     
     if (verbose) {
-        std::cout << "Starting 2D Lorentzian fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
+        std::cout << "Starting 2D Lorentz fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
     // Create maps to group data by rows and columns
@@ -875,7 +875,7 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
     bool x_fit_success = false;
     bool y_fit_success = false;
     
-    // Fit X direction (central row)
+    //  X direction (central row)
     if (rows_data.find(best_row_y) != rows_data.end() && rows_data[best_row_y].size() >= 4) {
         auto& row_data = rows_data[best_row_y];
         
@@ -893,16 +893,16 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
         }
         
         if (verbose) {
-            std::cout << "Fitting Lorentzian X direction with " << x_vals.size() << " points" << std::endl;
+            std::cout << "ting Lorentz X direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        x_fit_success = FitLorentzianCeres(
+        x_fit_success = LorentzCeres(
             x_vals, y_vals, center_x_estimate, pixel_spacing,
-            result.x_amplitude, result.x_center, result.x_gamma, result.x_vertical_offset,
-            result.x_amplitude_err, result.x_center_err, result.x_gamma_err, result.x_vertical_offset_err,
+            result.x_amp, result.x_center, result.x_gamma, result.x_vert_offset,
+            result.x_amp_err, result.x_center_err, result.x_gamma_err, result.x_vert_offset_err,
             result.x_chi2red, verbose, enable_outlier_filtering);
         
-        // Calculate DOF and p-value
+        // Calc DOF and p-value
         result.x_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
         result.x_pp = (result.x_chi2red > 0) ? 1.0 - std::min(1.0, result.x_chi2red / 10.0) : 0.0;
         
@@ -912,7 +912,7 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
         result.x_row_charge_errors = std::vector<double>(); // Empty vector
     }
     
-    // Fit Y direction (central column)
+    //  Y direction (central column)
     if (cols_data.find(best_col_x) != cols_data.end() && cols_data[best_col_x].size() >= 4) {
         auto& col_data = cols_data[best_col_x];
         
@@ -930,16 +930,16 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
         }
         
         if (verbose) {
-            std::cout << "Fitting Lorentzian Y direction with " << x_vals.size() << " points" << std::endl;
+            std::cout << "ting Lorentz Y direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        y_fit_success = FitLorentzianCeres(
+        y_fit_success = LorentzCeres(
             x_vals, y_vals, center_y_estimate, pixel_spacing,
-            result.y_amplitude, result.y_center, result.y_gamma, result.y_vertical_offset,
-            result.y_amplitude_err, result.y_center_err, result.y_gamma_err, result.y_vertical_offset_err,
+            result.y_amp, result.y_center, result.y_gamma, result.y_vert_offset,
+            result.y_amp_err, result.y_center_err, result.y_gamma_err, result.y_vert_offset_err,
             result.y_chi2red, verbose, enable_outlier_filtering);
         
-        // Calculate DOF and p-value
+        // Calc DOF and p-value
         result.y_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
         result.y_pp = (result.y_chi2red > 0) ? 1.0 - std::min(1.0, result.y_chi2red / 10.0) : 0.0;
         
@@ -950,17 +950,17 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
     }
     
     // Set overall success status
-    result.fit_successful = x_fit_success && y_fit_success;
+    result.fit_success = x_fit_success && y_fit_success;
     
-    // Calculate and store charge uncertainties (5% of max charge for each direction) only if enabled
-    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+    // Calc and store charge uncertainties (5% of max charge for each direction) only if enabled
+    if (Constants::ENABLE_VERT_CHARGE_ERR) {
         if (x_fit_success && rows_data.find(best_row_y) != rows_data.end()) {
             auto& row_data = rows_data[best_row_y];
             double max_charge_x = 0.0;
             for (const auto& point : row_data) {
                 max_charge_x = std::max(max_charge_x, point.second);
             }
-            result.x_charge_uncertainty = 0.05 * max_charge_x;
+            result.x_charge_err = 0.05 * max_charge_x;
         }
         
         if (y_fit_success && cols_data.find(best_col_x) != cols_data.end()) {
@@ -969,15 +969,15 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
             for (const auto& point : col_data) {
                 max_charge_y = std::max(max_charge_y, point.second);
             }
-            result.y_charge_uncertainty = 0.05 * max_charge_y;
+            result.y_charge_err = 0.05 * max_charge_y;
         }
     } else {
-        result.x_charge_uncertainty = 0.0;
-        result.y_charge_uncertainty = 0.0;
+        result.x_charge_err = 0.0;
+        result.y_charge_err = 0.0;
     }
     
     if (verbose) {
-        std::cout << "2D Lorentzian fit (Ceres) " << (result.fit_successful ? "successful" : "failed") 
+        std::cout << "2D Lorentz fit (Ceres) " << (result.fit_success ? "success" : "failed") 
                  << " (X: " << (x_fit_success ? "OK" : "FAIL") 
                  << ", Y: " << (y_fit_success ? "OK" : "FAIL") << ")" << std::endl;
     }
@@ -985,7 +985,7 @@ LorentzianFit2DResultsCeres Fit2DLorentzianCeres(
     return result;
 }
 
-DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
+DiagLorentzResultsCeres DiagLorentzCeres(
     const std::vector<double>& x_coords,
     const std::vector<double>& y_coords, 
     const std::vector<double>& charge_values,
@@ -995,36 +995,36 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
     bool verbose,
     bool enable_outlier_filtering)
 {
-    DiagonalLorentzianFitResultsCeres result;
+    DiagLorentzResultsCeres result;
     
     // Initialize Ceres logging (removed mutex for better parallelization)
-    InitializeCeresLorentzian();
+    InitializeCeresLorentz();
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size() || x_coords.size() < 4) {
         if (verbose) {
-            std::cout << "Diagonal Lorentzian fit (Ceres): Invalid input data size" << std::endl;
+            std::cout << "Diag Lorentz fit (Ceres): Invalid input data size" << std::endl;
         }
         return result;
     }
     
     if (verbose) {
-        std::cout << "Starting Diagonal Lorentzian fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
+        std::cout << "Starting Diag Lorentz fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
-    // FIXED DIAGONAL APPROACH:
+    // FIXED DIAG APPROACH:
     // 1. Use spatial binning instead of exact coordinate matching
     // 2. Correct coordinate transformations for ±45° rotations
     // 3. Proper pixel spacing for diagonal geometry
     
-    // Diagonal bin width - wider than row/column to capture more pixels
+    // Diag bin width - wider than row/column to capture more pixels
     const double bin_width = pixel_spacing * 0.5; // 50% of pixel spacing for better coverage
     
     // Correct diagonal pixel spacing (actual distance between diagonal neighbors)
     const double diag_pixel_spacing = pixel_spacing * 1.41421356237; // √2, no calibration factor
     
     // Maps: binned diagonal coordinate → [(distance_along_diagonal, charge), ...]
-    std::map<int, std::vector<std::pair<double, double>>> main_diagonal_bins; // +45° direction
-    std::map<int, std::vector<std::pair<double, double>>> sec_diagonal_bins;  // -45° direction
+    std::map<int, std::vector<std::pair<double, double>>> main_diag_bins; // +45° direction
+    std::map<int, std::vector<std::pair<double, double>>> sec_diag_bins;  // -45° direction
     
     for (size_t i = 0; i < x_coords.size(); ++i) {
         double x = x_coords[i];
@@ -1039,27 +1039,27 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
         // CORRECTED COORDINATE TRANSFORMATIONS:
         // Main diagonal (+45°): pixels where x-coordinate increases as y-coordinate increases
         // We rotate by -45° to align with X-axis: (x',y') = ((dx+dy)/√2, (dy-dx)/√2)
-        // The diagonal runs along constant (dy-dx), and position along diagonal is (dx+dy)/√2
+        // The diagonal runs along constant (dy-dx), and pos along diagonal is (dx+dy)/√2
         double main_diag_id = dy - dx;                    // Perpendicular distance to +45° line
-        double main_diag_pos = (dx + dy) / 1.41421356237; // Position along +45° diagonal
+        double main_diag_pos = (dx + dy) / 1.41421356237; // Pos along +45° diagonal
         
         // Secondary diagonal (-45°): pixels where x-coordinate increases as y-coordinate decreases  
         // We rotate by +45° to align with X-axis: (x',y') = ((dx-dy)/√2, (dx+dy)/√2)
-        // The diagonal runs along constant (dx+dy), and position along diagonal is (dx-dy)/√2
+        // The diagonal runs along constant (dx+dy), and pos along diagonal is (dx-dy)/√2
         double sec_diag_id = dx + dy;                     // Perpendicular distance to -45° line
-        double sec_diag_pos = (dx - dy) / 1.41421356237; // Position along -45° diagonal
+        double sec_diag_pos = (dx - dy) / 1.41421356237; // Pos along -45° diagonal
         
         // Bin the diagonal identifiers for spatial grouping
         int main_bin = static_cast<int>(std::round(main_diag_id / bin_width));
         int sec_bin = static_cast<int>(std::round(sec_diag_id / bin_width));
         
-        main_diagonal_bins[main_bin].emplace_back(main_diag_pos, charge);
-        sec_diagonal_bins[sec_bin].emplace_back(sec_diag_pos, charge);
+        main_diag_bins[main_bin].emplace_back(main_diag_pos, charge);
+        sec_diag_bins[sec_bin].emplace_back(sec_diag_pos, charge);
     }
     
     if (verbose) {
-        std::cout << "Found " << main_diagonal_bins.size() << " main diagonal bins and " 
-                 << sec_diagonal_bins.size() << " secondary diagonal bins" << std::endl;
+        std::cout << "Found " << main_diag_bins.size() << " main diagonal bins and " 
+                 << sec_diag_bins.size() << " secondary diagonal bins" << std::endl;
     }
     
     // Find the best bins (those with most pixels near the center)
@@ -1081,121 +1081,121 @@ DiagonalLorentzianFitResultsCeres FitDiagonalLorentzianCeres(
         return best_bin;
     };
     
-    int best_main_bin = find_best_bin(main_diagonal_bins, "main");
-    int best_sec_bin = find_best_bin(sec_diagonal_bins, "secondary");
+    int best_main_bin = find_best_bin(main_diag_bins, "main");
+    int best_sec_bin = find_best_bin(sec_diag_bins, "secondary");
     
     bool main_diag_success = false;
     bool sec_diag_success = false;
     
-    // Fit main diagonal (+45° direction)
-    if (main_diagonal_bins.find(best_main_bin) != main_diagonal_bins.end() && 
-        main_diagonal_bins[best_main_bin].size() >= 4) {
+    //  main diagonal (+45° direction)
+    if (main_diag_bins.find(best_main_bin) != main_diag_bins.end() && 
+        main_diag_bins[best_main_bin].size() >= 4) {
         
-        auto& main_data = main_diagonal_bins[best_main_bin];
+        auto& main_data = main_diag_bins[best_main_bin];
         
-        // Sort by position along diagonal
+        // Sort by pos along diagonal
         std::sort(main_data.begin(), main_data.end());
         
-        std::vector<double> positions, charges;
+        std::vector<double> poss, charges;
         for (const auto& point : main_data) {
-            positions.push_back(point.first);
+            poss.push_back(point.first);
             charges.push_back(point.second);
         }
         
         if (verbose) {
-            std::cout << "Fitting main diagonal (+45°) with " << positions.size() << " points" << std::endl;
+            std::cout << "ting main diagonal (+45°) with " << poss.size() << " points" << std::endl;
         }
         
-        main_diag_success = FitLorentzianCeres(
-            positions, charges, 0.0, diag_pixel_spacing,
-            result.main_diag_x_amplitude, result.main_diag_x_center, result.main_diag_x_gamma, result.main_diag_x_vertical_offset,
-            result.main_diag_x_amplitude_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err, result.main_diag_x_vertical_offset_err,
+        main_diag_success = LorentzCeres(
+            poss, charges, 0.0, diag_pixel_spacing,
+            result.main_diag_x_amp, result.main_diag_x_center, result.main_diag_x_gamma, result.main_diag_x_vert_offset,
+            result.main_diag_x_amp_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err, result.main_diag_x_vert_offset_err,
             result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
         
-        result.main_diag_x_dof = std::max(1, static_cast<int>(positions.size()) - 4);
+        result.main_diag_x_dof = std::max(1, static_cast<int>(poss.size()) - 4);
         result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
-        result.main_diag_x_fit_successful = main_diag_success;
+        result.main_diag_x_fit_success = main_diag_success;
         
         // Store data for ROOT analysis
-        result.main_diag_x_pixel_coords = positions;
+        result.main_diag_x_pixel_coords = poss;
         result.main_diag_x_charge_values = charges;
         result.main_diag_x_charge_errors = std::vector<double>();
         
         // For symmetry, copy results to Y (since we only have one diagonal measurement)
-        result.main_diag_y_amplitude = result.main_diag_x_amplitude;
+        result.main_diag_y_amp = result.main_diag_x_amp;
         result.main_diag_y_center = result.main_diag_x_center;
         result.main_diag_y_gamma = result.main_diag_x_gamma;
-        result.main_diag_y_vertical_offset = result.main_diag_x_vertical_offset;
-        result.main_diag_y_amplitude_err = result.main_diag_x_amplitude_err;
+        result.main_diag_y_vert_offset = result.main_diag_x_vert_offset;
+        result.main_diag_y_amp_err = result.main_diag_x_amp_err;
         result.main_diag_y_center_err = result.main_diag_x_center_err;
         result.main_diag_y_gamma_err = result.main_diag_x_gamma_err;
-        result.main_diag_y_vertical_offset_err = result.main_diag_x_vertical_offset_err;
+        result.main_diag_y_vert_offset_err = result.main_diag_x_vert_offset_err;
         result.main_diag_y_chi2red = result.main_diag_x_chi2red;
         result.main_diag_y_dof = result.main_diag_x_dof;
         result.main_diag_y_pp = result.main_diag_x_pp;
-        result.main_diag_y_fit_successful = main_diag_success;
-        result.main_diag_y_pixel_coords = positions;
+        result.main_diag_y_fit_success = main_diag_success;
+        result.main_diag_y_pixel_coords = poss;
         result.main_diag_y_charge_values = charges;
         result.main_diag_y_charge_errors = std::vector<double>();
     }
     
-    // Fit secondary diagonal (-45° direction)
-    if (sec_diagonal_bins.find(best_sec_bin) != sec_diagonal_bins.end() && 
-        sec_diagonal_bins[best_sec_bin].size() >= 4) {
+    //  secondary diagonal (-45° direction)
+    if (sec_diag_bins.find(best_sec_bin) != sec_diag_bins.end() && 
+        sec_diag_bins[best_sec_bin].size() >= 4) {
         
-        auto& sec_data = sec_diagonal_bins[best_sec_bin];
+        auto& sec_data = sec_diag_bins[best_sec_bin];
         
-        // Sort by position along diagonal
+        // Sort by pos along diagonal
         std::sort(sec_data.begin(), sec_data.end());
         
-        std::vector<double> positions, charges;
+        std::vector<double> poss, charges;
         for (const auto& point : sec_data) {
-            positions.push_back(point.first);
+            poss.push_back(point.first);
             charges.push_back(point.second);
         }
         
         if (verbose) {
-            std::cout << "Fitting secondary diagonal (-45°) with " << positions.size() << " points" << std::endl;
+            std::cout << "ting secondary diagonal (-45°) with " << poss.size() << " points" << std::endl;
         }
         
-        sec_diag_success = FitLorentzianCeres(
-            positions, charges, 0.0, diag_pixel_spacing,
-            result.sec_diag_x_amplitude, result.sec_diag_x_center, result.sec_diag_x_gamma, result.sec_diag_x_vertical_offset,
-            result.sec_diag_x_amplitude_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err, result.sec_diag_x_vertical_offset_err,
+        sec_diag_success = LorentzCeres(
+            poss, charges, 0.0, diag_pixel_spacing,
+            result.sec_diag_x_amp, result.sec_diag_x_center, result.sec_diag_x_gamma, result.sec_diag_x_vert_offset,
+            result.sec_diag_x_amp_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err, result.sec_diag_x_vert_offset_err,
             result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
         
-        result.sec_diag_x_dof = std::max(1, static_cast<int>(positions.size()) - 4);
+        result.sec_diag_x_dof = std::max(1, static_cast<int>(poss.size()) - 4);
         result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
-        result.sec_diag_x_fit_successful = sec_diag_success;
+        result.sec_diag_x_fit_success = sec_diag_success;
         
         // Store data for ROOT analysis
-        result.sec_diag_x_pixel_coords = positions;
+        result.sec_diag_x_pixel_coords = poss;
         result.sec_diag_x_charge_values = charges;
         result.sec_diag_x_charge_errors = std::vector<double>();
         
         // For symmetry, copy results to Y
-        result.sec_diag_y_amplitude = result.sec_diag_x_amplitude;
+        result.sec_diag_y_amp = result.sec_diag_x_amp;
         result.sec_diag_y_center = result.sec_diag_x_center;
         result.sec_diag_y_gamma = result.sec_diag_x_gamma;
-        result.sec_diag_y_vertical_offset = result.sec_diag_x_vertical_offset;
-        result.sec_diag_y_amplitude_err = result.sec_diag_x_amplitude_err;
+        result.sec_diag_y_vert_offset = result.sec_diag_x_vert_offset;
+        result.sec_diag_y_amp_err = result.sec_diag_x_amp_err;
         result.sec_diag_y_center_err = result.sec_diag_x_center_err;
         result.sec_diag_y_gamma_err = result.sec_diag_x_gamma_err;
-        result.sec_diag_y_vertical_offset_err = result.sec_diag_x_vertical_offset_err;
+        result.sec_diag_y_vert_offset_err = result.sec_diag_x_vert_offset_err;
         result.sec_diag_y_chi2red = result.sec_diag_x_chi2red;
         result.sec_diag_y_dof = result.sec_diag_x_dof;
         result.sec_diag_y_pp = result.sec_diag_x_pp;
-        result.sec_diag_y_fit_successful = sec_diag_success;
-        result.sec_diag_y_pixel_coords = positions;
+        result.sec_diag_y_fit_success = sec_diag_success;
+        result.sec_diag_y_pixel_coords = poss;
         result.sec_diag_y_charge_values = charges;
         result.sec_diag_y_charge_errors = std::vector<double>();
     }
     
     // Set overall success status
-    result.fit_successful = main_diag_success && sec_diag_success;
+    result.fit_success = main_diag_success && sec_diag_success;
     
     if (verbose) {
-        std::cout << "Diagonal Lorentzian fit (Ceres) " << (result.fit_successful ? "successful" : "failed") 
+        std::cout << "Diag Lorentz fit (Ceres) " << (result.fit_success ? "success" : "failed") 
                  << " (Main +45°: " << (main_diag_success ? "OK" : "FAIL") 
                  << ", Secondary -45°: " << (sec_diag_success ? "OK" : "FAIL") << ")" << std::endl;
     }

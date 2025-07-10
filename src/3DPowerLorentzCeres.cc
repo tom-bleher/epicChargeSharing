@@ -1,4 +1,4 @@
-#include "3DPowerLorentzianFitCeres.hh"
+#include "3DPowerLorentzCeres.hh"
 #include "CeresLoggingInit.hh"
 #include "Constants.hh"
 #include "G4SystemOfUnits.hh"
@@ -18,30 +18,30 @@
 // Thread counter for debugging (removed mutex for better parallelization)
 
 // Use shared Google logging initialization
-void InitializeCeres3DPowerLorentzian() {
+void InitializeCeres3DPowerLorentz() {
     CeresLoggingInitializer::InitializeOnce();
 }
 
-// Calculate uncertainty as 5% of max charge in neighborhood (if enabled)
-double Calculate3DPowerLorentzianUncertainty(double max_charge_in_neighborhood) {
-    if (!Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+// Calc err as 5% of max charge in neighborhood (if enabled)
+double Calc3DPowerLorentzErr(double max_charge_in_neighborhood) {
+    if (!Constants::ENABLE_VERT_CHARGE_ERR) {
         return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
-    double uncertainty = 0.05 * max_charge_in_neighborhood;
-    if (uncertainty < Constants::MIN_UNCERTAINTY_VALUE) uncertainty = Constants::MIN_UNCERTAINTY_VALUE;
-    return uncertainty;
+    double err = 0.05 * max_charge_in_neighborhood;
+    if (err < Constants::MIN_UNCERTAINTY_VALUE) err = Constants::MIN_UNCERTAINTY_VALUE;
+    return err;
 }
 
-// 3D Power-Law Lorentzian cost function
+// 3D Power-Law Lorentz cost function
 // Function form: z(x,y) = A / (1 + ((x - mx) / γx)^2 + ((y - my) / γy)^2)^β + B  
-struct PowerLorentzian3DCostFunction {
-    PowerLorentzian3DCostFunction(double x, double y, double z, double uncertainty) 
-        : x_(x), y_(y), z_(z), uncertainty_(uncertainty) {}
+struct PowerLorentz3DCostFunction {
+    PowerLorentz3DCostFunction(double x, double y, double z, double err) 
+        : x_(x), y_(y), z_(z), err_(err) {}
     
     template <typename T>
     bool operator()(const T* const params, T* residual) const {
-        // params[0] = A (amplitude)
+        // params[0] = A (amp)
         // params[1] = mx (X center)
         // params[2] = my (Y center)
         // params[3] = gamma_x (X width)
@@ -65,7 +65,7 @@ struct PowerLorentzian3DCostFunction {
         if (safe_gamma_y < T(1e-12)) safe_gamma_y = T(1e-12);
         if (safe_beta < T(0.1)) safe_beta = T(0.1);
         
-        // 3D Power-Law Lorentzian function
+        // 3D Power-Law Lorentz function
         T dx = x_ - mx;
         T dy = y_ - my;
         T normalized_dx = dx / safe_gamma_x;
@@ -79,61 +79,61 @@ struct PowerLorentzian3DCostFunction {
         T denominator = ceres::pow(denominator_base, safe_beta);
         T predicted = A / denominator + B;
         
-        residual[0] = (predicted - T(z_)) / T(uncertainty_);
+        residual[0] = (predicted - T(z_)) / T(err_);
         
         return true;
     }
     
-    static ceres::CostFunction* Create(double x, double y, double z, double uncertainty) {
-        return (new ceres::AutoDiffCostFunction<PowerLorentzian3DCostFunction, 1, 7>(
-            new PowerLorentzian3DCostFunction(x, y, z, uncertainty)));
+    static ceres::CostFunction* Create(double x, double y, double z, double err) {
+        return (new ceres::AutoDiffCostFunction<PowerLorentz3DCostFunction, 1, 7>(
+            new PowerLorentz3DCostFunction(x, y, z, err)));
     }
     
 private:
     const double x_;
     const double y_;
     const double z_;
-    const double uncertainty_;
+    const double err_;
 };
 
-// Core 3D Power-Law Lorentzian fitting function using Ceres Solver
-bool Fit3DPowerLorentzianCeres(
+// Core 3D Power-Law Lorentz fitting function using Ceres Solver
+bool PowerLorentzCeres3D_detail(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     const std::vector<double>& z_vals,
     double center_x_estimate,
     double center_y_estimate,
     double pixel_spacing,
-    double& fit_amplitude,
+    double& fit_amp,
     double& fit_center_x,
     double& fit_center_y,
     double& fit_gamma_x,
     double& fit_gamma_y,
     double& fit_beta,
-    double& fit_vertical_offset,
-    double& fit_amplitude_err,
+    double& fit_vert_offset,
+    double& fit_amp_err,
     double& fit_center_x_err,
     double& fit_center_y_err,
     double& fit_gamma_x_err,
     double& fit_gamma_y_err,
     double& fit_beta_err,
-    double& fit_vertical_offset_err,
+    double& fit_vert_offset_err,
     double& chi2_reduced,
     bool verbose,
     bool enable_outlier_filtering) {
     
     if (x_vals.size() != y_vals.size() || x_vals.size() != z_vals.size() || x_vals.size() < 7) {
         if (verbose) {
-            std::cout << "Insufficient data points for 3D Power-Law Lorentzian fitting" << std::endl;
+            std::cout << "Insufficient data points for 3D Power-Law Lorentz fitting" << std::endl;
         }
         return false;
     }
     
-    // Calculate basic statistics for parameter estimation
+    // Calc basic statistics for parameter estimation
     double max_charge = *std::max_element(z_vals.begin(), z_vals.end());
     double min_charge = *std::min_element(z_vals.begin(), z_vals.end());
     
-    // Calculate weighted center estimates
+    // Calc weighted center estimates
     double weighted_x = 0.0, weighted_y = 0.0, total_weight = 0.0;
     for (size_t i = 0; i < x_vals.size(); ++i) {
         double weight = std::max(0.0, z_vals[i] - min_charge);
@@ -151,11 +151,11 @@ bool Fit3DPowerLorentzianCeres(
         weighted_y = center_y_estimate;
     }
     
-    // Calculate uncertainty
-    double uncertainty = Calculate3DPowerLorentzianUncertainty(max_charge);
+    // Calc err
+    double err = Calc3DPowerLorentzErr(max_charge);
     
     // OPTIMIZED: Cheap config first with early exit based on quality (Step 1 from optimize.md)
-    struct PowerLorentzian3DFittingConfig {
+    struct PowerLorentz3DtingConfig {
         ceres::LinearSolverType linear_solver;
         ceres::TrustRegionStrategyType trust_region;
         double function_tolerance;
@@ -166,24 +166,24 @@ bool Fit3DPowerLorentzianCeres(
     };
     
     // Stage 1: Cheap configuration (as per optimize.md section 4.1)
-    PowerLorentzian3DFittingConfig cheap_config = {
+    PowerLorentz3DtingConfig cheap_config = {
         ceres::DENSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 
         1e-10, 1e-10, 400, "NONE", 0.0
     };
     
     // Stage 2: Expensive fallback configurations (only if needed)
-    const std::vector<PowerLorentzian3DFittingConfig> expensive_configs = {
+    const std::vector<PowerLorentz3DtingConfig> expensive_configs = {
         {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", (max_charge - min_charge) * 0.1},
         {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", (max_charge - min_charge) * 0.16}
     };
     
     // Try cheap config first
-    auto try_config = [&](const PowerLorentzian3DFittingConfig& config, const std::string& stage_name) -> bool {
+    auto try_config = [&](const PowerLorentz3DtingConfig& config, const std::string& stage_name) -> bool {
         if (verbose) {
-            std::cout << "Trying 3D Power Lorentzian " << stage_name << " configuration..." << std::endl;
+            std::cout << "Trying 3D Power Lorentz " << stage_name << " configuration..." << std::endl;
         }
         
-        // STEP 2 OPTIMIZATION: Hierarchical multi-start budget for 3D Power Lorentzian
+        // STEP 2 OPTIMIZATION: Hierarchical multi-start budget for 3D Power Lorentz
         // Start with base estimate, only add 2 perturbations if χ²ᵣ > 2.0
         // Expected: ×4-5 speed-up, average #Ceres solves/fit ≤10
         
@@ -196,12 +196,12 @@ bool Fit3DPowerLorentzianCeres(
         
         // ALWAYS start with base estimate first
         ParameterSet base_set;
-        base_set.params[0] = max_charge - min_charge; // amplitude
+        base_set.params[0] = max_charge - min_charge; // amp
         base_set.params[1] = weighted_x; // center_x
         base_set.params[2] = weighted_y; // center_y
         base_set.params[3] = pixel_spacing * 0.7; // gamma_x
         base_set.params[4] = pixel_spacing * 0.7; // gamma_y
-        base_set.params[5] = 1.0; // beta (start with standard Lorentzian)
+        base_set.params[5] = 1.0; // beta (start with standard Lorentz)
         base_set.params[6] = min_charge; // baseline
         base_set.description = "base_estimate";
         initial_guesses.push_back(base_set);
@@ -242,8 +242,8 @@ bool Fit3DPowerLorentzianCeres(
             ceres::Problem problem;
             
             for (size_t i = 0; i < x_vals.size(); ++i) {
-                ceres::CostFunction* cost_function = PowerLorentzian3DCostFunction::Create(
-                    x_vals[i], y_vals[i], z_vals[i], uncertainty);
+                ceres::CostFunction* cost_function = PowerLorentz3DCostFunction::Create(
+                    x_vals[i], y_vals[i], z_vals[i], err);
                 problem.AddResidualBlock(cost_function, nullptr, parameters);
             }
             
@@ -304,7 +304,7 @@ bool Fit3DPowerLorentzianCeres(
             ceres::Solver::Summary summary_stage1;
             ceres::Solve(options, &problem, &summary_stage1);
             
-            bool stage1_successful = (summary_stage1.termination_type == ceres::CONVERGENCE ||
+            bool stage1_success = (summary_stage1.termination_type == ceres::CONVERGENCE ||
                                     summary_stage1.termination_type == ceres::USER_SUCCESS) &&
                                    parameters[0] > 0 && parameters[3] > 0 && parameters[4] > 0 &&
                                    !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
@@ -313,7 +313,7 @@ bool Fit3DPowerLorentzianCeres(
                                    !std::isnan(parameters[6]);
             
             ceres::Solver::Summary summary;
-            if (stage1_successful) {
+            if (stage1_success) {
                 // Stage 2: Allow beta to vary more freely
                 problem.SetParameterLowerBound(parameters, 5, 0.2);
                 problem.SetParameterUpperBound(parameters, 5, 4.0);
@@ -333,7 +333,7 @@ bool Fit3DPowerLorentzianCeres(
                 ceres::Solve(options, &problem, &summary);
             }
             
-            bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
+            bool fit_success = (summary.termination_type == ceres::CONVERGENCE ||
                                   summary.termination_type == ceres::USER_SUCCESS) &&
                                  parameters[0] > 0 && parameters[3] > 0 && parameters[4] > 0 && 
                                  parameters[5] > 0.1 && parameters[5] < 5.0 &&
@@ -342,7 +342,7 @@ bool Fit3DPowerLorentzianCeres(
                                  !std::isnan(parameters[4]) && !std::isnan(parameters[5]) &&
                                  !std::isnan(parameters[6]);
             
-            if (fit_successful) {
+            if (fit_success) {
                 double cost = summary.final_cost;
                 double chi2 = cost * 2.0;
                 int dof = std::max(1, static_cast<int>(x_vals.size()) - 7);
@@ -356,7 +356,7 @@ bool Fit3DPowerLorentzianCeres(
                     any_success = true;
                     
                     if (verbose) {
-                        std::cout << "New best 3D Power Lorentzian result from " << guess.description 
+                        std::cout << "New best 3D Power Lorentz result from " << guess.description 
                                  << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
                     }
                 }
@@ -366,10 +366,10 @@ bool Fit3DPowerLorentzianCeres(
         // ALWAYS add perturbations regardless of chi-squared quality
         if (any_success) {
             if (verbose) {
-                std::cout << "Base 3D Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
+                std::cout << "Base 3D Power Lorentz fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
             }
             
-            // Add exactly 2 perturbations for 3D Power Lorentzian case
+            // Add exactly 2 perturbations for 3D Power Lorentz case
             const std::vector<double> perturbation_factors = {0.7, 1.3};
             const std::vector<double> beta_variations = {0.8, 1.2};
             
@@ -400,8 +400,8 @@ bool Fit3DPowerLorentzianCeres(
                 ceres::Problem problem;
                 
                 for (size_t j = 0; j < x_vals.size(); ++j) {
-                    ceres::CostFunction* cost_function = PowerLorentzian3DCostFunction::Create(
-                        x_vals[j], y_vals[j], z_vals[j], uncertainty);
+                    ceres::CostFunction* cost_function = PowerLorentz3DCostFunction::Create(
+                        x_vals[j], y_vals[j], z_vals[j], err);
                     problem.AddResidualBlock(cost_function, nullptr, parameters);
                 }
                 
@@ -462,7 +462,7 @@ bool Fit3DPowerLorentzianCeres(
                 ceres::Solver::Summary summary_stage1;
                 ceres::Solve(options, &problem, &summary_stage1);
                 
-                bool stage1_successful = (summary_stage1.termination_type == ceres::CONVERGENCE ||
+                bool stage1_success = (summary_stage1.termination_type == ceres::CONVERGENCE ||
                                         summary_stage1.termination_type == ceres::USER_SUCCESS) &&
                                        parameters[0] > 0 && parameters[3] > 0 && parameters[4] > 0 &&
                                        !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
@@ -471,7 +471,7 @@ bool Fit3DPowerLorentzianCeres(
                                        !std::isnan(parameters[6]);
                 
                 ceres::Solver::Summary summary;
-                if (stage1_successful) {
+                if (stage1_success) {
                     problem.SetParameterLowerBound(parameters, 5, 0.2);
                     problem.SetParameterUpperBound(parameters, 5, 4.0);
                     
@@ -490,7 +490,7 @@ bool Fit3DPowerLorentzianCeres(
                     ceres::Solve(options, &problem, &summary);
                 }
                 
-                bool fit_successful = (summary.termination_type == ceres::CONVERGENCE ||
+                bool fit_success = (summary.termination_type == ceres::CONVERGENCE ||
                                       summary.termination_type == ceres::USER_SUCCESS) &&
                                      parameters[0] > 0 && parameters[3] > 0 && parameters[4] > 0 && 
                                      parameters[5] > 0.1 && parameters[5] < 5.0 &&
@@ -499,7 +499,7 @@ bool Fit3DPowerLorentzianCeres(
                                      !std::isnan(parameters[4]) && !std::isnan(parameters[5]) &&
                                      !std::isnan(parameters[6]);
                 
-                if (fit_successful) {
+                if (fit_success) {
                     double cost = summary.final_cost;
                     double chi2 = cost * 2.0;
                     int dof = std::max(1, static_cast<int>(x_vals.size()) - 7);
@@ -519,37 +519,37 @@ bool Fit3DPowerLorentzianCeres(
                 }
             }
         } else if (verbose && any_success) {
-            std::cout << "Base 3D Power Lorentzian fit χ²ᵣ=" << best_chi2_reduced << " ≤ 0.5, skipping perturbations (hierarchical multi-start)" << std::endl;
+            std::cout << "Base 3D Power Lorentz fit χ²ᵣ=" << best_chi2_reduced << " ≤ 0.5, skipping perturbations (hierarchical multi-start)" << std::endl;
         }
         
         if (any_success) {
             // Extract results from best attempt
-            fit_amplitude = best_parameters[0];
+            fit_amp = best_parameters[0];
             fit_center_x = best_parameters[1];
             fit_center_y = best_parameters[2];
             fit_gamma_x = std::abs(best_parameters[3]);
             fit_gamma_y = std::abs(best_parameters[4]);
             fit_beta = best_parameters[5];
-            fit_vertical_offset = best_parameters[6];
+            fit_vert_offset = best_parameters[6];
             
-            // Simple uncertainty estimation (fallback method)
-            fit_amplitude_err = 0.02 * fit_amplitude;
+            // Simple err estimation (fallback method)
+            fit_amp_err = 0.02 * fit_amp;
             fit_center_x_err = 0.02 * pixel_spacing;
             fit_center_y_err = 0.02 * pixel_spacing;
             fit_gamma_x_err = 0.05 * fit_gamma_x;
             fit_gamma_y_err = 0.05 * fit_gamma_y;
             fit_beta_err = 0.1 * fit_beta;
-            fit_vertical_offset_err = 0.1 * std::abs(fit_vertical_offset);
+            fit_vert_offset_err = 0.1 * std::abs(fit_vert_offset);
             
             chi2_reduced = best_chi2_reduced;
             
             if (verbose) {
-                std::cout << "Successful 3D Power-Law Lorentzian fit with " << stage_name 
+                std::cout << "Success 3D Power-Law Lorentz fit with " << stage_name 
                          << ", best init: " << best_description
-                         << ": A=" << fit_amplitude << ", mx=" << fit_center_x 
+                         << ": A=" << fit_amp << ", mx=" << fit_center_x 
                          << ", my=" << fit_center_y << ", gamma_x=" << fit_gamma_x
                          << ", gamma_y=" << fit_gamma_y << ", beta=" << fit_beta
-                         << ", B=" << fit_vertical_offset << ", chi2red=" << chi2_reduced << std::endl;
+                         << ", B=" << fit_vert_offset << ", chi2red=" << chi2_reduced << std::endl;
             }
             
             return true;
@@ -563,14 +563,14 @@ bool Fit3DPowerLorentzianCeres(
     double best_chi2 = chi2_reduced;
     
     if (verbose) {
-        std::cout << "Cheap 3D Power Lorentzian config " << (success ? "succeeded" : "failed") 
+        std::cout << "Cheap 3D Power Lorentz config " << (success ? "succeeded" : "failed") 
                  << " with χ²ᵣ=" << chi2_reduced << std::endl;
     }
     
     // Always try ALL expensive configurations regardless of cheap config result
     if (verbose) {
         std::cout << "Trying all " << expensive_configs.size() 
-                 << " expensive 3D Power Lorentzian configurations..." << std::endl;
+                 << " expensive 3D Power Lorentz configurations..." << std::endl;
     }
     
     for (size_t i = 0; i < expensive_configs.size(); ++i) {
@@ -582,7 +582,7 @@ bool Fit3DPowerLorentzianCeres(
         }
         
         if (verbose) {
-            std::cout << "Expensive 3D Power Lorentzian config " << (i+1) << " " 
+            std::cout << "Expensive 3D Power Lorentz config " << (i+1) << " " 
                      << (config_success ? "succeeded" : "failed") 
                      << " with χ²ᵣ=" << chi2_reduced << std::endl;
         }
@@ -590,18 +590,18 @@ bool Fit3DPowerLorentzianCeres(
     
     if (best_success) {
         if (verbose) {
-            std::cout << "Best 3D Power Lorentzian fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
+            std::cout << "Best 3D Power Lorentz fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
         }
         return true;
     }
     
     if (verbose) {
-        std::cout << "All 3D Power Lorentzian fitting strategies failed" << std::endl;
+        std::cout << "All 3D Power Lorentz fitting strategies failed" << std::endl;
     }
     return false;
 }
 
-PowerLorentzianFit3DResultsCeres Fit3DPowerLorentzianCeres(
+PowerLorentz3DResultsCeres PowerLorentzCeres3D(
     const std::vector<double>& x_coords,
     const std::vector<double>& y_coords, 
     const std::vector<double>& charge_values,
@@ -611,27 +611,27 @@ PowerLorentzianFit3DResultsCeres Fit3DPowerLorentzianCeres(
     bool verbose,
     bool enable_outlier_filtering)
 {
-    PowerLorentzianFit3DResultsCeres result;
+    PowerLorentz3DResultsCeres result;
     
     // Initialize Ceres logging (removed mutex for better parallelization)
-    InitializeCeres3DPowerLorentzian();
+    InitializeCeres3DPowerLorentz();
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
         if (verbose) {
-            std::cout << "Fit3DPowerLorentzianCeres: Error - coordinate and charge vector sizes don't match" << std::endl;
+            std::cout << "PowerLorentzCeres3D: Error - coordinate and charge vector sizes don't match" << std::endl;
         }
         return result;
     }
     
     if (x_coords.size() < 7) {
         if (verbose) {
-            std::cout << "Fit3DPowerLorentzianCeres: Error - need at least 7 data points for 3D fitting" << std::endl;
+            std::cout << "PowerLorentzCeres3D: Error - need at least 7 data points for 3D fitting" << std::endl;
         }
         return result;
     }
     
     if (verbose) {
-        std::cout << "Starting 3D Power-Law Lorentzian fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
+        std::cout << "Starting 3D Power-Law Lorentz fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
     // Store input data for ROOT analysis
@@ -639,36 +639,36 @@ PowerLorentzianFit3DResultsCeres Fit3DPowerLorentzianCeres(
     result.y_coords = y_coords;
     result.charge_values = charge_values;
     
-    // Create charge errors if vertical uncertainties are enabled
-    if (Constants::ENABLE_VERTICAL_CHARGE_UNCERTAINTIES) {
+    // Create charge errors if vert uncertainties are enabled
+    if (Constants::ENABLE_VERT_CHARGE_ERR) {
         double max_charge = *std::max_element(charge_values.begin(), charge_values.end());
-        double charge_uncertainty = 0.05 * max_charge;
-        result.charge_uncertainty = charge_uncertainty;
+        double charge_err = 0.05 * max_charge;
+        result.charge_err = charge_err;
         
         result.charge_errors.clear();
-        result.charge_errors.resize(charge_values.size(), charge_uncertainty);
+        result.charge_errors.resize(charge_values.size(), charge_err);
     } else {
-        result.charge_uncertainty = 0.0;
+        result.charge_err = 0.0;
         result.charge_errors.clear();
         result.charge_errors.resize(charge_values.size(), 1.0); // Uniform weighting
     }
     
-    // Perform 3D Power-Law Lorentzian surface fitting
-    bool fit_success = Fit3DPowerLorentzianCeres(
+    // Perform 3D Power-Law Lorentz surface fitting
+    bool fit_success = PowerLorentzCeres3D_detail(
         x_coords, y_coords, charge_values, center_x_estimate, center_y_estimate, pixel_spacing,
-        result.amplitude, result.center_x, result.center_y, result.gamma_x, result.gamma_y, result.beta, result.vertical_offset,
-        result.amplitude_err, result.center_x_err, result.center_y_err, result.gamma_x_err, result.gamma_y_err, result.beta_err, result.vertical_offset_err,
+        result.amp, result.center_x, result.center_y, result.gamma_x, result.gamma_y, result.beta, result.vert_offset,
+        result.amp_err, result.center_x_err, result.center_y_err, result.gamma_x_err, result.gamma_y_err, result.beta_err, result.vert_offset_err,
         result.chi2red, verbose, enable_outlier_filtering);
     
-    // Calculate DOF and p-value
+    // Calc DOF and p-value
     result.dof = std::max(1, static_cast<int>(x_coords.size()) - 7);
     result.pp = (result.chi2red > 0) ? 1.0 - std::min(1.0, result.chi2red / 10.0) : 0.0;
     
     // Set overall success status
-    result.fit_successful = fit_success;
+    result.fit_success = fit_success;
     
     if (verbose) {
-        std::cout << "3D Power-Law Lorentzian fit (Ceres) " << (result.fit_successful ? "successful" : "failed") << std::endl;
+        std::cout << "3D Power-Law Lorentz fit (Ceres) " << (result.fit_success ? "success" : "failed") << std::endl;
     }
     
     return result;
