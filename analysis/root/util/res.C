@@ -113,17 +113,41 @@
      methods.push_back(make_pair("Digital Readout X", "PixelTrueDeltaX"));
      methods.push_back(make_pair("Digital Readout Y", "PixelTrueDeltaY"));
      methods.push_back(make_pair("Gauss Row X", "GaussRowDeltaX"));
-     methods.push_back(make_pair("Gauss Column Y", "GaussColumnDeltaY"));
+     methods.push_back(make_pair("Gauss Column Y", "GaussColDeltaY"));
      methods.push_back(make_pair("Lorentz Row X", "LorentzRowDeltaX"));
-     methods.push_back(make_pair("Lorentz Column Y", "LorentzColumnDeltaY"));
-     methods.push_back(make_pair("3D Gaussian X", "3DGaussianDeltaX"));
-     methods.push_back(make_pair("3D Gaussian Y", "3DGaussianDeltaY"));
-     methods.push_back(make_pair("3D Lorentzian X", "3DLorentzianDeltaX"));
-     methods.push_back(make_pair("3D Lorentzian Y", "3DLorentzianDeltaY"));
+     methods.push_back(make_pair("Lorentz Column Y", "LorentzColDeltaY"));
+     methods.push_back(make_pair("Power Lorentz Row X", "PowerLorentzRowDeltaX"));
+     methods.push_back(make_pair("Power Lorentz Column Y", "PowerLorentzColDeltaY"));
+     
+     // Diagonal fitting methods (transformed coordinates)
+     methods.push_back(make_pair("Gauss Main Diag X", "GaussMainDiagTransDeltaX"));
+     methods.push_back(make_pair("Gauss Main Diag Y", "GaussMainDiagTransDeltaY"));
+     methods.push_back(make_pair("Gauss Sec Diag X", "GaussSecDiagTransDeltaX"));
+     methods.push_back(make_pair("Gauss Sec Diag Y", "GaussSecDiagTransDeltaY"));
+     methods.push_back(make_pair("Lorentz Main Diag X", "LorentzMainDiagTransDeltaX"));
+     methods.push_back(make_pair("Lorentz Main Diag Y", "LorentzMainDiagTransDeltaY"));
+     methods.push_back(make_pair("Lorentz Sec Diag X", "LorentzSecDiagTransDeltaX"));
+     methods.push_back(make_pair("Lorentz Sec Diag Y", "LorentzSecDiagTransDeltaY"));
+     methods.push_back(make_pair("Power Lorentz Main Diag X", "PowerLorentzMainDiagTransDeltaX"));
+     methods.push_back(make_pair("Power Lorentz Main Diag Y", "PowerLorentzMainDiagTransDeltaY"));
+     methods.push_back(make_pair("Power Lorentz Sec Diag X", "PowerLorentzSecDiagTransDeltaX"));
+     methods.push_back(make_pair("Power Lorentz Sec Diag Y", "PowerLorentzSecDiagTransDeltaY"));
+     
+     // 3D fitting methods
+     methods.push_back(make_pair("3D Gaussian X", "3DGaussDeltaX"));
+     methods.push_back(make_pair("3D Gaussian Y", "3DGaussDeltaY"));
+     methods.push_back(make_pair("3D Lorentzian X", "3DLorentzDeltaX"));
+     methods.push_back(make_pair("3D Lorentzian Y", "3DLorentzDeltaY"));
+     methods.push_back(make_pair("3D Power Lorentzian X", "3DPowerLorentzDeltaX"));
+     methods.push_back(make_pair("3D Power Lorentzian Y", "3DPowerLorentzDeltaY"));
+     
+     // Mean estimators
      methods.push_back(make_pair("Gauss Mean Estimator X", "GaussMeanTrueDeltaX"));
      methods.push_back(make_pair("Gauss Mean Estimator Y", "GaussMeanTrueDeltaY"));
      methods.push_back(make_pair("Lorentz Mean Estimator X", "LorentzMeanTrueDeltaX"));
      methods.push_back(make_pair("Lorentz Mean Estimator Y", "LorentzMeanTrueDeltaY"));
+     methods.push_back(make_pair("Power Lorentz Mean Estimator X", "PowerLorentzMeanTrueDeltaX"));
+     methods.push_back(make_pair("Power Lorentz Mean Estimator Y", "PowerLorentzMeanTrueDeltaY"));
      
      cout << "\nStarting parallel analysis of " << methods.size() << " methods..." << endl;
      
