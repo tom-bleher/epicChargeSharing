@@ -116,16 +116,16 @@ def read_root_data(root_file_path):
             'PowerLorentzRowDeltaX', 'PowerLorentzColDeltaY',  # Power Lorentz row/column fit deltas
             
             # Main diagonal deltas
-            'GaussMainDiagTransformedDeltaX', 'GaussMainDiagTransformedDeltaY',
-            'LorentzMainDiagTransformedDeltaX', 'LorentzMainDiagTransformedDeltaY',
+            'GaussMainDiagTransDeltaX', 'GaussMainDiagTransDeltaY',
+            'LorentzMainDiagTransDeltaX', 'LorentzMainDiagTransDeltaY',
             
             # Secondary diagonal deltas (check if they exist)
-            'GaussSecDiagTransformedDeltaX', 'GaussSecDiagTransformedDeltaY',
-            'LorentzSecDiagTransformedDeltaX', 'LorentzSecDiagTransformedDeltaY',
+            'GaussSecDiagTransDeltaX', 'GaussSecDiagTransDeltaY',
+            'LorentzSecDiagTransDeltaX', 'LorentzSecDiagTransDeltaY',
             
             # Power Lorentz deltas (check if they exist)
-            'PowerLorentzMainDiagTransformedDeltaX', 'PowerLorentzMainDiagTransformedDeltaY',
-            'PowerLorentzSecDiagTransformedDeltaX', 'PowerLorentzSecDiagTransformedDeltaY',
+            'PowerLorentzMainDiagTransDeltaX', 'PowerLorentzMainDiagTransDeltaY',
+            'PowerLorentzSecDiagTransDeltaX', 'PowerLorentzSecDiagTransDeltaY',
             
             # 3D fit deltas (check if they exist)
             '3DGaussDeltaX', '3DGaussDeltaY',  # 3D Gauss fit deltas
@@ -211,24 +211,24 @@ def calculate_all_resolutions(data):
         ('Power Lorentz Col  Y', 'PowerLorentzColDeltaY'),
         
         # Main Diag s (slope +1: dx - dy = constant)
-        ('Gauss Main Diag  X', 'GaussMainDiagTransformedDeltaX'),
-        ('Gauss Main Diag  Y', 'GaussMainDiagTransformedDeltaY'),
-        ('Lorentz Main Diag  X', 'LorentzMainDiagTransformedDeltaX'),
-        ('Lorentz Main Diag  Y', 'LorentzMainDiagTransformedDeltaY'),
+        ('Gauss Main Diag  X', 'GaussMainDiagTransDeltaX'),
+        ('Gauss Main Diag  Y', 'GaussMainDiagTransDeltaY'),
+        ('Lorentz Main Diag  X', 'LorentzMainDiagTransDeltaX'),
+        ('Lorentz Main Diag  Y', 'LorentzMainDiagTransDeltaY'),
         
         # Secondary Diag s (slope -1: dx + dy = constant)
-        ('Gauss Secondary Diag  X', 'GaussSecDiagTransformedDeltaX'),
-        ('Gauss Secondary Diag  Y', 'GaussSecDiagTransformedDeltaY'),
-        ('Lorentz Secondary Diag  X', 'LorentzSecDiagTransformedDeltaX'),
-        ('Lorentz Secondary Diag  Y', 'LorentzSecDiagTransformedDeltaY'),
+        ('Gauss Secondary Diag  X', 'GaussSecDiagTransDeltaX'),
+        ('Gauss Secondary Diag  Y', 'GaussSecDiagTransDeltaY'),
+        ('Lorentz Secondary Diag  X', 'LorentzSecDiagTransDeltaX'),
+        ('Lorentz Secondary Diag  Y', 'LorentzSecDiagTransDeltaY'),
         
         # Power Lorentz Main Diag s (slope +1: dx - dy = constant)
-        ('Power Lorentz Main Diag  X', 'PowerLorentzMainDiagTransformedDeltaX'),
-        ('Power Lorentz Main Diag  Y', 'PowerLorentzMainDiagTransformedDeltaY'),
+        ('Power Lorentz Main Diag  X', 'PowerLorentzMainDiagTransDeltaX'),
+        ('Power Lorentz Main Diag  Y', 'PowerLorentzMainDiagTransDeltaY'),
         
         # Power Lorentz Secondary Diag s (slope -1: dx + dy = constant)
-        ('Power Lorentz Secondary Diag  X', 'PowerLorentzSecDiagTransformedDeltaX'),
-        ('Power Lorentz Secondary Diag  Y', 'PowerLorentzSecDiagTransformedDeltaY'),
+        ('Power Lorentz Secondary Diag  X', 'PowerLorentzSecDiagTransDeltaX'),
+        ('Power Lorentz Secondary Diag  Y', 'PowerLorentzSecDiagTransDeltaY'),
         
         # 3D Surface s
         ('3D Gauss  X', '3DGaussDeltaX'),
@@ -249,7 +249,15 @@ def calculate_all_resolutions(data):
     
     print("\nCalculating spatial resolution for all methods...")
     
+    # Track diagonal results specifically for better user feedback
+    diagonal_found = 0
+    diagonal_total = 0
+    
     for method_name, delta_branch in methods:
+        is_diagonal = 'Diag' in method_name
+        if is_diagonal:
+            diagonal_total += 1
+            
         if delta_branch in data:
             # The residuals are already calculated in the ROOT file
             residuals = data[delta_branch]
@@ -262,13 +270,36 @@ def calculate_all_resolutions(data):
                 stats = calculate_resolution_stats(clean_residuals, method_name)
                 if stats:
                     results.append(stats)
-                    print(f"  {method_name}: σ = {stats['std_dev']*1000:.1f} μm, "
-                          f"bias = {stats['mean_bias']*1000:.3f} μm, "
-                          f"RMS = {stats['rms']*1000:.1f} μm")
+                    if is_diagonal:
+                        diagonal_found += 1
+                        print(f"  {method_name}: σ = {stats['std_dev']*1000:.1f} μm, "
+                              f"bias = {stats['mean_bias']*1000:.3f} μm, "
+                              f"RMS = {stats['rms']*1000:.1f} μm [DIAGONAL]")
+                    else:
+                        print(f"  {method_name}: σ = {stats['std_dev']*1000:.1f} μm, "
+                              f"bias = {stats['mean_bias']*1000:.3f} μm, "
+                              f"RMS = {stats['rms']*1000:.1f} μm")
             else:
-                print(f"  {method_name}: No valid data")
+                if is_diagonal:
+                    print(f"  {method_name}: No valid data [DIAGONAL - MISSING]")
+                else:
+                    print(f"  {method_name}: No valid data")
         else:
-            print(f"  {method_name}: Branch '{delta_branch}' not found")
+            if is_diagonal:
+                print(f"  {method_name}: Branch '{delta_branch}' not found [DIAGONAL - MISSING]")
+            else:
+                print(f"  {method_name}: Branch '{delta_branch}' not found")
+    
+    # Summary of diagonal results
+    if diagonal_total > 0:
+        print(f"\nDIAGONAL RESULTS SUMMARY:")
+        print(f"  Found {diagonal_found}/{diagonal_total} diagonal methods with valid data")
+        if diagonal_found == 0:
+            print("  WARNING: No diagonal results found! Check if diagonal fits are enabled in simulation.")
+        elif diagonal_found < diagonal_total:
+            print(f"  NOTE: {diagonal_total - diagonal_found} diagonal methods missing or have no valid data")
+        else:
+            print("  SUCCESS: All diagonal methods have valid data")
     
     return results
 
@@ -294,8 +325,9 @@ def save_results_to_file(results, output_file):
         gauss_row_col_results = [r for r in results if ('Gauss Row ' in r['name'] or 'Gauss Col ' in r['name'])]
         lorentz_row_col_results = [r for r in results if ('Lorentz Row ' in r['name'] or 'Lorentz Col ' in r['name']) and 'Power' not in r['name']]
         power_lorentz_row_col_results = [r for r in results if ('Power Lorentz Row ' in r['name'] or 'Power Lorentz Col ' in r['name'])]
-        main_diag_results = [r for r in results if 'Main Diag' in r['name'] and r['std_dev'] > 0]
-        sec_diag_results = [r for r in results if 'Secondary Diag' in r['name'] and r['std_dev'] > 0]
+        # Remove std_dev > 0 filter for diagonal results to show all available diagonal data
+        main_diag_results = [r for r in results if 'Main Diag' in r['name']]
+        sec_diag_results = [r for r in results if 'Secondary Diag' in r['name']]
         three_d_results = [r for r in results if '3D' in r['name'] and r['std_dev'] > 0]
         mean_results = [r for r in results if 'Mean Estimator' in r['name'] and r['std_dev'] > 0]
         
@@ -349,10 +381,10 @@ def save_results_to_file(results, output_file):
                        f"{result['rms']*1000:>12.2f}\n")
             f.write("-" * 103 + "\n")
         
-        # Main diagonal fits section
+        # Main diagonal fits section - now shows all diagonal results regardless of std_dev
         if main_diag_results:
-            f.write("MAIN DIAG FITS (slope +1, dx-dy=constant):\n")
-            for result in sorted(main_diag_results, key=lambda x: x['std_dev']):
+            f.write("MAIN DIAGONAL FITS (slope +1, dx-dy=constant):\n")
+            for result in sorted(main_diag_results, key=lambda x: x['name']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
                        f"{result['mean_bias']*1000:>14.3f} "
@@ -360,10 +392,10 @@ def save_results_to_file(results, output_file):
                        f"{result['rms']*1000:>12.2f}\n")
             f.write("-" * 103 + "\n")
         
-        # Secondary diagonal fits section
+        # Secondary diagonal fits section - now shows all diagonal results regardless of std_dev
         if sec_diag_results:
-            f.write("SECONDARY DIAG FITS (slope -1, dx+dy=constant):\n")
-            for result in sorted(sec_diag_results, key=lambda x: x['std_dev']):
+            f.write("SECONDARY DIAGONAL FITS (slope -1, dx+dy=constant):\n")
+            for result in sorted(sec_diag_results, key=lambda x: x['name']):
                 f.write(f"{result['name']:<45} "
                        f"{result['n_events']:>10,} "
                        f"{result['mean_bias']*1000:>14.3f} "
