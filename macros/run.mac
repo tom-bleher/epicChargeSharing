@@ -1,6 +1,3 @@
-# Test macro for Gaussian fitting
-# Simple run with a few events to test the fitting
-
 # Set verbosity
 /control/verbose 0
 /run/verbose 0
@@ -15,4 +12,5 @@
 /gun/energy 10 GeV
 
 # Run events to test fitting
-/run/beamOn 3
+/run/beamOn 1000
+
