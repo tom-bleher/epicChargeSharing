@@ -95,7 +95,7 @@ EpicChargeSharingAnalysis/
 ├── src/                          # Source implementation
 │   ├── DetectorConstruction.cc   # Detector geometry
 │   ├── EventAction.cc            # Event processing & charge sharing
-│   ├── 2DGaussCeres.cc     # Pos reconstruction
+│   ├── 2DGaussFit.cc     # Pos reconstruction
 │   └── ...
 ├── include/                      # Header files
 ├── macros/                       # GEANT4 macro files
