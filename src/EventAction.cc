@@ -2,14 +2,15 @@
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
 #include "Constants.hh"
+#include "Control.hh"
 #include "CrashHandler.hh"
 #include "SimulationLogger.hh"
-#include "2DGaussCeres.hh"
-#include "2DLorentzCeres.hh"
-#include "2DPowerLorentzCeres.hh"
-#include "3DGaussCeres.hh"
-#include "3DLorentzCeres.hh"
-#include "3DPowerLorentzCeres.hh"
+#include "2DGaussFit.hh"
+#include "2DLorentzFit.hh"
+#include "2DPowerLorentzFit.hh"
+#include "3DGaussFit.hh"
+#include "3DLorentzFit.hh"
+#include "3DPowerLorentzFit.hh"
 
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
@@ -44,7 +45,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fPixelTrueDeltaY(0),
   fActualPixelDistance(-1.),
   fPixelHit(false),
-  fAutoRadiusEnabled(Constants::ENABLE_AUTO_RADIUS),
+  fAutoRadiusEnabled(Control::ENABLE_AUTO_RADIUS),
   fMinAutoRadius(Constants::MIN_AUTO_RADIUS),
   fMaxAutoRadius(Constants::MAX_AUTO_RADIUS),
   fSelectedRadius(4),
@@ -221,7 +222,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     // ===============================================
     
     // Perform 2D fitting if we have enough data points and Gauss fitting is enabled
-    if (x_coords.size() >= 3 && Constants::ENABLE_GAUSS_FIT && Constants::ENABLE_ROWCOL_FIT) { // Need at least 3 points for 1D Gauss fit
+    if (x_coords.size() >= 3 && Control::ENABLE_GAUSS_FIT && Control::ENABLE_ROWCOL_FIT) { // Need at least 3 points for 1D Gauss fit
       // Perform 2D Gauss fitting using the Ceres Solver implementation
       Gauss2DResultsCeres fitResults = GaussCeres2D(
         x_coords, y_coords, charge_values,
@@ -253,7 +254,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       }
         
         // Perform diagonal fitting if 2D fitting was performed and success and diagonal fitting is enabled
-        if (fitResults.fit_success && Constants::ENABLE_DIAG_FIT) {
+        if (fitResults.fit_success && Control::ENABLE_DIAG_FIT) {
           // Perform diagonal Gauss fitting using the Ceres Solver implementation
           DiagResultsCeres diagResults = DiagGaussCeres(
           x_coords, y_coords, charge_values,
@@ -299,7 +300,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       // ===============================================
       
       // Perform 2D Lorentz fitting if we have enough data points and Lorentz fitting is enabled
-      if (x_coords.size() >= 3 && Constants::ENABLE_LORENTZ_FIT && Constants::ENABLE_ROWCOL_FIT) { // Need at least 3 points for 1D Lorentz fit
+      if (x_coords.size() >= 3 && Control::ENABLE_LORENTZ_FIT && Control::ENABLE_ROWCOL_FIT) { // Need at least 3 points for 1D Lorentz fit
         // Perform 2D Lorentz fitting using the Ceres Solver implementation
         Lorentz2DResultsCeres lorentzResults = LorentzCeres2D(
           x_coords, y_coords, charge_values,
@@ -333,7 +334,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         // Note: Lorentz charge error data was removed as per user request
           
         // Perform diagonal Lorentz fitting if 2D fitting was performed and success and diagonal fitting is enabled
-        if (lorentzResults.fit_success && Constants::ENABLE_DIAG_FIT) {
+        if (lorentzResults.fit_success && Control::ENABLE_DIAG_FIT) {
           // Perform diagonal Lorentz fitting using the Ceres Solver implementation
           DiagLorentzResultsCeres lorentzDiagResults = DiagLorentzCeres(
           x_coords, y_coords, charge_values,
@@ -378,7 +379,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         
     } else {
       // Not enough data points for Lorentz fitting or Lorentz fitting is disabled
-      if (Constants::ENABLE_LORENTZ_FIT) {
+      if (Control::ENABLE_LORENTZ_FIT) {
         fRunAction->Set2DLorentzResults(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
@@ -400,7 +401,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       // ===============================================
       
       // Perform 2D Power-Law Lorentz fitting if we have enough data points and Power-Law Lorentz fitting is enabled
-      if (x_coords.size() >= 3 && Constants::ENABLE_POWER_LORENTZ_FIT && Constants::ENABLE_ROWCOL_FIT) { // Need at least 3 points for Power-Law Lorentz fit
+      if (x_coords.size() >= 3 && Control::ENABLE_POWER_LORENTZ_FIT && Control::ENABLE_ROWCOL_FIT) { // Need at least 3 points for Power-Law Lorentz fit
         // Perform 2D Power-Law Lorentz fitting using the Ceres Solver implementation
         PowerLorentz2DResultsCeres powerLorentzResults = PowerLorentzCeres2D(
           x_coords, y_coords, charge_values,
@@ -432,7 +433,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         }
           
         // Perform diagonal Power-Law Lorentz fitting if 2D fitting was performed and success and diagonal fitting is enabled
-        if (powerLorentzResults.fit_success && Constants::ENABLE_DIAG_FIT) {
+        if (powerLorentzResults.fit_success && Control::ENABLE_DIAG_FIT) {
           // Perform diagonal Power-Law Lorentz fitting using the Ceres Solver implementation
           DiagPowerLorentzResultsCeres powerLorentzDiagResults = DiagPowerLorentzCeres(
           x_coords, y_coords, charge_values,
@@ -476,7 +477,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         
     } else {
       // Not enough data points for Power-Law Lorentz fitting or Power-Law Lorentz fitting is disabled
-      if (Constants::ENABLE_POWER_LORENTZ_FIT) {
+      if (Control::ENABLE_POWER_LORENTZ_FIT) {
         fRunAction->Set2DPowerLorentzResults(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, beta, amp, center_err, gamma_err, beta_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
@@ -498,7 +499,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       // ===============================================
       
       // Perform 3D Lorentz fitting if we have enough data points and 3D Lorentz fitting is enabled
-      if (x_coords.size() >= 6 && Constants::ENABLE_3D_LORENTZ_FIT) { // Need at least 6 points for 3D Lorentz fit
+      if (x_coords.size() >= 6 && Control::ENABLE_3D_LORENTZ_FIT) { // Need at least 6 points for 3D Lorentz fit
         // Perform 3D Lorentz fitting using the Ceres Solver implementation
         Lorentz3DResultsCeres lorentz3DResults = LorentzCeres3D(
           x_coords, y_coords, charge_values,
@@ -530,7 +531,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         
     } else {
       // Not enough data points for 3D Lorentz fitting or 3D Lorentz fitting is disabled
-      if (Constants::ENABLE_3D_LORENTZ_FIT) {
+      if (Control::ENABLE_3D_LORENTZ_FIT) {
         fRunAction->Set3DLorentzResults(
           0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, amp, vert_offset
           0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, amp_err, vert_offset_err
@@ -545,7 +546,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       // ===============================================
       
       // Perform 3D Gauss fitting if we have enough data points and 3D Gauss fitting is enabled
-      if (x_coords.size() >= 6 && Constants::ENABLE_3D_GAUSS_FIT) { // Need at least 6 points for 3D Gauss fit
+      if (x_coords.size() >= 6 && Control::ENABLE_3D_GAUSS_FIT) { // Need at least 6 points for 3D Gauss fit
         // Perform 3D Gauss fitting using the Ceres Solver implementation
         Gauss3DResultsCeres gauss3DResults = GaussCeres3D(
           x_coords, y_coords, charge_values,
@@ -577,7 +578,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         
     } else {
       // Not enough data points for 3D Gauss fitting or 3D Gauss fitting is disabled
-      if (Constants::ENABLE_3D_GAUSS_FIT) {
+      if (Control::ENABLE_3D_GAUSS_FIT) {
         fRunAction->Set3DGaussResults(
           0, 0, 0, 0, 0, 0,  // center_x, center_y, sigma_x, sigma_y, amp, vert_offset
           0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, sigma_x_err, sigma_y_err, amp_err, vert_offset_err
@@ -592,7 +593,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       // ===============================================
       
       // Perform 3D Power-Law Lorentz fitting if we have enough data points and 3D Power-Law Lorentz fitting is enabled
-      if (x_coords.size() >= 7 && Constants::ENABLE_3D_POWER_LORENTZ_FIT) { // Need at least 7 points for 3D Power-Law Lorentz fit
+      if (x_coords.size() >= 7 && Control::ENABLE_3D_POWER_LORENTZ_FIT) { // Need at least 7 points for 3D Power-Law Lorentz fit
         // Perform 3D Power-Law Lorentz fitting using the Ceres Solver implementation
         PowerLorentz3DResultsCeres powerLorentz3DResults = PowerLorentzCeres3D(
           x_coords, y_coords, charge_values,
@@ -626,7 +627,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         
     } else {
       // Not enough data points for 3D Power-Law Lorentz fitting or 3D Power-Law Lorentz fitting is disabled
-      if (Constants::ENABLE_3D_POWER_LORENTZ_FIT) {
+      if (Control::ENABLE_3D_POWER_LORENTZ_FIT) {
         fRunAction->Set3DPowerLorentzResults(
           0, 0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, beta, amp, vert_offset
           0, 0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, beta_err, amp_err, vert_offset_err
@@ -639,7 +640,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         
     } else {
       // Not enough data points for fitting or Gauss fitting is disabled
-      if (Constants::ENABLE_GAUSS_FIT) {
+      if (Control::ENABLE_GAUSS_FIT) {
         fRunAction->Set2DGaussResults(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amp, center_err, sigma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
@@ -656,7 +657,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
       }
       
       // Not enough data points for Lorentz fitting or Lorentz fitting is disabled
-      if (Constants::ENABLE_LORENTZ_FIT) {
+      if (Control::ENABLE_LORENTZ_FIT) {
         fRunAction->Set2DLorentzResults(
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
@@ -679,7 +680,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
     
     // Set default values (no fitting performed or fitting is disabled)
-    if (Constants::ENABLE_GAUSS_FIT) {
+    if (Control::ENABLE_GAUSS_FIT) {
       fRunAction->Set2DGaussResults(
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amp, center_err, sigma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
@@ -696,7 +697,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
     
     // Set default Lorentz values (no fitting performed or Lorentz fitting is disabled)
-    if (Constants::ENABLE_LORENTZ_FIT) {
+    if (Control::ENABLE_LORENTZ_FIT) {
       fRunAction->Set2DLorentzResults(
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
@@ -713,7 +714,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
     
     // Set default Power-Law Lorentz values (no fitting performed or Power-Law Lorentz fitting is disabled)
-    if (Constants::ENABLE_POWER_LORENTZ_FIT) {
+    if (Control::ENABLE_POWER_LORENTZ_FIT) {
       fRunAction->Set2DPowerLorentzResults(
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, beta, amp, center_err, gamma_err, beta_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
@@ -730,7 +731,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
     
     // Set default 3D Lorentz values (no fitting performed or 3D Lorentz fitting is disabled)
-    if (Constants::ENABLE_3D_LORENTZ_FIT) {
+    if (Control::ENABLE_3D_LORENTZ_FIT) {
       fRunAction->Set3DLorentzResults(
         0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, amp, vert_offset
         0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, amp_err, vert_offset_err
@@ -740,7 +741,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
     
     // Set default 3D Gauss values (no fitting performed or 3D Gauss fitting is disabled)
-    if (Constants::ENABLE_3D_GAUSS_FIT) {
+    if (Control::ENABLE_3D_GAUSS_FIT) {
       fRunAction->Set3DGaussResults(
         0, 0, 0, 0, 0, 0,  // center_x, center_y, sigma_x, sigma_y, amp, vert_offset
         0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, sigma_x_err, sigma_y_err, amp_err, vert_offset_err
@@ -750,7 +751,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
     
     // Set default 3D Power-Law Lorentz values (no fitting performed or 3D Power-Law Lorentz fitting is disabled)
-    if (Constants::ENABLE_3D_POWER_LORENTZ_FIT) {
+    if (Control::ENABLE_3D_POWER_LORENTZ_FIT) {
       fRunAction->Set3DPowerLorentzResults(
         0, 0, 0, 0, 0, 0, 0,  // center_x, center_y, gamma_x, gamma_y, beta, amp, vert_offset
         0, 0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, gamma_x_err, gamma_y_err, beta_err, amp_err, vert_offset_err

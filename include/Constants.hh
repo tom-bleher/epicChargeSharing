@@ -43,7 +43,6 @@ namespace Constants {
     // Automatic radius selection parameters
     const G4int MIN_AUTO_RADIUS = 4;                     // Minimum radius for auto selection (5x5 grid)
     const G4int MAX_AUTO_RADIUS = 10;                     // Maximum radius for auto selection (13x13 grid)
-    const G4bool ENABLE_AUTO_RADIUS = false;             // Enable automatic radius selection per hit
     
     // Fit quality thresholds for radius selection
     const G4int MIN_POINTS_FOR_FIT = 3;                  // Minimum number of points required for fitting
@@ -88,44 +87,6 @@ namespace Constants {
     const G4double AMPLIFICATION_FACTOR = 10.0;          // AC-LGAD amplification factor
     const G4double D0_CHARGE_SHARING = 10.0;             // d0 constant for charge sharing (microns)
     const G4double ELEMENTARY_CHARGE = 1.602176634e-19;  // Elementary charge in Coulombs
-    
-    // ========================
-    // FITTING MODEL CONTROL FLAGS
-    // ========================
-    
-    // Enable/disable different fitting models
-    const G4bool ENABLE_GAUSS_FIT = true;         // Enable Gauss fitting (2D and diagonal)
-    const G4bool ENABLE_LORENTZ_FIT = true;       // Enable Lorentz fitting (2D and diagonal) 
-    const G4bool ENABLE_POWER_LORENTZ_FIT = false; // Enable Power Lorentz fitting (2D and diagonal)
-    
-    // Individual fitting type control (only used if main model is enabled)
-    const G4bool ENABLE_ROWCOL_FIT = true;               // Enable central row/column fitting
-    const G4bool ENABLE_DIAG_FIT = false;         // Enable diagonal fitting
-    
-    // 3D fitting control flags (fit entire neighborhood surface directly)
-    const G4bool ENABLE_3D_GAUSS_FIT = true;      // Enable 3D Gauss surface fitting
-    const G4bool ENABLE_3D_LORENTZ_FIT = true;    // Enable 3D Lorentz surface fitting
-    const G4bool ENABLE_3D_POWER_LORENTZ_FIT = false; // Enable 3D Power-Law Lorentz surface fitting
-    
-    // ========================
-    // VERTICAL CHARGE UNCERTAINTIES CONTROL
-    // ========================
-    
-    // Enable/disable vert charge uncertainties in fitting and ROOT output
-    // When enabled: Uses 5% of max charge as err for weighted least squares fitting
-    // When disabled: Uses uniform weighting (err = 1.0) for unweighted fitting
-    // Also controls whether err values are saved to ROOT file branches
-    const G4bool ENABLE_VERT_CHARGE_ERR = true;  // Enable charge uncertainties
-    
-    // ========================
-    // ROOT AUTO-SAVE CONTROL
-    // ========================
-
-    // Frequent AutoSave (TTree::AutoSave/Flush) inside RunAction significantly increases the
-    // probability of producing partially-written baskets when the simulation is killed or the
-    // file system momentarily blocks.  Set this flag to 'false' to disable the per-interval
-    // AutoSave and rely on a single FlushBaskets()+Write() at the end of the run instead.
-    const G4bool ENABLE_AUTOSAVE = false;  // disable by default
 
 } // namespace Constants
 
