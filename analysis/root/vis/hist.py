@@ -81,6 +81,11 @@ def process_branch(branch_name):
 #include <TStyle.h>
 #include <TSystem.h>
 #include <TBranch.h>
+#include <TPaveStats.h>
+#include <TLatex.h>
+#include <TList.h>
+#include <TText.h>
+#include <TNamed.h>
 #include <string>
 #include <iostream>
 
@@ -93,7 +98,7 @@ std::string extractUnit(const std::string& title) {{
     return "";
 }}
 
-std::string getAxisTitle(const std::string& branchName, const std::string& branchTitle) {{
+std::string getAxisTitle(const std::string& branchName, const std::string& branchTitle, double pixelPitch = 0.0) {{
     std::string unit = extractUnit(branchTitle);
     std::string cleanName = branchName;
     
@@ -107,6 +112,15 @@ std::string getAxisTitle(const std::string& branchName, const std::string& branc
             formatted += " ";
         }}
         formatted += cleanName[i];
+    }}
+    
+    // Add pixel pitch information for PixelX/PixelY
+    if ((branchName.find("PixelX") != std::string::npos || branchName.find("PixelY") != std::string::npos) && pixelPitch > 0) {{
+        if (!unit.empty()) {{
+            return formatted + " " + unit + " (bin size: " + std::to_string(pixelPitch) + " mm)";
+        }} else {{
+            return formatted + " (bin size: " + std::to_string(pixelPitch) + " mm)";
+        }}
     }}
     
     if (!unit.empty()) {{
@@ -142,6 +156,13 @@ void process_{branch_name.replace("3D", "ThreeD")}() {{
     
     std::string branchTitle = branch->GetTitle();
     
+    // Read pixel pitch from metadata for PixelX/PixelY histograms
+    double pixelPitch_mm = 0.1; // default value
+    TNamed* pixelSizeObj = (TNamed*)file->Get("GridPixelSize_mm");
+    if (pixelSizeObj) {{
+        pixelPitch_mm = std::stod(pixelSizeObj->GetTitle());
+    }}
+    
     // Calculate min/max
     Double_t minVal = tree->GetMinimum(branchName.c_str());
     Double_t maxVal = tree->GetMaximum(branchName.c_str());
@@ -151,7 +172,16 @@ void process_{branch_name.replace("3D", "ThreeD")}() {{
     double xmin = minVal;
     double xmax = maxVal;
     
-    if (branchName.find("Chi2") != std::string::npos) {{
+    if (branchName.find("PixelX") != std::string::npos || branchName.find("PixelY") != std::string::npos) {{
+        // Use pixel pitch as bin size for PixelX and PixelY
+        double range = maxVal - minVal;
+        double paddedMin = minVal - 0.5 * pixelPitch_mm;
+        double paddedMax = maxVal + 0.5 * pixelPitch_mm;
+        nbins = (int)std::ceil((paddedMax - paddedMin) / pixelPitch_mm);
+        xmin = paddedMin;
+        xmax = paddedMin + nbins * pixelPitch_mm; // Ensure exact alignment
+        std::cout << "Using pixel pitch " << pixelPitch_mm << " mm for " << branchName << " (bins: " << nbins << ")" << std::endl;
+    }} else if (branchName.find("Chi2") != std::string::npos) {{
         xmin = 0;
         xmax = maxVal * 1.1;
         nbins = 50;
@@ -206,32 +236,54 @@ void process_{branch_name.replace("3D", "ThreeD")}() {{
     filledHist->SetFillColor(kBlue-9);
     filledHist->SetFillStyle(1001);
     filledHist->SetLineWidth(2);
+    // Set branch description as main title, with branch name to appear in stats box
     filledHist->SetTitle(branchTitle.c_str());
-    filledHist->GetXaxis()->SetTitle(getAxisTitle(branchName, branchTitle).c_str());
+    filledHist->SetName(branchName.c_str());
+    filledHist->GetXaxis()->SetTitle(getAxisTitle(branchName, branchTitle, pixelPitch_mm).c_str());
     filledHist->GetYaxis()->SetTitle("Entries");
     filledHist->GetXaxis()->SetTitleSize(0.045);
     filledHist->GetYaxis()->SetTitleSize(0.045);
     filledHist->GetXaxis()->SetLabelSize(0.04);
     filledHist->GetYaxis()->SetLabelSize(0.04);
     filledHist->GetXaxis()->SetTitleOffset(1.1);
-    filledHist->GetYaxis()->SetTitleOffset(1.2);
+    filledHist->GetYaxis()->SetTitleOffset(1.0);
     
-    // Create canvas
-    TCanvas* canvas = new TCanvas(("c_" + branchName).c_str(), branchTitle.c_str(), 1200, 800);
-    canvas->SetMargin(0.12, 0.05, 0.12, 0.08);
+    // Create canvas - sized for standard presentation slide (16:9 aspect ratio)
+    TCanvas* canvas = new TCanvas(("c_" + branchName).c_str(), branchTitle.c_str(), 1600, 900);
+    // Tighter margins to reduce white space on horizontal edges
+    canvas->SetMargin(0.08, 0.03, 0.12, 0.08);
     
     // Set style
-    gStyle->SetOptStat(1111);
+    gStyle->SetOptStat(1111);  // Show entries, mean, std dev
     gStyle->SetStatBorderSize(1);
     gStyle->SetStatColor(0);
     gStyle->SetStatFont(42);
-    gStyle->SetStatFontSize(0.03);
+    gStyle->SetStatFontSize(0.032);
     gStyle->SetStatX(0.94);
     gStyle->SetStatY(0.94);
+    gStyle->SetStatFormat("6.3g");  // Better number formatting
     
     // Draw and save
     filledHist->Draw("HIST");
     canvas->Update();
+    
+    // Customize stats box to show branch name as first line
+    TPaveStats* stats = (TPaveStats*)filledHist->FindObject("stats");
+    if (stats) {{
+        stats->SetName("mystats");
+        TList* listOfLines = stats->GetListOfLines();
+        TText* tconst = stats->GetLineWith(filledHist->GetName());
+        if (tconst) {{
+            listOfLines->Remove(tconst);
+        }}
+        // Add branch name as first line
+        TLatex* myt = new TLatex(0, 0, branchName.c_str());
+        myt->SetTextFont(42);
+        myt->SetTextSize(0.032);
+        listOfLines->AddFirst(myt);
+        stats->SetOptStat(1111);
+        canvas->Modified();
+    }}
     
     std::string svgFilename = outputDir + "/" + branchName + ".svg";
     canvas->SaveAs(svgFilename.c_str());
