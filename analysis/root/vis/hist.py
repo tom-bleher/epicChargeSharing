@@ -129,7 +129,7 @@ std::string getAxisTitle(const std::string& branchName, const std::string& branc
     return formatted;
 }}
 
-void process_{branch_name.replace("3D", "ThreeD")}() {{
+void process_{branch_name.replace("3D", "ThreeD").replace("Power", "Pwr").replace("Lorentz", "Lor")}() {{
     std::string branchName = "{branch_name}";
     std::string filename = "/home/tomble/epicChargeSharingOutput.root";
          std::string outputDir = "histograms";
@@ -298,7 +298,7 @@ void process_{branch_name.replace("3D", "ThreeD")}() {{
 '''
     
     # Write the script
-    safe_branch_name = branch_name.replace("3D", "ThreeD")
+    safe_branch_name = branch_name.replace("3D", "ThreeD").replace("Power", "Pwr").replace("Lorentz", "Lor")
     script_file = f'process_{safe_branch_name}.C'
     
     with open(script_file, 'w') as f:
