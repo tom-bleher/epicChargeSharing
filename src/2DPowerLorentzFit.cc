@@ -1,6 +1,7 @@
-#include "2DPowerLorentzCeres.hh"
+#include "2DPowerLorentzFit.hh"
 #include "CeresLoggingInit.hh"
 #include "Constants.hh"
+#include "Control.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <cmath>
@@ -21,7 +22,7 @@ void InitializeCeresPowerLorentz() {
 
 // Calc err as 5% of max charge in line (if enabled) - same as Lorentz
 double CalcPowerLorentzErr(double max_charge_in_line) {
-    if (!Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (!Control::ENABLE_VERT_CHARGE_ERR) {
         return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
@@ -1046,7 +1047,7 @@ PowerLorentz2DResultsCeres PowerLorentzCeres2D(
     result.fit_success = x_fit_success && y_fit_success;
     
     // Calc and store charge uncertainties (5% of max charge for each direction) only if enabled
-    if (Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::ENABLE_VERT_CHARGE_ERR) {
         if (x_fit_success && rows_data.find(best_row_y) != rows_data.end()) {
             auto& row_data = rows_data[best_row_y];
             double max_charge_x = 0.0;

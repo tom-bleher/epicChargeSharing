@@ -1,6 +1,7 @@
-#include "3DLorentzCeres.hh"
+#include "3DLorentzFit.hh"
 #include "CeresLoggingInit.hh"
 #include "Constants.hh"
+#include "Control.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <cmath>
@@ -21,7 +22,7 @@ void InitializeCeres3DLorentz() {
 
 // Calc err as 5% of max charge in neighborhood (if enabled)
 double Calc3DLorentzErr(double max_charge_in_neighborhood) {
-    if (!Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (!Control::ENABLE_VERT_CHARGE_ERR) {
         return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
@@ -896,7 +897,7 @@ Lorentz3DResultsCeres LorentzCeres3D(
     result.charge_values = charge_values;
     
     // Create charge errors if vert uncertainties are enabled
-    if (Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::ENABLE_VERT_CHARGE_ERR) {
         double max_charge = *std::max_element(charge_values.begin(), charge_values.end());
         double charge_err = 0.05 * max_charge;
         result.charge_err = charge_err;
