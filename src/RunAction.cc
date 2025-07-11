@@ -1,5 +1,6 @@
 #include "RunAction.hh"
 #include "Constants.hh"
+#include "Control.hh"
 #include "SimulationLogger.hh"
 #include "CrashHandler.hh"
 
@@ -515,15 +516,15 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // VALIDATION: CHECK THAT REQUIRED CONSTANTS ARE PROPERLY DEFINED
         // =============================================
         G4cout << "RunAction: Creating branches with fitting configuration:" << G4endl;
-        G4cout << "  - Gauss fitting: " << (Constants::ENABLE_GAUSS_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - Lorentz fitting: " << (Constants::ENABLE_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - Power-Law Lorentz fitting: " << (Constants::ENABLE_POWER_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - 2D fitting: " << (Constants::ENABLE_ROWCOL_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - Diag fitting: " << (Constants::ENABLE_DIAG_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - 3D Gauss fitting: " << (Constants::ENABLE_3D_GAUSS_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - 3D Lorentz fitting: " << (Constants::ENABLE_3D_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - 3D Power-Law Lorentz fitting: " << (Constants::ENABLE_3D_POWER_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - Vert charge uncertainties: " << (Constants::ENABLE_VERT_CHARGE_ERR ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Gauss fitting: " << (Control::ENABLE_GAUSS_FIT ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Lorentz fitting: " << (Control::ENABLE_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Power-Law Lorentz fitting: " << (Control::ENABLE_POWER_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - 2D fitting: " << (Control::ENABLE_ROWCOL_FIT ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Diag fitting: " << (Control::ENABLE_DIAG_FIT ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - 3D Gauss fitting: " << (Control::ENABLE_3D_GAUSS_FIT ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - 3D Lorentz fitting: " << (Control::ENABLE_3D_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - 3D Power-Law Lorentz fitting: " << (Control::ENABLE_3D_POWER_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
+        G4cout << "  - Vert charge uncertainties: " << (Control::ENABLE_VERT_CHARGE_ERR ? "ENABLED" : "DISABLED") << G4endl;
         
         // Track number of branches created for validation
         G4int branchCount = 0;
@@ -560,37 +561,37 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // Create delta branches only for enabled fitting types
         
         // 2D fitting deltas
-        if (Constants::ENABLE_GAUSS_FIT && Constants::ENABLE_ROWCOL_FIT) {
+        if (Control::ENABLE_GAUSS_FIT && Control::ENABLE_ROWCOL_FIT) {
             fTree->Branch("GaussRowDeltaX", &fGaussRowDeltaX, "GaussRowDeltaX/D")->SetTitle("Gauss Row  Delta X [mm] (fit - true)");
             fTree->Branch("GaussColDeltaY", &fGaussColDeltaY, "GaussColDeltaY/D")->SetTitle("Gauss Col  Delta Y [mm] (fit - true)");
         }
         
-        if (Constants::ENABLE_LORENTZ_FIT && Constants::ENABLE_ROWCOL_FIT) {
+        if (Control::ENABLE_LORENTZ_FIT && Control::ENABLE_ROWCOL_FIT) {
             fTree->Branch("LorentzRowDeltaX", &fLorentzRowDeltaX, "LorentzRowDeltaX/D")->SetTitle("Lorentz Row  Delta X [mm] (fit - true)");
             fTree->Branch("LorentzColDeltaY", &fLorentzColDeltaY, "LorentzColDeltaY/D")->SetTitle("Lorentz Col  Delta Y [mm] (fit - true)");
         }
         
-        if (Constants::ENABLE_POWER_LORENTZ_FIT && Constants::ENABLE_ROWCOL_FIT) {
+        if (Control::ENABLE_POWER_LORENTZ_FIT && Control::ENABLE_ROWCOL_FIT) {
             fTree->Branch("PowerLorentzRowDeltaX", &fPowerLorentzRowDeltaX, "PowerLorentzRowDeltaX/D")->SetTitle("Power Lorentz Row  Delta X [mm] (fit - true)");
             fTree->Branch("PowerLorentzColDeltaY", &fPowerLorentzColDeltaY, "PowerLorentzColDeltaY/D")->SetTitle("Power Lorentz Col  Delta Y [mm] (fit - true)");
         }
         
         // Diag fit deltas (Trans coordinates)
-        if (Constants::ENABLE_GAUSS_FIT && Constants::ENABLE_DIAG_FIT) {
+        if (Control::ENABLE_GAUSS_FIT && Control::ENABLE_DIAG_FIT) {
             fTree->Branch("GaussMainDiagTransDeltaX", &fGaussMainDiagTransformedDeltaX, "GaussMainDiagTransDeltaX/D")->SetTitle("Gauss Main Diag Trans Delta X [mm] (fit - true)");
             fTree->Branch("GaussMainDiagTransDeltaY", &fGaussMainDiagTransformedDeltaY, "GaussMainDiagTransDeltaY/D")->SetTitle("Gauss Main Diag Trans Delta Y [mm] (fit - true)");
             fTree->Branch("GaussSecDiagTransDeltaX", &fGaussSecDiagTransformedDeltaX, "GaussSecDiagTransDeltaX/D")->SetTitle("Gauss Secondary Diag Trans Delta X [mm] (fit - true)");
             fTree->Branch("GaussSecDiagTransDeltaY", &fGaussSecDiagTransformedDeltaY, "GaussSecDiagTransDeltaY/D")->SetTitle("Gauss Secondary Diag Trans Delta Y [mm] (fit - true)");
         }
         
-        if (Constants::ENABLE_LORENTZ_FIT && Constants::ENABLE_DIAG_FIT) {
+        if (Control::ENABLE_LORENTZ_FIT && Control::ENABLE_DIAG_FIT) {
             fTree->Branch("LorentzMainDiagTransDeltaX", &fLorentzMainDiagTransformedDeltaX, "LorentzMainDiagTransDeltaX/D")->SetTitle("Lorentz Main Diag Trans Delta X [mm] (fit - true)");
             fTree->Branch("LorentzMainDiagTransDeltaY", &fLorentzMainDiagTransformedDeltaY, "LorentzMainDiagTransDeltaY/D")->SetTitle("Lorentz Main Diag Trans Delta Y [mm] (fit - true)");
             fTree->Branch("LorentzSecDiagTransDeltaX", &fLorentzSecDiagTransformedDeltaX, "LorentzSecDiagTransDeltaX/D")->SetTitle("Lorentz Secondary Diag Trans Delta X [mm] (fit - true)");
             fTree->Branch("LorentzSecDiagTransDeltaY", &fLorentzSecDiagTransformedDeltaY, "LorentzSecDiagTransDeltaY/D")->SetTitle("Lorentz Secondary Diag Trans Delta Y [mm] (fit - true)");
         }
         
-        if (Constants::ENABLE_POWER_LORENTZ_FIT && Constants::ENABLE_DIAG_FIT) {
+        if (Control::ENABLE_POWER_LORENTZ_FIT && Control::ENABLE_DIAG_FIT) {
             fTree->Branch("PowerLorentzMainDiagTransDeltaX", &fPowerLorentzMainDiagTransformedDeltaX, "PowerLorentzMainDiagTransDeltaX/D")->SetTitle("Power Lorentz Main Diag Trans Delta X [mm] (fit - true)");
             fTree->Branch("PowerLorentzMainDiagTransDeltaY", &fPowerLorentzMainDiagTransformedDeltaY, "PowerLorentzMainDiagTransDeltaY/D")->SetTitle("Power Lorentz Main Diag Trans Delta Y [mm] (fit - true)");
             fTree->Branch("PowerLorentzSecDiagTransDeltaX", &fPowerLorentzSecDiagTransformedDeltaX, "PowerLorentzSecDiagTransDeltaX/D")->SetTitle("Power Lorentz Secondary Diag Trans Delta X [mm] (fit - true)");
@@ -598,33 +599,33 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         
         // 3D fit deltas
-        if (Constants::ENABLE_3D_GAUSS_FIT) {
+        if (Control::ENABLE_3D_GAUSS_FIT) {
             fTree->Branch("3DGaussDeltaX", &f3DGaussDeltaX, "3DGaussDeltaX/D")->SetTitle("3D Gauss  Delta X [mm] (fit - true)");
             fTree->Branch("3DGaussDeltaY", &f3DGaussDeltaY, "3DGaussDeltaY/D")->SetTitle("3D Gauss  Delta Y [mm] (fit - true)");
         }
         
-        if (Constants::ENABLE_3D_LORENTZ_FIT) {
+        if (Control::ENABLE_3D_LORENTZ_FIT) {
             fTree->Branch("3DLorentzDeltaX", &f3DLorentzDeltaX, "3DLorentzDeltaX/D")->SetTitle("3D Lorentz  Delta X [mm] (fit - true)");
             fTree->Branch("3DLorentzDeltaY", &f3DLorentzDeltaY, "3DLorentzDeltaY/D")->SetTitle("3D Lorentz  Delta Y [mm] (fit - true)");
         }
         
-        if (Constants::ENABLE_3D_POWER_LORENTZ_FIT) {
+        if (Control::ENABLE_3D_POWER_LORENTZ_FIT) {
             fTree->Branch("3DPowerLorentzDeltaX", &f3DPowerLorentzDeltaX, "3DPowerLorentzDeltaX/D")->SetTitle("3D Power Lorentz  Delta X [mm] (fit - true)");
             fTree->Branch("3DPowerLorentzDeltaY", &f3DPowerLorentzDeltaY, "3DPowerLorentzDeltaY/D")->SetTitle("3D Power Lorentz  Delta Y [mm] (fit - true)");
         }
         
         // Mean estimators (key resolution metrics) - only create if corresponding fitting is enabled
-        if (Constants::ENABLE_GAUSS_FIT && (Constants::ENABLE_DIAG_FIT || Constants::ENABLE_3D_GAUSS_FIT)) {
+        if (Control::ENABLE_GAUSS_FIT && (Control::ENABLE_DIAG_FIT || Control::ENABLE_3D_GAUSS_FIT)) {
             fTree->Branch("GaussMeanTrueDeltaX", &fGaussMeanTrueDeltaX, "GaussMeanTrueDeltaX/D")->SetTitle("Gauss Mean Estimator Delta X [mm] (mean_fit - true)");
             fTree->Branch("GaussMeanTrueDeltaY", &fGaussMeanTrueDeltaY, "GaussMeanTrueDeltaY/D")->SetTitle("Gauss Mean Estimator Delta Y [mm] (mean_fit - true)");
         }
         
-        if (Constants::ENABLE_LORENTZ_FIT && (Constants::ENABLE_DIAG_FIT || Constants::ENABLE_3D_LORENTZ_FIT)) {
+        if (Control::ENABLE_LORENTZ_FIT && (Control::ENABLE_DIAG_FIT || Control::ENABLE_3D_LORENTZ_FIT)) {
             fTree->Branch("LorentzMeanTrueDeltaX", &fLorentzMeanTrueDeltaX, "LorentzMeanTrueDeltaX/D")->SetTitle("Lorentz Mean Estimator Delta X [mm] (mean_fit - true)");
             fTree->Branch("LorentzMeanTrueDeltaY", &fLorentzMeanTrueDeltaY, "LorentzMeanTrueDeltaY/D")->SetTitle("Lorentz Mean Estimator Delta Y [mm] (mean_fit - true)");
         }
         
-        if (Constants::ENABLE_POWER_LORENTZ_FIT && (Constants::ENABLE_DIAG_FIT || Constants::ENABLE_3D_POWER_LORENTZ_FIT)) {
+        if (Control::ENABLE_POWER_LORENTZ_FIT && (Control::ENABLE_DIAG_FIT || Control::ENABLE_3D_POWER_LORENTZ_FIT)) {
             fTree->Branch("PowerLorentzMeanTrueDeltaX", &fPowerLorentzMeanTrueDeltaX, "PowerLorentzMeanTrueDeltaX/D")->SetTitle("Power Lorentz Mean Estimator Delta X [mm] (mean_fit - true)");
             fTree->Branch("PowerLorentzMeanTrueDeltaY", &fPowerLorentzMeanTrueDeltaY, "PowerLorentzMeanTrueDeltaY/D")->SetTitle("Power Lorentz Mean Estimator Delta Y [mm] (mean_fit - true)");
         }
@@ -632,9 +633,9 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         // GAUSS FIT PARAMETERS BRANCHES
         // =============================================
-        if (Constants::ENABLE_GAUSS_FIT) {
+        if (Control::ENABLE_GAUSS_FIT) {
             // Only create central row/column (2D) branches when 2D fitting is enabled
-            if (Constants::ENABLE_ROWCOL_FIT) {
+            if (Control::ENABLE_ROWCOL_FIT) {
                 // Row fit parameters
                 fTree->Branch("GaussRowAmp", &fGaussRowAmp, "GaussRowAmp/D")->SetTitle("Gauss Row  Amp");
                 fTree->Branch("GaussRowAmpErr", &fGaussRowAmpErr, "GaussRowAmpErr/D")->SetTitle("Gauss Row  Amp Error");
@@ -665,7 +666,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             } // end 2D Gauss branches
             
             // Create diagonal fit branches only when diagonal fitting is enabled
-            if (Constants::ENABLE_DIAG_FIT) {
+            if (Control::ENABLE_DIAG_FIT) {
                 // Main diagonal fit parameters
                 fTree->Branch("GaussMainDiagXAmp", &fGaussMainDiagXAmp, "GaussMainDiagXAmp/D")->SetTitle("Gauss Main Diag X  Amp");
                 fTree->Branch("GaussMainDiagXAmpErr", &fGaussMainDiagXAmpErr, "GaussMainDiagXAmpErr/D")->SetTitle("Gauss Main Diag X  Amp Error");
@@ -721,9 +722,9 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         // Lorentz FIT PARAMETERS BRANCHES
         // =============================================
-        if (Constants::ENABLE_LORENTZ_FIT) {
+        if (Control::ENABLE_LORENTZ_FIT) {
             // Only create central row/column (2D) branches when 2D fitting is enabled
-            if (Constants::ENABLE_ROWCOL_FIT) {
+            if (Control::ENABLE_ROWCOL_FIT) {
                 // Row fit parameters
                 fTree->Branch("LorentzRowAmp", &fLorentzRowAmp, "LorentzRowAmp/D")->SetTitle("Lorentz Row  Amp");
                 fTree->Branch("LorentzRowAmpErr", &fLorentzRowAmpErr, "LorentzRowAmpErr/D")->SetTitle("Lorentz Row  Amp Error");
@@ -754,7 +755,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             } // end 2D Lorentz branches
             
             // Create diagonal fit branches only when diagonal fitting is enabled
-            if (Constants::ENABLE_DIAG_FIT) {
+            if (Control::ENABLE_DIAG_FIT) {
                 // Main diagonal fit parameters
                 fTree->Branch("LorentzMainDiagXAmp", &fLorentzMainDiagXAmp, "LorentzMainDiagXAmp/D")->SetTitle("Lorentz Main Diag X  Amp");
                 fTree->Branch("LorentzMainDiagXAmpErr", &fLorentzMainDiagXAmpErr, "LorentzMainDiagXAmpErr/D")->SetTitle("Lorentz Main Diag X  Amp Error");
@@ -810,9 +811,9 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         // POWER-LAW Lorentz FIT PARAMETERS BRANCHES
         // =============================================
-        if (Constants::ENABLE_POWER_LORENTZ_FIT) {
+        if (Control::ENABLE_POWER_LORENTZ_FIT) {
             // Only create central row/column (2D) branches when 2D fitting is enabled
-            if (Constants::ENABLE_ROWCOL_FIT) {
+            if (Control::ENABLE_ROWCOL_FIT) {
                 // Row fit parameters
                 fTree->Branch("PowerLorentzRowAmp", &fPowerLorentzRowAmp, "PowerLorentzRowAmp/D")->SetTitle("Power-Law Lorentz Row  Amp");
                 fTree->Branch("PowerLorentzRowAmpErr", &fPowerLorentzRowAmpErr, "PowerLorentzRowAmpErr/D")->SetTitle("Power-Law Lorentz Row  Amp Error");
@@ -847,7 +848,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             } // end 2D Power-Law Lorentz branches
             
             // Create diagonal fit branches only when diagonal fitting is enabled
-            if (Constants::ENABLE_DIAG_FIT) {
+            if (Control::ENABLE_DIAG_FIT) {
                 // Main diagonal fit parameters
                 fTree->Branch("PowerLorentzMainDiagXAmp", &fPowerLorentzMainDiagXAmp, "PowerLorentzMainDiagXAmp/D")->SetTitle("Power-Law Lorentz Main Diag X  Amp");
                 fTree->Branch("PowerLorentzMainDiagXAmpErr", &fPowerLorentzMainDiagXAmpErr, "PowerLorentzMainDiagXAmpErr/D")->SetTitle("Power-Law Lorentz Main Diag X  Amp Error");
@@ -912,7 +913,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // 3D FIT PARAMETERS BRANCHES
         // =============================================
         // 3D Gauss fit parameters
-        if (Constants::ENABLE_3D_GAUSS_FIT) {
+        if (Control::ENABLE_3D_GAUSS_FIT) {
         fTree->Branch("3DGaussCenterX", &f3DGaussCenterX, "3DGaussCenterX/D")->SetTitle("3D Gauss  Center X");
         fTree->Branch("3DGaussCenterY", &f3DGaussCenterY, "3DGaussCenterY/D")->SetTitle("3D Gauss  Center Y");
         fTree->Branch("3DGaussSigmaX", &f3DGaussSigmaX, "3DGaussSigmaX/D")->SetTitle("3D Gauss  Sigma X");
@@ -933,7 +934,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         
         // 3D Lorentz fit parameters
-        if (Constants::ENABLE_3D_LORENTZ_FIT) {
+        if (Control::ENABLE_3D_LORENTZ_FIT) {
         fTree->Branch("3DLorentzCenterX", &f3DLorentzCenterX, "3DLorentzCenterX/D")->SetTitle("3D Lorentz  Center X");
         fTree->Branch("3DLorentzCenterY", &f3DLorentzCenterY, "3DLorentzCenterY/D")->SetTitle("3D Lorentz  Center Y");
         fTree->Branch("3DLorentzGammaX", &f3DLorentzGammaX, "3DLorentzGammaX/D")->SetTitle("3D Lorentz  Gamma X");
@@ -954,7 +955,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         
         // 3D Power-Law Lorentz fit parameters
-        if (Constants::ENABLE_3D_POWER_LORENTZ_FIT) {
+        if (Control::ENABLE_3D_POWER_LORENTZ_FIT) {
         fTree->Branch("3DPowerLorentzCenterX", &f3DPowerLorentzCenterX, "3DPowerLorentzCenterX/D")->SetTitle("3D Power-Law Lorentz  Center X");
         fTree->Branch("3DPowerLorentzCenterY", &f3DPowerLorentzCenterY, "3DPowerLorentzCenterY/D")->SetTitle("3D Power-Law Lorentz  Center Y");
         fTree->Branch("3DPowerLorentzGammaX", &f3DPowerLorentzGammaX, "3DPowerLorentzGammaX/D")->SetTitle("3D Power-Law Lorentz  Gamma X");
@@ -980,7 +981,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // Trans COORDINATE BRANCHES
         // =============================================
         // Gauss diagonal Trans coordinates
-        if (Constants::ENABLE_GAUSS_FIT && Constants::ENABLE_DIAG_FIT) {
+        if (Control::ENABLE_GAUSS_FIT && Control::ENABLE_DIAG_FIT) {
         fTree->Branch("GaussMainDiagTransX", &fGaussMainDiagTransformedX, "GaussMainDiagTransX/D")->SetTitle("Gauss Main Diag Trans X Coord [mm]");
         fTree->Branch("GaussMainDiagTransY", &fGaussMainDiagTransformedY, "GaussMainDiagTransY/D")->SetTitle("Gauss Main Diag Trans Y Coord [mm]");
         fTree->Branch("GaussSecDiagTransX", &fGaussSecDiagTransformedX, "GaussSecDiagTransX/D")->SetTitle("Gauss Secondary Diag Trans X Coord [mm]");
@@ -988,7 +989,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         
         // Lorentz diagonal Trans coordinates
-        if (Constants::ENABLE_LORENTZ_FIT && Constants::ENABLE_DIAG_FIT) {
+        if (Control::ENABLE_LORENTZ_FIT && Control::ENABLE_DIAG_FIT) {
         fTree->Branch("LorentzMainDiagTransX", &fLorentzMainDiagTransformedX, "LorentzMainDiagTransX/D")->SetTitle("Lorentz Main Diag Trans X Coord [mm]");
         fTree->Branch("LorentzMainDiagTransY", &fLorentzMainDiagTransformedY, "LorentzMainDiagTransY/D")->SetTitle("Lorentz Main Diag Trans Y Coord [mm]");
         fTree->Branch("LorentzSecDiagTransX", &fLorentzSecDiagTransformedX, "LorentzSecDiagTransX/D")->SetTitle("Lorentz Secondary Diag Trans X Coord [mm]");
@@ -996,7 +997,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         
         // Power-Law Lorentz diagonal Trans coordinates
-        if (Constants::ENABLE_POWER_LORENTZ_FIT && Constants::ENABLE_DIAG_FIT) {
+        if (Control::ENABLE_POWER_LORENTZ_FIT && Control::ENABLE_DIAG_FIT) {
         fTree->Branch("PowerLorentzMainDiagTransX", &fPowerLorentzMainDiagTransformedX, "PowerLorentzMainDiagTransX/D")->SetTitle("Power-Law Lorentz Main Diag Trans X Coord [mm]");
         fTree->Branch("PowerLorentzMainDiagTransY", &fPowerLorentzMainDiagTransformedY, "PowerLorentzMainDiagTransY/D")->SetTitle("Power-Law Lorentz Main Diag Trans Y Coord [mm]");
         fTree->Branch("PowerLorentzSecDiagTransX", &fPowerLorentzSecDiagTransformedX, "PowerLorentzSecDiagTransX/D")->SetTitle("Power-Law Lorentz Secondary Diag Trans X Coord [mm]");
@@ -1006,7 +1007,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         G4cout << "Created ROOT tree with " << fTree->GetNbranches() << " branches" << G4endl;
         
         // Enable frequent AutoSave only when explicitly requested via Constants flag
-        if (Constants::ENABLE_AUTOSAVE) {
+        if (Control::ENABLE_AUTOSAVE) {
             // 1000-event interval was the historical default; keep it when enabled.
             EnableAutoSave(1000);
         } else {
@@ -1233,8 +1234,17 @@ void RunAction::SetInitialPos(G4double x, G4double y, G4double z)
 
 void RunAction::SetNearestPixelPos(G4double x, G4double y)
 {
+    // Store nearest pixel centre coordinates
     fNearestPixelX = x;
     fNearestPixelY = y;
+
+    // Ensure internal pixel centre variables used by diagonal transformations are kept in sync.
+    // NOTE: Historically, the diagonal coordinate transformation functions relied on fPixelX/Y
+    // but these members were never initialised, causing large residuals for diagonal fits.
+    // Keeping the two representations consistent fixes the excessively large diagonal
+    // resolution values reported in the analysis stage.
+    fPixelX = x;
+    fPixelY = y;
 }
 
 void RunAction::SetInitialEnergy(G4double energy) 
@@ -1358,7 +1368,7 @@ void RunAction::Set2DGaussResults(G4double x_center, G4double x_sigma, G4double 
     fGaussColDOF = y_dof;
     
     // Store charge uncertainties (5% of max charge) only if feature is enabled
-    if (Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::ENABLE_VERT_CHARGE_ERR) {
         fGaussRowChargeErr = x_charge_err;
         fGaussColChargeErr = y_charge_err;
     } else {
@@ -1509,7 +1519,7 @@ void RunAction::Set2DLorentzResults(G4double x_center, G4double x_gamma, G4doubl
     fLorentzColDOF = y_dof;
     
     // Store charge uncertainties (5% of max charge) only if feature is enabled
-    if (Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::ENABLE_VERT_CHARGE_ERR) {
         fLorentzRowChargeErr = x_charge_err;
         fLorentzColChargeErr = y_charge_err;
     } else {
@@ -2025,7 +2035,7 @@ void RunAction::Set2DPowerLorentzResults(G4double x_center, G4double x_gamma, G4
     fPowerLorentzColDOF = y_dof;
     
     // Store charge uncertainties (5% of max charge) only if feature is enabled
-    if (Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::ENABLE_VERT_CHARGE_ERR) {
         fPowerLorentzRowChargeErr = x_charge_err;
         fPowerLorentzColChargeErr = y_charge_err;
     } else {
@@ -2176,7 +2186,7 @@ void RunAction::Set3DLorentzResults(G4double center_x, G4double center_y, G4doub
     f3DLorentzSuccess = fit_success;
     
     // Store charge err (5% of max charge) only if feature is enabled
-    if (Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::ENABLE_VERT_CHARGE_ERR) {
         f3DLorentzChargeErr = charge_err;
     } else {
         f3DLorentzChargeErr = 0.0;
@@ -2227,7 +2237,7 @@ void RunAction::Set3DPowerLorentzResults(G4double center_x, G4double center_y, G
     f3DPowerLorentzSuccess = fit_success;
     
     // Store charge err (5% of max charge) only if feature is enabled
-    if (Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::ENABLE_VERT_CHARGE_ERR) {
         f3DPowerLorentzChargeErr = charge_err;
     } else {
         f3DPowerLorentzChargeErr = 0.0;
@@ -2276,7 +2286,7 @@ void RunAction::Set3DGaussResults(G4double center_x, G4double center_y, G4double
     f3DGaussSuccess = fit_success;
     
     // Store charge err (5% of max charge) only if feature is enabled
-    if (Constants::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::ENABLE_VERT_CHARGE_ERR) {
         f3DGaussChargeErr = charge_err;
     } else {
         f3DGaussChargeErr = 0.0;
