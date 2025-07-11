@@ -1,6 +1,6 @@
-# EpicChargeSharingAnalysis
+# epicChargeSharingAnalysis
 
-A GEANT4-based simulation for charge sharing studies in AC-LGAD pixel sensors with a focus on position reconstruction.
+A GEANT4-based simulation for charge sharing studies in AC-LGAD pixel sensors.
 
 ## Prerequisites
 
@@ -95,7 +95,7 @@ EpicChargeSharingAnalysis/
 ├── src/                          # Source implementation
 │   ├── DetectorConstruction.cc   # Detector geometry
 │   ├── EventAction.cc            # Event processing & charge sharing
-│   ├── 2DGaussianFitCeres.cc     # Position reconstruction
+│   ├── 2DGaussCeres.cc     # Pos reconstruction
 │   └── ...
 ├── include/                      # Header files
 ├── macros/                       # GEANT4 macro files
@@ -105,3 +105,7 @@ EpicChargeSharingAnalysis/
 ## Contact
 
 For questions or contributions, please open an issue on GitHub or contact me.
+
+## TODO:
+
+- Fix `vis.mac`
