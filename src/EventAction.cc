@@ -845,19 +845,22 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
   G4double dy = pos.y() - pixelY;
   fActualPixelDistance = std::sqrt(dx*dx + dy*dy);
   
+  // Determine if the hit was on a pixel using the detector's method
+  G4bool isOnPixel = fDetector->IsPosOnPixel(pos);
+  
   // Calc and store delta values (pixel center - true pos)
-  // Only calculate meaningful deltas for hits within detector bounds
-  if (isWithinDetector) {
+  // Only calculate meaningful deltas for hits within detector bounds AND non-pixel hits
+  if (isWithinDetector && !isOnPixel) {
     fPixelTrueDeltaX = pixelX - pos.x();
     fPixelTrueDeltaY = pixelY - pos.y();
   } else {
-    // For hits outside detector bounds, mark deltas as invalid
+    // For hits outside detector bounds or pixel hits, mark deltas as invalid
     fPixelTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
     fPixelTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
   }
   
-  // Determine if the hit was on a pixel using the detector's method
-  fPixelHit = fDetector->IsPosOnPixel(pos);
+  // Store the pixel hit status
+  fPixelHit = isOnPixel;
   
   return G4ThreeVector(pixelX, pixelY, pixelZ);
 }
