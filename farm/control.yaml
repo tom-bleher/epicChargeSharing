@@ -1,0 +1,51 @@
+# Simulation Farmer
+# This YAML file allows you to specify which parameters to vary and their values
+# The simulation will run for each combination (Cartesian product) of parameter values
+
+# Global simulation settings
+simulation:
+  name: "pixel_size_study"
+  output_base_dir: "./pixel_size_study"
+  
+# Parameters to vary - only specify the ones you want to change
+# Each parameter can hold a list
+varied_parameters:
+  # Detector geometry parameters
+  DEFAULT_PIXEL_SIZE:
+    values: [0.005, 0.01, 0.015, 0.02]  # in mm
+    
+  # Uncomment and modify any of these to vary multiple parameters:
+  # DEFAULT_PIXEL_SPACING:
+  #   values: [0.3, 0.5, 0.7, 1.0]  # in mm
+  
+  # DEFAULT_PIXEL_CORNER_OFFSET:
+  #   values: [0.05, 0.1, 0.15]  # in mm
+
+  # ENABLE_3D_GAUSS_FIT:
+  #   values: [true, false, true, false]
+
+# Constant parameters
+constant_parameters:
+  # Detector dimensions
+  DEFAULT_DETECTOR_SIZE: 30.0  # mm
+  DEFAULT_DETECTOR_WIDTH: 0.05  # mm
+  
+  # Pixel geometry (only used if not being varied)
+  DEFAULT_PIXEL_SIZE: 0.01  # mm
+  DEFAULT_PIXEL_WIDTH: 0.001  # mm
+  DEFAULT_PIXEL_SPACING: 0.5  # mm
+  DEFAULT_PIXEL_CORNER_OFFSET: 0.1  # mm
+  
+  # Fitting control flags
+  ENABLE_GAUSS_FIT: true
+  ENABLE_LORENTZ_FIT: true
+  ENABLE_POWER_LORENTZ_FIT: false
+  ENABLE_ROWCOL_FIT: true
+  ENABLE_DIAG_FIT: false
+  ENABLE_3D_GAUSS_FIT: true
+  ENABLE_3D_LORENTZ_FIT: true
+  ENABLE_3D_POWER_LORENTZ_FIT: false
+  ENABLE_VERT_CHARGE_ERR: true
+
+  # Automatic radius selection
+  ENABLE_AUTO_RADIUS: false
