@@ -12,8 +12,8 @@ namespace Constants {
     // ========================
     
     // Default detector dimensions
-    const G4double DEFAULT_DETECTOR_SIZE = 30*mm;        // 30 mm default detector size
-    const G4double DEFAULT_DETECTOR_WIDTH = 0.05*mm;     // 50 microns thickness
+    const G4double DETECTOR_SIZE = 30.0*mm;        // 30 mm default detector size
+    const G4double DETECTOR_WIDTH = 0.05*mm;     // 50 microns thickness
     const G4double WORLD_SIZE = 5*cm;                    // World volume size
     const G4double DETECTOR_Z_POSITION = -1.0*cm;       // Fixed detector position
     
@@ -24,10 +24,10 @@ namespace Constants {
     // Parameters (all lengths are center–to–center except fPixelCornerOffset)
     
     // Default pixel dimensions and spacing
-    const G4double DEFAULT_PIXEL_SIZE = 0.1*mm;          // "pixel" side‐length
-    const G4double DEFAULT_PIXEL_WIDTH = 0.001*mm;       // Width/thickness of each pixel
-    const G4double DEFAULT_PIXEL_SPACING = 0.5*mm;       // center–to–center pitch
-    const G4double DEFAULT_PIXEL_CORNER_OFFSET = 0.1*mm; // from inner detector edge to first pixel
+    const G4double PIXEL_SIZE = 0.005*mm;          // "pixel" side‐length
+    const G4double PIXEL_WIDTH = 0.001*mm;       // Width/thickness of each pixel
+    const G4double PIXEL_SPACING = 0.5*mm;       // center–to–center pitch
+    const G4double PIXEL_CORNER_OFFSET = 0.1*mm; // from inner detector edge to first pixel
     
     // Pixel positioning precision
     const G4double GEOMETRY_TOLERANCE = 1*um;            // Geometry calculation tolerance
