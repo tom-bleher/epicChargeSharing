@@ -11,41 +11,41 @@ simulation:
 # Each parameter can hold a list
 varied_parameters:
   # Detector geometry parameters
-  DEFAULT_PIXEL_SIZE:
-    values: [0.005, 0.01, 0.015, 0.02]  # in mm
+  PIXEL_SIZE:
+    values: [0.005, 0.01] #, 0.015, 0.02]  # in mm
     
   # Uncomment and modify any of these to vary multiple parameters:
-  # DEFAULT_PIXEL_SPACING:
+  # PIXEL_SPACING:
   #   values: [0.3, 0.5, 0.7, 1.0]  # in mm
   
-  # DEFAULT_PIXEL_CORNER_OFFSET:
+  # PIXEL_CORNER_OFFSET:
   #   values: [0.05, 0.1, 0.15]  # in mm
 
-  # ENABLE_3D_GAUSS_FIT:
+  # GAUSS_FIT_3D:
   #   values: [true, false, true, false]
 
 # Constant parameters
 constant_parameters:
   # Detector dimensions
-  DEFAULT_DETECTOR_SIZE: 30.0  # mm
-  DEFAULT_DETECTOR_WIDTH: 0.05  # mm
+  DETECTOR_SIZE: 30.0  # mm
+  DETECTOR_WIDTH: 0.05  # mm
   
   # Pixel geometry (only used if not being varied)
-  DEFAULT_PIXEL_SIZE: 0.01  # mm
-  DEFAULT_PIXEL_WIDTH: 0.001  # mm
-  DEFAULT_PIXEL_SPACING: 0.5  # mm
-  DEFAULT_PIXEL_CORNER_OFFSET: 0.1  # mm
+  PIXEL_SIZE: 0.01  # mm
+  PIXEL_WIDTH: 0.001  # mm
+  PIXEL_SPACING: 0.5  # mm
+  PIXEL_CORNER_OFFSET: 0.1  # mm
   
   # Fitting control flags
-  ENABLE_GAUSS_FIT: true
-  ENABLE_LORENTZ_FIT: true
-  ENABLE_POWER_LORENTZ_FIT: false
-  ENABLE_ROWCOL_FIT: true
-  ENABLE_DIAG_FIT: false
-  ENABLE_3D_GAUSS_FIT: true
-  ENABLE_3D_LORENTZ_FIT: true
-  ENABLE_3D_POWER_LORENTZ_FIT: false
-  ENABLE_VERT_CHARGE_ERR: true
+  GAUSS_FIT: true
+  LORENTZ_FIT: true
+  POWER_LORENTZ_FIT: false
+  ROWCOL_FIT: true
+  DIAG_FIT: false
+  GAUSS_FIT_3D: true
+  LORENTZ_FIT_3D: true
+  POWER_LORENTZ_FIT_3D: false
+  CHARGE_ERR: true
 
   # Automatic radius selection
-  ENABLE_AUTO_RADIUS: false
+  AUTO_RADIUS: false
