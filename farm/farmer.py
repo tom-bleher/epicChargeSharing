@@ -30,7 +30,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 try:
     import yaml  # PyYAML
@@ -113,17 +113,25 @@ def cmake_build(build_dir: Path, jobs: int) -> None:
     subprocess.run(["cmake", "--build", str(build_dir), "--", f"-j{jobs}"], check=True)
 
 
-def run_simulation(build_dir: Path, macro: Path) -> None:
+def run_simulation(build_dir: Path, macro: Path, num_events: Optional[int] = None) -> None:
     exe = build_dir / "epicChargeSharing"
     if not exe.is_file():
         raise FileNotFoundError(f"Simulation binary not found: {exe}")
     
-    # Convert macro to absolute path since we're changing working directory
-    macro_abs = macro.resolve()
-    
     # Run simulation from build directory so ROOT file is created there
-    subprocess.run([str(exe), str(macro_abs)], cwd=str(build_dir), check=True)
-
+    # Convert to absolute path for working directory change
+    exe_abs = exe.resolve()
+    
+    if num_events is not None:
+        # Use header mode when num_events is specified
+        # This eliminates the need for macro files entirely
+        print(f"Running {num_events} events using header mode")
+        subprocess.run([str(exe_abs), "-header"], cwd=str(build_dir), check=True)
+    else:
+        # Traditional macro file mode (for compatibility)
+        macro_abs = macro.resolve()
+        print(f"Running simulation with macro: {macro}")
+        subprocess.run([str(exe_abs), "-m", str(macro_abs)], cwd=str(build_dir), check=True)
 
 def wait_for_file_merge_completion(build_dir: Path, timeout_seconds: int = 30) -> bool:
     """
@@ -312,7 +320,8 @@ def main(argv: List[str] | None = None) -> None:  # noqa: C901 – top-level cla
         cmake_build(args.build_dir, args.jobs)
 
         # Run simulation (Geant4 app is multi-threaded; max threads internal)
-        run_simulation(args.build_dir, args.macro)
+        num_events = run_params.get("NUMBER_OF_EVENTS")
+        run_simulation(args.build_dir, args.macro, num_events=num_events)
 
         # Wait for multithreaded file merging to complete
         print("Waiting for multithreaded file merging to complete...")

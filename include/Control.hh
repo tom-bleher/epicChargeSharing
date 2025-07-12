@@ -12,6 +12,15 @@ namespace Control {
     const G4bool AUTO_RADIUS = false;             // Enable automatic radius selection per hit
     
     // ========================
+    // SIMULATION CONTROL PARAMETERS
+    // ========================
+    
+    // Event generation control
+    const G4int NUMBER_OF_EVENTS = 1000;         // Number of events to simulate
+    const G4double PARTICLE_ENERGY = 0.0001;        // Particle energy in GeV
+    const G4String PARTICLE_TYPE = "e-";          // Particle type (e-, mu-, gamma, etc.)
+    
+    // ========================
     // FITTING MODEL CONTROL FLAGS
     // ========================
     

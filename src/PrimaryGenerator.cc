@@ -1,6 +1,7 @@
 #include "PrimaryGenerator.hh"
 #include "DetectorConstruction.hh"
 #include "Constants.hh"
+#include "Control.hh"
 #include "Randomize.hh"
 #include "G4Event.hh"
 #include "G4ParticleTable.hh"
@@ -14,9 +15,26 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     // Particle momentum direction - pointing toward the detector
     G4ThreeVector mom(0.0, 0.0, -1.0);
 
-    // Particle Type - using electrons for AC-LGAD simulation
+    // Set particle type from Control.hh (this overrides any macro file commands)
     G4ParticleTable *particleTable = G4ParticleTable::GetParticleTable();
-    G4ParticleDefinition *particle = particleTable->FindParticle("e-");
+    G4ParticleDefinition *particle = particleTable->FindParticle(Control::PARTICLE_TYPE);
+    if (!particle) {
+        G4cerr << "ERROR: Unknown particle type: " << Control::PARTICLE_TYPE << G4endl;
+        G4cerr << "Falling back to electron" << G4endl;
+        particle = particleTable->FindParticle("e-");
+    }
+    
+    fParticleGun->SetParticleDefinition(particle);
+    
+    // Set particle energy from Control.hh (this overrides any macro file commands)
+    fParticleGun->SetParticleEnergy(Control::PARTICLE_ENERGY * GeV);
+    
+    // Set particle momentum direction
+    fParticleGun->SetParticleMomentumDirection(mom);
+    
+    G4cout << "\n=== PARTICLE GUN CONFIGURED FROM HEADER FILES ===" << G4endl;
+    G4cout << "Particle type: " << Control::PARTICLE_TYPE << G4endl;
+    G4cout << "Particle energy: " << Control::PARTICLE_ENERGY << " GeV" << G4endl;
 
     // Particle gun now shoots uniformly across the entire detector surface
     G4double detSize = fDetector->GetDetSize();
@@ -31,19 +49,15 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
                     "Neighborhood radius larger than detector allows.");
     }
 
-    G4cout << "\n=== PARTICLE GUN WITH FULL " << (2*radius+1) << "x" << (2*radius+1)
-           << " NEIGHBOURHOOD GUARANTEE ===" << G4endl;
+    G4cout << "Full " << (2*radius+1) << "x" << (2*radius+1)
+           << " neighbourhood guarantee enabled" << G4endl;
     G4cout << "Allowed XY range inside detector: [" << (-detSize/2 + margin)/mm << ", "
            << (detSize/2 - margin)/mm << "] mm" << G4endl;
     G4cout << "(Margin from edges: " << margin/mm << " mm)" << G4endl;
-    G4cout << "===============================================================" << G4endl;
+    G4cout << "===============================================" << G4endl;
 
     // Initial position will be set randomly on the detector surface
     GenerateRandomPos();
-    
-    fParticleGun->SetParticleMomentumDirection(mom);
-    fParticleGun->SetParticleEnergy(0.1*MeV); // Realistic MIP energy
-    fParticleGun->SetParticleDefinition(particle);
 }
 
 PrimaryGenerator::~PrimaryGenerator()
