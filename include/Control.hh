@@ -9,25 +9,25 @@ namespace Control {
     // AUTOMATIC RADIUS SELECTION CONTROL
     // ========================
     
-    const G4bool ENABLE_AUTO_RADIUS = false;             // Enable automatic radius selection per hit
+    const G4bool AUTO_RADIUS = false;             // Enable automatic radius selection per hit
     
     // ========================
     // FITTING MODEL CONTROL FLAGS
     // ========================
     
     // Enable/disable different fitting models
-    const G4bool ENABLE_GAUSS_FIT = true;         // Enable Gauss fitting (2D and diagonal)
-    const G4bool ENABLE_LORENTZ_FIT = true;       // Enable Lorentz fitting (2D and diagonal) 
-    const G4bool ENABLE_POWER_LORENTZ_FIT = true; // Enable Power Lorentz fitting (2D and diagonal)
+    const G4bool GAUSS_FIT = true;         // Enable Gauss fitting (2D and diagonal)
+    const G4bool LORENTZ_FIT = true;       // Enable Lorentz fitting (2D and diagonal) 
+    const G4bool POWER_LORENTZ_FIT = false; // Enable Power Lorentz fitting (2D and diagonal)
     
     // Individual fitting type control (only used if main model is enabled)
-    const G4bool ENABLE_ROWCOL_FIT = true;               // Enable central row/column fitting
-    const G4bool ENABLE_DIAG_FIT = true;         // Enable diagonal fitting
+    const G4bool ROWCOL_FIT = true;               // Enable central row/column fitting
+    const G4bool DIAG_FIT = false;         // Enable diagonal fitting
     
     // 3D fitting control flags (fit entire neighborhood surface directly)
-    const G4bool ENABLE_3D_GAUSS_FIT = true;      // Enable 3D Gauss surface fitting
-    const G4bool ENABLE_3D_LORENTZ_FIT = true;    // Enable 3D Lorentz surface fitting
-    const G4bool ENABLE_3D_POWER_LORENTZ_FIT = true; // Enable 3D Power-Law Lorentz surface fitting
+    const G4bool GAUSS_FIT_3D = true;      // Enable 3D Gauss surface fitting
+    const G4bool LORENTZ_FIT_3D = true;    // Enable 3D Lorentz surface fitting
+    const G4bool POWER_LORENTZ_FIT_3D = false; // Enable 3D Power-Law Lorentz surface fitting
     
     // ========================
     // VERTICAL CHARGE UNCERTAINTIES CONTROL
@@ -37,7 +37,7 @@ namespace Control {
     // When enabled: Uses 5% of max charge as err for weighted least squares fitting
     // When disabled: Uses uniform weighting (err = 1.0) for unweighted fitting
     // Also controls whether err values are saved to ROOT file branches
-    const G4bool ENABLE_VERT_CHARGE_ERR = true;  // Enable charge uncertainties
+    const G4bool CHARGE_ERR = true;  // Enable charge uncertainties
     
     // ========================
     // ROOT AUTO-SAVE CONTROL

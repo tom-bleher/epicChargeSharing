@@ -17,12 +17,12 @@
 
 DetectorConstruction::DetectorConstruction()
     : G4VUserDetectorConstruction(),
-      fPixelSize(Constants::DEFAULT_PIXEL_SIZE),      // 100 microns - default value
-      fPixelSpacing(Constants::DEFAULT_PIXEL_SPACING),   // 500 microns - default value  
-      fPixelCornerOffset(Constants::DEFAULT_PIXEL_CORNER_OFFSET), // 100 microns - default value
-      fDetSize(Constants::DEFAULT_DETECTOR_SIZE),         // 30 mm - default value (may be adjusted)
-      fDetWidth(Constants::DEFAULT_DETECTOR_WIDTH),      // 50 microns thickness
-      fPixelWidth(Constants::DEFAULT_PIXEL_WIDTH),   // 1 micron thickness
+      fPixelSize(Constants::PIXEL_SIZE),      // 100 microns - default value
+      fPixelSpacing(Constants::PIXEL_SPACING),   // 500 microns - default value  
+      fPixelCornerOffset(Constants::PIXEL_CORNER_OFFSET), // 100 microns - default value
+      fDetSize(Constants::DETECTOR_SIZE),         // 30 mm - default value (may be adjusted)
+      fDetWidth(Constants::DETECTOR_WIDTH),      // 50 microns thickness
+      fPixelWidth(Constants::PIXEL_WIDTH),   // 1 micron thickness
       fNumBlocksPerSide(0),    // Will be calculated
       fCheckOverlaps(true),
       fEventAction(nullptr),   // Initialize EventAction pointer

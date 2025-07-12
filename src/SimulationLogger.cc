@@ -1,10 +1,10 @@
 #include "SimulationLogger.hh"
-#include "2DGaussFit.hh"
-#include "2DLorentzFit.hh"
-#include "2DPowerLorentzFit.hh"
-#include "3DGaussFit.hh"
-#include "3DLorentzFit.hh"
-#include "3DPowerLorentzFit.hh"
+#include "GaussFit2D.hh"
+#include "LorentzFit2D.hh"
+#include "PowerLorentzFit2D.hh"
+#include "GaussFit3D.hh"
+#include "LorentzFit3D.hh"
+#include "PowerLorentzFit3D.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <iostream>
