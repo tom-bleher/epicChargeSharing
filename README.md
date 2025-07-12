@@ -95,7 +95,7 @@ EpicChargeSharingAnalysis/
 ├── src/                          # Source implementation
 │   ├── DetectorConstruction.cc   # Detector geometry
 │   ├── EventAction.cc            # Event processing & charge sharing
-│   ├── 2DGaussFit.cc     # Pos reconstruction
+│   ├── GaussFit2D.cc     # Pos reconstruction
 │   └── ...
 ├── include/                      # Header files
 ├── macros/                       # GEANT4 macro files
@@ -105,6 +105,10 @@ EpicChargeSharingAnalysis/
 ## Contact
 
 For questions or contributions, please open an issue on GitHub or contact me.
+
+## Acknowledgements
+
+The simulation utilizes the analytical model for pad sharing as presented in arXiv:2007.09528
 
 ## TODO:
 
