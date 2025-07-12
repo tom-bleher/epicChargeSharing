@@ -142,19 +142,19 @@ void DetectorMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
     else if (command == fAutoRadiusEnabledCmd) {
         // Update the automatic radius selection enabled parameter
         G4bool newEnabled = fAutoRadiusEnabledCmd->GetNewBoolValue(newValue);
-        G4cout << "Setting automatic radius selection enabled: " << (newEnabled ? "Enabled" : "Disabled") << G4endl;
+        G4cout << "Auto radius selection: " << (newEnabled ? "Enabled" : "Disabled") << G4endl;
         fDetector->SetAutoRadiusEnabled(newEnabled);
     }
     else if (command == fMinAutoRadiusCmd) {
         // Update the minimum automatic radius parameter
         G4int newMinRadius = fMinAutoRadiusCmd->GetNewIntValue(newValue);
-        G4cout << "Setting minimum automatic radius to: " << newMinRadius << G4endl;
+        G4cout << "Min auto radius: " << newMinRadius << G4endl;
         fDetector->SetMinAutoRadius(newMinRadius);
     }
     else if (command == fMaxAutoRadiusCmd) {
         // Update the maximum automatic radius parameter
         G4int newMaxRadius = fMaxAutoRadiusCmd->GetNewIntValue(newValue);
-        G4cout << "Setting maximum automatic radius to: " << newMaxRadius << G4endl;
+        G4cout << "Max auto radius: " << newMaxRadius << G4endl;
         fDetector->SetMaxAutoRadius(newMaxRadius);
     }
 }

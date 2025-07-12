@@ -41,11 +41,11 @@ CrashHandler::CrashHandler()
     fStartTime = std::chrono::steady_clock::now();
     fLastSaveTime = fStartTime;
     
-    G4cout << "\n=== CRASH RECOVERY SYSTEM INITIALIZED ===" << G4endl;
-    G4cout << "Auto-save enabled: " << (fAutoSaveEnabled ? "YES" : "NO") << G4endl;
-    G4cout << "Auto-save interval: " << fAutoSaveInterval << " events" << G4endl;
-    G4cout << "Backup directory: " << fBackupDirectory << G4endl;
-    G4cout << "==========================================" << G4endl;
+    G4cout << "\n=== CRASH RECOVERY SYSTEM INITIALIZED ===\n"
+           << "Auto-save enabled: " << (fAutoSaveEnabled ? "YES" : "NO") << "\n"
+           << "Auto-save interval: " << fAutoSaveInterval << " events\n"
+           << "Backup directory: " << fBackupDirectory << "\n"
+           << "==========================================" << G4endl;
 }
 
 CrashHandler::~CrashHandler() {
@@ -141,9 +141,9 @@ void CrashHandler::ForceSave(const G4String& reason) {
         return;
     }
     
-    G4cout << "\n=== FORCING IMMEDIATE SAVE ===" << G4endl;
-    G4cout << "Reason: " << reason << G4endl;
-    G4cout << "Current event: " << fCurrentEvent.load() << G4endl;
+    G4cout << "\n=== FORCING IMMEDIATE SAVE ===\n"
+           << "Reason: " << reason << "\n"
+           << "Current event: " << fCurrentEvent.load() << G4endl;
     
     try {
         // Get ROOT file from RunAction and force write
@@ -417,10 +417,10 @@ void CrashHandler::LoadPreviousCrashInfo() {
                 fLastCrashInfo = buffer.str();
                 fRecoveryMode = true;
                 
-                G4cout << "\n=== CRASH RECOVERY MODE ===" << G4endl;
-                G4cout << "Previous crash detected!" << G4endl;
-                G4cout << "Recovery information available." << G4endl;
-                G4cout << "============================" << G4endl;
+                G4cout << "\n=== CRASH RECOVERY MODE ===\n"
+                       << "Previous crash detected!\n"
+                       << "Recovery information available.\n"
+                       << "============================" << G4endl;
                 
                 file.close();
             }

@@ -667,10 +667,10 @@ bool GaussCeres(
                         best_description = guess.description;
                         any_success = true;
                         
-                        if (verbose) {
-                            std::cout << "New best Gauss result from " << guess.description 
-                                     << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
-                        }
+                                if (verbose) {
+            std::cout << "New best Gauss result from " << guess.description 
+                     << " (cost=" << cost << ", χ²ᵣ=" << chi2_red << ")" << std::endl;
+        }
                     }
                 }
             }
@@ -780,7 +780,7 @@ bool GaussCeres(
                             
                             if (verbose) {
                                 std::cout << "New best result from " << perturbed_set.description 
-                                         << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
+                                         << " (cost=" << cost << ", χ²ᵣ=" << chi2_red << ")" << std::endl;
                             }
                         }
                     }
@@ -803,13 +803,13 @@ bool GaussCeres(
                 chi2_reduced = best_chi2_reduced;
                 
                 if (verbose) {
-                    std::cout << "Success Gauss fit with " << stage_name 
-                             << ", dataset " << dataset_idx << ", best init: " << best_description
-                             << ": A=" << fit_amp << "±" << fit_amp_err
+                    std::cout << "Success Gauss fit (" << stage_name << ", dataset " << dataset_idx 
+                             << ", init: " << best_description << ")\n"
+                             << "  A=" << fit_amp << "±" << fit_amp_err
                              << ", m=" << fit_center << "±" << fit_center_err
-                             << ", sigma=" << fit_sigma << "±" << fit_sigma_err
+                             << ", σ=" << fit_sigma << "±" << fit_sigma_err
                              << ", B=" << fit_offset << "±" << fit_offset_err
-                             << ", chi2red=" << chi2_reduced << std::endl;
+                             << ", χ²ᵣ=" << chi2_reduced << std::endl;
                 }
                 
                 return true;
