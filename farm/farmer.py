@@ -13,8 +13,8 @@ parameters* the farmer will:
    cores (or the user-provided ``--jobs`` value).
 3. Execute the resulting ``epicChargeSharing`` binary, passing it a macro file
    (default: ``macros/run.mac``).
-4. Move the full build directory to a uniquely-named results folder inside the
-   ``output_base_dir`` declared in the YAML (e.g. ``./pixel_size_study``).
+4. Move the final ROOT file and other essential artifacts to a uniquely-named 
+   results folder inside the ``output_base_dir`` declared in the YAML (e.g. ``./pixel_size_study``).
 
 The script restores the original header files after *every* combination so the
 repository always returns to a clean state.
@@ -28,6 +28,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -116,7 +117,148 @@ def run_simulation(build_dir: Path, macro: Path) -> None:
     exe = build_dir / "epicChargeSharing"
     if not exe.is_file():
         raise FileNotFoundError(f"Simulation binary not found: {exe}")
-    subprocess.run([str(exe), str(macro)], check=True)
+    
+    # Convert macro to absolute path since we're changing working directory
+    macro_abs = macro.resolve()
+    
+    # Run simulation from build directory so ROOT file is created there
+    subprocess.run([str(exe), str(macro_abs)], cwd=str(build_dir), check=True)
+
+
+def wait_for_file_merge_completion(build_dir: Path, timeout_seconds: int = 30) -> bool:
+    """
+    Wait for Geant4 multithreading to complete file merging.
+    
+    In multithreaded Geant4:
+    1. Worker threads create epicChargeSharingOutput_t*.root files  
+    2. Master thread merges VALID files into epicChargeSharingOutput.root
+    3. Valid worker files are deleted, but INVALID/EMPTY files may remain
+    
+    We only need to wait for the final merged file to exist and be valid.
+    Some empty worker files may be left behind intentionally.
+    
+    Returns True if final merged file exists and is valid, False on timeout.
+    """
+    final_file = build_dir / "epicChargeSharingOutput.root"
+    start_time = time.time()
+    
+    print(f"Waiting for final merged file: {final_file.name}")
+    
+    while time.time() - start_time < timeout_seconds:
+        if final_file.exists():
+            # Check if the file is valid (has content)
+            try:
+                file_size = final_file.stat().st_size
+                if file_size > 1024:  # At least 1KB - indicates real content
+                    print(f"Final merged file created: {final_file.name} ({file_size} bytes)")
+                    
+                    # Give a moment for any final cleanup
+                    time.sleep(2)
+                    return True
+                else:
+                    print(f"Final file exists but too small ({file_size} bytes), waiting...")
+            except Exception as e:
+                print(f"Error checking file: {e}, waiting...")
+        
+        time.sleep(1)
+    
+    print(f"Timeout waiting for valid final merged file")
+    return False
+
+
+def move_simulation_results(build_dir: Path, result_dir: Path) -> None:
+    """
+    Move only the essential simulation results to the result directory.
+    
+    For multithreaded Geant4, we expect:
+    - epicChargeSharingOutput.root (final merged file)
+    - Log files and other build artifacts
+    
+    We explicitly avoid moving intermediate worker thread files that should 
+    have been cleaned up automatically.
+    """
+    print(f"Files in build directory before moving:")
+    build_files = list(build_dir.iterdir())
+    for item in build_files:
+        print(f"     {item.name}")
+    
+    # Check for the final merged ROOT file
+    final_root_file = build_dir / "epicChargeSharingOutput.root"
+    worker_files = [f for f in build_dir.glob("epicChargeSharingOutput_t*.root")]
+    
+    if final_root_file.exists():
+        print(f"Found final merged ROOT file: {final_root_file.name}")
+    else:
+        print(f"ERROR: Final merged ROOT file not found!")
+        
+        # Check if we have worker files that weren't merged
+        if worker_files:
+            print(f"Found {len(worker_files)} unmerged worker files: {[f.name for f in worker_files]}")
+            print("This suggests the multithreaded merge process failed")
+            
+            # Fallback: Check if ROOT file was created in project root (old behavior)
+            project_root_file = ROOT_DIR / "epicChargeSharingOutput.root"
+            if project_root_file.exists():
+                print(f"🔍  Found ROOT file in project root, moving it to build directory")
+                shutil.move(str(project_root_file), str(final_root_file))
+            else:
+                raise FileNotFoundError("No ROOT output file found in build directory or project root")
+    
+    if worker_files:
+        print(f"Found {len(worker_files)} remaining worker files")
+        print("These are likely empty/invalid files that weren't merged (normal behavior)")
+        print("Moving only the final merged file")
+    
+    # Define which files to move (only essential results, not intermediate files)
+    files_to_move = []
+    
+    # Always move the final ROOT file if it exists
+    if final_root_file.exists():
+        files_to_move.append(final_root_file)
+    
+    # Move log files and other essential build artifacts (but not worker ROOT files)
+    for item in build_dir.iterdir():
+        if item.is_file():
+            # Move log files, binaries, but skip intermediate ROOT files
+            if (item.suffix in ['.log', '.txt'] or 
+                item.name == 'epicChargeSharing' or
+                (item.suffix == '.root' and not item.name.startswith('epicChargeSharingOutput_t'))):
+                if item != final_root_file:  # Don't add twice
+                    files_to_move.append(item)
+        elif item.is_dir():
+            # Move subdirectories (like logs/ if they exist)
+            files_to_move.append(item)
+    
+    # Move selected files to result directory
+    print(f"Moving {len(files_to_move)} essential files to result directory:")
+    for item in files_to_move:
+        dest_path = result_dir / item.name
+        if dest_path.exists():
+            if dest_path.is_dir():
+                shutil.rmtree(dest_path)
+            else:
+                dest_path.unlink()
+        shutil.move(str(item), str(dest_path))
+        print(f"     Moved: {item.name}")
+    
+    # Clean up any remaining intermediate files in build directory
+    remaining_worker_files = [f for f in build_dir.glob("epicChargeSharingOutput_t*.root")]
+    if remaining_worker_files:
+        print(f"Cleaning up {len(remaining_worker_files)} leftover worker files:")
+        for worker_file in remaining_worker_files:
+            try:
+                worker_file.unlink()
+                print(f"     Deleted: {worker_file.name}")
+            except Exception as e:
+                print(f"     Failed to delete {worker_file.name}: {e}")
+    
+    # Verify final result
+    result_root_files = [f for f in result_dir.iterdir() if f.suffix == '.root']
+    if result_root_files:
+        print(f"Final ROOT file in result directory: {[f.name for f in result_root_files]}")
+    else:
+        raise FileNotFoundError("ERROR: No ROOT file found in result directory after move!")
+
 
 # ---------------------------------------------------------------------------
 # MAIN FARM LOGIC
@@ -143,7 +285,7 @@ def main(argv: List[str] | None = None) -> None:  # noqa: C901 – top-level cla
     constant_params: Dict[str, Any] = cfg.get("constant_parameters", {})
 
     combinations = cartesian_product(varied_params)
-    print(f"📊  {len(combinations)} parameter combinations detected.")
+    print(f"{len(combinations)} parameter combinations detected.")
 
     # Snapshot original headers so we can restore after each build
     orig_constants = CONSTANTS_HEADER.read_text()
@@ -151,7 +293,7 @@ def main(argv: List[str] | None = None) -> None:  # noqa: C901 – top-level cla
 
     for idx, combo in enumerate(combinations, 1):
         print("\n────────────────────────────────────────────────────────")
-        print(f"🚀  Combination {idx}/{len(combinations)} → {combo}")
+        print(f"Combination {idx}/{len(combinations)} → {combo}")
 
         # Merge constants (combo has precedence over constant_params)
         run_params = constant_params.copy()
@@ -172,19 +314,34 @@ def main(argv: List[str] | None = None) -> None:  # noqa: C901 – top-level cla
         # Run simulation (Geant4 app is multi-threaded; max threads internal)
         run_simulation(args.build_dir, args.macro)
 
+        # Wait for multithreaded file merging to complete
+        print("Waiting for multithreaded file merging to complete...")
+        if not wait_for_file_merge_completion(args.build_dir):
+            print("Continuing despite merge timeout - files may need manual inspection")
+
         # Results directory naming – join on "__" when multiple params
         label_parts = [f"{k}_{v}" for k, v in combo.items()]
         result_dir = output_base_dir / "__".join(label_parts)
         result_dir.mkdir(parents=True, exist_ok=True)
-
-        # Move the entire build directory for record-keeping
-        shutil.move(str(args.build_dir), result_dir / "build")
-        print(f"📦  Build + outputs moved → {result_dir.relative_to(Path.cwd())}")
+        
+        # Move only essential simulation results (not intermediate worker files)
+        move_simulation_results(args.build_dir, result_dir)
+        
+        # Remove the build directory (may contain leftover files)
+        if args.build_dir.exists():
+            try:
+                shutil.rmtree(args.build_dir)
+                print(f"Cleaned up build directory")
+            except Exception as e:
+                print(f"Could not remove build directory: {e}")
+                print(f"(This is not critical - results are safely stored)")
+        
+        print(f"Results saved to → {result_dir.resolve().relative_to(Path.cwd())}")
 
     # Restore pristine headers at the end
     CONSTANTS_HEADER.write_text(orig_constants)
     CONTROL_HEADER.write_text(orig_control)
-    print("\n✅  All simulations completed successfully.")
+    print("\nAll simulations completed successfully.")
 
 
 if __name__ == "__main__":
