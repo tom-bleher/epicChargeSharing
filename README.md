@@ -108,7 +108,7 @@ For questions or contributions, please open an issue on GitHub or contact me.
 
 ## Acknowledgements
 
-The simulation utilizes the analytical model for pad sharing as presented in arXiv:2007.09528
+The simulation utilizes the analytical model for signal pad sharing as presented in arXiv:2007.09528, M. Tornago et al
 
 ## TODO:
 
