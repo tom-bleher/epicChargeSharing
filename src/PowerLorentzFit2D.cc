@@ -641,7 +641,7 @@ bool PowerLorentzCeres(
                         
                         if (verbose) {
                             std::cout << "New best Power Lorentz result from " << guess.description 
-                                     << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
+                                     << " (cost=" << cost << ", χ²ᵣ=" << chi2_red << ")" << std::endl;
                         }
                     }
                 }
@@ -811,14 +811,14 @@ bool PowerLorentzCeres(
                 chi2_reduced = best_chi2_reduced;
                 
                 if (verbose) {
-                    std::cout << "Success Power Lorentz fit with " << stage_name 
-                             << ", dataset " << dataset_idx << ", best init: " << best_description
-                             << ": A=" << fit_amp << "±" << fit_amp_err
+                    std::cout << "Success Power Lorentz fit (" << stage_name << ", dataset " << dataset_idx 
+                             << ", init: " << best_description << ")\n"
+                             << "  A=" << fit_amp << "±" << fit_amp_err
                              << ", m=" << fit_center << "±" << fit_center_err
-                             << ", gamma=" << fit_gamma << "±" << fit_gamma_err
-                             << ", beta=" << fit_beta << "±" << fit_beta_err
+                             << ", γ=" << fit_gamma << "±" << fit_gamma_err
+                             << ", β=" << fit_beta << "±" << fit_beta_err
                              << ", B=" << fit_vert_offset << "±" << fit_vert_offset_err
-                             << ", chi2red=" << chi2_reduced << std::endl;
+                             << ", χ²ᵣ=" << chi2_reduced << std::endl;
                 }
                 
                 return true;

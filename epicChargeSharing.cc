@@ -13,27 +13,13 @@
 #include "ActionInitialization.hh"
 #include "CrashHandler.hh"
 #include "SimulationLogger.hh"
-
-void PrintUsage() {
-    G4cout << "\nUsage: ./epicChargeSharing [options] [macro_file]\n" << G4endl;
-    G4cout << "Options:" << G4endl;
-    G4cout << "  -m, --macro [file]     : Run in batch mode with specified macro file" << G4endl;
-    G4cout << "  -t, --threads [N]      : Set number of threads (default: all available cores)" << G4endl;
-    G4cout << "  --single-threaded      : Force single-threaded mode" << G4endl;
-    G4cout << "  -h, --help             : Print this help message" << G4endl;
-    G4cout << "\nExamples:" << G4endl;
-    G4cout << "  ./epicChargeSharing                          : Interactive mode with multithreading" << G4endl;
-    G4cout << "  ./epicChargeSharing -m macro.mac             : Batch mode with multithreading" << G4endl;
-    G4cout << "  ./epicChargeSharing -m macro.mac -t 4        : Batch mode with 4 threads" << G4endl;
-    G4cout << "  ./epicChargeSharing --single-threaded        : Interactive mode, single-threaded" << G4endl;
-    G4cout << G4endl;
-}
+#include "Control.hh"
 
 int main(int argc, char** argv)
 {
     // Default settings
     G4bool isBatch = false;
-    G4bool forceSingleThreaded = false;
+    G4bool headerMode = false;
     G4String macroFile = "";
     G4int requestedThreads = -1; // -1 means use all available cores
     
@@ -45,52 +31,33 @@ int main(int argc, char** argv)
     for (G4int i = 1; i < argc; i++) {
         G4String arg = argv[i];
         
-        if (arg == "-h" || arg == "--help") {
-            PrintUsage();
-            return 0;
-        }
-        else if (arg == "-m" || arg == "--macro") {
-            isBatch = true;
-            if (i + 1 < argc && argv[i + 1][0] != '-') {
-                macroFile = argv[++i];
-            } else {
-                G4cerr << "Error: -m/--macro requires a filename argument" << G4endl;
-                PrintUsage();
-                return 1;
-            }
-        }
-        else if (arg == "-t" || arg == "--threads") {
-            if (i + 1 < argc && argv[i + 1][0] != '-') {
-                requestedThreads = std::atoi(argv[++i]);
-                if (requestedThreads <= 0) {
-                    G4cerr << "Error: Invalid number of threads: " << requestedThreads << G4endl;
-                    PrintUsage();
-                    return 1;
-                }
-            } else {
-                G4cerr << "Error: -t/--threads requires a number argument" << G4endl;
-                PrintUsage();
-                return 1;
-            }
-        }
-        else if (arg == "--single-threaded") {
-            forceSingleThreaded = true;
-        }
-        else if (arg == "batch") {
-            // Legacy support for old command format
+        if (arg == "-m") {
             isBatch = true;
             if (i + 1 < argc) {
                 macroFile = argv[++i];
+            } else {
+                G4cerr << "Error: -m requires a filename argument" << G4endl;
+                return 1;
             }
         }
-        else if (arg[0] != '-') {
-            // Assume it's a macro file if no flag specified
-            isBatch = true;
-            macroFile = arg;
+        else if (arg == "-header") {
+            headerMode = true;
+            isBatch = true; // Force batch mode for header-only execution
+        }
+        else if (arg == "-t") {
+            if (i + 1 < argc) {
+                requestedThreads = std::atoi(argv[++i]);
+                if (requestedThreads <= 0) {
+                    G4cerr << "Error: Invalid number of threads: " << requestedThreads << G4endl;
+                    return 1;
+                }
+            } else {
+                G4cerr << "Error: -t requires a number argument" << G4endl;
+                return 1;
+            }
         }
         else {
             G4cerr << "Error: Unknown option: " << arg << G4endl;
-            PrintUsage();
             return 1;
         }
     }
@@ -112,8 +79,8 @@ int main(int argc, char** argv)
     G4RunManager* runManager = nullptr;
     
     #ifdef G4MULTITHREADED
-    if (!forceSingleThreaded) {
-        // Use multithreaded mode by default for both interactive and batch
+    if (requestedThreads != 1) {
+        // Use multithreaded mode unless explicitly set to 1 thread
         G4MTRunManager* mtRunManager = new G4MTRunManager;
         
         // Determine number of threads to use
@@ -135,25 +102,25 @@ int main(int argc, char** argv)
         
         mtRunManager->SetNumberOfThreads(nThreads);
         
-        G4cout << "=== MULTITHREADING ENABLED ===" << G4endl;
-        G4cout << "Mode: " << (isBatch ? "Batch" : "Interactive") << G4endl;
-        G4cout << "Threads: " << nThreads << " (of " << maxThreads << " available cores)" << G4endl;
-        G4cout << "===============================" << G4endl;
+        G4cout << "=== MULTITHREADING ENABLED ===\n"
+               << "Mode: " << (isBatch ? "Batch" : "Interactive") << "\n"
+               << "Threads: " << nThreads << " (of " << maxThreads << " available cores)\n"
+               << "===============================" << G4endl;
         
         runManager = mtRunManager;
     } else {
-        // Use single-threaded mode when explicitly requested
+        // Use single-threaded mode when explicitly requested with -t 1
         runManager = new G4RunManager;
-        G4cout << "=== SINGLE-THREADED MODE ===" << G4endl;
-        G4cout << "Mode: " << (isBatch ? "Batch" : "Interactive") << G4endl;
-        G4cout << "=============================" << G4endl;
+        G4cout << "=== SINGLE-THREADED MODE ===\n"
+               << "Mode: " << (isBatch ? "Batch" : "Interactive") << "\n"
+               << "=============================" << G4endl;
     }
     #else
         runManager = new G4RunManager;
-        G4cout << "=== SINGLE-THREADED MODE ===" << G4endl;
-        G4cout << "Reason: GEANT4 compiled without multithreading support" << G4endl;
-        G4cout << "Mode: " << (isBatch ? "Batch" : "Interactive") << G4endl;
-        G4cout << "=============================" << G4endl;
+        G4cout << "=== SINGLE-THREADED MODE ===\n"
+               << "Reason: GEANT4 compiled without multithreading support\n"
+               << "Mode: " << (isBatch ? "Batch" : "Interactive") << "\n"
+               << "=============================" << G4endl;
     #endif
     
     // Physics List
@@ -171,7 +138,6 @@ int main(int argc, char** argv)
     crashHandler.Initialize(runManager);
     
     // Configure crash handler
-    // Disable periodic crash-handler backups unless explicitly enabled by UI
     crashHandler.SetAutoSaveEnabled(false, 0);
     crashHandler.SetBackupDirectory("crash_recovery");
     
@@ -185,9 +151,9 @@ int main(int argc, char** argv)
     // Log system and configuration information
     std::map<std::string, std::string> config;
     config["Mode"] = isBatch ? "Batch" : "Interactive";
-    config["Threading"] = forceSingleThreaded ? "Single-threaded" : "Multi-threaded";
+    config["Threading"] = (requestedThreads == 1) ? "Single-threaded" : "Multi-threaded";
     #ifdef G4MULTITHREADED
-    if (!forceSingleThreaded) {
+    if (requestedThreads != 1) {
         G4MTRunManager* mtRunManager = dynamic_cast<G4MTRunManager*>(runManager);
         if (mtRunManager) {
             config["Threads"] = std::to_string(mtRunManager->GetNumberOfThreads());
@@ -217,7 +183,6 @@ int main(int argc, char** argv)
         visManager->Initialize();
         
         // Execute the visualization macro
-        // Use the macro from macros directory with fallback
         G4String command = "/control/execute macros/vis.mac";
         G4int status = uiManager->ApplyCommand(command);
         if (status != 0) {
@@ -227,28 +192,58 @@ int main(int argc, char** argv)
         ui->SessionStart();
         delete ui;
     } else {
-        // Batch mode - execute the specified macro without visualization
-        if (macroFile.empty()) {
-            G4cerr << "Error: No macro file specified for batch mode" << G4endl;
-            PrintUsage();
-            delete runManager;
-            return 1;
-        }
-        
-        G4cout << "Executing macro file: " << macroFile << G4endl;
-        G4String command = "/control/execute ";
-        command += macroFile;
-        G4int status = uiManager->ApplyCommand(command);
-        
-        if (status != 0) {
-            G4cerr << "Error executing macro file: " << macroFile << G4endl;
-            delete runManager;
-            return 1;
+        // Batch mode execution
+        if (headerMode) {
+            // Header mode: initialize and run using only Control.hh constants
+            G4cout << "\n=== HEADER MODE EXECUTION ===\n"
+                   << "Particle: " << Control::PARTICLE_TYPE << " @ " << Control::PARTICLE_ENERGY << " GeV\n"
+                   << "Number of events: " << Control::NUMBER_OF_EVENTS << "\n"
+                   << "===============================" << G4endl;
+            
+            // Initialize the run manager
+            uiManager->ApplyCommand("/run/initialize");
+            
+            // Set verbosity (minimal for batch processing)
+            uiManager->ApplyCommand("/control/verbose 0");
+            uiManager->ApplyCommand("/run/verbose 0");
+            uiManager->ApplyCommand("/event/verbose 0");
+            uiManager->ApplyCommand("/tracking/verbose 0");
+            
+            // Run the simulation using the number of events from Control.hh
+            G4String beamOnCommand = "/run/beamOn " + std::to_string(Control::NUMBER_OF_EVENTS);
+            G4int status = uiManager->ApplyCommand(beamOnCommand);
+            
+            if (status != 0) {
+                G4cerr << "Error executing beamOn command" << G4endl;
+                delete runManager;
+                return 1;
+            }
+            
+            G4cout << "Header mode execution completed successfully" << G4endl;
+            
+        } else {
+            // Traditional macro file mode
+            if (macroFile.empty()) {
+                G4cerr << "Error: No macro file specified for batch mode" << G4endl;
+                delete runManager;
+                return 1;
+            }
+            
+            G4cout << "Executing macro file: " << macroFile << G4endl;
+            G4String command = "/control/execute ";
+            command += macroFile;
+            G4int status = uiManager->ApplyCommand(command);
+            
+            if (status != 0) {
+                G4cerr << "Error executing macro file: " << macroFile << G4endl;
+                delete runManager;
+                return 1;
+            }
         }
     }
     
     // Finalize logging and crash recovery systems before cleanup
-    logger->Finalize();  // This internally calls LogSimulationEnd(), so no need for explicit call
+    logger->Finalize();
     
     CrashHandler::GetInstance().Finalize();
     

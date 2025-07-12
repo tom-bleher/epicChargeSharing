@@ -61,16 +61,16 @@ void DetectorConstruction::SetGridParameters(G4double pixelSize, G4double pixelS
     
     // Update detector size if it differs significantly (more than 1 μm tolerance)
     if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
-        G4cout << "\n=== DETECTOR SIZE ADJUSTMENT ===" << G4endl;
-        G4cout << "Original detector size: " << originalDetSize/mm << " mm" << G4endl;
-        G4cout << "Required detector size for " << fNumBlocksPerSide << "×" << fNumBlocksPerSide 
-               << " pixel grid: " << requiredDetSize/mm << " mm" << G4endl;
-        G4cout << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm" << G4endl;
+        G4cout << "\n=== DETECTOR SIZE ADJUSTMENT ===\n"
+               << "Original detector size: " << originalDetSize/mm << " mm\n"
+               << "Required detector size for " << fNumBlocksPerSide << "×" << fNumBlocksPerSide 
+               << " pixel grid: " << requiredDetSize/mm << " mm\n"
+               << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm\n";
         
         fDetSize = requiredDetSize;
         
-        G4cout << "Detector size adjusted to: " << fDetSize/mm << " mm" << G4endl;
-        G4cout << "=================================" << G4endl;
+        G4cout << "Detector size adjusted to: " << fDetSize/mm << " mm\n"
+               << "=================================" << G4endl;
     }
     
     // Verify the calculation
@@ -133,17 +133,17 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     
     // Update detector size if needed and notify user
     if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
-        G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===" << G4endl;
-        G4cout << "Original detector size: " << originalDetSize/mm << " mm" << G4endl;
-        G4cout << "Calcd pixel grid requires: " << fNumBlocksPerSide << "×" << fNumBlocksPerSide << " pixels" << G4endl;
-        G4cout << "Required detector size: " << requiredDetSize/mm << " mm" << G4endl;
-        G4cout << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm" << G4endl;
+        G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===\n"
+               << "Original detector size: " << originalDetSize/mm << " mm\n"
+               << "Calcd pixel grid requires: " << fNumBlocksPerSide << "×" << fNumBlocksPerSide << " pixels\n"
+               << "Required detector size: " << requiredDetSize/mm << " mm\n"
+               << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm\n";
         
         // Update detector size
         fDetSize = requiredDetSize;
         
-        G4cout << "✓ Detector size adjusted to: " << fDetSize/mm << " mm" << G4endl;
-        G4cout << "==========================================" << G4endl;
+        G4cout << "✓ Detector size adjusted to: " << fDetSize/mm << " mm\n"
+               << "==========================================" << G4endl;
         
         // Recreate the detector with the correct size
         delete detCube;
@@ -205,20 +205,20 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4double detectorArea = fDetSize * fDetSize;
     G4double pixelAreaRatio = totalPixelArea / detectorArea;
     
-    G4cout << "\n=== FINAL DETECTOR CONFIGURATION ===" << G4endl;
-    G4cout << "Detector Statistics:" << G4endl;
-    G4cout << "  Final detector size: " << fDetSize/mm << " mm × " << fDetSize/mm << " mm" << G4endl;
+    G4cout << "\n=== FINAL DETECTOR CONFIGURATION ===\n"
+           << "Detector Statistics:\n"
+           << "  Final detector size: " << fDetSize/mm << " mm × " << fDetSize/mm << " mm\n";
     if (std::abs(fDetSize - originalDetSize) > Constants::GEOMETRY_TOLERANCE) {
-        G4cout << "  (Adjusted from original: " << originalDetSize/mm << " mm)" << G4endl;
+        G4cout << "  (Adjusted from original: " << originalDetSize/mm << " mm)\n";
     }
-    G4cout << "  Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm" << G4endl;
-    G4cout << "  Total number of pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << G4endl;
-    G4cout << "  Pixel grid: " << fNumBlocksPerSide << " × " << fNumBlocksPerSide << G4endl;
-    G4cout << "  Single pixel area: " << fPixelSize * fPixelSize / (mm*mm) << " mm²" << G4endl;
-    G4cout << "  Total pixel area: " << totalPixelArea / (mm*mm) << " mm²" << G4endl;
-    G4cout << "  Detector area: " << detectorArea / (mm*mm) << " mm²" << G4endl;
-    G4cout << "  Pixel area / Detector area ratio: " << pixelAreaRatio << G4endl;
-    G4cout << "====================================" << G4endl;
+    G4cout << "  Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm\n"
+           << "  Total number of pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << "\n"
+           << "  Pixel grid: " << fNumBlocksPerSide << " × " << fNumBlocksPerSide << "\n"
+           << "  Single pixel area: " << fPixelSize * fPixelSize / (mm*mm) << " mm²\n"
+           << "  Total pixel area: " << totalPixelArea / (mm*mm) << " mm²\n"
+           << "  Detector area: " << detectorArea / (mm*mm) << " mm²\n"
+           << "  Pixel area / Detector area ratio: " << pixelAreaRatio << "\n"
+           << "====================================" << G4endl;
 
     // Save all simulation parameters to a log file
     SaveSimulationParameters(totalPixelArea, detectorArea, pixelAreaRatio);
