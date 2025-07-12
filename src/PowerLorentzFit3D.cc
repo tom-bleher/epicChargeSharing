@@ -1,4 +1,4 @@
-#include "3DPowerLorentzFit.hh"
+#include "PowerLorentzFit3D.hh"
 #include "CeresLoggingInit.hh"
 #include "Constants.hh"
 #include "Control.hh"
@@ -21,7 +21,7 @@ void InitializeCeres3DPowerLorentz() {
 
 // Calc err as 5% of max charge in neighborhood (if enabled)
 double Calc3DPowerLorentzErr(double max_charge_in_neighborhood) {
-    if (!Control::ENABLE_VERT_CHARGE_ERR) {
+    if (!Control::CHARGE_ERR) {
         return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
@@ -989,7 +989,7 @@ PowerLorentz3DResultsCeres PowerLorentzCeres3D(
     result.charge_values = charge_values;
     
     // Create charge errors if vert uncertainties are enabled
-    if (Control::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::CHARGE_ERR) {
         double max_charge = *std::max_element(charge_values.begin(), charge_values.end());
         double charge_err = 0.05 * max_charge;
         result.charge_err = charge_err;

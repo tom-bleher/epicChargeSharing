@@ -1,4 +1,4 @@
-#include "2DLorentzFit.hh"
+#include "PowerLorentzFit2D.hh"
 #include "CeresLoggingInit.hh"
 #include "Constants.hh"
 #include "Control.hh"
@@ -16,13 +16,13 @@
 #include "glog/logging.h"
 
 // Use shared Google logging initialization
-void InitializeCeresLorentz() {
+void InitializeCeresPowerLorentz() {
     CeresLoggingInitializer::InitializeOnce();
 }
 
-// Calc err as 5% of max charge in line (if enabled)
-double CalcLorentzErr(double max_charge_in_line) {
-    if (!Control::ENABLE_VERT_CHARGE_ERR) {
+// Calc err as 5% of max charge in line (if enabled) - same as Lorentz
+double CalcPowerLorentzErr(double max_charge_in_line) {
+    if (!Control::CHARGE_ERR) {
         return 1.0; // Uniform weighting when uncertainties are disabled
     }
     
@@ -32,51 +32,61 @@ double CalcLorentzErr(double max_charge_in_line) {
     return err;
 }
 
-// Lorentz cost function with err (5% of max charge)
-// Function form: y(x) = A / (1 + ((x - m) / γ)^2) + B  
-struct LorentzCostFunction {
-    LorentzCostFunction(double x, double y, double err) 
+// Power-Law Lorentz cost function
+// Function form: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
+struct PowerLorentzCostFunction {
+    PowerLorentzCostFunction(double x, double y, double err) 
         : x_(x), y_(y), err_(err) {}
     
     template <typename T>
     bool operator()(const T* const params, T* residual) const {
         // params[0] = A (amp)
         // params[1] = m (center)
-        // params[2] = gamma (HWHM)
-        // params[3] = B (baseline)
+        // params[2] = gamma (width parameter, like HWHM)
+        // params[3] = beta (power exponent)
+        // params[4] = B (baseline)
         
         const T& A = params[0];
         const T& m = params[1];
         const T& gamma = params[2];
-        const T& B = params[3];
+        const T& beta = params[3];
+        const T& B = params[4];
         
         // Robust handling of gamma (prevent division by zero)
         T safe_gamma = ceres::abs(gamma);
-        if (safe_gamma < T(Constants::MIN_SAFE_PARAMETER)) {
-            safe_gamma = T(Constants::MIN_SAFE_PARAMETER);
+        if (safe_gamma < T(1e-12)) {
+            safe_gamma = T(1e-12);
         }
         
-        // Lorentz function: y(x) = A / (1 + ((x - m) / γ)^2) + B
+        // Ensure beta stability (positive values)
+        T safe_beta = ceres::abs(beta);
+        if (safe_beta < T(0.1)) {
+            safe_beta = T(0.1);
+        }
+        
+        // Power-Law Lorentz function: y(x) = A / (1 + ((x - m) / γ)^2)^β + B
         T dx = x_ - m;
         T normalized_dx = dx / safe_gamma;
-        T denominator = T(1.0) + normalized_dx * normalized_dx;
+        T denominator_base = T(1.0) + normalized_dx * normalized_dx;
         
         // Prevent numerical issues with very small denominators
-        if (denominator < T(1e-12)) {
-            denominator = T(1e-12);
+        if (denominator_base < T(1e-12)) {
+            denominator_base = T(1e-12);
         }
         
+        // Apply power exponent
+        T denominator = ceres::pow(denominator_base, safe_beta);
         T predicted = A / denominator + B;
         
-        // Residual divided by err (standard weighted least squares)
+        // Residual divided by err (standard weighted least squares) - same as Lorentz
         residual[0] = (predicted - T(y_)) / T(err_);
         
         return true;
     }
     
     static ceres::CostFunction* Create(double x, double y, double err) {
-        return (new ceres::AutoDiffCostFunction<LorentzCostFunction, 1, 4>(
-            new LorentzCostFunction(x, y, err)));
+        return (new ceres::AutoDiffCostFunction<PowerLorentzCostFunction, 1, 5>(
+            new PowerLorentzCostFunction(x, y, err)));
     }
     
 private:
@@ -85,21 +95,7 @@ private:
     const double err_;
 };
 
-// Parameter estimation structures for Lorentz
-struct LorentzParameterEstimates {
-    double amp;
-    double center;
-    double gamma;
-    double baseline;
-    double amp_err;
-    double center_err;
-    double gamma_err;
-    double baseline_err;
-    bool valid;
-    int method_used;
-};
-
-// Robust statistics calculations (reusing from Gauss implementation)
+// Robust statistics calculations with improved outlier detection
 struct DataStatistics {
     double mean;
     double median;
@@ -113,8 +109,8 @@ struct DataStatistics {
     bool valid;
 };
 
-DataStatistics CalcRobustStatisticsLorentz(const std::vector<double>& x_vals, 
-                                                   const std::vector<double>& y_vals) {
+DataStatistics CalcRobustStatisticsPowerLorentz(const std::vector<double>& x_vals, 
+                                                      const std::vector<double>& y_vals) {
     DataStatistics stats;
     stats.valid = false;
     
@@ -157,18 +153,13 @@ DataStatistics CalcRobustStatisticsLorentz(const std::vector<double>& x_vals,
     std::sort(abs_deviations.begin(), abs_deviations.end());
     stats.mad = abs_deviations[n/2] * 1.4826;
     
-    // ------------------------------------------------------------------------------------
-    // Numerical stability safeguard: ensure MAD is positive and finite.
-    // A zero or non-finite MAD can later produce divide-by-zero errors or NaNs in weighting
-    // and outlier filtering, ultimately destabilising the fit.  When this happens we fall
-    // back to the standard deviation (if sensible) or a small epsilon.
-    // ------------------------------------------------------------------------------------
+    // Numerical stability safeguard
     if (!std::isfinite(stats.mad) || stats.mad < 1e-12) {
         stats.mad = (std::isfinite(stats.std_dev) && stats.std_dev > 1e-12) ?
                     stats.std_dev : 1e-12;
     }
     
-    // Weighted statistics
+    // Use same center estimation logic as Lorentz for consistency
     stats.weighted_mean = 0.0;
     stats.total_weight = 0.0;
     
@@ -184,37 +175,54 @@ DataStatistics CalcRobustStatisticsLorentz(const std::vector<double>& x_vals,
         stats.weighted_mean /= stats.total_weight;
         stats.robust_center = stats.weighted_mean;
     } else {
+        // Fallback to arithmetic mean
         stats.weighted_mean = std::accumulate(x_vals.begin(), x_vals.end(), 0.0) / x_vals.size();
         stats.robust_center = stats.weighted_mean;
     }
     
     stats.valid = true;
     return stats;
-} 
+}
 
-// Parameter estimation for Lorentz distributions
-LorentzParameterEstimates EstimateLorentzParameters(
+// Parameter estimation structures for Power-Law Lorentz
+struct PowerLorentzParameterEstimates {
+    double amp;
+    double center;
+    double gamma;
+    double beta;
+    double baseline;
+    double amp_err;
+    double center_err;
+    double gamma_err;
+    double beta_err;
+    double baseline_err;
+    bool valid;
+    int method_used;
+};
+
+// Parameter estimation for Power-Law Lorentz distributions
+PowerLorentzParameterEstimates EstimatePowerLorentzParameters(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     double center_estimate,
     double pixel_spacing,
     bool verbose = false) {
     
-    LorentzParameterEstimates estimates;
+    PowerLorentzParameterEstimates estimates;
     estimates.valid = false;
     estimates.method_used = 0;
     
-    if (x_vals.size() != y_vals.size() || x_vals.size() < 4) {
+    if (x_vals.size() != y_vals.size() || x_vals.size() < 5) {
         return estimates;
     }
     
-    DataStatistics stats = CalcRobustStatisticsLorentz(x_vals, y_vals);
+    DataStatistics stats = CalcRobustStatisticsPowerLorentz(x_vals, y_vals);
     if (!stats.valid) {
         return estimates;
     }
     
     if (verbose) {
-        std::cout << "Lorentz data statistics: min=" << stats.min_val << ", max=" << stats.max_val 
+        std::cout << "Power Lorentz data statistics: min=" << stats.min_val << ", max=" << stats.max_val 
                  << ", median=" << stats.median << ", weighted_mean=" << stats.weighted_mean << std::endl;
     }
     
@@ -222,9 +230,9 @@ LorentzParameterEstimates EstimateLorentzParameters(
     estimates.center = stats.weighted_mean;
     estimates.baseline = std::min(stats.min_val, stats.q25);
     estimates.amp = stats.max_val - estimates.baseline;
+    estimates.beta = 1.0; // Start with standard Lorentz
     
-    // For Lorentz: gamma (HWHM) estimation based on charge spread
-    // Lorentz tails are wider than Gauss, so use larger initial gamma
+    // For Power Lorentz: gamma estimation based on charge spread (similar to Lorentz)
     double distance_spread = 0.0;
     double weight_sum = 0.0;
     
@@ -238,27 +246,27 @@ LorentzParameterEstimates EstimateLorentzParameters(
     }
     
     if (weight_sum > 0) {
-        // For Lorentz, gamma ≈ sqrt(2*sigma^2) where sigma is from Gauss equivalent
+        // For Power Lorentz, gamma ≈ sqrt(2*sigma^2) where sigma is from Gauss equivalent
         estimates.gamma = std::sqrt(2.0 * distance_spread / weight_sum);
     } else {
-        estimates.gamma = pixel_spacing * 0.7; // Larger default for Lorentz
+        estimates.gamma = pixel_spacing * 0.7; // Larger default for Power Lorentz
     }
     
-    // Apply physics-based bounds (Lorentz has wider tails)
+    // Apply physics-based bounds (Power Lorentz has wider tails)
     estimates.gamma = std::max(pixel_spacing * 0.3, std::min(pixel_spacing * 3.0, estimates.gamma));
     estimates.amp = std::max(estimates.amp, (stats.max_val - stats.min_val) * 0.1);
     
     // Validate Method 1
     if (estimates.amp > 0 && estimates.gamma > 0 && 
         !std::isnan(estimates.center) && !std::isnan(estimates.amp) && 
-        !std::isnan(estimates.gamma) && !std::isnan(estimates.baseline)) {
+        !std::isnan(estimates.gamma) && !std::isnan(estimates.beta) && !std::isnan(estimates.baseline)) {
         estimates.method_used = 1;
         estimates.valid = true;
         
         if (verbose) {
-            std::cout << "Lorentz Method 1 (Physics-based): A=" << estimates.amp 
+            std::cout << "Power Lorentz Method 1 (Physics-based): A=" << estimates.amp 
                      << ", m=" << estimates.center << ", gamma=" << estimates.gamma 
-                     << ", B=" << estimates.baseline << std::endl;
+                     << ", beta=" << estimates.beta << ", B=" << estimates.baseline << std::endl;
         }
         return estimates;
     }
@@ -268,15 +276,16 @@ LorentzParameterEstimates EstimateLorentzParameters(
     estimates.baseline = stats.q25;
     estimates.amp = stats.q75 - stats.q25;
     estimates.gamma = std::max(stats.mad, pixel_spacing * 0.5);
+    estimates.beta = 1.0;
     
     if (estimates.amp > 0 && estimates.gamma > 0) {
         estimates.method_used = 2;
         estimates.valid = true;
         
         if (verbose) {
-            std::cout << "Lorentz Method 2 (Robust statistical): A=" << estimates.amp 
+            std::cout << "Power Lorentz Method 2 (Robust statistical): A=" << estimates.amp 
                      << ", m=" << estimates.center << ", gamma=" << estimates.gamma 
-                     << ", B=" << estimates.baseline << std::endl;
+                     << ", beta=" << estimates.beta << ", B=" << estimates.baseline << std::endl;
         }
         return estimates;
     }
@@ -286,24 +295,21 @@ LorentzParameterEstimates EstimateLorentzParameters(
     estimates.baseline = 0.0;
     estimates.amp = stats.max_val;
     estimates.gamma = pixel_spacing * 0.7;
+    estimates.beta = 1.0;
     estimates.method_used = 3;
     estimates.valid = true;
     
     if (verbose) {
-        std::cout << "Lorentz Method 3 (Conservative fallback): A=" << estimates.amp 
+        std::cout << "Power Lorentz Method 3 (Conservative fallback): A=" << estimates.amp 
                  << ", m=" << estimates.center << ", gamma=" << estimates.gamma 
-                 << ", B=" << estimates.baseline << std::endl;
+                 << ", beta=" << estimates.beta << ", B=" << estimates.baseline << std::endl;
     }
     
     return estimates;
 }
 
-
-
- 
-
-// Outlier filtering for Lorentz fitting (adapted from Gauss version)
-std::pair<std::vector<double>, std::vector<double>> FilterLorentzOutliers(
+// Outlier filtering for Power Lorentz fitting (adapted from Lorentz version)
+std::pair<std::vector<double>, std::vector<double>> FilterPowerLorentzOutliers(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     double sigma_threshold = 2.5,
@@ -311,11 +317,11 @@ std::pair<std::vector<double>, std::vector<double>> FilterLorentzOutliers(
     
     std::vector<double> filtered_x, filtered_y;
     
-    if (x_vals.size() != y_vals.size() || x_vals.size() < 4) {
+    if (x_vals.size() != y_vals.size() || x_vals.size() < 5) {
         return std::make_pair(filtered_x, filtered_y);
     }
     
-    DataStatistics stats = CalcRobustStatisticsLorentz(x_vals, y_vals);
+    DataStatistics stats = CalcRobustStatisticsPowerLorentz(x_vals, y_vals);
     if (!stats.valid) {
         return std::make_pair(x_vals, y_vals);
     }
@@ -337,7 +343,7 @@ std::pair<std::vector<double>, std::vector<double>> FilterLorentzOutliers(
     // Use lenient filtering if too many outliers removed
     if (filtered_x.size() < x_vals.size() / 2) {
         if (verbose) {
-            std::cout << "Too many Lorentz outliers detected (" << outliers_removed 
+            std::cout << "Too many Power Lorentz outliers detected (" << outliers_removed 
                      << "), using lenient filtering" << std::endl;
         }
         
@@ -355,24 +361,25 @@ std::pair<std::vector<double>, std::vector<double>> FilterLorentzOutliers(
         }
     }
     
-    if (filtered_x.size() < 4) {
+    if (filtered_x.size() < 5) {
         if (verbose) {
-            std::cout << "Warning: After Lorentz outlier filtering, only " << filtered_x.size() 
+            std::cout << "Warning: After Power Lorentz outlier filtering, only " << filtered_x.size() 
                      << " points remain" << std::endl;
         }
         return std::make_pair(x_vals, y_vals);
     }
     
     if (verbose && outliers_removed > 0) {
-        std::cout << "Removed " << outliers_removed << " Lorentz outliers, " 
+        std::cout << "Removed " << outliers_removed << " Power Lorentz outliers, " 
                  << filtered_x.size() << " points remaining" << std::endl;
     }
     
     return std::make_pair(filtered_x, filtered_y);
 }
 
-// Core Lorentz fitting function using Ceres Solver
-bool LorentzCeres(
+// Core Power-Law Lorentz fitting function using Ceres Solver
+// Model: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
+bool PowerLorentzCeres(
     const std::vector<double>& x_vals,
     const std::vector<double>& y_vals,
     double center_estimate,
@@ -380,18 +387,20 @@ bool LorentzCeres(
     double& fit_amp,
     double& fit_center,
     double& fit_gamma,
+    double& fit_beta,
     double& fit_vert_offset,
     double& fit_amp_err,
     double& fit_center_err,
     double& fit_gamma_err,
+    double& fit_beta_err,
     double& fit_vert_offset_err,
     double& chi2_reduced,
     bool verbose,
     bool enable_outlier_filtering) {
     
-    if (x_vals.size() != y_vals.size() || x_vals.size() < 4) {
+    if (x_vals.size() != y_vals.size() || x_vals.size() < 5) {
         if (verbose) {
-            std::cout << "Insufficient data points for Lorentz fitting" << std::endl;
+            std::cout << "Insufficient data points for Power Lorentz fitting" << std::endl;
         }
         return false;
     }
@@ -400,13 +409,13 @@ bool LorentzCeres(
     std::vector<std::pair<std::vector<double>, std::vector<double>>> filtered_datasets;
     
     if (enable_outlier_filtering) {
-        auto conservative_data = FilterLorentzOutliers(x_vals, y_vals, 2.5, verbose);
-        if (conservative_data.first.size() >= 4) {
+        auto conservative_data = FilterPowerLorentzOutliers(x_vals, y_vals, 2.5, verbose);
+        if (conservative_data.first.size() >= 5) {
             filtered_datasets.push_back(conservative_data);
         }
         
-        auto lenient_data = FilterLorentzOutliers(x_vals, y_vals, 3.0, verbose);
-        if (lenient_data.first.size() >= 4) {
+        auto lenient_data = FilterPowerLorentzOutliers(x_vals, y_vals, 3.0, verbose);
+        if (lenient_data.first.size() >= 5) {
             filtered_datasets.push_back(lenient_data);
         }
     }
@@ -415,7 +424,7 @@ bool LorentzCeres(
     filtered_datasets.push_back(std::make_pair(x_vals, y_vals));
     
     if (verbose) {
-        std::cout << "Lorentz outlier filtering " << (enable_outlier_filtering ? "enabled" : "disabled") 
+        std::cout << "Power Lorentz outlier filtering " << (enable_outlier_filtering ? "enabled" : "disabled") 
                  << ", testing " << filtered_datasets.size() << " datasets" << std::endl;
     }
     
@@ -424,27 +433,27 @@ bool LorentzCeres(
         std::vector<double> clean_x = filtered_datasets[dataset_idx].first;
         std::vector<double> clean_y = filtered_datasets[dataset_idx].second;
         
-        if (clean_x.size() < 4) continue;
+        if (clean_x.size() < 5) continue;
         
         if (verbose) {
-            std::cout << "Trying Lorentz dataset " << dataset_idx << " with " << clean_x.size() << " points" << std::endl;
+            std::cout << "Trying Power Lorentz dataset " << dataset_idx << " with " << clean_x.size() << " points" << std::endl;
         }
         
         // Get parameter estimates
-        LorentzParameterEstimates estimates = EstimateLorentzParameters(clean_x, clean_y, center_estimate, pixel_spacing, verbose);
+        PowerLorentzParameterEstimates estimates = EstimatePowerLorentzParameters(clean_x, clean_y, center_estimate, pixel_spacing, verbose);
         if (!estimates.valid) {
             if (verbose) {
-                std::cout << "Lorentz parameter estimation failed for dataset " << dataset_idx << std::endl;
+                std::cout << "Power Lorentz parameter estimation failed for dataset " << dataset_idx << std::endl;
             }
             continue;
         }
         
         // Calc err as 5% of max charge
         double max_charge = *std::max_element(clean_y.begin(), clean_y.end());
-        double err = CalcLorentzErr(max_charge);
+        double err = CalcPowerLorentzErr(max_charge);
         
         // OPTIMIZED: Cheap config first with early exit based on quality (Step 1 from optimize.md)
-        struct LorentztingConfig {
+        struct PowerLorentztingConfig {
             ceres::LinearSolverType linear_solver;
             ceres::TrustRegionStrategyType trust_region;
             double function_tolerance;
@@ -455,29 +464,29 @@ bool LorentzCeres(
         };
         
         // Stage 1: Cheap configuration
-        LorentztingConfig cheap_config = {
+        PowerLorentztingConfig cheap_config = {
             ceres::DENSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 
             1e-10, 1e-10, 400, "NONE", 0.0
         };
         
         // Stage 2: Expensive fallback configurations
-        const std::vector<LorentztingConfig> expensive_configs = {
+        const std::vector<PowerLorentztingConfig> expensive_configs = {
             {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "HUBER", estimates.amp * 0.1},
             {ceres::DENSE_QR, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1500, "CAUCHY", estimates.amp * 0.16},
             {ceres::SPARSE_NORMAL_CHOLESKY, ceres::LEVENBERG_MARQUARDT, 1e-12, 1e-12, 1200, "CAUCHY", estimates.amp * 0.22}
         };
         
         // Try cheap config first
-        auto try_config = [&](const LorentztingConfig& config, const std::string& stage_name) -> bool {
+        auto try_config = [&](const PowerLorentztingConfig& config, const std::string& stage_name) -> bool {
             if (verbose) {
-                std::cout << "Trying Lorentz " << stage_name << " configuration..." << std::endl;
+                std::cout << "Trying Power Lorentz " << stage_name << " configuration..." << std::endl;
             }
-            // STEP 2 OPTIMIZATION: Hierarchical multi-start budget for Lorentz
+            // STEP 2 OPTIMIZATION: Hierarchical multi-start budget for Power Lorentz
             // Start with base estimate, only add 2 perturbations if χ²ᵣ > 2.0
             // Expected: ×4-5 speed-up, average #Ceres solves/fit ≤10
             
             struct ParameterSet {
-                double params[4];
+                double params[5];
                 std::string description;
             };
             
@@ -488,18 +497,19 @@ bool LorentzCeres(
             base_set.params[0] = estimates.amp;
             base_set.params[1] = estimates.center;
             base_set.params[2] = estimates.gamma;
-            base_set.params[3] = estimates.baseline;
+            base_set.params[3] = estimates.beta;
+            base_set.params[4] = estimates.baseline;
             base_set.description = "base_estimate";
             initial_guesses.push_back(base_set);
             
             double best_cost = std::numeric_limits<double>::max();
-            double best_parameters[4];
+            double best_parameters[5];
             bool any_success = false;
             std::string best_description;
             double best_chi2_reduced = std::numeric_limits<double>::max();
             
             // Data characteristics for adaptive bounds
-            DataStatistics data_stats = CalcRobustStatisticsLorentz(clean_x, clean_y);
+            DataStatistics data_stats = CalcRobustStatisticsPowerLorentz(clean_x, clean_y);
             double data_spread = *std::max_element(clean_x.begin(), clean_x.end()) - 
                                *std::min_element(clean_x.begin(), clean_x.end());
             double outlier_ratio = 0.0;
@@ -514,16 +524,17 @@ bool LorentzCeres(
             
             // Try base estimate first
             for (const auto& guess : initial_guesses) {
-                double parameters[4];
+                double parameters[5];
                 parameters[0] = guess.params[0];
                 parameters[1] = guess.params[1];
                 parameters[2] = guess.params[2];
                 parameters[3] = guess.params[3];
-                
+                parameters[4] = guess.params[4];
+            
                 ceres::Problem problem;
                 
                 for (size_t i = 0; i < clean_x.size(); ++i) {
-                    ceres::CostFunction* cost_function = LorentzCostFunction::Create(
+                    ceres::CostFunction* cost_function = PowerLorentzCostFunction::Create(
                         clean_x[i], clean_y[i], err);
                     problem.AddResidualBlock(cost_function, nullptr, parameters);
                 }
@@ -541,19 +552,32 @@ bool LorentzCeres(
                 problem.SetParameterLowerBound(parameters, 0, amp_min);
                 problem.SetParameterUpperBound(parameters, 0, amp_max);
                 
-                double center_range = pixel_spacing * 3.0;
-                problem.SetParameterLowerBound(parameters, 1, parameters[1] - center_range);
-                problem.SetParameterUpperBound(parameters, 1, parameters[1] + center_range);
+                double adaptive_center_range = (outlier_ratio > 0.15) ? 
+                    std::min(pixel_spacing * 3.0, data_spread * 0.4) : pixel_spacing * 3.0;
+                problem.SetParameterLowerBound(parameters, 1, parameters[1] - adaptive_center_range);
+                problem.SetParameterUpperBound(parameters, 1, parameters[1] + adaptive_center_range);
                 
-                problem.SetParameterLowerBound(parameters, 2, pixel_spacing * 0.05);
-                problem.SetParameterUpperBound(parameters, 2, pixel_spacing * 4.0);
+                double gamma_min = std::max(pixel_spacing * 0.05, data_spread * 0.01);
+                double gamma_max = std::min(pixel_spacing * 4.0, data_spread * 0.8);
+                problem.SetParameterLowerBound(parameters, 2, gamma_min);
+                problem.SetParameterUpperBound(parameters, 2, gamma_max);
+                
+                double beta_min = (outlier_ratio > 0.2) ? 0.5 : 0.2;
+                double beta_max = (outlier_ratio > 0.2) ? 2.5 : 4.0;
+                problem.SetParameterLowerBound(parameters, 3, beta_min);
+                problem.SetParameterUpperBound(parameters, 3, beta_max);
                 
                 double charge_range = std::abs(max_charge_val - min_charge_val);
                 double baseline_range = std::max(charge_range * 0.5, 
-                                               std::max(std::abs(parameters[3]) * 2.0, 1e-12));
-                problem.SetParameterLowerBound(parameters, 3, parameters[3] - baseline_range);
-                problem.SetParameterUpperBound(parameters, 3, parameters[3] + baseline_range);
+                                               std::max(std::abs(parameters[4]) * 2.0, 1e-12));
+                problem.SetParameterLowerBound(parameters, 4, parameters[4] - baseline_range);
+                problem.SetParameterUpperBound(parameters, 4, parameters[4] + baseline_range);
             
+                // Two-stage fitting approach to ensure consistent center
+                // Stage 1: Constrain beta close to 1.0 to stabilize center
+                problem.SetParameterLowerBound(parameters, 3, 0.9);
+                problem.SetParameterUpperBound(parameters, 3, 1.1);
+                
                 ceres::Solver::Options options;
                 options.linear_solver_type = config.linear_solver;
                 options.minimizer_type = ceres::TRUST_REGION;
@@ -565,66 +589,99 @@ bool LorentzCeres(
                 options.max_num_consecutive_invalid_steps = 50;
                 options.use_nonmonotonic_steps = true;
                 options.minimizer_progress_to_stdout = false;
-            
+                
+                ceres::Solver::Summary summary_stage1;
+                ceres::Solve(options, &problem, &summary_stage1);
+                
+                bool stage1_success = (summary_stage1.termination_type == ceres::CONVERGENCE ||
+                                        summary_stage1.termination_type == ceres::USER_SUCCESS) &&
+                                       parameters[0] > 0 && parameters[2] > 0 &&
+                                       !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
+                                       !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
+                                       !std::isnan(parameters[4]);
+                
                 ceres::Solver::Summary summary;
-                ceres::Solve(options, &problem, &summary);
+                if (stage1_success) {
+                    // Stage 2: Allow beta to vary more freely
+                    problem.SetParameterLowerBound(parameters, 3, 0.2);
+                    problem.SetParameterUpperBound(parameters, 3, 4.0);
+                    
+                    double stage1_center = parameters[1];
+                    double tight_center_range = pixel_spacing * 1.0;
+                    problem.SetParameterLowerBound(parameters, 1, stage1_center - tight_center_range);
+                    problem.SetParameterUpperBound(parameters, 1, stage1_center + tight_center_range);
+                    
+                    ceres::Solve(options, &problem, &summary);
+                } else {
+                    problem.SetParameterLowerBound(parameters, 3, 0.2);
+                    problem.SetParameterUpperBound(parameters, 3, 4.0);
+                    ceres::Solve(options, &problem, &summary);
+                }
                 
                 bool fit_success = (summary.termination_type == ceres::CONVERGENCE ||
                                       summary.termination_type == ceres::USER_SUCCESS) &&
-                                     parameters[0] > 0 && parameters[2] > 0 &&
+                                     parameters[0] > 0 && parameters[2] > 0 && parameters[3] > 0.1 &&
+                                     parameters[3] < 5.0 &&
                                      !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
-                                     !std::isnan(parameters[2]) && !std::isnan(parameters[3]);
+                                     !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
+                                     !std::isnan(parameters[4]);
                 
                 if (fit_success) {
                     double cost = summary.final_cost;
                     double chi2 = cost * 2.0;
-                    int dof = std::max(1, static_cast<int>(clean_x.size()) - 4);
+                    int dof = std::max(1, static_cast<int>(clean_x.size()) - 5);
                     double chi2_red = chi2 / dof;
                     
                     if (cost < best_cost) {
                         best_cost = cost;
                         best_chi2_reduced = chi2_red;
-                        std::copy(parameters, parameters + 4, best_parameters);
+                        std::copy(parameters, parameters + 5, best_parameters);
                         best_description = guess.description;
                         any_success = true;
                         
                         if (verbose) {
-                            std::cout << "New best Lorentz result from " << guess.description 
+                            std::cout << "New best Power Lorentz result from " << guess.description 
                                      << " with cost=" << cost << ", χ²ᵣ=" << chi2_red << std::endl;
                         }
                     }
                 }
             }
             
-            // ALWAYS add perturbations regardless of chi-squared quality
+            // ALWAYS add perturbations regardless of chi-squared quality  
             if (any_success) {
                 if (verbose) {
-                    std::cout << "Base Lorentz fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
+                    std::cout << "Base Power Lorentz fit χ²ᵣ=" << best_chi2_reduced << " > 0.3, trying 2 perturbations..." << std::endl;
                 }
                 
-                // Add exactly 2 perturbations to reduce multi-start budget
+                // Add exactly 2 perturbations with beta variations
                 const std::vector<double> perturbation_factors = {0.7, 1.3};
+                const std::vector<double> beta_variations = {0.8, 1.2};
                 
-                for (double factor : perturbation_factors) {
+                for (size_t i = 0; i < perturbation_factors.size(); ++i) {
+                    double factor = perturbation_factors[i];
+                    double beta_factor = beta_variations[i];
+                    
                     ParameterSet perturbed_set;
                     perturbed_set.params[0] = estimates.amp * factor;
                     perturbed_set.params[1] = estimates.center + (factor - 1.0) * pixel_spacing * 0.3;
                     perturbed_set.params[2] = estimates.gamma * std::sqrt(factor);
-                    perturbed_set.params[3] = estimates.baseline * (0.8 + 0.4 * factor);
-                    perturbed_set.description = "lorentz_perturbation_" + std::to_string(factor);
+                    perturbed_set.params[3] = std::max(0.3, std::min(3.5, estimates.beta * beta_factor));
+                    perturbed_set.params[4] = estimates.baseline * (0.8 + 0.4 * factor);
+                    perturbed_set.description = "power_perturbation_" + std::to_string(factor) + "_beta_" + std::to_string(beta_factor);
                     
-                    // Try this perturbation (same logic as above)
-                    double parameters[4];
+                    // Try this perturbation (same two-stage logic as above)
+                    double parameters[5];
                     parameters[0] = perturbed_set.params[0];
                     parameters[1] = perturbed_set.params[1];
                     parameters[2] = perturbed_set.params[2];
                     parameters[3] = perturbed_set.params[3];
+                    parameters[4] = perturbed_set.params[4];
                     
                     ceres::Problem problem;
                     
-                    for (size_t i = 0; i < clean_x.size(); ++i) {
-                        ceres::CostFunction* cost_function = LorentzCostFunction::Create(
-                            clean_x[i], clean_y[i], err);
+                    for (size_t j = 0; j < clean_x.size(); ++j) {
+                        ceres::CostFunction* cost_function = PowerLorentzCostFunction::Create(
+                            clean_x[j], clean_y[j], err);
                         problem.AddResidualBlock(cost_function, nullptr, parameters);
                     }
                     
@@ -641,18 +698,30 @@ bool LorentzCeres(
                     problem.SetParameterLowerBound(parameters, 0, amp_min);
                     problem.SetParameterUpperBound(parameters, 0, amp_max);
                     
-                    double center_range = pixel_spacing * 3.0;
-                    problem.SetParameterLowerBound(parameters, 1, parameters[1] - center_range);
-                    problem.SetParameterUpperBound(parameters, 1, parameters[1] + center_range);
+                    double adaptive_center_range = (outlier_ratio > 0.15) ? 
+                        std::min(pixel_spacing * 3.0, data_spread * 0.4) : pixel_spacing * 3.0;
+                    problem.SetParameterLowerBound(parameters, 1, parameters[1] - adaptive_center_range);
+                    problem.SetParameterUpperBound(parameters, 1, parameters[1] + adaptive_center_range);
                     
-                    problem.SetParameterLowerBound(parameters, 2, pixel_spacing * 0.05);
-                    problem.SetParameterUpperBound(parameters, 2, pixel_spacing * 4.0);
+                    double gamma_min = std::max(pixel_spacing * 0.05, data_spread * 0.01);
+                    double gamma_max = std::min(pixel_spacing * 4.0, data_spread * 0.8);
+                    problem.SetParameterLowerBound(parameters, 2, gamma_min);
+                    problem.SetParameterUpperBound(parameters, 2, gamma_max);
+                    
+                    double beta_min = (outlier_ratio > 0.2) ? 0.5 : 0.2;
+                    double beta_max = (outlier_ratio > 0.2) ? 2.5 : 4.0;
+                    problem.SetParameterLowerBound(parameters, 3, beta_min);
+                    problem.SetParameterUpperBound(parameters, 3, beta_max);
                     
                     double charge_range = std::abs(max_charge_val - min_charge_val);
                     double baseline_range = std::max(charge_range * 0.5, 
-                                                   std::max(std::abs(parameters[3]) * 2.0, 1e-12));
-                    problem.SetParameterLowerBound(parameters, 3, parameters[3] - baseline_range);
-                    problem.SetParameterUpperBound(parameters, 3, parameters[3] + baseline_range);
+                                                   std::max(std::abs(parameters[4]) * 2.0, 1e-12));
+                    problem.SetParameterLowerBound(parameters, 4, parameters[4] - baseline_range);
+                    problem.SetParameterUpperBound(parameters, 4, parameters[4] + baseline_range);
+                    
+                    // Two-stage approach for perturbations too
+                    problem.SetParameterLowerBound(parameters, 3, 0.9);
+                    problem.SetParameterUpperBound(parameters, 3, 1.1);
                     
                     ceres::Solver::Options options;
                     options.linear_solver_type = config.linear_solver;
@@ -666,25 +735,51 @@ bool LorentzCeres(
                     options.use_nonmonotonic_steps = true;
                     options.minimizer_progress_to_stdout = false;
                     
+                    ceres::Solver::Summary summary_stage1;
+                    ceres::Solve(options, &problem, &summary_stage1);
+                    
+                    bool stage1_success = (summary_stage1.termination_type == ceres::CONVERGENCE ||
+                                            summary_stage1.termination_type == ceres::USER_SUCCESS) &&
+                                           parameters[0] > 0 && parameters[2] > 0 &&
+                                           !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
+                                           !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
+                                           !std::isnan(parameters[4]);
+                    
                     ceres::Solver::Summary summary;
-                    ceres::Solve(options, &problem, &summary);
+                    if (stage1_success) {
+                        problem.SetParameterLowerBound(parameters, 3, 0.2);
+                        problem.SetParameterUpperBound(parameters, 3, 4.0);
+                        
+                        double stage1_center = parameters[1];
+                        double tight_center_range = pixel_spacing * 1.0;
+                        problem.SetParameterLowerBound(parameters, 1, stage1_center - tight_center_range);
+                        problem.SetParameterUpperBound(parameters, 1, stage1_center + tight_center_range);
+                        
+                        ceres::Solve(options, &problem, &summary);
+                    } else {
+                        problem.SetParameterLowerBound(parameters, 3, 0.2);
+                        problem.SetParameterUpperBound(parameters, 3, 4.0);
+                        ceres::Solve(options, &problem, &summary);
+                    }
                     
                     bool fit_success = (summary.termination_type == ceres::CONVERGENCE ||
                                           summary.termination_type == ceres::USER_SUCCESS) &&
-                                         parameters[0] > 0 && parameters[2] > 0 &&
+                                         parameters[0] > 0 && parameters[2] > 0 && parameters[3] > 0.1 &&
+                                         parameters[3] < 5.0 &&
                                          !std::isnan(parameters[0]) && !std::isnan(parameters[1]) &&
-                                         !std::isnan(parameters[2]) && !std::isnan(parameters[3]);
+                                         !std::isnan(parameters[2]) && !std::isnan(parameters[3]) &&
+                                         !std::isnan(parameters[4]);
                     
                     if (fit_success) {
                         double cost = summary.final_cost;
                         double chi2 = cost * 2.0;
-                        int dof = std::max(1, static_cast<int>(clean_x.size()) - 4);
+                        int dof = std::max(1, static_cast<int>(clean_x.size()) - 5);
                         double chi2_red = chi2 / dof;
                         
                         if (cost < best_cost) {
                             best_cost = cost;
                             best_chi2_reduced = chi2_red;
-                            std::copy(parameters, parameters + 4, best_parameters);
+                            std::copy(parameters, parameters + 5, best_parameters);
                             best_description = perturbed_set.description;
                             
                             if (verbose) {
@@ -695,7 +790,7 @@ bool LorentzCeres(
                     }
                 }
             } else if (verbose && any_success) {
-                std::cout << "Base Lorentz fit χ²ᵣ=" << best_chi2_reduced << " ≤ 0.3, skipping perturbations (hierarchical multi-start)" << std::endl;
+                std::cout << "Base Power Lorentz fit χ²ᵣ=" << best_chi2_reduced << ", trying perturbations..." << std::endl;
             }
             
             if (any_success) {
@@ -703,22 +798,25 @@ bool LorentzCeres(
                 fit_amp = best_parameters[0];
                 fit_center = best_parameters[1];
                 fit_gamma = std::abs(best_parameters[2]);
-                fit_vert_offset = best_parameters[3];
+                fit_beta = best_parameters[3];
+                fit_vert_offset = best_parameters[4];
                 
                 // Simple fallback err estimation
                 fit_amp_err = std::max(0.02 * fit_amp, 0.1 * data_stats.mad);
                 fit_center_err = std::max(0.02 * pixel_spacing, fit_gamma / 10.0);
                 fit_gamma_err = std::max(0.05 * fit_gamma, 0.01 * pixel_spacing);
+                fit_beta_err = std::max(0.1 * fit_beta, 0.05);
                 fit_vert_offset_err = std::max(0.1 * std::abs(fit_vert_offset), 0.05 * data_stats.mad);
                 
                 chi2_reduced = best_chi2_reduced;
                 
                 if (verbose) {
-                    std::cout << "Success Lorentz fit with " << stage_name 
+                    std::cout << "Success Power Lorentz fit with " << stage_name 
                              << ", dataset " << dataset_idx << ", best init: " << best_description
                              << ": A=" << fit_amp << "±" << fit_amp_err
                              << ", m=" << fit_center << "±" << fit_center_err
                              << ", gamma=" << fit_gamma << "±" << fit_gamma_err
+                             << ", beta=" << fit_beta << "±" << fit_beta_err
                              << ", B=" << fit_vert_offset << "±" << fit_vert_offset_err
                              << ", chi2red=" << chi2_reduced << std::endl;
                 }
@@ -734,14 +832,14 @@ bool LorentzCeres(
         double best_chi2 = chi2_reduced;
         
         if (verbose) {
-            std::cout << "Cheap Lorentz config " << (success ? "succeeded" : "failed") 
+            std::cout << "Cheap Power Lorentz config " << (success ? "succeeded" : "failed") 
                      << " with χ²ᵣ=" << chi2_reduced << std::endl;
         }
         
         // Always try ALL expensive configurations regardless of cheap config result
         if (verbose) {
             std::cout << "Trying all " << expensive_configs.size() 
-                     << " expensive Lorentz configurations..." << std::endl;
+                     << " expensive Power Lorentz configurations..." << std::endl;
         }
         
         for (size_t i = 0; i < expensive_configs.size(); ++i) {
@@ -753,7 +851,7 @@ bool LorentzCeres(
             }
             
             if (verbose) {
-                std::cout << "Expensive Lorentz config " << (i+1) << " " 
+                std::cout << "Expensive Power Lorentz config " << (i+1) << " " 
                          << (config_success ? "succeeded" : "failed") 
                          << " with χ²ᵣ=" << chi2_reduced << std::endl;
             }
@@ -761,19 +859,19 @@ bool LorentzCeres(
         
         if (best_success) {
             if (verbose) {
-                std::cout << "Best Lorentz fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
+                std::cout << "Best Power Lorentz fit achieved with χ²ᵣ=" << best_chi2 << std::endl;
             }
             return true;
         }
     }
     
     if (verbose) {
-        std::cout << "All Lorentz fitting strategies failed" << std::endl;
+        std::cout << "All Power Lorentz fitting strategies failed" << std::endl;
     }
     return false;
-} 
+}
 
-Lorentz2DResultsCeres LorentzCeres2D(
+PowerLorentz2DResultsCeres PowerLorentzCeres2D(
     const std::vector<double>& x_coords,
     const std::vector<double>& y_coords, 
     const std::vector<double>& charge_values,
@@ -783,27 +881,27 @@ Lorentz2DResultsCeres LorentzCeres2D(
     bool verbose,
     bool enable_outlier_filtering)
 {
-    Lorentz2DResultsCeres result;
+    PowerLorentz2DResultsCeres result;
     
     // Initialize Ceres logging (removed mutex for better parallelization)
-    InitializeCeresLorentz();
+    InitializeCeresPowerLorentz();
     
     if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
         if (verbose) {
-            std::cout << "LorentzCeres2D: Error - coordinate and charge vector sizes don't match" << std::endl;
+            std::cout << "PowerLorentzCeres2D: Error - coordinate and charge vector sizes don't match" << std::endl;
         }
         return result;
     }
     
-    if (x_coords.size() < 4) {
+    if (x_coords.size() < 5) {
         if (verbose) {
-            std::cout << "LorentzCeres2D: Error - need at least 4 data points for fitting" << std::endl;
+            std::cout << "PowerLorentzCeres2D: Error - need at least 5 data points for fitting" << std::endl;
         }
         return result;
     }
     
     if (verbose) {
-        std::cout << "Starting 2D Lorentz fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
+        std::cout << "Starting 2D Power Lorentz fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
     // Create maps to group data by rows and columns
@@ -852,7 +950,7 @@ Lorentz2DResultsCeres LorentzCeres2D(
     double min_row_dist = std::numeric_limits<double>::max();
     for (const auto& row_pair : rows_data) {
         double dist = std::abs(row_pair.first - center_y_estimate);
-        if (dist < min_row_dist && row_pair.second.size() >= 4) {
+        if (dist < min_row_dist && row_pair.second.size() >= 5) {
             min_row_dist = dist;
             best_row_y = row_pair.first;
         }
@@ -862,7 +960,7 @@ Lorentz2DResultsCeres LorentzCeres2D(
     double min_col_dist = std::numeric_limits<double>::max();
     for (const auto& col_pair : cols_data) {
         double dist = std::abs(col_pair.first - center_x_estimate);
-        if (dist < min_col_dist && col_pair.second.size() >= 4) {
+        if (dist < min_col_dist && col_pair.second.size() >= 5) {
             min_col_dist = dist;
             best_col_x = col_pair.first;
         }
@@ -872,7 +970,7 @@ Lorentz2DResultsCeres LorentzCeres2D(
     bool y_fit_success = false;
     
     //  X direction (central row)
-    if (rows_data.find(best_row_y) != rows_data.end() && rows_data[best_row_y].size() >= 4) {
+    if (rows_data.find(best_row_y) != rows_data.end() && rows_data[best_row_y].size() >= 5) {
         auto& row_data = rows_data[best_row_y];
         
         // Sort by X coordinate
@@ -889,17 +987,17 @@ Lorentz2DResultsCeres LorentzCeres2D(
         }
         
         if (verbose) {
-            std::cout << "ting Lorentz X direction with " << x_vals.size() << " points" << std::endl;
+            std::cout << "ting Power Lorentz X direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        x_fit_success = LorentzCeres(
+        x_fit_success = PowerLorentzCeres(
             x_vals, y_vals, center_x_estimate, pixel_spacing,
-            result.x_amp, result.x_center, result.x_gamma, result.x_vert_offset,
-            result.x_amp_err, result.x_center_err, result.x_gamma_err, result.x_vert_offset_err,
+            result.x_amp, result.x_center, result.x_gamma, result.x_beta, result.x_vert_offset,
+            result.x_amp_err, result.x_center_err, result.x_gamma_err, result.x_beta_err, result.x_vert_offset_err,
             result.x_chi2red, verbose, enable_outlier_filtering);
         
         // Calc DOF and p-value
-        result.x_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
+        result.x_dof = std::max(1, static_cast<int>(x_vals.size()) - 5); // Corrected DOF for 5 parameters
         result.x_pp = (result.x_chi2red > 0) ? 1.0 - std::min(1.0, result.x_chi2red / 10.0) : 0.0;
         
         // Store data for ROOT analysis
@@ -909,7 +1007,7 @@ Lorentz2DResultsCeres LorentzCeres2D(
     }
     
     //  Y direction (central column)
-    if (cols_data.find(best_col_x) != cols_data.end() && cols_data[best_col_x].size() >= 4) {
+    if (cols_data.find(best_col_x) != cols_data.end() && cols_data[best_col_x].size() >= 5) {
         auto& col_data = cols_data[best_col_x];
         
         // Sort by Y coordinate
@@ -926,17 +1024,17 @@ Lorentz2DResultsCeres LorentzCeres2D(
         }
         
         if (verbose) {
-            std::cout << "ting Lorentz Y direction with " << x_vals.size() << " points" << std::endl;
+            std::cout << "ting Power Lorentz Y direction with " << x_vals.size() << " points" << std::endl;
         }
         
-        y_fit_success = LorentzCeres(
+        y_fit_success = PowerLorentzCeres(
             x_vals, y_vals, center_y_estimate, pixel_spacing,
-            result.y_amp, result.y_center, result.y_gamma, result.y_vert_offset,
-            result.y_amp_err, result.y_center_err, result.y_gamma_err, result.y_vert_offset_err,
+            result.y_amp, result.y_center, result.y_gamma, result.y_beta, result.y_vert_offset,
+            result.y_amp_err, result.y_center_err, result.y_gamma_err, result.y_beta_err, result.y_vert_offset_err,
             result.y_chi2red, verbose, enable_outlier_filtering);
         
         // Calc DOF and p-value
-        result.y_dof = std::max(1, static_cast<int>(x_vals.size()) - 4);
+        result.y_dof = std::max(1, static_cast<int>(x_vals.size()) - 5); // Corrected DOF for 5 parameters
         result.y_pp = (result.y_chi2red > 0) ? 1.0 - std::min(1.0, result.y_chi2red / 10.0) : 0.0;
         
         // Store data for ROOT analysis
@@ -949,7 +1047,7 @@ Lorentz2DResultsCeres LorentzCeres2D(
     result.fit_success = x_fit_success && y_fit_success;
     
     // Calc and store charge uncertainties (5% of max charge for each direction) only if enabled
-    if (Control::ENABLE_VERT_CHARGE_ERR) {
+    if (Control::CHARGE_ERR) {
         if (x_fit_success && rows_data.find(best_row_y) != rows_data.end()) {
             auto& row_data = rows_data[best_row_y];
             double max_charge_x = 0.0;
@@ -973,7 +1071,7 @@ Lorentz2DResultsCeres LorentzCeres2D(
     }
     
     if (verbose) {
-        std::cout << "2D Lorentz fit (Ceres) " << (result.fit_success ? "success" : "failed") 
+        std::cout << "2D Power Lorentz fit (Ceres) " << (result.fit_success ? "success" : "failed") 
                  << " (X: " << (x_fit_success ? "OK" : "FAIL") 
                  << ", Y: " << (y_fit_success ? "OK" : "FAIL") << ")" << std::endl;
     }
@@ -981,7 +1079,8 @@ Lorentz2DResultsCeres LorentzCeres2D(
     return result;
 }
 
-DiagLorentzResultsCeres DiagLorentzCeres(
+// Diag Power Lorentz fitting function
+DiagPowerLorentzResultsCeres DiagPowerLorentzCeres(
     const std::vector<double>& x_coords,
     const std::vector<double>& y_coords, 
     const std::vector<double>& charge_values,
@@ -991,20 +1090,27 @@ DiagLorentzResultsCeres DiagLorentzCeres(
     bool verbose,
     bool enable_outlier_filtering)
 {
-    DiagLorentzResultsCeres result;
+    DiagPowerLorentzResultsCeres result;
     
     // Initialize Ceres logging (removed mutex for better parallelization)
-    InitializeCeresLorentz();
+    InitializeCeresPowerLorentz();
     
-    if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size() || x_coords.size() < 4) {
+    if (x_coords.size() != y_coords.size() || x_coords.size() != charge_values.size()) {
         if (verbose) {
-            std::cout << "Diag Lorentz fit (Ceres): Invalid input data size" << std::endl;
+            std::cout << "DiagPowerLorentzCeres: Error - coordinate and charge vector sizes don't match" << std::endl;
+        }
+        return result;
+    }
+    
+    if (x_coords.size() < 5) {
+        if (verbose) {
+            std::cout << "DiagPowerLorentzCeres: Error - need at least 5 data points for fitting" << std::endl;
         }
         return result;
     }
     
     if (verbose) {
-        std::cout << "Starting Diag Lorentz fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
+        std::cout << "Starting diagonal Power Lorentz fit (Ceres) with " << x_coords.size() << " data points" << std::endl;
     }
     
     // FIXED DIAG APPROACH:
@@ -1065,7 +1171,7 @@ DiagLorentzResultsCeres DiagLorentzCeres(
         int max_pixels = 0;
         for (const auto& bin_pair : bins) {
             int pixel_count = bin_pair.second.size();
-            if (pixel_count >= 4 && pixel_count > max_pixels) {
+            if (pixel_count >= 5 && pixel_count > max_pixels) { // Need at least 5 for Power Lorentz
                 max_pixels = pixel_count;
                 best_bin = bin_pair.first;
             }
@@ -1085,7 +1191,7 @@ DiagLorentzResultsCeres DiagLorentzCeres(
     
     //  main diagonal (+45° direction)
     if (main_diag_bins.find(best_main_bin) != main_diag_bins.end() && 
-        main_diag_bins[best_main_bin].size() >= 4) {
+        main_diag_bins[best_main_bin].size() >= 5) {
         
         auto& main_data = main_diag_bins[best_main_bin];
         
@@ -1102,42 +1208,38 @@ DiagLorentzResultsCeres DiagLorentzCeres(
             std::cout << "ting main diagonal (+45°) with " << poss.size() << " points" << std::endl;
         }
         
-        main_diag_success = LorentzCeres(
+        main_diag_success = PowerLorentzCeres(
             poss, charges, 0.0, diag_pixel_spacing,
-            result.main_diag_x_amp, result.main_diag_x_center, result.main_diag_x_gamma, result.main_diag_x_vert_offset,
-            result.main_diag_x_amp_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err, result.main_diag_x_vert_offset_err,
+            result.main_diag_x_amp, result.main_diag_x_center, result.main_diag_x_gamma, 
+            result.main_diag_x_beta, result.main_diag_x_vert_offset,
+            result.main_diag_x_amp_err, result.main_diag_x_center_err, result.main_diag_x_gamma_err,
+            result.main_diag_x_beta_err, result.main_diag_x_vert_offset_err,
             result.main_diag_x_chi2red, verbose, enable_outlier_filtering);
         
-        result.main_diag_x_dof = std::max(1, static_cast<int>(poss.size()) - 4);
+        result.main_diag_x_dof = std::max(1, static_cast<int>(poss.size()) - 5);
         result.main_diag_x_pp = (result.main_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.main_diag_x_chi2red / 10.0) : 0.0;
         result.main_diag_x_fit_success = main_diag_success;
-        
-        // Store data for ROOT analysis
-        result.main_diag_x_pixel_coords = poss;
-        result.main_diag_x_charge_values = charges;
-        result.main_diag_x_charge_errors = std::vector<double>();
         
         // For symmetry, copy results to Y (since we only have one diagonal measurement)
         result.main_diag_y_amp = result.main_diag_x_amp;
         result.main_diag_y_center = result.main_diag_x_center;
         result.main_diag_y_gamma = result.main_diag_x_gamma;
+        result.main_diag_y_beta = result.main_diag_x_beta;
         result.main_diag_y_vert_offset = result.main_diag_x_vert_offset;
         result.main_diag_y_amp_err = result.main_diag_x_amp_err;
         result.main_diag_y_center_err = result.main_diag_x_center_err;
         result.main_diag_y_gamma_err = result.main_diag_x_gamma_err;
+        result.main_diag_y_beta_err = result.main_diag_x_beta_err;
         result.main_diag_y_vert_offset_err = result.main_diag_x_vert_offset_err;
         result.main_diag_y_chi2red = result.main_diag_x_chi2red;
         result.main_diag_y_dof = result.main_diag_x_dof;
         result.main_diag_y_pp = result.main_diag_x_pp;
         result.main_diag_y_fit_success = main_diag_success;
-        result.main_diag_y_pixel_coords = poss;
-        result.main_diag_y_charge_values = charges;
-        result.main_diag_y_charge_errors = std::vector<double>();
     }
     
     //  secondary diagonal (-45° direction)
     if (sec_diag_bins.find(best_sec_bin) != sec_diag_bins.end() && 
-        sec_diag_bins[best_sec_bin].size() >= 4) {
+        sec_diag_bins[best_sec_bin].size() >= 5) {
         
         auto& sec_data = sec_diag_bins[best_sec_bin];
         
@@ -1154,47 +1256,45 @@ DiagLorentzResultsCeres DiagLorentzCeres(
             std::cout << "ting secondary diagonal (-45°) with " << poss.size() << " points" << std::endl;
         }
         
-        sec_diag_success = LorentzCeres(
+        sec_diag_success = PowerLorentzCeres(
             poss, charges, 0.0, diag_pixel_spacing,
-            result.sec_diag_x_amp, result.sec_diag_x_center, result.sec_diag_x_gamma, result.sec_diag_x_vert_offset,
-            result.sec_diag_x_amp_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err, result.sec_diag_x_vert_offset_err,
+            result.sec_diag_x_amp, result.sec_diag_x_center, result.sec_diag_x_gamma,
+            result.sec_diag_x_beta, result.sec_diag_x_vert_offset,
+            result.sec_diag_x_amp_err, result.sec_diag_x_center_err, result.sec_diag_x_gamma_err,
+            result.sec_diag_x_beta_err, result.sec_diag_x_vert_offset_err,
             result.sec_diag_x_chi2red, verbose, enable_outlier_filtering);
         
-        result.sec_diag_x_dof = std::max(1, static_cast<int>(poss.size()) - 4);
+        result.sec_diag_x_dof = std::max(1, static_cast<int>(poss.size()) - 5);
         result.sec_diag_x_pp = (result.sec_diag_x_chi2red > 0) ? 1.0 - std::min(1.0, result.sec_diag_x_chi2red / 10.0) : 0.0;
         result.sec_diag_x_fit_success = sec_diag_success;
-        
-        // Store data for ROOT analysis
-        result.sec_diag_x_pixel_coords = poss;
-        result.sec_diag_x_charge_values = charges;
-        result.sec_diag_x_charge_errors = std::vector<double>();
         
         // For symmetry, copy results to Y
         result.sec_diag_y_amp = result.sec_diag_x_amp;
         result.sec_diag_y_center = result.sec_diag_x_center;
         result.sec_diag_y_gamma = result.sec_diag_x_gamma;
+        result.sec_diag_y_beta = result.sec_diag_x_beta;
         result.sec_diag_y_vert_offset = result.sec_diag_x_vert_offset;
         result.sec_diag_y_amp_err = result.sec_diag_x_amp_err;
         result.sec_diag_y_center_err = result.sec_diag_x_center_err;
         result.sec_diag_y_gamma_err = result.sec_diag_x_gamma_err;
+        result.sec_diag_y_beta_err = result.sec_diag_x_beta_err;
         result.sec_diag_y_vert_offset_err = result.sec_diag_x_vert_offset_err;
         result.sec_diag_y_chi2red = result.sec_diag_x_chi2red;
         result.sec_diag_y_dof = result.sec_diag_x_dof;
         result.sec_diag_y_pp = result.sec_diag_x_pp;
         result.sec_diag_y_fit_success = sec_diag_success;
-        result.sec_diag_y_pixel_coords = poss;
-        result.sec_diag_y_charge_values = charges;
-        result.sec_diag_y_charge_errors = std::vector<double>();
     }
     
     // Set overall success status
     result.fit_success = main_diag_success && sec_diag_success;
     
     if (verbose) {
-        std::cout << "Diag Lorentz fit (Ceres) " << (result.fit_success ? "success" : "failed") 
+        std::cout << "Diag Power Lorentz fit (Ceres) " << (result.fit_success ? "success" : "failed") 
                  << " (Main +45°: " << (main_diag_success ? "OK" : "FAIL") 
                  << ", Secondary -45°: " << (sec_diag_success ? "OK" : "FAIL") << ")" << std::endl;
     }
     
     return result;
 }
+
+ 
