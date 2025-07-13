@@ -42,7 +42,7 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
     if (postVol) postVolName = postVol->GetLogicalVolume()->GetName();
     
     // Determine if we're inside the detector volume
-    G4bool insideDetector = (preVolName == "logicCube" || postVolName == "logicCube");
+    G4bool insideDetector = (preVolName == "logicCube");// || postVolName == "logicCube");
     
     if (insideDetector) {
       // Energy deposited inside detector volume - accumulate in EventAction
