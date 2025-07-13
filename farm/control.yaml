@@ -24,9 +24,9 @@ varied_parameters:
   # GAUSS_FIT_3D:
   #   values: [true, false, true, false]
   
-  # Particle gun parameters - uncomment to vary
-  PARTICLE_ENERGY:
-    values: [0.0001, 0.001] # , 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 15.0, 20.0]  # in GeV
+  # Particle gun parameters
+  # PARTICLE_ENERGY:
+    # values: [0.0001, 0.001] # , 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 15.0, 20.0]  # in GeV
 
 # Constant parameters
 constant_parameters:
@@ -35,7 +35,7 @@ constant_parameters:
   DETECTOR_WIDTH: 0.05  # mm
   
   # Pixel geometry (only used if not being varied)
-  PIXEL_SIZE: 0.01  # mm
+  PIXEL_SIZE: 0.1  # mm
   PIXEL_WIDTH: 0.001  # mm
   PIXEL_SPACING: 0.5  # mm
   PIXEL_CORNER_OFFSET: 0.1  # mm
@@ -55,6 +55,6 @@ constant_parameters:
   AUTO_RADIUS: false
   
   # Simulation control parameters
-  NUMBER_OF_EVENTS: 1000    # number of events to simulate
-  # PARTICLE_ENERGY: 10.0      # particle energy in GeV  
+  NUMBER_OF_EVENTS: 10000    # number of events to simulate
+  PARTICLE_ENERGY: 10.0      # particle energy in GeV  
   PARTICLE_TYPE: "e-"        # particle type (e-, mu-, gamma, etc.)
