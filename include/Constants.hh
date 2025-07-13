@@ -24,7 +24,7 @@ namespace Constants {
     // Parameters (all lengths are center–to–center except fPixelCornerOffset)
     
     // Default pixel dimensions and spacing
-    const G4double PIXEL_SIZE = 0.01*mm;          // "pixel" side‐length
+    const G4double PIXEL_SIZE = 0.1*mm;          // "pixel" side‐length
     const G4double PIXEL_WIDTH = 0.001*mm;       // Width/thickness of each pixel
     const G4double PIXEL_SPACING = 0.5*mm;       // center–to–center pitch
     const G4double PIXEL_CORNER_OFFSET = 0.1*mm; // from inner detector edge to first pixel
