@@ -5,6 +5,7 @@
 #include "globals.hh"
 
 class EventAction;
+class DetectorConstruction;
 
 class SteppingAction : public G4UserSteppingAction
 {

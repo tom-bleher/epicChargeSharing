@@ -71,5 +71,5 @@ void ActionInitialization::Build() const
     }
     
     // Create and register SteppingAction
-    SetUserAction(new SteppingAction(eventAction));
+    SetUserAction(new SteppingAction(eventAction, fDetector));
 }
