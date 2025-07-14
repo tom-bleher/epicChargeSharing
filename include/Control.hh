@@ -17,7 +17,7 @@ namespace Control {
     
     // Event generation control
     const G4int NUMBER_OF_EVENTS = 1000;         // Number of events to simulate
-    const G4double PARTICLE_ENERGY = 0.0001;        // Particle energy in GeV
+    const G4double PARTICLE_ENERGY = 10;        // Particle energy in GeV
     const G4String PARTICLE_TYPE = "e-";          // Particle type (e-, mu-, gamma, etc.)
     
     // ========================
@@ -26,7 +26,7 @@ namespace Control {
     
     // Enable/disable different fitting models
     const G4bool GAUSS_FIT = true;         // Enable Gauss fitting (2D and diagonal)
-    const G4bool LORENTZ_FIT = true;       // Enable Lorentz fitting (2D and diagonal) 
+    const G4bool LORENTZ_FIT = false;       // Enable Lorentz fitting (2D and diagonal) 
     const G4bool POWER_LORENTZ_FIT = false; // Enable Power Lorentz fitting (2D and diagonal)
     
     // Individual fitting type control (only used if main model is enabled)
@@ -34,8 +34,8 @@ namespace Control {
     const G4bool DIAG_FIT = false;         // Enable diagonal fitting
     
     // 3D fitting control flags (fit entire neighborhood surface directly)
-    const G4bool GAUSS_FIT_3D = true;      // Enable 3D Gauss surface fitting
-    const G4bool LORENTZ_FIT_3D = true;    // Enable 3D Lorentz surface fitting
+    const G4bool GAUSS_FIT_3D = false;      // Enable 3D Gauss surface fitting
+    const G4bool LORENTZ_FIT_3D = false;    // Enable 3D Lorentz surface fitting
     const G4bool POWER_LORENTZ_FIT_3D = false; // Enable 3D Power-Law Lorentz surface fitting
     
     // ========================
