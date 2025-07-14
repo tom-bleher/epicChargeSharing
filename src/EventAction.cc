@@ -139,14 +139,15 @@ void EventAction::EndOfEventAction(const G4Event* event)
   
   // VALIDATION: For pixel hits both deltas must be NaN. If either value is finite we report an error
   if (isPixelHit) {
-    const G4bool deltaXIsFinite = !std::isnan(fPixelTrueDeltaX);
-    const G4bool deltaYIsFinite = !std::isnan(fPixelTrueDeltaY);
+    // Use robust NaN check: NaN != NaN is always true
+    const G4bool deltaXIsFinite = (fPixelTrueDeltaX == fPixelTrueDeltaX);
+    const G4bool deltaYIsFinite = (fPixelTrueDeltaY == fPixelTrueDeltaY);
 
     if (deltaXIsFinite || deltaYIsFinite) {
       G4cerr << "ERROR: Deltas should be NaN for pixel hits!" << G4endl;
       G4cerr << "  Pixel hit: YES" << G4endl;
-      G4cerr << "  DeltaX: " << fPixelTrueDeltaX/mm << " mm" << G4endl;
-      G4cerr << "  DeltaY: " << fPixelTrueDeltaY/mm << " mm" << G4endl;
+      G4cerr << "  DeltaX: " << fPixelTrueDeltaX/mm << " mm (finite: " << (deltaXIsFinite ? "YES" : "NO") << ")" << G4endl;
+      G4cerr << "  DeltaY: " << fPixelTrueDeltaY/mm << " mm (finite: " << (deltaYIsFinite ? "YES" : "NO") << ")" << G4endl;
 
       // Force deltas to NaN for pixel hits to keep downstream logic consistent
       fPixelTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
