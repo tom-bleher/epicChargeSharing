@@ -33,6 +33,10 @@ namespace Constants {
     const G4double GEOMETRY_TOLERANCE = 1*um;            // Geometry calculation tolerance
     const G4double PRECISION_TOLERANCE = 1*nm;           // High precision calculations
     
+    // Pixel boundary detection
+    const G4double PIXEL_BOUNDARY_TOLERANCE = 1*nanometer; // Tolerance for pixel boundary detection to handle floating point precision
+                                                            // Ensures hits exactly on pixel edges are consistently classified as pixel hits
+    
     // Grid and neighborhood configuration
     const G4int NEIGHBORHOOD_RADIUS = 4;                 // Default neighborhood radius for 9x9 grid
     

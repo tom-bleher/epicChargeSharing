@@ -293,8 +293,17 @@ G4bool DetectorConstruction::IsPosOnPixel(const G4ThreeVector& pos) const
     G4double distanceX = std::abs(pos.x() - pixelX);
     G4double distanceY = std::abs(pos.y() - pixelY);
     
-    // Check if the hit is within the pixel boundary (half the size in each direction)
-    return (distanceX <= fPixelSize/2 && distanceY <= fPixelSize/2);
+    // ROBUST PIXEL BOUNDARY CHECK with tolerance for floating point precision
+    // Add a small tolerance to ensure hits exactly on edges are considered pixel hits
+    G4double pixelHalfSize = fPixelSize / 2.0;
+    G4double tolerance = Constants::PIXEL_BOUNDARY_TOLERANCE; // Tolerance for floating point precision
+    
+    // Check if the hit is within the pixel boundary (with tolerance for edge cases)
+    // Using < (pixelHalfSize + tolerance) ensures hits exactly on edges are pixel hits
+    G4bool withinPixelX = (distanceX < (pixelHalfSize + tolerance));
+    G4bool withinPixelY = (distanceY < (pixelHalfSize + tolerance));
+    
+    return (withinPixelX && withinPixelY);
 }
 
 // Implementation of SaveSimulationParameters method
