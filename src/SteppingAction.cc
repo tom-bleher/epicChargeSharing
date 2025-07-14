@@ -9,9 +9,10 @@
 #include "G4Event.hh"
 #include "G4RunManager.hh"
 
-SteppingAction::SteppingAction(EventAction* eventAction)
+SteppingAction::SteppingAction(EventAction* eventAction, DetectorConstruction* detector)
 : G4UserSteppingAction(),
-  fEventAction(eventAction)
+  fEventAction(eventAction),
+  fDetector(detector)
 {}
 
 SteppingAction::~SteppingAction()
@@ -45,6 +46,14 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
     G4bool insideDetector = (preVolName == "logicCube");// || postVolName == "logicCube");
     
     if (insideDetector) {
+      // NEW FILTER: Ignore any energy deposition whose (x,y) lies inside the
+      // footprint of a pixel.  This guarantees that only non-pixel hits
+      // contribute to the subsequent Gauss-delta calculations.
+      if (fDetector && fDetector->IsPosOnPixel(stepPos)) {
+        // Skip – this is a pixel hit, we do not accumulate it.
+        return;
+      }
+
       // Energy deposited inside detector volume - accumulate in EventAction
       // Only energy deposited while particle travels through detector is counted
       fEventAction->AddEdep(edep, stepPos);
