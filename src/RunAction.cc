@@ -17,6 +17,8 @@
 #include <thread>
 #include <chrono>
 #include <limits>
+#include <cstdlib>
+#include <cmath>
 
 // ROOT includes
 #include "TFile.h"
@@ -1381,14 +1383,14 @@ void RunAction::Set2DGaussResults(G4double x_center, G4double x_sigma, G4double 
     if (fit_success) {
         // Check X fit validity (row fit) - use dof as success indicator
         if (x_dof > 0) {
-            fGaussRowDeltaX = x_center - fTrueX;      // x_row_fit - x_true
+            fGaussRowDeltaX = std::abs(x_center - fTrueX);      // x_row_fit - x_true
         } else {
             fGaussRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         // Check Y fit validity (column fit) - use dof as success indicator  
         if (y_dof > 0) {
-            fGaussColDeltaY = y_center - fTrueY;   // y_column_fit - y_true
+            fGaussColDeltaY = std::abs(y_center - fTrueY);   // y_column_fit - y_true
         } else {
             fGaussColDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
@@ -1531,14 +1533,14 @@ void RunAction::Set2DLorentzResults(G4double x_center, G4double x_gamma, G4doubl
     if (fit_success) {
         // Check X fit validity (row fit) - use dof as success indicator
         if (x_dof > 0) {
-            fLorentzRowDeltaX = x_center - fTrueX;      // x_row_fit - x_true
+            fLorentzRowDeltaX = std::abs(x_center - fTrueX);      // x_row_fit - x_true
         } else {
             fLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         // Check Y fit validity (column fit) - use dof as success indicator  
         if (y_dof > 0) {
-            fLorentzColDeltaY = y_center - fTrueY;   // y_column_fit - y_true
+            fLorentzColDeltaY = std::abs(y_center - fTrueY);   // y_column_fit - y_true
         } else {
             fLorentzColDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
@@ -1912,7 +1914,7 @@ void RunAction::CalcMeanEstimations()
             sum += coord;
         }
         G4double mean_x = sum / gauss_x_coords.size();
-        fGaussMeanTrueDeltaX = mean_x - fTrueX;
+        fGaussMeanTrueDeltaX = std::abs(mean_x - fTrueX);
     } else {
         fGaussMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
     }
@@ -1923,7 +1925,7 @@ void RunAction::CalcMeanEstimations()
             sum += coord;
         }
         G4double mean_y = sum / gauss_y_coords.size();
-        fGaussMeanTrueDeltaY = mean_y - fTrueY;
+        fGaussMeanTrueDeltaY = std::abs(mean_y - fTrueY);
     } else {
         fGaussMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
@@ -1934,7 +1936,7 @@ void RunAction::CalcMeanEstimations()
             sum += coord;
         }
         G4double mean_x = sum / lorentz_x_coords.size();
-        fLorentzMeanTrueDeltaX = mean_x - fTrueX;
+        fLorentzMeanTrueDeltaX = std::abs(mean_x - fTrueX);
     } else {
         fLorentzMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
     }
@@ -1945,7 +1947,7 @@ void RunAction::CalcMeanEstimations()
             sum += coord;
         }
         G4double mean_y = sum / lorentz_y_coords.size();
-        fLorentzMeanTrueDeltaY = mean_y - fTrueY;
+        fLorentzMeanTrueDeltaY = std::abs(mean_y - fTrueY);
     } else {
         fLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
@@ -1957,7 +1959,7 @@ void RunAction::CalcMeanEstimations()
             sum += coord;
         }
         G4double mean_x = sum / power_lorentz_x_coords.size();
-        fPowerLorentzMeanTrueDeltaX = mean_x - fTrueX;
+        fPowerLorentzMeanTrueDeltaX = std::abs(mean_x - fTrueX);
     } else {
         fPowerLorentzMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
     }
@@ -1968,7 +1970,7 @@ void RunAction::CalcMeanEstimations()
             sum += coord;
         }
         G4double mean_y = sum / power_lorentz_y_coords.size();
-        fPowerLorentzMeanTrueDeltaY = mean_y - fTrueY;
+        fPowerLorentzMeanTrueDeltaY = std::abs(mean_y - fTrueY);
     } else {
         fPowerLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
@@ -2047,14 +2049,14 @@ void RunAction::Set2DPowerLorentzResults(G4double x_center, G4double x_gamma, G4
     if (fit_success) {
         // Check X fit validity (row fit) - use dof as success indicator
         if (x_dof > 0) {
-            fPowerLorentzRowDeltaX = x_center - fTrueX;      // x_row_fit - x_true
+            fPowerLorentzRowDeltaX = std::abs(x_center - fTrueX);      // x_row_fit - x_true
         } else {
             fPowerLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         // Check Y fit validity (column fit) - use dof as success indicator  
         if (y_dof > 0) {
-            fPowerLorentzColDeltaY = y_center - fTrueY;   // y_column_fit - y_true
+            fPowerLorentzColDeltaY = std::abs(y_center - fTrueY);   // y_column_fit - y_true
         } else {
             fPowerLorentzColDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
@@ -2194,8 +2196,8 @@ void RunAction::Set3DLorentzResults(G4double center_x, G4double center_y, G4doub
     
     // Calc delta values vs true position
     if (fit_success && dof > 0) {
-        f3DLorentzDeltaX = center_x - fTrueX;      // x_3D_fit - x_true
-        f3DLorentzDeltaY = center_y - fTrueY;      // y_3D_fit - y_true
+        f3DLorentzDeltaX = std::abs(center_x - fTrueX);      // x_3D_fit - x_true
+        f3DLorentzDeltaY = std::abs(center_y - fTrueY);      // y_3D_fit - y_true
     } else {
         // Set delta values to NaN for failed fits
         f3DLorentzDeltaX = std::numeric_limits<G4double>::quiet_NaN();
@@ -2245,8 +2247,8 @@ void RunAction::Set3DPowerLorentzResults(G4double center_x, G4double center_y, G
     
     // Calc delta values vs true position
     if (fit_success && dof > 0) {
-        f3DPowerLorentzDeltaX = center_x - fTrueX;      // x_3D_fit - x_true
-        f3DPowerLorentzDeltaY = center_y - fTrueY;      // y_3D_fit - y_true
+        f3DPowerLorentzDeltaX = std::abs(center_x - fTrueX);      // x_3D_fit - x_true
+        f3DPowerLorentzDeltaY = std::abs(center_y - fTrueY);      // y_3D_fit - y_true
     } else {
         // Set delta values to NaN for failed fits
         f3DPowerLorentzDeltaX = std::numeric_limits<G4double>::quiet_NaN();
@@ -2294,8 +2296,8 @@ void RunAction::Set3DGaussResults(G4double center_x, G4double center_y, G4double
     
     // Calc delta values vs true position
     if (fit_success && dof > 0) {
-        f3DGaussDeltaX = center_x - fTrueX;      // x_3D_fit - x_true
-        f3DGaussDeltaY = center_y - fTrueY;      // y_3D_fit - y_true
+        f3DGaussDeltaX = std::abs(center_x - fTrueX);      // x_3D_fit - x_true
+        f3DGaussDeltaY = std::abs(center_y - fTrueY);      // y_3D_fit - y_true
     } else {
         // Set delta values to NaN for failed fits
         f3DGaussDeltaX = std::numeric_limits<G4double>::quiet_NaN();
