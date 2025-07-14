@@ -125,6 +125,31 @@ void EventAction::EndOfEventAction(const G4Event* event)
   // Determine if hit is a pixel hit: only based on whether it's on pixel surface
   G4bool isPixelHit = fPixelHit;
   
+  // ADDITIONAL VALIDATION: Double-check pixel hit status for consistency
+  G4bool pixelHitDoubleCheck = fDetector->IsPosOnPixel(fPos);
+  if (isPixelHit != pixelHitDoubleCheck) {
+    G4cerr << "WARNING: Pixel hit status inconsistency detected!" << G4endl;
+    G4cerr << "  Initial check: " << (isPixelHit ? "PIXEL HIT" : "NON-PIXEL HIT") << G4endl;
+    G4cerr << "  Double check: " << (pixelHitDoubleCheck ? "PIXEL HIT" : "NON-PIXEL HIT") << G4endl;
+    G4cerr << "  Position: (" << fPos.x()/mm << ", " << fPos.y()/mm << ", " << fPos.z()/mm << ") mm" << G4endl;
+    // Use the more recent check as it's more reliable
+    isPixelHit = pixelHitDoubleCheck;
+    fPixelHit = pixelHitDoubleCheck;
+  }
+  
+  // VALIDATION: Ensure deltas are NaN for pixel hits
+  if (isPixelHit) {
+    if (!std::isnan(fPixelTrueDeltaX) || !std::isnan(fPixelTrueDeltaY)) {
+      G4cerr << "ERROR: Deltas should be NaN for pixel hits!" << G4endl;
+      G4cerr << "  Pixel hit: " << (isPixelHit ? "YES" : "NO") << G4endl;
+      G4cerr << "  DeltaX: " << fPixelTrueDeltaX/mm << " mm" << G4endl;
+      G4cerr << "  DeltaY: " << fPixelTrueDeltaY/mm << " mm" << G4endl;
+      // Force deltas to NaN for pixel hits
+      fPixelTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
+      fPixelTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
+    }
+  }
+  
   // ENERGY DEPOSITION LOGIC:
   // - Energy is summed only while particle travels through detector volume (handled in SteppingAction)
   // - For pixel hits: set energy deposition to zero (per user requirement)  
@@ -236,23 +261,33 @@ void EventAction::EndOfEventAction(const G4Event* event)
       if (fitResults.fit_success) {
       }
       
-      // Pass 2D fit results to RunAction
-      fRunAction->Set2DGaussResults(
-        fitResults.x_center, fitResults.x_sigma, fitResults.x_amp,
-        fitResults.x_center_err, fitResults.x_sigma_err, fitResults.x_amp_err,
-        fitResults.x_vert_offset, fitResults.x_vert_offset_err,
-        fitResults.x_chi2red, fitResults.x_pp, fitResults.x_dof,
-        fitResults.y_center, fitResults.y_sigma, fitResults.y_amp,
-        fitResults.y_center_err, fitResults.y_sigma_err, fitResults.y_amp_err,
-        fitResults.y_vert_offset, fitResults.y_vert_offset_err,
-        fitResults.y_chi2red, fitResults.y_pp, fitResults.y_dof,
-        fitResults.x_charge_err, fitResults.y_charge_err,
-        fitResults.fit_success);
-      
-      // Log Gauss fitting results to SimulationLogger
-      SimulationLogger* logger = SimulationLogger::GetInstance();
-      if (logger) {
-        logger->LogGaussResults(event->GetEventID(), fitResults);
+      // VALIDATION: Only save fitting results for non-pixel hits
+      if (isPixelHit) {
+        G4cerr << "CRITICAL ERROR: Attempting to save Gauss fitting results for a pixel hit!" << G4endl;
+        G4cerr << "  This should never happen - fitting should only be performed for non-pixel hits." << G4endl;
+        G4cerr << "  Event ID: " << event->GetEventID() << G4endl;
+        G4cerr << "  Position: (" << fPos.x()/mm << ", " << fPos.y()/mm << ", " << fPos.z()/mm << ") mm" << G4endl;
+        G4cerr << "  Skipping fitting result storage." << G4endl;
+      } else {
+        // SAFE: Save fitting results only for non-pixel hits
+        // Pass 2D fit results to RunAction
+        fRunAction->Set2DGaussResults(
+          fitResults.x_center, fitResults.x_sigma, fitResults.x_amp,
+          fitResults.x_center_err, fitResults.x_sigma_err, fitResults.x_amp_err,
+          fitResults.x_vert_offset, fitResults.x_vert_offset_err,
+          fitResults.x_chi2red, fitResults.x_pp, fitResults.x_dof,
+          fitResults.y_center, fitResults.y_sigma, fitResults.y_amp,
+          fitResults.y_center_err, fitResults.y_sigma_err, fitResults.y_amp_err,
+          fitResults.y_vert_offset, fitResults.y_vert_offset_err,
+          fitResults.y_chi2red, fitResults.y_pp, fitResults.y_dof,
+          fitResults.x_charge_err, fitResults.y_charge_err,
+          fitResults.fit_success);
+        
+        // Log Gauss fitting results to SimulationLogger
+        SimulationLogger* logger = SimulationLogger::GetInstance();
+        if (logger) {
+          logger->LogGaussResults(event->GetEventID(), fitResults);
+        }
       }
         
         // Perform diagonal fitting if 2D fitting was performed and success and diagonal fitting is enabled
@@ -268,25 +303,35 @@ void EventAction::EndOfEventAction(const G4Event* event)
         if (diagResults.fit_success) {
         }
         
-        // Pass diagonal fit results to RunAction
-        fRunAction->SetDiagGaussResults(
-          diagResults.main_diag_x_center, diagResults.main_diag_x_sigma, diagResults.main_diag_x_amp,
-          diagResults.main_diag_x_center_err, diagResults.main_diag_x_sigma_err, diagResults.main_diag_x_amp_err,
-          diagResults.main_diag_x_vert_offset, diagResults.main_diag_x_vert_offset_err,
-          diagResults.main_diag_x_chi2red, diagResults.main_diag_x_pp, diagResults.main_diag_x_dof, diagResults.main_diag_x_fit_success,
-          diagResults.main_diag_y_center, diagResults.main_diag_y_sigma, diagResults.main_diag_y_amp,
-          diagResults.main_diag_y_center_err, diagResults.main_diag_y_sigma_err, diagResults.main_diag_y_amp_err,
-          diagResults.main_diag_y_vert_offset, diagResults.main_diag_y_vert_offset_err,
-          diagResults.main_diag_y_chi2red, diagResults.main_diag_y_pp, diagResults.main_diag_y_dof, diagResults.main_diag_y_fit_success,
-          diagResults.sec_diag_x_center, diagResults.sec_diag_x_sigma, diagResults.sec_diag_x_amp,
-          diagResults.sec_diag_x_center_err, diagResults.sec_diag_x_sigma_err, diagResults.sec_diag_x_amp_err,
-          diagResults.sec_diag_x_vert_offset, diagResults.sec_diag_x_vert_offset_err,
-          diagResults.sec_diag_x_chi2red, diagResults.sec_diag_x_pp, diagResults.sec_diag_x_dof, diagResults.sec_diag_x_fit_success,
-          diagResults.sec_diag_y_center, diagResults.sec_diag_y_sigma, diagResults.sec_diag_y_amp,
-          diagResults.sec_diag_y_center_err, diagResults.sec_diag_y_sigma_err, diagResults.sec_diag_y_amp_err,
-          diagResults.sec_diag_y_vert_offset, diagResults.sec_diag_y_vert_offset_err,
-          diagResults.sec_diag_y_chi2red, diagResults.sec_diag_y_pp, diagResults.sec_diag_y_dof, diagResults.sec_diag_y_fit_success,
-          diagResults.fit_success);
+        // VALIDATION: Only save diagonal fitting results for non-pixel hits
+        if (isPixelHit) {
+          G4cerr << "CRITICAL ERROR: Attempting to save diagonal Gauss fitting results for a pixel hit!" << G4endl;
+          G4cerr << "  This should never happen - diagonal fitting should only be performed for non-pixel hits." << G4endl;
+          G4cerr << "  Event ID: " << event->GetEventID() << G4endl;
+          G4cerr << "  Position: (" << fPos.x()/mm << ", " << fPos.y()/mm << ", " << fPos.z()/mm << ") mm" << G4endl;
+          G4cerr << "  Skipping diagonal fitting result storage." << G4endl;
+        } else {
+          // SAFE: Save diagonal fitting results only for non-pixel hits
+          // Pass diagonal fit results to RunAction
+          fRunAction->SetDiagGaussResults(
+            diagResults.main_diag_x_center, diagResults.main_diag_x_sigma, diagResults.main_diag_x_amp,
+            diagResults.main_diag_x_center_err, diagResults.main_diag_x_sigma_err, diagResults.main_diag_x_amp_err,
+            diagResults.main_diag_x_vert_offset, diagResults.main_diag_x_vert_offset_err,
+            diagResults.main_diag_x_chi2red, diagResults.main_diag_x_pp, diagResults.main_diag_x_dof, diagResults.main_diag_x_fit_success,
+            diagResults.main_diag_y_center, diagResults.main_diag_y_sigma, diagResults.main_diag_y_amp,
+            diagResults.main_diag_y_center_err, diagResults.main_diag_y_sigma_err, diagResults.main_diag_y_amp_err,
+            diagResults.main_diag_y_vert_offset, diagResults.main_diag_y_vert_offset_err,
+            diagResults.main_diag_y_chi2red, diagResults.main_diag_y_pp, diagResults.main_diag_y_dof, diagResults.main_diag_y_fit_success,
+            diagResults.sec_diag_x_center, diagResults.sec_diag_x_sigma, diagResults.sec_diag_x_amp,
+            diagResults.sec_diag_x_center_err, diagResults.sec_diag_x_sigma_err, diagResults.sec_diag_x_amp_err,
+            diagResults.sec_diag_x_vert_offset, diagResults.sec_diag_x_vert_offset_err,
+            diagResults.sec_diag_x_chi2red, diagResults.sec_diag_x_pp, diagResults.sec_diag_x_dof, diagResults.sec_diag_x_fit_success,
+            diagResults.sec_diag_y_center, diagResults.sec_diag_y_sigma, diagResults.sec_diag_y_amp,
+            diagResults.sec_diag_y_center_err, diagResults.sec_diag_y_sigma_err, diagResults.sec_diag_y_amp_err,
+            diagResults.sec_diag_y_vert_offset, diagResults.sec_diag_y_vert_offset_err,
+            diagResults.sec_diag_y_chi2red, diagResults.sec_diag_y_pp, diagResults.sec_diag_y_dof, diagResults.sec_diag_y_fit_success,
+            diagResults.fit_success);
+        }
       } else {
         // Set default diagonal fit values when 2D fitting failed
         fRunAction->SetDiagGaussResults(
