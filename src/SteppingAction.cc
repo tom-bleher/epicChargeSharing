@@ -1,5 +1,6 @@
 #include "SteppingAction.hh"
 #include "EventAction.hh"
+#include "DetectorConstruction.hh"
 #include "SimulationLogger.hh"
 #include "G4Step.hh"
 #include "G4VTouchable.hh"
