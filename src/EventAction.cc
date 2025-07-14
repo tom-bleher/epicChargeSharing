@@ -21,6 +21,8 @@
 #include <vector>
 #include <algorithm>
 #include <limits>
+#include <cmath>
+#include <cstdlib>
 
 // Alpha calculation method: ANALYTICAL
 // This implementation uses the analytical formula for calculating the alpha angle:
@@ -851,8 +853,8 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
   // Calc and store delta values (pixel center - true pos)
   // Only calculate meaningful deltas for hits within detector bounds AND non-pixel hits
   if (isWithinDetector && !isOnPixel) {
-    fPixelTrueDeltaX = pixelX - pos.x();
-    fPixelTrueDeltaY = pixelY - pos.y();
+    fPixelTrueDeltaX = std::abs(pixelX - pos.x());
+    fPixelTrueDeltaY = std::abs(pixelY - pos.y());
   } else {
     // For hits outside detector bounds or pixel hits, mark deltas as invalid
     fPixelTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
