@@ -30,6 +30,7 @@ import threading
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import gc
 import time
+import csv
 try:
     from tqdm import tqdm
     HAS_TQDM = True
@@ -698,6 +699,11 @@ def create_gauss_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=N
     # Create output paths
     x_pdf_path = os.path.join(output_dir, "gauss_fits_row.pdf")
     y_pdf_path = os.path.join(output_dir, "gauss_fits_column.pdf")
+    delta_csv_path = os.path.join(output_dir, "gauss_deltas.csv")
+    
+    # Lists to store delta values
+    row_deltas = []
+    col_deltas = []
     
     # Pre-filter events with success fits to avoid processing invalid events
     row_valid_events = []
@@ -759,9 +765,21 @@ def create_gauss_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=N
                 for event_idx in row_valid_events:
                     fig, success = results.get(event_idx, (None, False))
                     if success and fig is not None:
-                        pdf.savefig(fig, dpi=300, bbox_inches='tight')
+                        # Check if abs(PixelX-TrueX) > 0.1mm condition is met
+                        pixel_x = data['PixelX'][event_idx]
+                        true_x = data['TrueX'][event_idx]
+                        if abs(pixel_x - true_x) > 0.1:
+                            # Calculate and store row delta
+                            row_delta = np.abs(data['TrueX'][event_idx] - data['GaussRowCenter'][event_idx])
+                            row_deltas.append({
+                                'event_idx': event_idx,
+                                'true_x': true_x,
+                                'gauss_center': data['GaussRowCenter'][event_idx],
+                                'delta': row_delta
+                            })
+                            pdf.savefig(fig, dpi=300, bbox_inches='tight')
+                            x_success_count += 1
                         plt.close(fig)
-                        x_success_count += 1
                     pbar.update(1)
         
         # Cleanup
@@ -805,15 +823,59 @@ def create_gauss_fit_pdfs(data, output_dir="plots", max_events=None, n_workers=N
                 for event_idx in col_valid_events:
                     fig, success = results.get(event_idx, (None, False))
                     if success and fig is not None:
-                        pdf.savefig(fig, dpi=300, bbox_inches='tight')
+                        # Check if abs(PixelX-TrueX) > 0.1mm condition is met
+                        pixel_x = data['PixelX'][event_idx]
+                        true_x = data['TrueX'][event_idx]
+                        if abs(pixel_x - true_x) > 0.1:
+                            # Calculate and store column delta
+                            col_delta = np.abs(data['TrueY'][event_idx] - data['GaussColCenter'][event_idx])
+                            col_deltas.append({
+                                'event_idx': event_idx,
+                                'true_y': data['TrueY'][event_idx],
+                                'gauss_center': data['GaussColCenter'][event_idx],
+                                'delta': col_delta
+                            })
+                            pdf.savefig(fig, dpi=300, bbox_inches='tight')
+                            y_success_count += 1
                         plt.close(fig)
-                        y_success_count += 1
                     pbar.update(1)
         
         # Cleanup
         del results
         del col_args
         gc.collect()
+    
+    # Save delta values to CSV
+    if row_deltas or col_deltas:
+        with open(delta_csv_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            
+            # Write header
+            writer.writerow(['direction', 'event_idx', 'true_position', 'gauss_center', 'delta'])
+            
+            # Write row deltas
+            for delta_data in row_deltas:
+                writer.writerow([
+                    'row',
+                    delta_data['event_idx'],
+                    delta_data['true_x'],
+                    delta_data['gauss_center'],
+                    delta_data['delta']
+                ])
+            
+            # Write column deltas
+            for delta_data in col_deltas:
+                writer.writerow([
+                    'column',
+                    delta_data['event_idx'],
+                    delta_data['true_y'],
+                    delta_data['gauss_center'],
+                    delta_data['delta']
+                ])
+        
+        print(f"Delta values saved to: {delta_csv_path}")
+        print(f"  Row deltas: {len(row_deltas)}")
+        print(f"  Column deltas: {len(col_deltas)}")
     
     print(f"PDF generation completed!")
     print(f"  Row fits visualized: {x_success_count}")
