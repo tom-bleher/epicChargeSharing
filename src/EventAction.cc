@@ -934,7 +934,9 @@ void EventAction::EndOfEventAction(const G4Event* event)
     }
     
     // Set default values for all fitting results since no calculations will be performed
-    SetDefaultFittingResults();
+    // DO NOT reset fitting results here – earlier fits (row/column) are already stored.
+    // Leaving them intact avoids GaussRowDOF being overwritten to 0.
+    // SetDefaultFittingResults();
   }
   
   // Transfer scorer data to RunAction for ROOT tree storage
