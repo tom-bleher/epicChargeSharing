@@ -306,26 +306,25 @@ void EventAction::EndOfEventAction(const G4Event* event)
     // The neighborhood grid is a systematic 9x9 grid around the center pixel
     G4int gridSize = 2 * fNeighborhoodRadius + 1; // Should be 9 for radius 4
     for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
-      if (fNeighborhoodChargeFractions[i] > 0) { // Only include pixels with charge
-        // Calc grid pos from array index
-        // The grid is stored in column-major order: i = col * gridSize + row
-        // because di (X) is outer loop, dj (Y) is inner loop in charge calculation
-        G4int col = i / gridSize;  // di (X) was outer loop
-        G4int row = i % gridSize;  // dj (Y) was inner loop
-        
-        // Convert grid pos to pixel offset from center
-        G4int offsetI = col - fNeighborhoodRadius; // -4 to +4 for 9x9 grid (X offset)
-        G4int offsetJ = row - fNeighborhoodRadius; // -4 to +4 for 9x9 grid (Y offset)
-        
-        // Calc actual pos
-        G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
-        G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
-        
-        x_coords.push_back(x_pos);
-        y_coords.push_back(y_pos);
-        // Use actual charge values (in Coulombs) instead of fractions for fitting
-        charge_values.push_back(fNeighborhoodCharge[i]);
-      }
+      // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
+      // Calc grid pos from array index
+      // The grid is stored in column-major order: i = col * gridSize + row
+      // because di (X) is outer loop, dj (Y) is inner loop in charge calculation
+      G4int col = i / gridSize;  // di (X) was outer loop
+      G4int row = i % gridSize;  // dj (Y) was inner loop
+      
+      // Convert grid pos to pixel offset from center
+      G4int offsetI = col - fNeighborhoodRadius; // -4 to +4 for 9x9 grid (X offset)
+      G4int offsetJ = row - fNeighborhoodRadius; // -4 to +4 for 9x9 grid (Y offset)
+      
+      // Calc actual pos
+      G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
+      G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
+      
+      x_coords.push_back(x_pos);
+      y_coords.push_back(y_pos);
+      // Use actual charge values (in Coulombs) instead of fractions for fitting
+      charge_values.push_back(fNeighborhoodCharge[i]);
     }
     
     // ===============================================
@@ -1435,12 +1434,7 @@ G4double EventAction::EvaluateFitQuality(G4int radius, const G4ThreeVector& hitP
   CalcNeighborhoodChargeSharing();
   
   // Check if we have enough data points for fitting
-  G4int validPoints = 0;
-  for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
-    if (fNeighborhoodChargeFractions[i] > 0) {
-      validPoints++;
-    }
-  }
+  G4int validPoints = fNeighborhoodChargeFractions.size(); // Use ALL points, not just positive charge
   
   if (validPoints < Constants::MIN_POINTS_FOR_FIT) {
     // Restore original data and radius
@@ -1459,20 +1453,19 @@ G4double EventAction::EvaluateFitQuality(G4int radius, const G4ThreeVector& hitP
   G4ThreeVector nearestPixel = CalcNearestPixel(hitPos);
   
   for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
-    if (fNeighborhoodChargeFractions[i] > 0) {
-      G4int col = i / gridSize;  // di (X) was outer loop
-      G4int row = i % gridSize;  // dj (Y) was inner loop
-      
-      G4int offsetI = col - radius; // X offset from center pixel
-      G4int offsetJ = row - radius; // Y offset from center pixel
-      
-      G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
-      G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
-      
-      x_coords.push_back(x_pos);
-      y_coords.push_back(y_pos);
-      charge_values.push_back(fNeighborhoodCharge[i]);
-    }
+    // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
+    G4int col = i / gridSize;  // di (X) was outer loop
+    G4int row = i % gridSize;  // dj (Y) was inner loop
+    
+    G4int offsetI = col - radius; // X offset from center pixel
+    G4int offsetJ = row - radius; // Y offset from center pixel
+    
+    G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
+    G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
+    
+    x_coords.push_back(x_pos);
+    y_coords.push_back(y_pos);
+    charge_values.push_back(fNeighborhoodCharge[i]);
   }
   
   G4double fitQuality = 0.0;
@@ -1938,20 +1931,19 @@ void EventAction::PerformChargeShareFitting(const G4Event* event, const G4ThreeV
   // Convert grid indices to actual coordinates
   G4int gridSize = 2 * fNeighborhoodRadius + 1;
   for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
-    if (fNeighborhoodChargeFractions[i] > 0) {
-      G4int col = i / gridSize;
-      G4int row = i % gridSize;
-      
-      G4int offsetI = col - fNeighborhoodRadius;
-      G4int offsetJ = row - fNeighborhoodRadius;
-      
-      G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
-      G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
-      
-      x_coords.push_back(x_pos);
-      y_coords.push_back(y_pos);
-      charge_values.push_back(fNeighborhoodCharge[i]);
-    }
+    // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
+    G4int col = i / gridSize;
+    G4int row = i % gridSize;
+    
+    G4int offsetI = col - fNeighborhoodRadius;
+    G4int offsetJ = row - fNeighborhoodRadius;
+    
+    G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
+    G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
+    
+    x_coords.push_back(x_pos);
+    y_coords.push_back(y_pos);
+    charge_values.push_back(fNeighborhoodCharge[i]);
   }
   
   // Perform 2D Gauss fitting if enabled and we have enough data
