@@ -1801,8 +1801,11 @@ void EventAction::ConditionalChargeCalculation(const G4Event* event)
       logger->LogInfo(reason);
     }
     
-    // Set default values for all fitting results since no calculations will be performed
-    SetDefaultFittingResults();
+    // Previously we reset all fit results to default (which zeroed the DOF).
+    // This obliterated the valid fits that were already performed earlier in EndOfEventAction
+    // and produced misleading DOF=0 entries in the output tree.
+    // To preserve the earlier fit results we simply return here without touching them.
+    // SetDefaultFittingResults();
     return;
   }
   
