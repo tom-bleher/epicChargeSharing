@@ -16,7 +16,7 @@ namespace Control {
     // ========================
     
     // Event generation control
-    const G4int NUMBER_OF_EVENTS = 1000;         // Number of events to simulate
+    const G4int NUMBER_OF_EVENTS = 5000;         // Number of events to simulate
     const G4double PARTICLE_ENERGY = 10;        // Particle energy in GeV
     const G4String PARTICLE_TYPE = "e-";          // Particle type (e-, mu-, gamma, etc.)
     

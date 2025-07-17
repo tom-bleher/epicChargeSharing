@@ -54,7 +54,7 @@ void ActionInitialization::Build() const
     
     // Create and register EventAction with detector information
     EventAction* eventAction = new EventAction(runAction, fDetector);
-    // Don't set initial position here - it will be set for each event
+    // Don't set initial position here - it will be updated for each event
     SetUserAction(eventAction);
     
     // Connect EventAction and DetectorConstruction bidirectionally
@@ -71,5 +71,9 @@ void ActionInitialization::Build() const
     }
     
     // Create and register SteppingAction
-    SetUserAction(new SteppingAction(eventAction, fDetector));
+    SteppingAction* steppingAction = new SteppingAction(eventAction, fDetector);
+    SetUserAction(steppingAction);
+    
+    // Connect SteppingAction to EventAction for aluminum interaction tracking
+    eventAction->SetSteppingAction(steppingAction);
 }
