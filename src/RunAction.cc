@@ -1357,7 +1357,7 @@ void RunAction::FillTree()
             return;
         }
         
-                 // Log scorer data storage (only in debug mode to avoid excessive output)
+        // Log scorer data storage (only in debug mode to avoid excessive output)
         static G4int eventCount = 0;
         eventCount++;
         if (eventCount % 100 == 0) {  // Log every 100 events

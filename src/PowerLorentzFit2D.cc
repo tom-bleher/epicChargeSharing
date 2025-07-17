@@ -1037,9 +1037,7 @@ PowerLorentz2DResultsCeres PowerLorentzCeres2D(
         double x = x_coords[i];
         double y = y_coords[i];
         double charge = charge_values[i];
-        
-        if (charge <= 0) continue; // Skip non-positive charges
-        
+                
         // Find or create row
         bool found_row = false;
         for (auto& row_pair : rows_data) {
@@ -1254,9 +1252,7 @@ DiagPowerLorentzResultsCeres DiagPowerLorentzCeres(
         double x = x_coords[i];
         double y = y_coords[i];
         double charge = charge_values[i];
-        
-        if (charge <= 0) continue;
-        
+                
         double dx = x - center_x_estimate;
         double dy = y - center_y_estimate;
         
