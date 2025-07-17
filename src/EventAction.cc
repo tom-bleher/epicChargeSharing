@@ -307,6 +307,11 @@ void EventAction::EndOfEventAction(const G4Event* event)
     G4int gridSize = 2 * fNeighborhoodRadius + 1; // Should be 9 for radius 4
     for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
       // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
+      // BUT: Still need to filter out invalid markers (-999)
+      if (fNeighborhoodChargeFractions[i] < -998.0) {
+        continue; // Skip pixels with invalid markers (-999)
+      }
+      
       // Calc grid pos from array index
       // The grid is stored in column-major order: i = col * gridSize + row
       // because di (X) is outer loop, dj (Y) is inner loop in charge calculation
@@ -1454,6 +1459,11 @@ G4double EventAction::EvaluateFitQuality(G4int radius, const G4ThreeVector& hitP
   
   for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
     // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
+    // BUT: Still need to filter out invalid markers (-999)
+    if (fNeighborhoodChargeFractions[i] < -998.0) {
+      continue; // Skip pixels with invalid markers (-999)
+    }
+    
     G4int col = i / gridSize;  // di (X) was outer loop
     G4int row = i % gridSize;  // dj (Y) was inner loop
     
@@ -1932,8 +1942,13 @@ void EventAction::PerformChargeShareFitting(const G4Event* event, const G4ThreeV
   G4int gridSize = 2 * fNeighborhoodRadius + 1;
   for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
     // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
-    G4int col = i / gridSize;
-    G4int row = i % gridSize;
+    // BUT: Still need to filter out invalid markers (-999)
+    if (fNeighborhoodChargeFractions[i] < -998.0) {
+      continue; // Skip pixels with invalid markers (-999)
+    }
+    
+    G4int col = i / gridSize;  // di (X) was outer loop
+    G4int row = i % gridSize;  // dj (Y) was inner loop
     
     G4int offsetI = col - fNeighborhoodRadius;
     G4int offsetJ = row - fNeighborhoodRadius;
