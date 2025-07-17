@@ -9,6 +9,10 @@
 #include "G4ThreeVector.hh"
 #include "G4PVPlacement.hh"
 #include "G4VisAttributes.hh"
+// Multi-Functional Detector includes
+#include "G4MultiFunctionalDetector.hh"
+#include "G4PSEnergyDeposit.hh"
+#include "G4PSNofStep.hh"
 
 class DetectorMessenger;
 class EventAction;
@@ -20,6 +24,7 @@ public:
     virtual ~DetectorConstruction();
     
     virtual G4VPhysicalVolume* Construct();
+    void ConstructSDandField() override;
     
     // Method to set EventAction pointer for neighborhood configuration
     void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
@@ -44,6 +49,11 @@ public:
     // Getter method for DetectorMessenger
     DetectorMessenger* GetDetectorMessenger() const { return fDetectorMessenger; }
     
+    // Multi-Functional Detector methods
+    void SetupMultiFunctionalDetector();
+    void AttachPrimitiveScorers();
+    G4MultiFunctionalDetector* GetMultiFunctionalDetector() const { return fMultiFunctionalDetector; }
+    
     // Getter methods for parameters needed to calculate nearest pixel
     G4double GetPixelSize() const { return fPixelSize; }
     G4double GetPixelSpacing() const { return fPixelSpacing; }
@@ -51,9 +61,6 @@ public:
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
     G4ThreeVector GetDetectorPos() const; // Fixed pos from Construct()
-    
-    // Method to check if a pos is within a pixel area
-    G4bool IsPosOnPixel(const G4ThreeVector& pos) const;
     
     // Method to save simulation parameters to a log file
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
@@ -82,6 +89,12 @@ private:
     
     // Neighborhood radius
     G4int fNeighborhoodRadius;
+    
+    // Multi-Functional Detector and Primitive Scorers
+    G4MultiFunctionalDetector* fMultiFunctionalDetector;
+    G4PSEnergyDeposit* fEnergyScorer;
+    G4PSNofStep* fHitCountScorer;
+    G4LogicalVolume* fLogicSilicon;
 };
 
 #endif

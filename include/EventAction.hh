@@ -8,6 +8,7 @@
 
 class RunAction;
 class DetectorConstruction;
+class SteppingAction;
 
 class EventAction : public G4UserEventAction
 {
@@ -17,6 +18,9 @@ public:
 
     virtual void BeginOfEventAction(const G4Event* event);
     virtual void EndOfEventAction(const G4Event* event);
+    
+    // Method to set SteppingAction pointer for aluminum interaction tracking
+    void SetSteppingAction(SteppingAction* steppingAction) { fSteppingAction = steppingAction; }
     
     // Method to accumulate energy deposition and pos
     void AddEdep(G4double edep, G4ThreeVector pos);
@@ -55,9 +59,25 @@ public:
         fMaxAutoRadius = maxRadius; 
     }
     
+    // Scorer data collection methods
+    void CollectScorerData(const G4Event* event);
+    void SetScorerData(G4double energy, G4int hits, G4bool valid);
+    G4double GetScorerEnergyDeposit() const { return fScorerEnergyDeposit; }
+    G4int GetScorerHitCount() const { return fScorerHitCount; }
+    G4bool IsScorerDataValid() const { return fScorerDataValid; }
+    
+    // Validation methods
+    void ValidateScorerDataIntegrity() const;
+    
+    // Exclusive Multi-Functional Detector validation methods
+    void ValidateHitPurity();
+    G4bool ShouldCalculateChargeSharing() const;
+    void ConditionalChargeCalculation(const G4Event* event);
+    
 private:
     RunAction* fRunAction;
     DetectorConstruction* fDetector;
+    SteppingAction* fSteppingAction;
     
     // Neighborhood configuration
     G4int fNeighborhoodRadius;  // Radius of neighborhood grid (4 = 9x9, 3 = 7x7, etc.)
@@ -66,6 +86,11 @@ private:
     G4ThreeVector fPos;  // Pos of energy depositionit (weighted average)
     G4ThreeVector fInitialPos; // Initial particle pos
     G4bool fHasHit;   // Flag to indicate if any energy was deposited
+    
+    // Hit purity tracking variables for Multi-Functional Detector validation
+    G4bool fPureSiliconHit;
+    G4bool fAluminumContaminated;
+    G4bool fChargeCalculationEnabled;
     
     // Pixel mapping information
     G4int fPixelIndexI;    // Pixel index in the X direction
@@ -99,6 +124,33 @@ private:
     // Helper methods for automatic radius selection
     G4int SelectOptimalRadius(const G4ThreeVector& hitPos, G4int hitPixelI, G4int hitPixelJ);
     G4double EvaluateFitQuality(G4int radius, const G4ThreeVector& hitPos, G4int hitPixelI, G4int hitPixelJ);
+    
+    // Helper methods for exclusive Multi-Functional Detector validation
+    void SetDefaultFittingResults();
+    void PerformChargeShareFitting(const G4Event* event, const G4ThreeVector& nearestPixel);
+    
+    // Hit purity status getter methods for SteppingAction integration
+    G4bool GetPureSiliconHit() const { return fPureSiliconHit; }
+    G4bool GetAluminumContaminated() const { return fAluminumContaminated; }
+    G4bool GetChargeCalculationEnabled() const { return fChargeCalculationEnabled; }
+    G4bool GetHitPurityStatus() const { return fPureSiliconHit && !fAluminumContaminated; }
+    
+    // Comprehensive hit validation summary combining SteppingAction trajectory analysis with EventAction validation
+    void GetHitValidationSummary(G4bool& pureSiliconHit, G4bool& aluminumContaminated, 
+                                 G4bool& chargeCalculationEnabled, G4String& firstInteractionVolume,
+                                 G4bool& hasAluminumInteraction, G4bool& hasAluminumPreContact) const;
+    
+    // Integration validation methods for SteppingAction connection
+    G4bool IsSteppingActionConnected() const { return fSteppingAction != nullptr; }
+    void ValidateSteppingActionIntegration() const;
+    
+    // Complete integration workflow demonstration
+    void DemonstrateIntegrationWorkflow() const;
+    
+    // Scorer data storage
+    G4double fScorerEnergyDeposit;
+    G4int fScorerHitCount;
+    G4bool fScorerDataValid;
 };
 
 #endif

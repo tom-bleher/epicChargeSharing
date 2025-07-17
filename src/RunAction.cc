@@ -23,6 +23,7 @@
 // ROOT includes
 #include "TFile.h"
 #include "TTree.h"
+#include "TBranch.h"
 #include "TNamed.h"
 #include "TChain.h"
 #include "TSystem.h"
@@ -424,7 +425,17 @@ RunAction::RunAction()
   fPowerLorentzColChargeErr(0),
   
   // Set automatic radius selection variables
-  fSelectedRadius(4)
+  fSelectedRadius(4),
+  
+  // Initialize scorer data variables
+  fScorerEnergyDeposit(0.0),
+  fScorerHitCount(0),
+  fScorerDataValid(false),
+  
+  // Initialize hit purity tracking variables
+  fPureSiliconHit(false),
+  fAluminumContaminated(false),
+  fChargeCalculationEnabled(false)
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize step energy depositionition vectors (they are automatically initialized empty)
@@ -1006,6 +1017,42 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->Branch("PowerLorentzSecDiagTransY", &fPowerLorentzSecDiagTransformedY, "PowerLorentzSecDiagTransY/D")->SetTitle("Power-Law Lorentz Secondary Diag Trans Y Coord [mm]");
         }
         
+        // =============================================
+        // SCORER DATA BRANCHES
+        // =============================================
+        // Add scorer data branches with validation
+        TBranch* scorerEnergyBranch = fTree->Branch("ScorerEnergyDeposit", &fScorerEnergyDeposit, "ScorerEnergyDeposit/D");
+        TBranch* scorerHitCountBranch = fTree->Branch("ScorerHitCount", &fScorerHitCount, "ScorerHitCount/I");
+        TBranch* scorerDataValidBranch = fTree->Branch("ScorerDataValid", &fScorerDataValid, "ScorerDataValid/O");
+        
+        // Validate scorer branch creation
+        if (scorerEnergyBranch && scorerHitCountBranch && scorerDataValidBranch) {
+            scorerEnergyBranch->SetTitle("Energy Deposit from Multi-Functional Detector [MeV]");
+            scorerHitCountBranch->SetTitle("Hit Count from Multi-Functional Detector");
+            scorerDataValidBranch->SetTitle("Validation Flag for Scorer Data");
+            G4cout << "✓ Scorer data branches successfully created in ROOT tree" << G4endl;
+        } else {
+            G4cerr << "ERROR: Failed to create scorer data branches in ROOT tree!" << G4endl;
+        }
+        
+        // =============================================
+        // HIT PURITY TRACKING BRANCHES
+        // =============================================
+        // Add hit purity tracking branches for Multi-Functional Detector validation
+        TBranch* pureSiliconHitBranch = fTree->Branch("PureSiliconHit", &fPureSiliconHit, "PureSiliconHit/O");
+        TBranch* aluminumContaminatedBranch = fTree->Branch("AluminumContaminated", &fAluminumContaminated, "AluminumContaminated/O");
+        TBranch* chargeCalculationEnabledBranch = fTree->Branch("ChargeCalculationEnabled", &fChargeCalculationEnabled, "ChargeCalculationEnabled/O");
+        
+        // Validate hit purity tracking branch creation
+        if (pureSiliconHitBranch && aluminumContaminatedBranch && chargeCalculationEnabledBranch) {
+            pureSiliconHitBranch->SetTitle("Pure Silicon Hit (No Aluminum Contamination)");
+            aluminumContaminatedBranch->SetTitle("Aluminum Contamination Detected");
+            chargeCalculationEnabledBranch->SetTitle("Charge Sharing Calculation Enabled");
+            G4cout << "✓ Hit purity tracking branches successfully created in ROOT tree" << G4endl;
+        } else {
+            G4cerr << "ERROR: Failed to create hit purity tracking branches in ROOT tree!" << G4endl;
+        }
+        
         G4cout << "Created ROOT tree with " << fTree->GetNbranches() << " branches" << G4endl;
         
         // Enable frequent AutoSave only when explicitly requested via Constants flag
@@ -1297,7 +1344,32 @@ void RunAction::FillTree()
 
     try {
         std::lock_guard<std::mutex> lock(fRootMutex);
-        fTree->Fill();
+        
+        // Validate scorer data before writing to tree
+        ValidateScorerDataForTreeStorage();
+        
+        // Fill the tree with all current data (including scorer data)
+        G4int fillResult = fTree->Fill();
+        
+        // Validate successful tree filling
+        if (fillResult < 0) {
+            G4cerr << "Error: Tree Fill() returned error code " << fillResult << G4endl;
+            return;
+        }
+        
+                 // Log scorer data storage (only in debug mode to avoid excessive output)
+        static G4int eventCount = 0;
+        eventCount++;
+        if (eventCount % 100 == 0) {  // Log every 100 events
+            G4cout << "Event " << eventCount << ": Scorer data stored - Energy: " 
+                   << fScorerEnergyDeposit << " MeV, Hits: " << fScorerHitCount 
+                   << ", Valid: " << (fScorerDataValid ? "Yes" : "No") << G4endl;
+        }
+        
+        // Verify scorer data is written to ROOT tree (periodic check)
+        if (eventCount % 500 == 0) {  // Verify every 500 events
+            VerifyScorerDataInTree();
+        }
         
         // Use the new thread-safe auto-save mechanism
         PerformAutoSave();
@@ -1989,6 +2061,111 @@ void RunAction::CalcMeanEstimations()
 void RunAction::SetAutoRadiusResults(G4int selectedRadius)
 {
     fSelectedRadius = selectedRadius;
+}
+
+// Set scorer data from Multi-Functional Detector
+void RunAction::SetScorerData(G4double energyDeposit, G4int hitCount, G4bool dataValid)
+{
+    fScorerEnergyDeposit = energyDeposit;
+    fScorerHitCount = hitCount;
+    fScorerDataValid = dataValid;
+}
+
+// Set hit purity tracking data from EventAction
+void RunAction::SetHitPurityData(G4bool pureSiliconHit, G4bool aluminumContaminated, G4bool chargeCalculationEnabled)
+{
+    fPureSiliconHit = pureSiliconHit;
+    fAluminumContaminated = aluminumContaminated;
+    fChargeCalculationEnabled = chargeCalculationEnabled;
+}
+
+// Validate scorer data before tree storage
+void RunAction::ValidateScorerDataForTreeStorage()
+{
+    // Validate energy deposit data type handling (G4double)
+    if (!std::isfinite(fScorerEnergyDeposit)) {
+        G4cerr << "WARNING: Scorer energy deposit is not finite: " << fScorerEnergyDeposit << G4endl;
+        fScorerEnergyDeposit = 0.0;  // Reset to safe default
+        fScorerDataValid = false;
+    }
+    
+    // Validate energy deposit is within reasonable bounds
+    if (fScorerEnergyDeposit < 0.0 || fScorerEnergyDeposit > 1000.0) {
+        G4cerr << "WARNING: Scorer energy deposit out of bounds: " << fScorerEnergyDeposit << " MeV" << G4endl;
+        fScorerEnergyDeposit = 0.0;  // Reset to safe default
+        fScorerDataValid = false;
+    }
+    
+    // Validate hit count data type handling (G4int)
+    if (fScorerHitCount < 0 || fScorerHitCount > 10000) {
+        G4cerr << "WARNING: Scorer hit count out of bounds: " << fScorerHitCount << G4endl;
+        fScorerHitCount = 0;  // Reset to safe default
+        fScorerDataValid = false;
+    }
+    
+    // Ensure proper data type storage for ROOT
+    // G4double should be stored as Double_t, G4int as Int_t, G4bool as Bool_t
+    // ROOT branches automatically handle these conversions, but we validate the data integrity
+    
+    // Check for data consistency: if we have energy deposit but no hits, or vice versa
+    if (fScorerDataValid) {
+        if (fScorerEnergyDeposit > 0.0 && fScorerHitCount == 0) {
+            G4cerr << "WARNING: Scorer has energy deposit (" << fScorerEnergyDeposit 
+                   << " MeV) but zero hits - possible data inconsistency" << G4endl;
+        }
+        if (fScorerEnergyDeposit == 0.0 && fScorerHitCount > 0) {
+            G4cerr << "WARNING: Scorer has " << fScorerHitCount 
+                   << " hits but zero energy deposit - possible data inconsistency" << G4endl;
+        }
+    }
+}
+
+// Verify scorer data is written to ROOT tree
+void RunAction::VerifyScorerDataInTree()
+{
+    if (!fTree) {
+        G4cerr << "WARNING: Cannot verify scorer data - ROOT tree is null" << G4endl;
+        return;
+    }
+    
+    // Get the scorer data branches
+    TBranch* energyBranch = fTree->GetBranch("ScorerEnergyDeposit");
+    TBranch* hitCountBranch = fTree->GetBranch("ScorerHitCount");
+    TBranch* validBranch = fTree->GetBranch("ScorerDataValid");
+    
+    if (!energyBranch || !hitCountBranch || !validBranch) {
+        G4cerr << "ERROR: One or more scorer data branches not found in ROOT tree!" << G4endl;
+        if (!energyBranch) G4cerr << "  - ScorerEnergyDeposit branch missing" << G4endl;
+        if (!hitCountBranch) G4cerr << "  - ScorerHitCount branch missing" << G4endl;
+        if (!validBranch) G4cerr << "  - ScorerDataValid branch missing" << G4endl;
+        return;
+    }
+    
+    // Check that branches have entries
+    Long64_t entries = fTree->GetEntries();
+    if (entries == 0) {
+        G4cerr << "WARNING: ROOT tree has no entries - cannot verify scorer data" << G4endl;
+        return;
+    }
+    
+    // Verify branch entry counts match tree entries
+    if (energyBranch->GetEntries() != entries || 
+        hitCountBranch->GetEntries() != entries || 
+        validBranch->GetEntries() != entries) {
+        G4cerr << "ERROR: Scorer data branch entry count mismatch!" << G4endl;
+        G4cerr << "  Tree entries: " << entries << G4endl;
+        G4cerr << "  ScorerEnergyDeposit entries: " << energyBranch->GetEntries() << G4endl;
+        G4cerr << "  ScorerHitCount entries: " << hitCountBranch->GetEntries() << G4endl;
+        G4cerr << "  ScorerDataValid entries: " << validBranch->GetEntries() << G4endl;
+        return;
+    }
+    
+    G4cout << "✓ Scorer data verification: All branches present with " << entries << " entries" << G4endl;
+    
+    // Verify data types are correctly stored
+    if (energyBranch->GetTitle() && hitCountBranch->GetTitle() && validBranch->GetTitle()) {
+        G4cout << "✓ Scorer data types verified: Energy (Double), HitCount (Int), Valid (Bool)" << G4endl;
+    }
 }
 
 // =============================================

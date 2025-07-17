@@ -7,6 +7,7 @@
 #include "G4VisExecutive.hh"
 #include "G4UIExecutive.hh"
 #include "G4Threading.hh"
+#include "G4ScoringManager.hh"
 
 #include "PhysicsList.hh"
 #include "DetectorConstruction.hh"
@@ -123,6 +124,14 @@ int main(int argc, char** argv)
                << "=============================" << G4endl;
     #endif
     
+    // ---------------------------------------------------------------
+    // Enable command-based scoring so that the Multi-Functional
+    // Detector’s primitive scorers actually create their hits
+    // collections. Without this call the scorer collections are not
+    // instantiated and CollectScorerData() finds no data.
+    // ---------------------------------------------------------------
+    G4ScoringManager::GetScoringManager();
+
     // Physics List
     runManager->SetUserInitialization(new PhysicsList());
 

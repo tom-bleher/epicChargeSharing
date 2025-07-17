@@ -205,7 +205,19 @@ public:
     
     // Method to store automatic radius selection results
     void SetAutoRadiusResults(G4int selectedRadius);
-
+    
+    // Method to set scorer data from Multi-Functional Detector
+    void SetScorerData(G4double energyDeposit, G4int hitCount, G4bool dataValid);
+    
+    // Method to validate scorer data before tree storage
+    void ValidateScorerDataForTreeStorage();
+    
+    // Method to verify scorer data is written to ROOT tree
+    void VerifyScorerDataInTree();
+    
+    // Method to set hit purity tracking data from EventAction
+    void SetHitPurityData(G4bool pureSiliconHit, G4bool aluminumContaminated, G4bool chargeCalculationEnabled);
+ 
 private:
     // =============================================
     // COORDINATE TRANSFORMATION HELPER METHODS
@@ -711,6 +723,16 @@ private:
     G4double fGridPixelCornerOffset; // Pixel corner offset [mm]
     G4double fGridDetSize;          // Detector size [mm]
     G4int fGridNumBlocksPerSide;    // Number of blocks per side
+    
+    // Scorer data variables
+    G4double fScorerEnergyDeposit;  // Energy deposit from Multi-Functional Detector [MeV]
+    G4int fScorerHitCount;          // Hit count from Multi-Functional Detector
+    G4bool fScorerDataValid;        // Validation flag for scorer data
+    
+    // Hit purity tracking variables for Multi-Functional Detector validation
+    G4bool fPureSiliconHit;         // True if hit is purely in silicon (no aluminum contamination)
+    G4bool fAluminumContaminated;   // True if hit has aluminum contamination
+    G4bool fChargeCalculationEnabled; // True if charge sharing calculation was enabled
 };
 
 #endif
