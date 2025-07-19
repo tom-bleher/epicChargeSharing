@@ -1455,14 +1455,14 @@ void RunAction::Set2DGaussResults(G4double x_center, G4double x_sigma, G4double 
     if (fit_success) {
         // Check X fit validity (row fit) - use dof as success indicator
         if (x_dof > 0) {
-            fGaussRowDeltaX = std::abs(x_center - fTrueX);      // x_row_fit - x_true
+            fGaussRowDeltaX = x_center - fTrueX;      // signed residual (row fit)
         } else {
             fGaussRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         }
         
         // Check Y fit validity (column fit) - use dof as success indicator  
         if (y_dof > 0) {
-            fGaussColDeltaY = std::abs(y_center - fTrueY);   // y_column_fit - y_true
+            fGaussColDeltaY = y_center - fTrueY;   // signed residual (column fit)
         } else {
             fGaussColDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         }
