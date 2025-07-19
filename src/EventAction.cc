@@ -1521,344 +1521,106 @@ G4double EventAction::EvaluateFitQuality(G4int radius, const G4ThreeVector& hitP
 
 void EventAction::CollectScorerData(const G4Event* event)
 {
-  G4HCofThisEvent* HC = event->GetHCofThisEvent();
-  if (!HC) {
-    G4cerr << "WARNING: No HCofThisEvent available" << G4endl;
-    fScorerDataValid = false;
-    return;
+  // Reset per–event scorer data
+  fScorerEnergyDeposit = 0.0;
+  fScorerHitCount      = 0;
+  fScorerDataValid     = false;
+
+  // Defensive check – HC may be null for empty events
+  G4HCofThisEvent* hce = event->GetHCofThisEvent();
+  if (!hce) return;
+
+  // Retrieve collection IDs once (static cache so cost is negligible)
+  static G4int edepID  = -1;
+  static G4int hitsID  = -1;
+  if (edepID < 0 || hitsID < 0)
+  {
+    edepID = G4SDManager::GetSDMpointer()->GetCollectionID("EnergyDeposit");
+    hitsID = G4SDManager::GetSDMpointer()->GetCollectionID("HitCount");
   }
 
-  G4SDManager* SDman = G4SDManager::GetSDMpointer();
-
-  // Energy deposit
-  int energyID = SDman->GetCollectionID("SiliconDetector/EnergyDeposit");
-  if (energyID < 0) {
-    G4cerr << "WARNING: Invalid collection ID for EnergyDeposit" << G4endl;
-    fScorerDataValid = false;
-    return;
-  }
-  G4THitsMap<G4double>* energyMap = static_cast<G4THitsMap<G4double>*>(HC->GetHC(energyID));
-  if (!energyMap) {
-    G4cerr << "WARNING: Energy map not found" << G4endl;
-    fScorerDataValid = false;
-    return;
-  }
-  fScorerEnergyDeposit = 0.;
-  for (auto it : *energyMap->GetMap()) {
-    fScorerEnergyDeposit += *it.second;
+  // Energy deposit map
+  if (edepID >= 0)
+  {
+    auto* edepMap = dynamic_cast<G4THitsMap<G4double>*>(hce->GetHC(edepID));
+    if (edepMap)
+    {
+      for (const auto& kv : *edepMap->GetMap())
+      {
+        fScorerEnergyDeposit += *(kv.second);
+      }
+    }
   }
 
-  // Hit count
-  int hitID = SDman->GetCollectionID("SiliconDetector/HitCount");
-  if (hitID < 0) {
-    G4cerr << "WARNING: Invalid collection ID for HitCount" << G4endl;
-    fScorerDataValid = false;
-    return;
-  }
-  G4THitsMap<G4double>* hitMap = static_cast<G4THitsMap<G4double>*>(HC->GetHC(hitID));
-  if (!hitMap) {
-    G4cerr << "WARNING: Hit map not found" << G4endl;
-    fScorerDataValid = false;
-    return;
-  }
-  fScorerHitCount = 0;
-  for (auto it : *hitMap->GetMap()) {
-    fScorerHitCount += static_cast<G4int>(*it.second);
+  // Hit-count map
+  if (hitsID >= 0)
+  {
+    auto* hitsMap = dynamic_cast<G4THitsMap<G4int>*>(hce->GetHC(hitsID));
+    if (hitsMap)
+    {
+      for (const auto& kv : *hitsMap->GetMap())
+      {
+        fScorerHitCount += *(kv.second);
+      }
+    }
   }
 
-  fScorerDataValid = (fScorerEnergyDeposit > 0. && fScorerHitCount > 0);
+  // Keep even very small energy deposits
+  // highly energetic, minimally ionising particles.
 }
 
 void EventAction::SetScorerData(G4double energy, G4int hits, G4bool valid)
 {
   fScorerEnergyDeposit = energy;
-  fScorerHitCount = hits;
-  fScorerDataValid = valid;
+  fScorerHitCount      = hits;
+  fScorerDataValid     = valid;
 }
 
 void EventAction::ValidateScorerDataIntegrity() const
 {
-  // Validate that scorer data collection doesn't interfere with existing charge sharing calculations
-  
-  // Check that core event data remains valid
-  if (fHasHit) {
-    // Validate that position data is still valid
-    if (!std::isfinite(fPos.x()) || !std::isfinite(fPos.y()) || !std::isfinite(fPos.z())) {
-      G4cerr << "WARNING: Event position data corrupted after scorer data collection!" << G4endl;
-      G4cerr << "Position: (" << fPos.x() << ", " << fPos.y() << ", " << fPos.z() << ")" << G4endl;
-    }
-    
-    // Validate that energy data is still valid
-    if (!std::isfinite(fEdep) || fEdep < 0.0) {
-      G4cerr << "WARNING: Event energy data corrupted after scorer data collection!" << G4endl;
-      G4cerr << "Energy deposit: " << fEdep << " MeV" << G4endl;
-    }
-    
-    // Validate that pixel mapping data is still valid
-    if (fPixelHit) {
-      if (fPixelIndexI < 0 || fPixelIndexJ < 0) {
-        G4cerr << "WARNING: Pixel mapping data corrupted after scorer data collection!" << G4endl;
-        G4cerr << "Pixel indices: (" << fPixelIndexI << ", " << fPixelIndexJ << ")" << G4endl;
-      }
-    }
+  if (!fScorerDataValid) return; // Nothing to validate
+
+  if (fScorerEnergyDeposit < 0)
+  {
+    G4cerr << "EventAction WARNING: Negative energy deposit reported by scorer (" << fScorerEnergyDeposit << ")" << G4endl;
   }
-  
-  // Check that scorer data is within reasonable bounds
-  if (fScorerDataValid) {
-    if (fScorerEnergyDeposit < 0.0 || fScorerEnergyDeposit > 1000.0) {
-      G4cerr << "WARNING: Scorer energy data out of reasonable bounds: " << fScorerEnergyDeposit << " MeV" << G4endl;
-    }
-    
-    if (fScorerHitCount < 0 || fScorerHitCount > 10000) {
-      G4cerr << "WARNING: Scorer hit count out of reasonable bounds: " << fScorerHitCount << G4endl;
-    }
-  }
-  
-  // Validate that neighborhood data is still intact
-  if (!fNeighborhoodChargeFractions.empty()) {
-    for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); i++) {
-      if (!std::isfinite(fNeighborhoodChargeFractions[i])) {
-        G4cerr << "WARNING: Neighborhood charge fraction data corrupted after scorer data collection!" << G4endl;
-        G4cerr << "Index " << i << ": " << fNeighborhoodChargeFractions[i] << G4endl;
-        break;
-      }
-    }
+  if (fScorerHitCount < 0)
+  {
+    G4cerr << "EventAction WARNING: Negative hit count reported by scorer (" << fScorerHitCount << ")" << G4endl;
   }
 }
 
 void EventAction::ValidateHitPurity()
 {
-  // ========================================
-  // EXCLUSIVE MULTI-FUNCTIONAL DETECTOR VALIDATION
-  // ========================================
-  
-  // This method implements the exclusive Multi-Functional Detector validation
-  // by combining scorer data with SteppingAction trajectory analysis
-  // Only pure silicon hits (no aluminum contamination) are approved for charge sharing
-  
-  // Reset hit purity flags
-  fPureSiliconHit = false;
-  fAluminumContaminated = false;
-  fChargeCalculationEnabled = false;
-  
-  // Validate that we have SteppingAction available for trajectory analysis
-  if (!fSteppingAction) {
-    G4cerr << "WARNING: SteppingAction not available for hit purity validation!" << G4endl;
-    return;
-  }
-  
-  // Step 1: Validate Multi-Functional Detector scorer data integrity
-  if (!fScorerDataValid) {
-    G4cerr << "WARNING: Multi-Functional Detector scorer data invalid - cannot perform hit purity validation" << G4endl;
-    return;
-  }
-  
-  // Step 2: Check if we have valid scorer data (energy deposit and hit count)
-  if (fScorerEnergyDeposit <= 0.0 || fScorerHitCount <= 0) {
-    // No valid scorer data - cannot validate hit purity
-    // This is normal behavior when particles don't hit the detector
-    SimulationLogger* logger = SimulationLogger::GetInstance();
-    if (logger) {
-      const G4Event* currentEvent = G4RunManager::GetRunManager()->GetCurrentEvent();
-      G4int eventID = currentEvent ? currentEvent->GetEventID() : -1;
-      
-      // Only log occasionally to avoid spam
-      if (eventID % 1000 == 0) {
-        logger->LogInfo("Event " + std::to_string(eventID) + ": No scorer data - particle missed detector");
-      }
-    }
-    return;
-  }
-  
-  // Step 3: Get trajectory analysis results from SteppingAction
-  G4bool hasAluminumInteraction = fSteppingAction->HasAluminumInteraction();
-  G4bool hasAluminumPreContact = fSteppingAction->HasAluminumPreContact();
-  G4bool isValidSiliconHit = fSteppingAction->IsValidSiliconHit();
-  G4String firstInteractionVolume = fSteppingAction->GetFirstInteractionVolume();
-  
-  // Step 4: Determine aluminum contamination status
-  fAluminumContaminated = hasAluminumInteraction || hasAluminumPreContact;
-  
-  // Step 5: Determine if this is a pure silicon hit
-  fPureSiliconHit = isValidSiliconHit && !fAluminumContaminated;
-  
-  // Step 6: Enable charge calculation only for pure silicon hits
-  // This ensures GaussRowDeltaX, GaussRowDeltaY calculations are skipped for aluminum-contaminated hits
-  fChargeCalculationEnabled = fPureSiliconHit;
-  
-  // Log hit purity validation results with SteppingAction integration details
-  SimulationLogger* logger = SimulationLogger::GetInstance();
-  if (logger) {
-    const G4Event* currentEvent = G4RunManager::GetRunManager()->GetCurrentEvent();
-    G4int eventID = currentEvent ? currentEvent->GetEventID() : -1;
-    
-    logger->LogInfo("Event " + std::to_string(eventID) + ": Hit Purity Validation Results");
-    logger->LogInfo("  - Scorer Energy Deposit: " + std::to_string(fScorerEnergyDeposit) + " MeV");
-    logger->LogInfo("  - Scorer Hit Count: " + std::to_string(fScorerHitCount));
-    logger->LogInfo("  - Scorer Data Valid: " + std::string(fScorerDataValid ? "YES" : "NO"));
-    
-    // SteppingAction trajectory analysis integration results
-    logger->LogInfo("  - SteppingAction Integration Results:");
-    logger->LogInfo("    * First Interaction Volume: " + firstInteractionVolume);
-    logger->LogInfo("    * Has Aluminum Interaction: " + std::string(hasAluminumInteraction ? "YES" : "NO"));
-    logger->LogInfo("    * Has Aluminum Pre-Contact: " + std::string(hasAluminumPreContact ? "YES" : "NO"));
-    logger->LogInfo("    * Is Valid Silicon Hit: " + std::string(isValidSiliconHit ? "YES" : "NO"));
-    
-    // EventAction validation results
-    logger->LogInfo("  - EventAction Validation Results:");
-    logger->LogInfo("    * Pure Silicon Hit: " + std::string(fPureSiliconHit ? "YES" : "NO"));
-    logger->LogInfo("    * Aluminum Contaminated: " + std::string(fAluminumContaminated ? "YES" : "NO"));
-    logger->LogInfo("    * Charge Calculation Enabled: " + std::string(fChargeCalculationEnabled ? "YES" : "NO"));
-    
-    // Integration status
-    logger->LogInfo("  - Integration Status: SteppingAction ↔ EventAction data transfer successful");
-  }
+  // Default to conservative values (no charge sharing)
+  fPureSiliconHit          = false;
+  fAluminumContaminated    = true;
+  fChargeCalculationEnabled= false;
+
+  if (!fSteppingAction) return; // Cannot validate without trajectory data
+
+  // SteppingAction already determined whether the silicon interaction happened without aluminum pre-contact
+  fPureSiliconHit       = fSteppingAction->IsValidSiliconHit();
+  fAluminumContaminated = !fPureSiliconHit; // if pure -> not contaminated, else contaminated
+
+  // Charge sharing can only be calculated if
+  //   1) the hit is pure silicon (no aluminum)
+  //   2) scorer data looks reasonable
+  fChargeCalculationEnabled = fPureSiliconHit && fScorerDataValid;
 }
 
 G4bool EventAction::ShouldCalculateChargeSharing() const
 {
-  // ========================================
-  // EXCLUSIVE MULTI-FUNCTIONAL DETECTOR VALIDATION
-  // ========================================
-  
-  // This method implements the exclusive Multi-Functional Detector validation
-  // and determines if charge sharing calculations should proceed
-  // Only pure silicon hits (no aluminum contamination) are processed
-  
-  // Check 1: Multi-Functional Detector validation allows charge sharing calculation
-  if (!fChargeCalculationEnabled) {
-    return false; // Multi-Functional Detector validation disabled charge calculation
-  }
-  
-  // Check 2: Valid Multi-Functional Detector scorer data
-  if (!fScorerDataValid) {
-    return false; // Invalid scorer data from Multi-Functional Detector
-  }
-  
-  // Check 3: Pure silicon hit (no aluminum pre-interaction)
-  if (!fPureSiliconHit) {
-    return false; // Not a pure silicon hit
-  }
-  
-  // Check 4: No aluminum contamination (critical for GaussRowDeltaX, GaussRowDeltaY exclusion)
-  if (fAluminumContaminated) {
-    return false; // Aluminum contamination detected - skip charge sharing
-  }
-  
-  // Check 5: SteppingAction trajectory analysis confirms valid silicon hit
-  if (fSteppingAction && !fSteppingAction->IsValidSiliconHit()) {
-    return false; // SteppingAction reports invalid silicon hit
-  }
-  
-  // Check 6: Energy deposited in detector
-  if (fEdep <= 0.0) {
-    return false; // No energy deposited
-  }
-  
-  // Check 7: Valid hit detected
-  if (!fHasHit) {
-    return false; // No valid hit detected
-  }
-  
-  // All conditions met - charge sharing calculation should proceed for pure silicon hit
-  return true;
+  return fChargeCalculationEnabled;
 }
 
 void EventAction::ConditionalChargeCalculation(const G4Event* event)
 {
-  // ========================================
-  // CONDITIONAL CHARGE SHARING FOR PURE SILICON HITS ONLY
-  // ========================================
-  
-  // This method implements the exclusive Multi-Functional Detector validation
-  // and only performs charge sharing calculations for pure silicon hits
-  // GaussRowDeltaX, GaussRowDeltaY calculations are skipped for aluminum-contaminated hits
-  
-  // Check if charge sharing calculation should be performed
-  if (!ShouldCalculateChargeSharing()) {
-    // Log why charge sharing calculation was skipped
-    SimulationLogger* logger = SimulationLogger::GetInstance();
-    if (logger) {
-      G4int eventID = event ? event->GetEventID() : -1;
-      G4String reason = "Charge sharing calculation skipped for Event " + std::to_string(eventID) + ": ";
-      
-      if (!fChargeCalculationEnabled) {
-        reason += "Charge calculation disabled by Multi-Functional Detector validation";
-      } else if (!fScorerDataValid) {
-        reason += "Invalid Multi-Functional Detector scorer data";
-      } else if (!fPureSiliconHit) {
-        reason += "Not a pure silicon hit (Multi-Functional Detector validation)";
-      } else if (fAluminumContaminated) {
-        reason += "Aluminum contamination detected (SteppingAction trajectory analysis)";
-      } else if (fSteppingAction && !fSteppingAction->IsValidSiliconHit()) {
-        reason += "SteppingAction reports invalid silicon hit";
-      } else if (fEdep <= 0.0) {
-        reason += "No energy deposited";
-      } else if (!fHasHit) {
-        reason += "No valid hit detected";
-      } else {
-        reason += "Unknown reason";
-      }
-      
-      logger->LogInfo(reason);
-    }
-    
-    // Previously we reset all fit results to default (which zeroed the DOF).
-    // This obliterated the valid fits that were already performed earlier in EndOfEventAction
-    // and produced misleading DOF=0 entries in the output tree.
-    // To preserve the earlier fit results we simply return here without touching them.
-    // SetDefaultFittingResults();
-    return;
-  }
-  
-  // Proceed with charge sharing calculation for pure silicon hits only
-  SimulationLogger* logger = SimulationLogger::GetInstance();
-  if (logger) {
-    G4int eventID = event ? event->GetEventID() : -1;
-    logger->LogInfo("Event " + std::to_string(eventID) + 
-                   ": Performing charge sharing calculation for pure silicon hit");
-    logger->LogInfo("  - Multi-Functional Detector validation: PASSED");
-    logger->LogInfo("  - Aluminum contamination check: PASSED");
-    logger->LogInfo("  - SteppingAction trajectory analysis: PASSED");
-  }
-  
-  // Calculate nearest pixel position and pixel alpha
+  if (!ShouldCalculateChargeSharing()) return;
+
+  // Recompute nearest pixel (needed by PerformChargeShareFitting)
   G4ThreeVector nearestPixel = CalcNearestPixel(fPos);
-  G4double pixelAlpha = CalcPixelAlpha(fPos, fPixelIndexI, fPixelIndexJ);
-  
-  // Determine if hit is a pixel hit
-  G4bool isPixelHit = fPixelHit;
-  
-  // Perform charge sharing calculations only for non-pixel hits
-  if (!isPixelHit) {
-    // Select optimal radius if auto-selection is enabled
-    if (fAutoRadiusEnabled) {
-      fSelectedRadius = SelectOptimalRadius(fPos, fPixelIndexI, fPixelIndexJ);
-      fNeighborhoodRadius = fSelectedRadius;
-    } else {
-      fSelectedRadius = fNeighborhoodRadius;
-      fSelectedQuality = 0.0;
-    }
-    
-    // Calculate neighborhood grid data
-    CalcNeighborhoodGridAngles(fPos, fPixelIndexI, fPixelIndexJ);
-    CalcNeighborhoodChargeSharing();
-    
-    // Perform fitting only if we have sufficient data
-    if (!fNeighborhoodChargeFractions.empty()) {
-      PerformChargeShareFitting(event, nearestPixel);
-    } else {
-      // No neighborhood data available - set default values
-      SetDefaultFittingResults();
-    }
-  } else {
-    // Pixel hit - clear neighborhood data and set default fitting results
-    fNeighborhoodAngles.clear();
-    fNeighborhoodChargeFractions.clear();
-    fNeighborhoodDistances.clear();
-    fNeighborhoodCharge.clear();
-    SetDefaultFittingResults();
-  }
+  PerformChargeShareFitting(event, nearestPixel);
 }
 
 void EventAction::SetDefaultFittingResults()
