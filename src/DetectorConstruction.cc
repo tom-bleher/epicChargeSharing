@@ -189,16 +189,20 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     
     G4cout << "✓ Step limiting enabled: maximum step size = 10 micrometers" << G4endl;
     
-    // CRITICAL GEOMETRY FIX: Place aluminum pixels behind the silicon detector
-    // This ensures particles hit the silicon detector first, allowing the Multi-Functional Detector to register hits
-    // Previous configuration had pixels in front, blocking particles from reaching the silicon detector
-    // Place pixels on the detector surface (back face instead of front face)
+    // GEOMETRY UPDATE (2025-07): Pixel-pad aluminium must be the FIRST layer seen by the
+    // incoming particle.  Therefore pixels are now placed on the FRONT face of the
+    // silicon sensor (i.e. upstream along the particle direction).  SteppingAction
+    // logic will mark events that traverse this metal layer before reaching the
+    // silicon as aluminium-contaminated so that charge sharing is skipped.
     G4int copyNo = 0;
     G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
-    // Calc z pos for pixels - they should be behind the detector surface
-    // Changed from front face to back face so particles hit silicon detector first
-    G4double pixelZ = detectorPos.z() - fDetWidth/2 - fPixelWidth/2;
+    // Calculate Z position for the aluminium pads – FRONT face of the silicon
+    // The primary particles start at +z and travel towards –z (momentum (0,0,-1)).
+    // The silicon detector centre is at detectorPos.z(), so its front face is at
+    //   detectorPos.z() + fDetWidth/2.  We add half the pad thickness to sit the
+    // pads flush on top of that face.
+    G4double pixelZ = detectorPos.z() + fDetWidth/2 + fPixelWidth/2;
     
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
         for (G4int j = 0; j < fNumBlocksPerSide; j++) {
