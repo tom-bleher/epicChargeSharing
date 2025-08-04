@@ -245,20 +245,46 @@ endif()
 # Add Ceres include directories
 include_directories(${CERES_INCLUDE_DIRS})
 
-# Find source files
-file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cc)
-file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh)
-
 # Ensure our new utility files are included
-list(APPEND sources 
-    ${PROJECT_SOURCE_DIR}/src/StatsUtils.cc
+list(APPEND sources
+    ${PROJECT_SOURCE_DIR}/src/ActionInitialization.cc
+    ${PROJECT_SOURCE_DIR}/src/CeresLoggingInit.cc
     ${PROJECT_SOURCE_DIR}/src/CeresUtils.cc
+    ${PROJECT_SOURCE_DIR}/src/CrashHandler.cc
+    ${PROJECT_SOURCE_DIR}/src/DetectorConstruction.cc
+    ${PROJECT_SOURCE_DIR}/src/DetectorMessenger.cc
+    ${PROJECT_SOURCE_DIR}/src/EventAction.cc
+    ${PROJECT_SOURCE_DIR}/src/GaussFit2D.cc
+    ${PROJECT_SOURCE_DIR}/src/GaussFit3D.cc
+    ${PROJECT_SOURCE_DIR}/src/LorentzFit2D.cc
+    ${PROJECT_SOURCE_DIR}/src/LorentzFit3D.cc
+    ${PROJECT_SOURCE_DIR}/src/PhysicsList.cc
+    ${PROJECT_SOURCE_DIR}/src/PrimaryGenerator.cc
+    ${PROJECT_SOURCE_DIR}/src/RunAction.cc
     ${PROJECT_SOURCE_DIR}/src/SimulationLogger.cc
+    ${PROJECT_SOURCE_DIR}/src/StatsUtils.cc
+    ${PROJECT_SOURCE_DIR}/src/SteppingAction.cc
 )
 list(APPEND headers 
-    ${PROJECT_SOURCE_DIR}/include/StatsUtils.hh
+    ${PROJECT_SOURCE_DIR}/include/ActionInitialization.hh
+    ${PROJECT_SOURCE_DIR}/include/CeresLoggingInit.hh
     ${PROJECT_SOURCE_DIR}/include/CeresUtils.hh
+    ${PROJECT_SOURCE_DIR}/include/Constants.hh
+    ${PROJECT_SOURCE_DIR}/include/Control.hh
+    ${PROJECT_SOURCE_DIR}/include/CrashHandler.hh
+    ${PROJECT_SOURCE_DIR}/include/DetectorConstruction.hh
+    ${PROJECT_SOURCE_DIR}/include/DetectorMessenger.hh
+    ${PROJECT_SOURCE_DIR}/include/EventAction.hh
+    ${PROJECT_SOURCE_DIR}/include/GaussFit2D.hh
+    ${PROJECT_SOURCE_DIR}/include/GaussFit3D.hh
+    ${PROJECT_SOURCE_DIR}/include/LorentzFit2D.hh
+    ${PROJECT_SOURCE_DIR}/include/LorentzFit3D.hh
+    ${PROJECT_SOURCE_DIR}/include/PhysicsList.hh
+    ${PROJECT_SOURCE_DIR}/include/PrimaryGenerator.hh
+    ${PROJECT_SOURCE_DIR}/include/RunAction.hh
     ${PROJECT_SOURCE_DIR}/include/SimulationLogger.hh
+    ${PROJECT_SOURCE_DIR}/include/StatsUtils.hh
+    ${PROJECT_SOURCE_DIR}/include/SteppingAction.hh
 )
 
 # Define ROOT libraries needed - only if ROOT was found properly

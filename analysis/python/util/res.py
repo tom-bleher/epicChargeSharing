@@ -113,7 +113,6 @@ def read_root_data(root_file_path):
             'PixelTrueDeltaX', 'PixelTrueDeltaY',  # Digital readout deltas
             'GaussRowDeltaX', 'GaussColDeltaY',  # Gauss row/column fit deltas
             'LorentzRowDeltaX', 'LorentzColDeltaY',  # Lorentz row/column fit deltas
-            'PowerLorentzRowDeltaX', 'PowerLorentzColDeltaY',  # Power Lorentz row/column fit deltas
             
             # Main diagonal deltas
             'GaussMainDiagTransDeltaX', 'GaussMainDiagTransDeltaY',
@@ -123,19 +122,13 @@ def read_root_data(root_file_path):
             'GaussSecDiagTransDeltaX', 'GaussSecDiagTransDeltaY',
             'LorentzSecDiagTransDeltaX', 'LorentzSecDiagTransDeltaY',
             
-            # Power Lorentz deltas (check if they exist)
-            'PowerLorentzMainDiagTransDeltaX', 'PowerLorentzMainDiagTransDeltaY',
-            'PowerLorentzSecDiagTransDeltaX', 'PowerLorentzSecDiagTransDeltaY',
-            
             # 3D fit deltas (check if they exist)
             '3DGaussDeltaX', '3DGaussDeltaY',  # 3D Gauss fit deltas
             '3DLorentzDeltaX', '3DLorentzDeltaY',  # 3D Lorentz fit deltas
-            '3DPowerLorentzDeltaX', '3DPowerLorentzDeltaY',  # 3D Power-Law Lorentz fit deltas
             
             # Mean estimators
             'GaussMeanTrueDeltaX', 'GaussMeanTrueDeltaY',
             'LorentzMeanTrueDeltaX', 'LorentzMeanTrueDeltaY',
-            'PowerLorentzMeanTrueDeltaX', 'PowerLorentzMeanTrueDeltaY',
         ]
         
         # Read all branches at once with better error handling
@@ -207,8 +200,6 @@ def calculate_all_resolutions(data):
         ('Gauss Col  Y', 'GaussColDeltaY'),
         ('Lorentz Row  X', 'LorentzRowDeltaX'),
         ('Lorentz Col  Y', 'LorentzColDeltaY'),
-        ('Power Lorentz Row  X', 'PowerLorentzRowDeltaX'),
-        ('Power Lorentz Col  Y', 'PowerLorentzColDeltaY'),
         
         # Main Diag s (slope +1: dx - dy = constant)
         ('Gauss Main Diag  X', 'GaussMainDiagTransDeltaX'),
@@ -222,29 +213,17 @@ def calculate_all_resolutions(data):
         ('Lorentz Secondary Diag  X', 'LorentzSecDiagTransDeltaX'),
         ('Lorentz Secondary Diag  Y', 'LorentzSecDiagTransDeltaY'),
         
-        # Power Lorentz Main Diag s (slope +1: dx - dy = constant)
-        ('Power Lorentz Main Diag  X', 'PowerLorentzMainDiagTransDeltaX'),
-        ('Power Lorentz Main Diag  Y', 'PowerLorentzMainDiagTransDeltaY'),
-        
-        # Power Lorentz Secondary Diag s (slope -1: dx + dy = constant)
-        ('Power Lorentz Secondary Diag  X', 'PowerLorentzSecDiagTransDeltaX'),
-        ('Power Lorentz Secondary Diag  Y', 'PowerLorentzSecDiagTransDeltaY'),
-        
         # 3D Surface s
         ('3D Gauss  X', '3DGaussDeltaX'),
         ('3D Gauss  Y', '3DGaussDeltaY'),
         ('3D Lorentz  X', '3DLorentzDeltaX'),
         ('3D Lorentz  Y', '3DLorentzDeltaY'),
-        ('3D Power Lorentz  X', '3DPowerLorentzDeltaX'),
-        ('3D Power Lorentz  Y', '3DPowerLorentzDeltaY'),
         
         # Mean Estimators (combined from all methods)
         ('Gauss Mean Estimator X', 'GaussMeanTrueDeltaX'),
         ('Gauss Mean Estimator Y', 'GaussMeanTrueDeltaY'),
         ('Lorentz Mean Estimator X', 'LorentzMeanTrueDeltaX'),
         ('Lorentz Mean Estimator Y', 'LorentzMeanTrueDeltaY'),
-        ('Power Lorentz Mean Estimator X', 'PowerLorentzMeanTrueDeltaX'),
-        ('Power Lorentz Mean Estimator Y', 'PowerLorentzMeanTrueDeltaY'),
     ]
     
     print("\nCalculating spatial resolution for all methods...")

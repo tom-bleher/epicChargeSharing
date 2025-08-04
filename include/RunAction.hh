@@ -104,7 +104,14 @@ public:
                                       G4double sec_diag_y_center_err, G4double sec_diag_y_sigma_err, G4double sec_diag_y_amp_err,
                                       G4double sec_diag_y_vert_offset, G4double sec_diag_y_vert_offset_err,
                                       G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_success,
-                                      G4bool fit_success);
+                                                                             G4bool fit_success);
+
+    // Method to set 3D Gauss fit results
+    void Set3DGaussResults(G4double center_x, G4double center_y, G4double sigma_x, G4double sigma_y, G4double amp, G4double vert_offset,
+                                        G4double center_x_err, G4double center_y_err, G4double sigma_x_err, G4double sigma_y_err, G4double amp_err, G4double vert_offset_err,
+                                        G4double chi2red, G4double pp, G4int dof,
+                                        G4double charge_err,
+                                        G4bool fit_success);
     
     // Method to set 2D Lorentz fit results (central row and column fitting)
     void Set2DLorentzResults(G4double x_center, G4double x_gamma, G4double x_amp,
@@ -139,66 +146,7 @@ public:
                                         G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_success,
                                         G4bool fit_success);
 
-    // Method to set 2D Power-Law Lorentz fit results (central row and column fitting)
-    // Model: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
-    void Set2DPowerLorentzResults(G4double x_center, G4double x_gamma, G4double x_beta, G4double x_amp,
-                                        G4double x_center_err, G4double x_gamma_err, G4double x_beta_err, G4double x_amp_err,
-                                        G4double x_vert_offset, G4double x_vert_offset_err,
-                                        G4double x_chi2red, G4double x_pp, G4int x_dof,
-                                        G4double y_center, G4double y_gamma, G4double y_beta, G4double y_amp,
-                                        G4double y_center_err, G4double y_gamma_err, G4double y_beta_err, G4double y_amp_err,
-                                        G4double y_vert_offset, G4double y_vert_offset_err,
-                                        G4double y_chi2red, G4double y_pp, G4int y_dof,
-                                        G4double x_charge_err, G4double y_charge_err,
-                                        G4bool fit_success);
-    
-    // Method to set diagonal Power-Law Lorentz fit results (4 separate fits: Main X, Main Y, Sec X, Sec Y)
-    // Model: y(x) = A / (1 + ((x-m)/gamma)^2)^beta + B
-    void SetDiagPowerLorentzResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_beta, G4double main_diag_x_amp,
-                                              G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_beta_err, G4double main_diag_x_amp_err,
-                                              G4double main_diag_x_vert_offset, G4double main_diag_x_vert_offset_err,
-                                              G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_success,
-                                              G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_beta, G4double main_diag_y_amp,
-                                              G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_beta_err, G4double main_diag_y_amp_err,
-                                              G4double main_diag_y_vert_offset, G4double main_diag_y_vert_offset_err,
-                                              G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_success,
-                                              G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_beta, G4double sec_diag_x_amp,
-                                              G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_beta_err, G4double sec_diag_x_amp_err,
-                                              G4double sec_diag_x_vert_offset, G4double sec_diag_x_vert_offset_err,
-                                              G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_success,
-                                              G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_beta, G4double sec_diag_y_amp,
-                                              G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_beta_err, G4double sec_diag_y_amp_err,
-                                              G4double sec_diag_y_vert_offset, G4double sec_diag_y_vert_offset_err,
-                                              G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_success,
-                                              G4bool fit_success);
 
-    // =============================================
-    // 3D FIT RESULTS SETTER METHODS
-    // =============================================
-    
-    // Method to set 3D Lorentz fit results (entire neighborhood surface fitting)
-    // Model: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2) + B
-    void Set3DLorentzResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double amp, G4double vert_offset,
-                                   G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double amp_err, G4double vert_offset_err,
-                                   G4double chi2red, G4double pp, G4int dof,
-                                   G4double charge_err,
-                                   G4bool fit_success);
-    
-    // Method to set 3D Gauss fit results (entire neighborhood surface fitting)
-    // Model: z(x,y) = A * exp(-((x-mx)^2/(2*σx^2) + (y-my)^2/(2*σy^2))) + B
-    void Set3DGaussResults(G4double center_x, G4double center_y, G4double sigma_x, G4double sigma_y, G4double amp, G4double vert_offset,
-                                 G4double center_x_err, G4double center_y_err, G4double sigma_x_err, G4double sigma_y_err, G4double amp_err, G4double vert_offset_err,
-                                 G4double chi2red, G4double pp, G4int dof,
-                                 G4double charge_err,
-                                 G4bool fit_success);
-    
-    // Method to set 3D Power-Law Lorentz fit results (entire neighborhood surface fitting)
-    // Model: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2)^β + B
-    void Set3DPowerLorentzResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double beta, G4double amp, G4double vert_offset,
-                                        G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double beta_err, G4double amp_err, G4double vert_offset_err,
-                                        G4double chi2red, G4double pp, G4int dof,
-                                        G4double charge_err,
-                                        G4bool fit_success);
     
     // Fill the ROOT tree with current event data
     void FillTree();
@@ -237,7 +185,6 @@ private:
     void CreateHitsBranches();
     void CreateGaussBranches();
     void CreateLorentzBranches();
-    void CreatePowerLorentzBranches();
     void Create3DBranches();
     void CreateNeighborhoodBranches();
     void CreateMetadataBranches();
@@ -285,16 +232,12 @@ private:
     G4double fGaussColDeltaY;
     G4double fLorentzRowDeltaX;
     G4double fLorentzColDeltaY;
-    G4double fPowerLorentzRowDeltaX;
-    G4double fPowerLorentzColDeltaY;
     
     // 3D fitting delta variables
     G4double f3DLorentzDeltaX;          // Delta X from 3D Lorentz fit to True Pos [mm]
     G4double f3DLorentzDeltaY;          // Delta Y from 3D Lorentz fit to True Pos [mm]
     G4double f3DGaussDeltaX;            // Delta X from 3D Gauss fit to True Pos [mm]
     G4double f3DGaussDeltaY;            // Delta Y from 3D Gauss fit to True Pos [mm]
-    G4double f3DPowerLorentzDeltaX;     // Delta X from 3D Power-Law Lorentz fit to True Pos [mm]
-    G4double f3DPowerLorentzDeltaY;     // Delta Y from 3D Power-Law Lorentz fit to True Pos [mm]
 
     // =============================================
     // TRANSFORMED DIAG COORDINATES (ROTATION MATRIX)
@@ -311,11 +254,7 @@ private:
     G4double fGaussSecDiagTransformedY;    // Transformed Y from secondary diagonal (y' -> y)
     G4double fLorentzSecDiagTransformedX;  // Transformed X from secondary diagonal (x' -> x)
     G4double fLorentzSecDiagTransformedY;  // Transformed Y from secondary diagonal (y' -> y)
-    G4double fPowerLorentzMainDiagTransformedX;    // Transformed X from Power-Law Lorentz main diagonal (x' -> x)
-    G4double fPowerLorentzMainDiagTransformedY;    // Transformed Y from Power-Law Lorentz main diagonal (y' -> y)
-    G4double fPowerLorentzSecDiagTransformedX;  // Transformed X from Power-Law Lorentz secondary diagonal (x' -> x)
-    G4double fPowerLorentzSecDiagTransformedY;  // Transformed Y from Power-Law Lorentz secondary diagonal (y' -> y)
-    
+
     // Delta values for transformed coordinates vs true pos
     G4double fGaussMainDiagTransformedDeltaX;   // x_transformed - x_true (main diagonal)
     G4double fGaussMainDiagTransformedDeltaY;   // y_transformed - y_true (main diagonal)
@@ -325,10 +264,6 @@ private:
     G4double fLorentzMainDiagTransformedDeltaY;   // y_transformed - y_true (main diagonal)
     G4double fLorentzSecDiagTransformedDeltaX; // x_transformed - x_true (secondary diagonal)
     G4double fLorentzSecDiagTransformedDeltaY; // y_transformed - y_true (secondary diagonal)
-    G4double fPowerLorentzMainDiagTransformedDeltaX;   // x_transformed - x_true (Power-Law Lorentz main diagonal)
-    G4double fPowerLorentzMainDiagTransformedDeltaY;   // y_transformed - y_true (Power-Law Lorentz main diagonal)
-    G4double fPowerLorentzSecDiagTransformedDeltaX; // x_transformed - x_true (Power-Law Lorentz secondary diagonal)
-    G4double fPowerLorentzSecDiagTransformedDeltaY; // y_transformed - y_true (Power-Law Lorentz secondary diagonal)
 
     // =============================================
     // MEAN ESTIMATIONS FROM ALL FIT METHODS
@@ -339,8 +274,6 @@ private:
     G4double fGaussMeanTrueDeltaY;   // Mean delta Y from all Gauss estimation methods to True Pos [mm]
     G4double fLorentzMeanTrueDeltaX; // Mean delta X from all Lorentz estimation methods to True Pos [mm]
     G4double fLorentzMeanTrueDeltaY; // Mean delta Y from all Lorentz estimation methods to True Pos [mm]
-    G4double fPowerLorentzMeanTrueDeltaX; // Mean delta X from all Power-Law Lorentz estimation methods to True Pos [mm]
-    G4double fPowerLorentzMeanTrueDeltaY; // Mean delta Y from all Power-Law Lorentz estimation methods to True Pos [mm]
 
     // =============================================
     // AUTOMATIC RADIUS SELECTION VARIABLES
@@ -525,185 +458,46 @@ private:
     G4int fLorentzSecDiagYDOF;
 
     // =============================================
-    // POWER-LAW LORENTZ FITS VARIABLES
+    // 3D GAUSS FITS VARIABLES
     // =============================================
-    
-    // PowerLorentzRow/PowerLorentzRowX
-    G4double fPowerLorentzRowAmp;
-    G4double fPowerLorentzRowAmpErr;
-    G4double fPowerLorentzRowBeta;
-    G4double fPowerLorentzRowBetaErr;
-    G4double fPowerLorentzRowGamma;
-    G4double fPowerLorentzRowGammaErr;
-    G4double fPowerLorentzRowVertOffset;
-    G4double fPowerLorentzRowVertOffsetErr;
-    G4double fPowerLorentzRowCenter;
-    G4double fPowerLorentzRowCenterErr;
-    G4double fPowerLorentzRowChi2red;
-    G4double fPowerLorentzRowPp;
-    G4int fPowerLorentzRowDOF;
-    
-    // PowerLorentzCol/PowerLorentzColY
-    G4double fPowerLorentzColAmp;
-    G4double fPowerLorentzColAmpErr;
-    G4double fPowerLorentzColBeta;
-    G4double fPowerLorentzColBetaErr;
-    G4double fPowerLorentzColGamma;
-    G4double fPowerLorentzColGammaErr;
-    G4double fPowerLorentzColVertOffset;
-    G4double fPowerLorentzColVertOffsetErr;
-    G4double fPowerLorentzColCenter;
-    G4double fPowerLorentzColCenterErr;
-    G4double fPowerLorentzColChi2red;
-    G4double fPowerLorentzColPp;
-    G4int fPowerLorentzColDOF;
-    
-    // Charge uncertainties for Power-Law Lorentz fits (5% of max charge)
-    G4double fPowerLorentzRowChargeErr;    // Row charge uncertainty (5% of max charge)
-    G4double fPowerLorentzColChargeErr; // Column charge uncertainty (5% of max charge)
-    
-    // PowerLorentzMainDiag/PowerLorentzMainDiagX
-    G4double fPowerLorentzMainDiagXAmp;
-    G4double fPowerLorentzMainDiagXAmpErr;
-    G4double fPowerLorentzMainDiagXBeta;
-    G4double fPowerLorentzMainDiagXBetaErr;
-    G4double fPowerLorentzMainDiagXGamma;
-    G4double fPowerLorentzMainDiagXGammaErr;
-    G4double fPowerLorentzMainDiagXVertOffset;
-    G4double fPowerLorentzMainDiagXVertOffsetErr;
-    G4double fPowerLorentzMainDiagXCenter;
-    G4double fPowerLorentzMainDiagXCenterErr;
-    G4double fPowerLorentzMainDiagXChi2red;
-    G4double fPowerLorentzMainDiagXPp;
-    G4int fPowerLorentzMainDiagXDOF;
-    
-    // PowerLorentzMainDiag/PowerLorentzMainDiagY
-    G4double fPowerLorentzMainDiagYAmp;
-    G4double fPowerLorentzMainDiagYAmpErr;
-    G4double fPowerLorentzMainDiagYBeta;
-    G4double fPowerLorentzMainDiagYBetaErr;
-    G4double fPowerLorentzMainDiagYGamma;
-    G4double fPowerLorentzMainDiagYGammaErr;
-    G4double fPowerLorentzMainDiagYVertOffset;
-    G4double fPowerLorentzMainDiagYVertOffsetErr;
-    G4double fPowerLorentzMainDiagYCenter;
-    G4double fPowerLorentzMainDiagYCenterErr;
-    G4double fPowerLorentzMainDiagYChi2red;
-    G4double fPowerLorentzMainDiagYPp;
-    G4int fPowerLorentzMainDiagYDOF;
-    
-    // PowerLorentzSecDiag/PowerLorentzSecDiagX
-    G4double fPowerLorentzSecDiagXAmp;
-    G4double fPowerLorentzSecDiagXAmpErr;
-    G4double fPowerLorentzSecDiagXBeta;
-    G4double fPowerLorentzSecDiagXBetaErr;
-    G4double fPowerLorentzSecDiagXGamma;
-    G4double fPowerLorentzSecDiagXGammaErr;
-    G4double fPowerLorentzSecDiagXVertOffset;
-    G4double fPowerLorentzSecDiagXVertOffsetErr;
-    G4double fPowerLorentzSecDiagXCenter;
-    G4double fPowerLorentzSecDiagXCenterErr;
-    G4double fPowerLorentzSecDiagXChi2red;
-    G4double fPowerLorentzSecDiagXPp;
-    G4int fPowerLorentzSecDiagXDOF;
-    
-    // PowerLorentzSecDiag/PowerLorentzSecDiagY
-    G4double fPowerLorentzSecDiagYAmp;
-    G4double fPowerLorentzSecDiagYAmpErr;
-    G4double fPowerLorentzSecDiagYBeta;
-    G4double fPowerLorentzSecDiagYBetaErr;
-    G4double fPowerLorentzSecDiagYGamma;
-    G4double fPowerLorentzSecDiagYGammaErr;
-    G4double fPowerLorentzSecDiagYVertOffset;
-    G4double fPowerLorentzSecDiagYVertOffsetErr;
-    G4double fPowerLorentzSecDiagYCenter;
-    G4double fPowerLorentzSecDiagYCenterErr;
-    G4double fPowerLorentzSecDiagYChi2red;
-    G4double fPowerLorentzSecDiagYPp;
-    G4int fPowerLorentzSecDiagYDOF;
+    G4double f3DGaussAmp;
+    G4double f3DGaussAmpErr;
+    G4double f3DGaussSigmaX;
+    G4double f3DGaussSigmaXErr;
+    G4double f3DGaussSigmaY;
+    G4double f3DGaussSigmaYErr;
+    G4double f3DGaussVertOffset;
+    G4double f3DGaussVertOffsetErr;
+    G4double f3DGaussCenterX;
+    G4double f3DGaussCenterXErr;
+    G4double f3DGaussCenterY;
+    G4double f3DGaussCenterYErr;
+    G4double f3DGaussChi2red;
+    G4double f3DGaussPp;
+    G4int f3DGaussDOF;
+    G4double f3DGaussChargeErr;
+    G4bool f3DGaussSuccess;
 
     // =============================================
     // 3D LORENTZ FITS VARIABLES
     // =============================================
-    
-    // 3D Lorentz fit parameters: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2) + B
-    G4double f3DLorentzCenterX;            // mx parameter (X center)
-    G4double f3DLorentzCenterY;            // my parameter (Y center)
-    G4double f3DLorentzGammaX;             // γx parameter (X width/HWHM)
-    G4double f3DLorentzGammaY;             // γy parameter (Y width/HWHM)
-    G4double f3DLorentzAmp;          // A parameter (peak amplitude)
-    G4double f3DLorentzVertOffset;     // B parameter (baseline)
-    
-    // 3D Lorentz fit parameter errors
-    G4double f3DLorentzCenterXErr;         
-    G4double f3DLorentzCenterYErr;         
-    G4double f3DLorentzGammaXErr;          
-    G4double f3DLorentzGammaYErr;          
-    G4double f3DLorentzAmpErr;       
-    G4double f3DLorentzVertOffsetErr;  
-    
-    // 3D Lorentz fit statistics
-    G4double f3DLorentzChi2red;            // Reduced Chi-squared
-    G4double f3DLorentzPp;                 // P-value  
-    G4int f3DLorentzDOF;                   // Degrees of Freedom
-    G4double f3DLorentzChargeErr;  // Charge uncertainty (5% of max charge)
-    G4bool f3DLorentzSuccess;           //  success flag
-
-    // =============================================
-    // 3D GAUSS FITS VARIABLES
-    // =============================================
-    
-    // 3D Gauss fit parameters: z(x,y) = A * exp(-((x-mx)^2/(2*σx^2) + (y-my)^2/(2*σy^2))) + B
-    G4double f3DGaussCenterX;            // mx parameter (X center)
-    G4double f3DGaussCenterY;            // my parameter (Y center)
-    G4double f3DGaussSigmaX;             // σx parameter (X standard deviation)
-    G4double f3DGaussSigmaY;             // σy parameter (Y standard deviation)
-    G4double f3DGaussAmp;          // A parameter (peak amplitude)
-    G4double f3DGaussVertOffset;     // B parameter (baseline)
-    
-    // 3D Gauss fit parameter errors
-    G4double f3DGaussCenterXErr;         
-    G4double f3DGaussCenterYErr;         
-    G4double f3DGaussSigmaXErr;          
-    G4double f3DGaussSigmaYErr;          
-    G4double f3DGaussAmpErr;       
-    G4double f3DGaussVertOffsetErr;  
-    
-    // 3D Gauss fit statistics
-    G4double f3DGaussChi2red;            // Reduced Chi-squared
-    G4double f3DGaussPp;                 // P-value  
-    G4int f3DGaussDOF;                   // Degrees of Freedom
-    G4double f3DGaussChargeErr;  // Charge uncertainty (5% of max charge)
-    G4bool f3DGaussSuccess;           //  success flag
-
-    // =============================================
-    // 3D POWER-LAW LORENTZ FITS VARIABLES
-    // =============================================
-    
-    // 3D Power-Law Lorentz fit parameters: z(x,y) = A / (1 + ((x-mx)/γx)^2 + ((y-my)/γy)^2)^β + B
-    G4double f3DPowerLorentzCenterX;            // mx parameter (X center)
-    G4double f3DPowerLorentzCenterY;            // my parameter (Y center)
-    G4double f3DPowerLorentzGammaX;             // γx parameter (X width)
-    G4double f3DPowerLorentzGammaY;             // γy parameter (Y width)
-    G4double f3DPowerLorentzBeta;               // β parameter (power exponent)  
-    G4double f3DPowerLorentzAmp;          // A parameter (peak amplitude)
-    G4double f3DPowerLorentzVertOffset;     // B parameter (baseline)
-    
-    // 3D Power-Law Lorentz fit parameter errors
-    G4double f3DPowerLorentzCenterXErr;         
-    G4double f3DPowerLorentzCenterYErr;         
-    G4double f3DPowerLorentzGammaXErr;          
-    G4double f3DPowerLorentzGammaYErr;          
-    G4double f3DPowerLorentzBetaErr;            
-    G4double f3DPowerLorentzAmpErr;       
-    G4double f3DPowerLorentzVertOffsetErr;  
-    
-    // 3D Power-Law Lorentz fit statistics
-    G4double f3DPowerLorentzChi2red;            // Reduced Chi-squared
-    G4double f3DPowerLorentzPp;                 // P-value  
-    G4int f3DPowerLorentzDOF;                   // Degrees of Freedom
-    G4double f3DPowerLorentzChargeErr;  // Charge uncertainty (5% of max charge)
-    G4bool f3DPowerLorentzSuccess;           //  success flag
+    G4double f3DLorentzAmp;
+    G4double f3DLorentzAmpErr;
+    G4double f3DLorentzGammaX;
+    G4double f3DLorentzGammaXErr;
+    G4double f3DLorentzGammaY;
+    G4double f3DLorentzGammaYErr;
+    G4double f3DLorentzVertOffset;
+    G4double f3DLorentzVertOffsetErr;
+    G4double f3DLorentzCenterX;
+    G4double f3DLorentzCenterXErr;
+    G4double f3DLorentzCenterY;
+    G4double f3DLorentzCenterYErr;
+    G4double f3DLorentzChi2red;
+    G4double f3DLorentzPp;
+    G4int f3DLorentzDOF;
+    G4double f3DLorentzChargeErr;
+    G4bool f3DLorentzSuccess;
 
     // Legacy variables that may still be used
     G4bool fIsPixelHit;  // True if hit is on pixel OR distance <= D0
