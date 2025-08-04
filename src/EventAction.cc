@@ -4,13 +4,6 @@
 #include "SteppingAction.hh"
 #include "Constants.hh"
 #include "Control.hh"
-#include "CrashHandler.hh"
-#include "SimulationLogger.hh"
-#include "GaussFit2D.hh"
-#include "LorentzFit2D.hh"
-#include "GaussFit3D.hh"
-#include "LorentzFit3D.hh"
-
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ParticleTable.hh"
@@ -45,21 +38,8 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fDetector(detector),
   fSteppingAction(nullptr),
   fNeighborhoodRadius(4), // Default to 9x9 grid (radius 4)
-  fEdep(0.),
-  fPos(G4ThreeVector(0.,0.,0.)),
   fInitialPos(G4ThreeVector(0.,0.,0.)),
-  fHasHit(false),
-  fPixelIndexI(-1),
-  fPixelIndexJ(-1),
-  fPixelTrueDeltaX(0),
-  fPixelTrueDeltaY(0),
-  fActualPixelDistance(-1.),
-  fPixelHit(false),
-  fAutoRadiusEnabled(Control::AUTO_RADIUS),
-  fMinAutoRadius(Constants::MIN_AUTO_RADIUS),
-  fMaxAutoRadius(Constants::MAX_AUTO_RADIUS),
-  fSelectedRadius(4),
-  fSelectedQuality(0.0),
+
   fIonizationEnergy(Constants::IONIZATION_ENERGY),
   fAmplificationFactor(Constants::AMPLIFICATION_FACTOR),
   fD0(Constants::D0_CHARGE_SHARING),
@@ -68,619 +48,87 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fScorerHitCount(0),
   fScorerDataValid(false),
   fPureSiliconHit(false),
-  fAluminumContaminated(false),
   fChargeCalculationEnabled(false)
 { 
-  G4cout << "EventAction: Using 2D Gauss fitting for central row and column" << G4endl;
 }
 
 EventAction::~EventAction()
 { 
-  // No 3D Gauss fitter to clean up
 }
 
 void EventAction::BeginOfEventAction(const G4Event* event)
 {
-  // Log event start
-  SimulationLogger* logger = SimulationLogger::GetInstance();
-  if (logger) {
-    logger->LogEventStart(event->GetEventID());
-  }
-  
-  // Validate SteppingAction integration for first event only (to avoid spam)
-  if (event->GetEventID() == 0) {
-    ValidateSteppingActionIntegration();
-    DemonstrateIntegrationWorkflow();
-  }
-  
-  // ========================================
-  // EXCLUSIVE SCORER USAGE WORKFLOW
-  // ========================================
-  
-  // Step 1: Reset aluminum interaction tracking in SteppingAction for trajectory analysis
+  // Reset all per-event variables.
   if (fSteppingAction) {
-    fSteppingAction->ResetInteractionTracking();
+      fSteppingAction->Reset();
   }
   
-  // Step 2: Reset hit purity tracking variables for Multi-Functional Detector validation
-  fPureSiliconHit = false;
-  fAluminumContaminated = false;
-  fChargeCalculationEnabled = false;
-  
-  // Step 3: Reset scorer data for exclusive Multi-Functional Detector usage
-  fScorerEnergyDeposit = 0.0;
-  fScorerHitCount = 0;
-  fScorerDataValid = false;
-  
-  // ========================================
-  // TRADITIONAL EVENT VARIABLES RESET
-  // ========================================
-  
-  // Reset per-event variables
   fEdep = 0.;
   fPos = G4ThreeVector(0.,0.,0.);
   fHasHit = false;
-  
-  // Initialize particle pos - this will be updated when the primary vertex is created
   fInitialPos = G4ThreeVector(0.,0.,0.);
-  
-  // Reset pixel mapping variables
   fPixelIndexI = -1;
   fPixelIndexJ = -1;
-  fPixelTrueDeltaX = 0;
-  fPixelTrueDeltaY = 0;
+  fPixelTrueDeltaX = 0.;
+  fPixelTrueDeltaY = 0.;
   fActualPixelDistance = -1.;
   fPixelHit = false;
-  
-  // Reset neighborhood (9x9) grid angle data
-  fNeighborhoodAngles.clear();
-  
-  // Reset neighborhood (9x9) grid charge sharing data
+
   fNeighborhoodChargeFractions.clear();
   fNeighborhoodDistances.clear();
   fNeighborhoodCharge.clear();
+
+  // Reset scorer data.
+  fScorerEnergyDeposit = 0.0;
+  fScorerHitCount = 0;
+  fScorerDataValid = false;
+
+  // Reset hit purity data.
+  fPureSiliconHit = false;
+  fChargeCalculationEnabled = false;
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
 {
-  // ========================================
-  // EXCLUSIVE MULTI-FUNCTIONAL DETECTOR DATA PRIORITIZATION
-  // ========================================
-  
-  // Step 1: Collect scorer data from Multi-Functional Detector (PRIMARY DATA SOURCE)
-  // This is prioritized over traditional SteppingAction data collection
-  try {
+    // Collect data from the multi-functional detector first.
     CollectScorerData(event);
-    // Validate that scorer data collection hasn't interfered with existing calculations
-    ValidateScorerDataIntegrity();
-  } catch (const std::exception& e) {
-    // Fallback: If scorer data collection fails, continue with default values
-    fScorerEnergyDeposit = 0.0;
-    fScorerHitCount = 0;
-    fScorerDataValid = false;
-  } catch (...) {
-    // Fallback: If any other exception occurs, continue with default values
-    fScorerEnergyDeposit = 0.0;
-    fScorerHitCount = 0;
-    fScorerDataValid = false;
-  }
-  
-  // Step 2: Perform exclusive Multi-Functional Detector validation
-  // Validate hit purity by combining scorer data with trajectory analysis
-  ValidateHitPurity();
-  
-  // Step 3: Determine if charge sharing calculations should proceed
-  // Only proceed for pure silicon hits (aluminum-contaminated hits are excluded)
-  G4bool shouldCalculateChargeSharing = ShouldCalculateChargeSharing();
-  
-  // ========================================
-  // TRADITIONAL EVENT DATA PROCESSING
-  // ========================================
-  
-  // Get the primary vertex pos and energy from the event
-  if (event->GetPrimaryVertex()) {
-    G4ThreeVector primaryPos = event->GetPrimaryVertex()->GetPosition();
-    // Update the initial pos
-    fInitialPos = primaryPos;
-    
-    // Get the initial particle energy (kinetic energy)
-    G4PrimaryParticle* primaryParticle = event->GetPrimaryVertex()->GetPrimary();
-    if (primaryParticle) {
-      G4double initialKineticEnergy = primaryParticle->GetKineticEnergy();
-      // Store the initial energy in the RunAction for ROOT output
-      // Convert from Geant4 internal units (MeV) to MeV for storage
-      fRunAction->SetInitialEnergy(initialKineticEnergy);
-    }
-  }
-  
-  // Calc and store nearest pixel pos (this calculates fActualPixelDistance)
-  G4ThreeVector nearestPixel = CalcNearestPixel(fPos);
-  
-  // Calc and pass pixel angular size to RunAction
-  G4double pixelAlpha = CalcPixelAlpha(fPos, fPixelIndexI, fPixelIndexJ);
-  
-  // Determine if hit is a pixel hit: only based on whether it's on pixel surface
-  G4bool isPixelHit = fPixelHit;
-  
-  // ADDITIONAL VALIDATION: Double-check pixel hit status for consistency
-  G4bool pixelHitDoubleCheck = fSteppingAction ? fSteppingAction->IsPixelHit() : false;
-  if (isPixelHit != pixelHitDoubleCheck) {
-    G4cerr << "WARNING: Pixel hit status inconsistency detected!" << G4endl;
-    G4cerr << "  Initial check: " << (isPixelHit ? "PIXEL HIT" : "NON-PIXEL HIT") << G4endl;
-    G4cerr << "  Double check: " << (pixelHitDoubleCheck ? "PIXEL HIT" : "NON-PIXEL HIT") << G4endl;
-    G4cerr << "  Position: (" << fPos.x()/mm << ", " << fPos.y()/mm << ", " << fPos.z()/mm << ") mm" << G4endl;
-    // Use the more recent check as it's more reliable
-    isPixelHit = pixelHitDoubleCheck;
-    fPixelHit = pixelHitDoubleCheck;
-  }
-  
-  // VALIDATION: For pixel hits both deltas must be NaN. If either value is finite we report an error
-  if (isPixelHit) {
-    // Use robust NaN check: NaN != NaN is always true
-    const G4bool deltaXIsFinite = std::isfinite(fPixelTrueDeltaX);
-    const G4bool deltaYIsFinite = std::isfinite(fPixelTrueDeltaY);
 
-    if (deltaXIsFinite || deltaYIsFinite) {
-      G4cerr << "ERROR: Deltas should be NaN for pixel hits!" << G4endl;
-      G4cerr << "  Pixel hit: YES" << G4endl;
-      G4cerr << "  DeltaX: " << fPixelTrueDeltaX/mm << " mm (finite: " << (deltaXIsFinite ? "YES" : "NO") << ")" << G4endl;
-      G4cerr << "  DeltaY: " << fPixelTrueDeltaY/mm << " mm (finite: " << (deltaYIsFinite ? "YES" : "NO") << ")" << G4endl;
+    // Use the MFD data for energy deposition.
+    G4double finalEdep = fScorerDataValid ? fScorerEnergyDeposit : 0.0;
 
-      // Force deltas to NaN for pixel hits to keep downstream logic consistent
-      fPixelTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-      fPixelTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
-  }
-  
-  // ENERGY DEPOSITION LOGIC:
-  // - Energy is summed only while particle travels through detector volume (handled in SteppingAction)
-  // - For pixel hits: set energy deposition to zero (per user requirement)  
-  // - For non-pixel hits: use energy deposited inside detector during particle passage
-  G4double finalEdep = fEdep;
-  if (isPixelHit) {
-    finalEdep = 0.0; // Set to zero for pixel hits (per user requirement)
-  } else {
-    // For non-pixel hits, use the energy deposited inside the detector (already accumulated in fEdep from SteppingAction)
-  }
-  
-  // Pass classification data to RunAction
-  fRunAction->SetPixelClassification(isPixelHit, fPixelTrueDeltaX, fPixelTrueDeltaY);
-  fRunAction->SetPixelHitStatus(isPixelHit);
-  
-  // Update the event data with the corrected energy deposition
-  fRunAction->SetEventData(finalEdep, fPos.x(), fPos.y(), fPos.z());
-  fRunAction->SetInitialPos(fInitialPos.x(), fInitialPos.y(), fInitialPos.z());
-  
-  // Set nearest pixel pos in RunAction  
-  fRunAction->SetNearestPixelPos(nearestPixel.x(), nearestPixel.y());
-  
-  // Only calculate and store pixel-specific data for pixel hits (on pixel surface)
-  if (isPixelHit) {
-    
-    // Clear non-pixel data for pixel hits
-    fNeighborhoodAngles.clear();
-    fNeighborhoodChargeFractions.clear();
-    fNeighborhoodDistances.clear();
-    fNeighborhoodCharge.clear();
-  } else {
-    // Non-pixel hit: determine optimal radius and calculate neighborhood grid data
-    if (fAutoRadiusEnabled) {
-      // Perform automatic radius selection based on fit quality
-      fSelectedRadius = SelectOptimalRadius(fPos, fPixelIndexI, fPixelIndexJ);
-      fNeighborhoodRadius = fSelectedRadius;
-      
-      G4cout << "EventAction: Auto-selected radius " << fSelectedRadius 
-             << " with fit quality " << fSelectedQuality << G4endl;
-    } else {
-      // Use fixed radius
-      fSelectedRadius = fNeighborhoodRadius;
-      fSelectedQuality = 0.0; // Not evaluated
-    }
-    
-    // Calc neighborhood grid data with selected radius
-    CalcNeighborhoodGridAngles(fPos, fPixelIndexI, fPixelIndexJ);
-    CalcNeighborhoodChargeSharing();
-  }
-  
-  // Pass neighborhood grid data to RunAction (will be empty for pixel hits)
-  fRunAction->SetNeighborhoodGridData(fNeighborhoodAngles);
-  fRunAction->SetNeighborhoodChargeData(fNeighborhoodChargeFractions, fNeighborhoodDistances, fNeighborhoodCharge, fNeighborhoodCharge);
-  
-  // Pass automatic radius selection results to RunAction
-  fRunAction->SetAutoRadiusResults(fSelectedRadius);
-  
-  // Perform 2D Gauss fitting on charge distribution data (central row and column)
-  // Only fit for non-pixel hits (not on pixel surface)
-  G4bool shouldPerform = !isPixelHit && !fNeighborhoodChargeFractions.empty();
-  
-  if (shouldPerform) {
-    // Extract coordinates and charge values for fitting
-    std::vector<double> x_coords, y_coords, charge_values;
-    
-    // Get detector parameters for coordinate calculation
-    G4double pixelSpacing = fDetector->GetPixelSpacing();
-    
-    // Convert grid indices to actual coordinates
-    // The neighborhood grid is a systematic 9x9 grid around the center pixel
-    G4int gridSize = 2 * fNeighborhoodRadius + 1; // Should be 9 for radius 4
-    for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
-      // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
-      // BUT: Still need to filter out invalid markers (-999)
-      if (fNeighborhoodChargeFractions[i] < -998.0) {
-        continue; // Skip pixels with invalid markers (-999)
-      }
-      
-      // Calc grid pos from array index
-      // The grid is stored in column-major order: i = col * gridSize + row
-      // because di (X) is outer loop, dj (Y) is inner loop in charge calculation
-      G4int col = i / gridSize;  // di (X) was outer loop
-      G4int row = i % gridSize;  // dj (Y) was inner loop
-      
-      // Convert grid pos to pixel offset from center
-      G4int offsetI = col - fNeighborhoodRadius; // -4 to +4 for 9x9 grid (X offset)
-      G4int offsetJ = row - fNeighborhoodRadius; // -4 to +4 for 9x9 grid (Y offset)
-      
-      // Calc actual pos
-      G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
-      G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
-      
-      x_coords.push_back(x_pos);
-      y_coords.push_back(y_pos);
-      // Use actual charge values (in Coulombs) instead of fractions for fitting
-      charge_values.push_back(fNeighborhoodCharge[i]);
-    }
-    
-    // ===============================================
-    // GAUSS FIT (conditionally enabled)
-    // ===============================================
-    
-    // Perform 2D fitting if we have enough data points and Gauss fitting is enabled
-    if (x_coords.size() >= 3 && Control::GAUSS_FIT && Control::ROWCOL_FIT) { // Need at least 3 points for 1D Gauss fit
-      // Perform 2D Gauss fitting using the Ceres Solver implementation
-      Gauss2DResultsCeres fitResults = GaussCeres2D(
-        x_coords, y_coords, charge_values,
-        nearestPixel.x(), nearestPixel.y(),
-        pixelSpacing, 
-        false, // verbose=false for production
-        false); // enable_outlier_filtering
-      
-      if (fitResults.fit_success) {
-      }
-      
-      // VALIDATION: Only save fitting results for non-pixel hits
-      if (isPixelHit) {
-        G4cerr << "CRITICAL ERROR: Attempting to save Gauss fitting results for a pixel hit!" << G4endl;
-        G4cerr << "  This should never happen - fitting should only be performed for non-pixel hits." << G4endl;
-        G4cerr << "  Event ID: " << event->GetEventID() << G4endl;
-        G4cerr << "  Position: (" << fPos.x()/mm << ", " << fPos.y()/mm << ", " << fPos.z()/mm << ") mm" << G4endl;
-        G4cerr << "  Skipping fitting result storage." << G4endl;
-      } else {
-        // SAFE: Save fitting results only for non-pixel hits
-        // Pass 2D fit results to RunAction
-        fRunAction->Set2DGaussResults(
-          fitResults.x_center, fitResults.x_sigma, fitResults.x_amp,
-          fitResults.x_center_err, fitResults.x_sigma_err, fitResults.x_amp_err,
-          fitResults.x_vert_offset, fitResults.x_vert_offset_err,
-          fitResults.x_chi2red, fitResults.x_pp, fitResults.x_dof,
-          fitResults.y_center, fitResults.y_sigma, fitResults.y_amp,
-          fitResults.y_center_err, fitResults.y_sigma_err, fitResults.y_amp_err,
-          fitResults.y_vert_offset, fitResults.y_vert_offset_err,
-          fitResults.y_chi2red, fitResults.y_pp, fitResults.y_dof,
-          fitResults.x_charge_err, fitResults.y_charge_err,
-          fitResults.fit_success);
-        
-        // Log Gauss fitting results to SimulationLogger
-        SimulationLogger* logger = SimulationLogger::GetInstance();
-        if (logger) {
-          logger->LogGaussResults(event->GetEventID(), fitResults);
-        }
-      }
-        
-        // Perform diagonal fitting if 2D fitting was performed and success and diagonal fitting is enabled
-        if (fitResults.fit_success && Control::DIAG_FIT) {
-          // Perform diagonal Gauss fitting using the Ceres Solver implementation
-          DiagResultsCeres diagResults = DiagGaussCeres(
-          x_coords, y_coords, charge_values,
-          nearestPixel.x(), nearestPixel.y(),
-          pixelSpacing, 
-          false, // verbose=false for production
-          false); // enable_outlier_filtering
-        
-        if (diagResults.fit_success) {
-        }
-        
-        // VALIDATION: Only save diagonal fitting results for non-pixel hits
-        if (isPixelHit) {
-          G4cerr << "CRITICAL ERROR: Attempting to save diagonal Gauss fitting results for a pixel hit!" << G4endl;
-          G4cerr << "  This should never happen - diagonal fitting should only be performed for non-pixel hits." << G4endl;
-          G4cerr << "  Event ID: " << event->GetEventID() << G4endl;
-          G4cerr << "  Position: (" << fPos.x()/mm << ", " << fPos.y()/mm << ", " << fPos.z()/mm << ") mm" << G4endl;
-          G4cerr << "  Skipping diagonal fitting result storage." << G4endl;
-        } else {
-          // SAFE: Save diagonal fitting results only for non-pixel hits
-          // Pass diagonal fit results to RunAction
-          fRunAction->SetDiagGaussResults(
-            diagResults.main_diag_x_center, diagResults.main_diag_x_sigma, diagResults.main_diag_x_amp,
-            diagResults.main_diag_x_center_err, diagResults.main_diag_x_sigma_err, diagResults.main_diag_x_amp_err,
-            diagResults.main_diag_x_vert_offset, diagResults.main_diag_x_vert_offset_err,
-            diagResults.main_diag_x_chi2red, diagResults.main_diag_x_pp, diagResults.main_diag_x_dof, diagResults.main_diag_x_fit_success,
-            diagResults.main_diag_y_center, diagResults.main_diag_y_sigma, diagResults.main_diag_y_amp,
-            diagResults.main_diag_y_center_err, diagResults.main_diag_y_sigma_err, diagResults.main_diag_y_amp_err,
-            diagResults.main_diag_y_vert_offset, diagResults.main_diag_y_vert_offset_err,
-            diagResults.main_diag_y_chi2red, diagResults.main_diag_y_pp, diagResults.main_diag_y_dof, diagResults.main_diag_y_fit_success,
-            diagResults.sec_diag_x_center, diagResults.sec_diag_x_sigma, diagResults.sec_diag_x_amp,
-            diagResults.sec_diag_x_center_err, diagResults.sec_diag_x_sigma_err, diagResults.sec_diag_x_amp_err,
-            diagResults.sec_diag_x_vert_offset, diagResults.sec_diag_x_vert_offset_err,
-            diagResults.sec_diag_x_chi2red, diagResults.sec_diag_x_pp, diagResults.sec_diag_x_dof, diagResults.sec_diag_x_fit_success,
-            diagResults.sec_diag_y_center, diagResults.sec_diag_y_sigma, diagResults.sec_diag_y_amp,
-            diagResults.sec_diag_y_center_err, diagResults.sec_diag_y_sigma_err, diagResults.sec_diag_y_amp_err,
-            diagResults.sec_diag_y_vert_offset, diagResults.sec_diag_y_vert_offset_err,
-            diagResults.sec_diag_y_chi2red, diagResults.sec_diag_y_pp, diagResults.sec_diag_y_dof, diagResults.sec_diag_y_fit_success,
-            diagResults.fit_success);
-        }
-      } else {
-        // Set default diagonal fit values when 2D fitting failed
-        fRunAction->SetDiagGaussResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amp, center_err, sigma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof, fit_success)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-          false); // fit_success = false
-      }
-      
-      // ===============================================
-      // LORENTZ FIT (conditionally enabled)
-      // ===============================================
-      
-      // Perform 2D Lorentz fitting if we have enough data points and Lorentz fitting is enabled
-      if (x_coords.size() >= 3 && Control::LORENTZ_FIT && Control::ROWCOL_FIT) { // Need at least 3 points for 1D Lorentz fit
-        // Perform 2D Lorentz fitting using the Ceres Solver implementation
-        Lorentz2DResultsCeres lorentzResults = LorentzCeres2D(
-          x_coords, y_coords, charge_values,
-          nearestPixel.x(), nearestPixel.y(),
-          pixelSpacing, 
-          false, // verbose=false for production
-          false); // enable_outlier_filtering
-        
-        if (lorentzResults.fit_success) {
-        }
-        
-        // Pass 2D Lorentz fit results to RunAction
-        fRunAction->Set2DLorentzResults(
-          lorentzResults.x_center, lorentzResults.x_gamma, lorentzResults.x_amp,
-          lorentzResults.x_center_err, lorentzResults.x_gamma_err, lorentzResults.x_amp_err,
-          lorentzResults.x_vert_offset, lorentzResults.x_vert_offset_err,
-          lorentzResults.x_chi2red, lorentzResults.x_pp, lorentzResults.x_dof,
-          lorentzResults.y_center, lorentzResults.y_gamma, lorentzResults.y_amp,
-          lorentzResults.y_center_err, lorentzResults.y_gamma_err, lorentzResults.y_amp_err,
-          lorentzResults.y_vert_offset, lorentzResults.y_vert_offset_err,
-          lorentzResults.y_chi2red, lorentzResults.y_pp, lorentzResults.y_dof,
-          lorentzResults.x_charge_err, lorentzResults.y_charge_err,
-          lorentzResults.fit_success);
-        
-        // Log Lorentz fitting results to SimulationLogger
-        SimulationLogger* logger = SimulationLogger::GetInstance();
-        if (logger) {
-          logger->LogLorentzResults(event->GetEventID(), lorentzResults);
-        }
-          
-        // Note: Lorentz charge error data was removed as per user request
-          
-        // Perform diagonal Lorentz fitting if 2D fitting was performed and success and diagonal fitting is enabled
-        if (lorentzResults.fit_success && Control::DIAG_FIT) {
-          // Perform diagonal Lorentz fitting using the Ceres Solver implementation
-          DiagLorentzResultsCeres lorentzDiagResults = DiagLorentzCeres(
-          x_coords, y_coords, charge_values,
-          nearestPixel.x(), nearestPixel.y(),
-          pixelSpacing, 
-          false, // verbose=false for production
-          false); // enable_outlier_filtering
-        
-        if (lorentzDiagResults.fit_success) {
-        }
-        
-        // Pass diagonal Lorentz fit results to RunAction
-        fRunAction->SetDiagLorentzResults(
-          lorentzDiagResults.main_diag_x_center, lorentzDiagResults.main_diag_x_gamma, lorentzDiagResults.main_diag_x_amp,
-          lorentzDiagResults.main_diag_x_center_err, lorentzDiagResults.main_diag_x_gamma_err, lorentzDiagResults.main_diag_x_amp_err,
-          lorentzDiagResults.main_diag_x_vert_offset, lorentzDiagResults.main_diag_x_vert_offset_err,
-          lorentzDiagResults.main_diag_x_chi2red, lorentzDiagResults.main_diag_x_pp, lorentzDiagResults.main_diag_x_dof, lorentzDiagResults.main_diag_x_fit_success,
-          lorentzDiagResults.main_diag_y_center, lorentzDiagResults.main_diag_y_gamma, lorentzDiagResults.main_diag_y_amp,
-          lorentzDiagResults.main_diag_y_center_err, lorentzDiagResults.main_diag_y_gamma_err, lorentzDiagResults.main_diag_y_amp_err,
-          lorentzDiagResults.main_diag_y_vert_offset, lorentzDiagResults.main_diag_y_vert_offset_err,
-          lorentzDiagResults.main_diag_y_chi2red, lorentzDiagResults.main_diag_y_pp, lorentzDiagResults.main_diag_y_dof, lorentzDiagResults.main_diag_y_fit_success,
-          lorentzDiagResults.sec_diag_x_center, lorentzDiagResults.sec_diag_x_gamma, lorentzDiagResults.sec_diag_x_amp,
-          lorentzDiagResults.sec_diag_x_center_err, lorentzDiagResults.sec_diag_x_gamma_err, lorentzDiagResults.sec_diag_x_amp_err,
-          lorentzDiagResults.sec_diag_x_vert_offset, lorentzDiagResults.sec_diag_x_vert_offset_err,
-          lorentzDiagResults.sec_diag_x_chi2red, lorentzDiagResults.sec_diag_x_pp, lorentzDiagResults.sec_diag_x_dof, lorentzDiagResults.sec_diag_x_fit_success,
-          lorentzDiagResults.sec_diag_y_center, lorentzDiagResults.sec_diag_y_gamma, lorentzDiagResults.sec_diag_y_amp,
-          lorentzDiagResults.sec_diag_y_center_err, lorentzDiagResults.sec_diag_y_gamma_err, lorentzDiagResults.sec_diag_y_amp_err,
-          lorentzDiagResults.sec_diag_y_vert_offset, lorentzDiagResults.sec_diag_y_vert_offset_err,
-          lorentzDiagResults.sec_diag_y_chi2red, lorentzDiagResults.sec_diag_y_pp, lorentzDiagResults.sec_diag_y_dof, lorentzDiagResults.sec_diag_y_fit_success,
-          lorentzDiagResults.fit_success);
-          
-        // Note: Diag Lorentz charge error data was removed as per user request
-      } else {
-        // Set default diagonal Lorentz fit values when 2D fitting failed
-        fRunAction->SetDiagLorentzResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof, fit_success)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-          false); // fit_success = false
-      }
-        
-    } else {
-      // Not enough data points for Lorentz fitting or Lorentz fitting is disabled
-      if (Control::LORENTZ_FIT) {
-        fRunAction->Set2DLorentzResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-          0, 0,  // charge uncertainties (x_charge_err, y_charge_err)
-          false); // fit_success = false
-        
-        // Set default diagonal Lorentz fit values when not enough data points
-        fRunAction->SetDiagLorentzResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof, fit_success)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-          false); // fit_success = false
-      }
-    }
-      
+    // The hit position is still determined by the energy-weighted average
+    // from SteppingAction for charge sharing calculations.
+    G4ThreeVector hitPos = fHasHit ? fPos : G4ThreeVector(0, 0, 0);
 
-        
-    } else {
-      // Not enough data points for fitting or Gauss fitting is disabled
-      if (Control::GAUSS_FIT) {
-        fRunAction->Set2DGaussResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amp, center_err, sigma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-          0, 0,  // charge uncertainties (x_charge_err, y_charge_err)
-          false); // fit_success = false
-        
-        // Set default diagonal fit values when not enough data points
-        fRunAction->SetDiagGaussResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amp, center_err, sigma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof, fit_success)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-          false); // fit_success = false
-      }
-      
-      // Not enough data points for Lorentz fitting or Lorentz fitting is disabled
-      if (Control::LORENTZ_FIT) {
-        fRunAction->Set2DLorentzResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-          0, 0,  // charge uncertainties (x_charge_err, y_charge_err)
-          false); // fit_success = false
-        
-        // Set default diagonal Lorentz fit values when not enough data points
-        fRunAction->SetDiagLorentzResults(
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof, fit_success)
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-          false); // fit_success = false
-      }
-    }
-  } else {
-    // Skip fitting due to conditions not met
-    if (isPixelHit) {
-    } else if (fNeighborhoodChargeFractions.empty()) {
-    }
-    
-    // Set default values (no fitting performed or fitting is disabled)
-    if (Control::GAUSS_FIT) {
-      fRunAction->Set2DGaussResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, sigma, amp, center_err, sigma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-        0, 0,  // charge uncertainties (x_charge_err, y_charge_err)
-        false); // fit_success = false
-      
-      // Set default diagonal fit values when fitting is skipped
-      fRunAction->SetDiagGaussResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, sigma, amp, center_err, sigma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof, fit_success)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-        false); // fit_success = false
-    }
-    
-    // Set default Lorentz values (no fitting performed or Lorentz fitting is disabled)
-    if (Control::LORENTZ_FIT) {
-      fRunAction->Set2DLorentzResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-        0, 0,  // charge uncertainties (x_charge_err, y_charge_err)
-        false); // fit_success = false
-      
-      // Set default diagonal Lorentz fit values when fitting is skipped
-      fRunAction->SetDiagLorentzResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters (center, gamma, amp, center_err, gamma_err, amp_err, vert_offset, vert_offset_err, chi2red, pp, dof, fit_success)
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-        false); // fit_success = false
-    }
-    
-    // Set default 3D Gauss values (no fitting performed or 3D Gauss fitting is disabled)
-    if (Control::GAUSS_FIT_3D) {
-      fRunAction->Set3DGaussResults(
-        0, 0, 0, 0, 0, 0,  // center_x, center_y, sigma_x, sigma_y, amp, vert_offset
-        0, 0, 0, 0, 0, 0,  // center_x_err, center_y_err, sigma_x_err, sigma_y_err, amp_err, vert_offset_err
-        0, 0, 0,           // chi2red, pp, dof
-        0,                 // charge_err
-        false);            // fit_success = false
-    }
-    
+    // Determine hit purity and if charge sharing should be enabled.
+    fPureSiliconHit = fSteppingAction ? fSteppingAction->IsValidSiliconHit() : false;
+    fChargeCalculationEnabled = fPureSiliconHit && fScorerDataValid;
 
-  }
-  
-  // ========================================
-  // CONDITIONAL CHARGE SHARING CALCULATION
-  // ========================================
-  
-  // Perform conditional charge sharing calculation based on hit purity validation
-  // This replaces traditional charge sharing and only processes pure silicon hits
-  // GaussRowDeltaX, GaussRowDeltaY calculations are skipped for aluminum-contaminated hits
-  if (shouldCalculateChargeSharing) {
-    SimulationLogger* logger = SimulationLogger::GetInstance();
-    if (logger) {
-      logger->LogInfo("Event " + std::to_string(event->GetEventID()) + 
-                     ": Performing charge sharing calculation for pure silicon hit");
+    // Calculate and store nearest pixel position (this calculates fActualPixelDistance)
+    G4ThreeVector nearestPixel = CalcNearestPixel(hitPos);
+
+    // If charge sharing is enabled, perform the calculation.
+    if (fChargeCalculationEnabled) {
+        CalcNeighborhoodChargeSharing();
+        CalcNeighborhoodGridAngles(hitPos, fPixelIndexI, fPixelIndexJ);
     }
-    ConditionalChargeCalculation(event);
-  } else {
-    // Skip charge sharing calculations for aluminum-contaminated hits
-    SimulationLogger* logger = SimulationLogger::GetInstance();
-    if (logger) {
-      G4String reason = "Charge sharing calculation skipped for Event " + 
-                       std::to_string(event->GetEventID()) + ": ";
-      
-      if (!fChargeCalculationEnabled) {
-        reason += "Charge calculation disabled";
-      } else if (!fScorerDataValid) {
-        reason += "Invalid scorer data";
-      } else if (!fPureSiliconHit) {
-        reason += "Not a pure silicon hit";
-      } else if (fAluminumContaminated) {
-        reason += "Aluminum contamination detected";
-      } else {
-        reason += "Hit validation failed";
-      }
-      
-      logger->LogInfo(reason);
+
+    // Pass all relevant data to RunAction for storage.
+    fRunAction->SetEventData(finalEdep, hitPos.x(), hitPos.y(), hitPos.z());
+    fRunAction->SetInitialPos(fInitialPos.x(), fInitialPos.y(), fInitialPos.z());
+    fRunAction->SetNearestPixelPos(nearestPixel.x(), nearestPixel.y());
+    fRunAction->SetPixelHitStatus(fSteppingAction ? fSteppingAction->IsPixelHit() : false);
+    fRunAction->SetPixelClassification(fPixelHit, fPixelTrueDeltaX, fPixelTrueDeltaY);
+
+    if (fChargeCalculationEnabled) {
+        fRunAction->SetNeighborhoodGridData(fNeighborhoodAngles);
+        fRunAction->SetNeighborhoodChargeData(fNeighborhoodChargeFractions, fNeighborhoodDistances, fNeighborhoodCharge, fNeighborhoodCharge);
     }
     
-    // Set default values for all fitting results since no calculations will be performed
-    // DO NOT reset fitting results here – earlier fits (row/column) are already stored.
-    // Leaving them intact avoids GaussRowDOF being overwritten to 0.
-    // SetDefaultFittingResults();
-  }
-  
-  // Transfer scorer data to RunAction for ROOT tree storage
-  fRunAction->SetScorerData(fScorerEnergyDeposit, fScorerHitCount, fScorerDataValid);
-  
-  // Transfer hit purity tracking data to RunAction for ROOT tree storage
-  fRunAction->SetHitPurityData(fPureSiliconHit, fAluminumContaminated, fChargeCalculationEnabled);
-  
-  fRunAction->FillTree();
-  
-  // Log event end
-  G4int eventID = event->GetEventID();
-  SimulationLogger* logger = SimulationLogger::GetInstance();
-  if (logger) {
-    logger->LogEventEnd(eventID);
-  }
-  
-  // Update crash recovery progress tracking - only every 100 events to reduce mutex contention
-  // The auto-save functionality in CrashHandler will still work at its configured intervals
-  if (eventID % 100 == 0) {
-    CrashHandler::GetInstance().UpdateProgress(eventID);
-  }
+    fRunAction->SetHitPurityData(fPureSiliconHit, fChargeCalculationEnabled);
+
+    // Fill the ROOT tree for this event.
+    fRunAction->FillTree();
 }
 
 void EventAction::AddEdep(G4double edep, G4ThreeVector pos)
@@ -698,12 +146,6 @@ void EventAction::AddEdep(G4double edep, G4ThreeVector pos)
       fEdep += edep;  // Accumulate total energy deposited in detector
     }
   }
-}
-
-// Implementation of the new method to set the initial pos
-void EventAction::SetInitialPos(const G4ThreeVector& pos)
-{
-  fInitialPos = pos;
 }
 
 // Implementation of the nearest pixel calculation method
@@ -1123,124 +565,6 @@ void EventAction::CalcNeighborhoodChargeSharing()
   }
 }
 
-// Perform automatic radius selection based on fit quality
-G4int EventAction::SelectOptimalRadius(const G4ThreeVector& hitPos, G4int hitPixelI, G4int hitPixelJ)
-{
-  G4double bestQuality = -1.0;
-  G4int bestRadius = fNeighborhoodRadius; // Default fallback
-  
-  // Test different radii from min to max
-  for (G4int testRadius = fMinAutoRadius; testRadius <= fMaxAutoRadius; testRadius++) {
-    G4double fitQuality = EvaluateFitQuality(testRadius, hitPos, hitPixelI, hitPixelJ);
-    
-    if (fitQuality > bestQuality) {
-      bestQuality = fitQuality;
-      bestRadius = testRadius;
-    }
-  }
-  
-  // Store the best fit quality found
-  fSelectedQuality = bestQuality;
-  
-  return bestRadius;
-}
-
-// Evaluate fit quality for a given radius
-G4double EventAction::EvaluateFitQuality(G4int radius, const G4ThreeVector& hitPos, G4int hitPixelI, G4int hitPixelJ)
-{
-  // Temporarily save current radius
-  G4int originalRadius = fNeighborhoodRadius;
-  fNeighborhoodRadius = radius;
-  
-  // Clear and recalculate neighborhood data with test radius
-  std::vector<G4double> tempAngles = fNeighborhoodAngles;
-  std::vector<G4double> tempChargeFractions = fNeighborhoodChargeFractions;
-  std::vector<G4double> tempDistances = fNeighborhoodDistances;
-  std::vector<G4double> tempCharge = fNeighborhoodCharge;
-  
-  // Calc neighborhood data with test radius
-  CalcNeighborhoodGridAngles(hitPos, hitPixelI, hitPixelJ);
-  CalcNeighborhoodChargeSharing();
-  
-  // Check if we have enough data points for fitting
-  G4int validPoints = fNeighborhoodChargeFractions.size(); // Use ALL points, not just positive charge
-  
-  if (validPoints < Constants::MIN_POINTS_FOR_FIT) {
-    // Restore original data and radius
-    fNeighborhoodRadius = originalRadius;
-    fNeighborhoodAngles = tempAngles;
-    fNeighborhoodChargeFractions = tempChargeFractions;
-    fNeighborhoodDistances = tempDistances;
-    fNeighborhoodCharge = tempCharge;
-    return 0.0; // Poor quality due to insufficient data
-  }
-  
-  // Extract data for fitting
-  std::vector<double> x_coords, y_coords, charge_values;
-  G4double pixelSpacing = fDetector->GetPixelSpacing();
-  G4int gridSize = 2 * radius + 1;
-  G4ThreeVector nearestPixel = CalcNearestPixel(hitPos);
-  
-  for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
-    // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
-    // BUT: Still need to filter out invalid markers (-999)
-    if (fNeighborhoodChargeFractions[i] < -998.0) {
-      continue; // Skip pixels with invalid markers (-999)
-    }
-    
-    G4int col = i / gridSize;  // di (X) was outer loop
-    G4int row = i % gridSize;  // dj (Y) was inner loop
-    
-    G4int offsetI = col - radius; // X offset from center pixel
-    G4int offsetJ = row - radius; // Y offset from center pixel
-    
-    G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
-    G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
-    
-    x_coords.push_back(x_pos);
-    y_coords.push_back(y_pos);
-    charge_values.push_back(fNeighborhoodCharge[i]);
-  }
-  
-  G4double fitQuality = 0.0;
-  
-  if (x_coords.size() >= Constants::MIN_POINTS_FOR_FIT) {
-    // Perform quick Gauss fit evaluation
-    Gauss2DResultsCeres fitResults = GaussCeres2D(
-      x_coords, y_coords, charge_values,
-      nearestPixel.x(), nearestPixel.y(),
-      pixelSpacing, 
-      false, // verbose=false
-      false); // enable_outlier_filtering
-    
-    if (fitResults.fit_success) {
-      // Calc fit quality based on residuals and fit parameters
-      // Use reduced chi-squared values and goodness of fit metrics
-      G4double rowQuality = (fitResults.x_chi2red > 0) ? 1.0 / (1.0 + fitResults.x_chi2red) : 0.0;
-      G4double colQuality = (fitResults.y_chi2red > 0) ? 1.0 / (1.0 + fitResults.y_chi2red) : 0.0;
-      
-      // Average the quality from row and column fits
-      fitQuality = (rowQuality + colQuality) / 2.0;
-      
-      // Apply penalty for outliers based on fit probability
-      G4double probPenalty = (fitResults.x_pp + fitResults.y_pp) / 2.0;
-      fitQuality *= probPenalty;
-      
-      // Clamp to [0, 1] range
-      fitQuality = std::max(0.0, std::min(1.0, fitQuality));
-    }
-  }
-  
-  // Restore original data and radius
-  fNeighborhoodRadius = originalRadius;
-  fNeighborhoodAngles = tempAngles;
-  fNeighborhoodChargeFractions = tempChargeFractions;
-  fNeighborhoodDistances = tempDistances;
-  fNeighborhoodCharge = tempCharge;
-  
-  return fitQuality;
-}
-
 void EventAction::CollectScorerData(const G4Event* event)
 {
   // Reset per–event scorer data
@@ -1257,15 +581,18 @@ void EventAction::CollectScorerData(const G4Event* event)
   static G4int hitsID  = -1;
   if (edepID < 0 || hitsID < 0)
   {
-    edepID = G4SDManager::GetSDMpointer()->GetCollectionID("EnergyDeposit");
-    hitsID = G4SDManager::GetSDMpointer()->GetCollectionID("HitCount");
+      G4SDManager* sdm = G4SDManager::GetSDMpointer();
+      if(sdm) {
+          edepID = sdm->GetCollectionID("SiliconDetector/EnergyDeposit");
+          hitsID = sdm->GetCollectionID("SiliconDetector/HitCount");
+      }
   }
 
   // Energy deposit map
   if (edepID >= 0)
   {
     auto* edepMap = dynamic_cast<G4THitsMap<G4double>*>(hce->GetHC(edepID));
-    if (edepMap)
+    if (edepMap && edepMap->GetMap()->size() > 0)
     {
       for (const auto& kv : *edepMap->GetMap())
       {
@@ -1278,7 +605,7 @@ void EventAction::CollectScorerData(const G4Event* event)
   if (hitsID >= 0)
   {
     auto* hitsMap = dynamic_cast<G4THitsMap<G4int>*>(hce->GetHC(hitsID));
-    if (hitsMap)
+    if (hitsMap && hitsMap->GetMap()->size() > 0)
     {
       for (const auto& kv : *hitsMap->GetMap())
       {
@@ -1287,364 +614,8 @@ void EventAction::CollectScorerData(const G4Event* event)
     }
   }
 
-  // Keep even very small energy deposits
-  // highly energetic, minimally ionising particles.
-}
-
-void EventAction::SetScorerData(G4double energy, G4int hits, G4bool valid)
-{
-  fScorerEnergyDeposit = energy;
-  fScorerHitCount      = hits;
-  fScorerDataValid     = valid;
-}
-
-void EventAction::ValidateScorerDataIntegrity() const
-{
-  if (!fScorerDataValid) return; // Nothing to validate
-
-  if (fScorerEnergyDeposit < 0)
-  {
-    G4cerr << "EventAction WARNING: Negative energy deposit reported by scorer (" << fScorerEnergyDeposit << ")" << G4endl;
-  }
-  if (fScorerHitCount < 0)
-  {
-    G4cerr << "EventAction WARNING: Negative hit count reported by scorer (" << fScorerHitCount << ")" << G4endl;
-  }
-}
-
-void EventAction::ValidateHitPurity()
-{
-  // Default to conservative values (no charge sharing)
-  fPureSiliconHit          = false;
-  fAluminumContaminated    = true;
-  fChargeCalculationEnabled= false;
-
-  if (!fSteppingAction) return; // Cannot validate without trajectory data
-
-  // SteppingAction already determined whether the silicon interaction happened without aluminum pre-contact
-  fPureSiliconHit       = fSteppingAction->IsValidSiliconHit();
-  fAluminumContaminated = !fPureSiliconHit; // if pure -> not contaminated, else contaminated
-
-  // Charge sharing can only be calculated if
-  //   1) the hit is pure silicon (no aluminum)
-  //   2) scorer data looks reasonable
-  fChargeCalculationEnabled = fPureSiliconHit && fScorerDataValid;
-}
-
-G4bool EventAction::ShouldCalculateChargeSharing() const
-{
-  return fChargeCalculationEnabled;
-}
-
-void EventAction::ConditionalChargeCalculation(const G4Event* event)
-{
-  if (!ShouldCalculateChargeSharing()) return;
-
-  // Recompute nearest pixel (needed by PerformChargeShareFitting)
-  G4ThreeVector nearestPixel = CalcNearestPixel(fPos);
-  PerformChargeShareFitting(event, nearestPixel);
-}
-
-void EventAction::SetDefaultFittingResults()
-{
-  // Set default values for all fitting results when calculations are skipped
-  if (Control::GAUSS_FIT) {
-    fRunAction->Set2DGaussResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-      0, 0,  // charge uncertainties
-      false); // fit_success = false
-    
-    fRunAction->SetDiagGaussResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-      false); // fit_success = false
-  }
-  
-  if (Control::LORENTZ_FIT) {
-    fRunAction->Set2DLorentzResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // X fit parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // Y fit parameters
-      0, 0,  // charge uncertainties
-      false); // fit_success = false
-    
-    fRunAction->SetDiagLorentzResults(
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Main diagonal Y parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal X parameters
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,  // Secondary diagonal Y parameters
-      false); // fit_success = false
-  }
-  
-
-}
-
-void EventAction::PerformChargeShareFitting(const G4Event* event, const G4ThreeVector& nearestPixel)
-{
-  // Extract coordinates and charge values for fitting
-  std::vector<double> x_coords, y_coords, charge_values;
-  G4double pixelSpacing = fDetector->GetPixelSpacing();
-  
-  // Convert grid indices to actual coordinates
-  G4int gridSize = 2 * fNeighborhoodRadius + 1;
-  for (size_t i = 0; i < fNeighborhoodChargeFractions.size(); ++i) {
-    // REMOVED: Only include pixels with charge filter - include ALL pixels for small charge values
-    // BUT: Still need to filter out invalid markers (-999)
-    if (fNeighborhoodChargeFractions[i] < -998.0) {
-      continue; // Skip pixels with invalid markers (-999)
-    }
-    
-    G4int col = i / gridSize;  // di (X) was outer loop
-    G4int row = i % gridSize;  // dj (Y) was inner loop
-    
-    G4int offsetI = col - fNeighborhoodRadius;
-    G4int offsetJ = row - fNeighborhoodRadius;
-    
-    G4double x_pos = nearestPixel.x() + offsetI * pixelSpacing;
-    G4double y_pos = nearestPixel.y() + offsetJ * pixelSpacing;
-    
-    x_coords.push_back(x_pos);
-    y_coords.push_back(y_pos);
-    charge_values.push_back(fNeighborhoodCharge[i]);
-  }
-  
-  // Perform 2D Gauss fitting if enabled and we have enough data
-  if (x_coords.size() >= 3 && Control::GAUSS_FIT && Control::ROWCOL_FIT) {
-    Gauss2DResultsCeres fitResults = GaussCeres2D(
-      x_coords, y_coords, charge_values,
-      nearestPixel.x(), nearestPixel.y(),
-      pixelSpacing, false, false);
-    
-    fRunAction->Set2DGaussResults(
-      fitResults.x_center, fitResults.x_sigma, fitResults.x_amp,
-      fitResults.x_center_err, fitResults.x_sigma_err, fitResults.x_amp_err,
-      fitResults.x_vert_offset, fitResults.x_vert_offset_err,
-      fitResults.x_chi2red, fitResults.x_pp, fitResults.x_dof,
-      fitResults.y_center, fitResults.y_sigma, fitResults.y_amp,
-      fitResults.y_center_err, fitResults.y_sigma_err, fitResults.y_amp_err,
-      fitResults.y_vert_offset, fitResults.y_vert_offset_err,
-      fitResults.y_chi2red, fitResults.y_pp, fitResults.y_dof,
-      fitResults.x_charge_err, fitResults.y_charge_err,
-      fitResults.fit_success);
-    
-    // Log fitting results
-    SimulationLogger* logger = SimulationLogger::GetInstance();
-    if (logger) {
-      logger->LogGaussResults(event->GetEventID(), fitResults);
-    }
-    
-    // Diagonal fitting if enabled and 2D fitting succeeded
-    if (fitResults.fit_success && Control::DIAG_FIT) {
-      DiagResultsCeres diagResults = DiagGaussCeres(
-        x_coords, y_coords, charge_values,
-        nearestPixel.x(), nearestPixel.y(),
-        pixelSpacing, false, false);
-      
-      fRunAction->SetDiagGaussResults(
-        diagResults.main_diag_x_center, diagResults.main_diag_x_sigma, diagResults.main_diag_x_amp,
-        diagResults.main_diag_x_center_err, diagResults.main_diag_x_sigma_err, diagResults.main_diag_x_amp_err,
-        diagResults.main_diag_x_vert_offset, diagResults.main_diag_x_vert_offset_err,
-        diagResults.main_diag_x_chi2red, diagResults.main_diag_x_pp, diagResults.main_diag_x_dof, diagResults.main_diag_x_fit_success,
-        diagResults.main_diag_y_center, diagResults.main_diag_y_sigma, diagResults.main_diag_y_amp,
-        diagResults.main_diag_y_center_err, diagResults.main_diag_y_sigma_err, diagResults.main_diag_y_amp_err,
-        diagResults.main_diag_y_vert_offset, diagResults.main_diag_y_vert_offset_err,
-        diagResults.main_diag_y_chi2red, diagResults.main_diag_y_pp, diagResults.main_diag_y_dof, diagResults.main_diag_y_fit_success,
-        diagResults.sec_diag_x_center, diagResults.sec_diag_x_sigma, diagResults.sec_diag_x_amp,
-        diagResults.sec_diag_x_center_err, diagResults.sec_diag_x_sigma_err, diagResults.sec_diag_x_amp_err,
-        diagResults.sec_diag_x_vert_offset, diagResults.sec_diag_x_vert_offset_err,
-        diagResults.sec_diag_x_chi2red, diagResults.sec_diag_x_pp, diagResults.sec_diag_x_dof, diagResults.sec_diag_x_fit_success,
-        diagResults.sec_diag_y_center, diagResults.sec_diag_y_sigma, diagResults.sec_diag_y_amp,
-        diagResults.sec_diag_y_center_err, diagResults.sec_diag_y_sigma_err, diagResults.sec_diag_y_amp_err,
-        diagResults.sec_diag_y_vert_offset, diagResults.sec_diag_y_vert_offset_err,
-        diagResults.sec_diag_y_chi2red, diagResults.sec_diag_y_pp, diagResults.sec_diag_y_dof, diagResults.sec_diag_y_fit_success,
-        diagResults.fit_success);
-    } else {
-      // Set default diagonal values if main 2D fitting failed
-      fRunAction->SetDiagGaussResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false);
-    }
-  } else {
-    // Set default Gauss values if not enough data or disabled
-    if (Control::GAUSS_FIT) {
-      fRunAction->Set2DGaussResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false);
-      fRunAction->SetDiagGaussResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false);
-    }
-  }
-  
-  // Perform 2D Lorentz fitting if enabled and we have enough data
-  if (x_coords.size() >= 3 && Control::LORENTZ_FIT && Control::ROWCOL_FIT) {
-    Lorentz2DResultsCeres lorentzResults = LorentzCeres2D(
-      x_coords, y_coords, charge_values,
-      nearestPixel.x(), nearestPixel.y(),
-      pixelSpacing, false, false);
-    
-    fRunAction->Set2DLorentzResults(
-      lorentzResults.x_center, lorentzResults.x_gamma, lorentzResults.x_amp,
-      lorentzResults.x_center_err, lorentzResults.x_gamma_err, lorentzResults.x_amp_err,
-      lorentzResults.x_vert_offset, lorentzResults.x_vert_offset_err,
-      lorentzResults.x_chi2red, lorentzResults.x_pp, lorentzResults.x_dof,
-      lorentzResults.y_center, lorentzResults.y_gamma, lorentzResults.y_amp,
-      lorentzResults.y_center_err, lorentzResults.y_gamma_err, lorentzResults.y_amp_err,
-      lorentzResults.y_vert_offset, lorentzResults.y_vert_offset_err,
-      lorentzResults.y_chi2red, lorentzResults.y_pp, lorentzResults.y_dof,
-      lorentzResults.x_charge_err, lorentzResults.y_charge_err,
-      lorentzResults.fit_success);
-    
-    // Log fitting results
-    SimulationLogger* logger = SimulationLogger::GetInstance();
-    if (logger) {
-      logger->LogLorentzResults(event->GetEventID(), lorentzResults);
-    }
-    
-    // Diagonal Lorentz fitting if enabled and 2D fitting succeeded
-    if (lorentzResults.fit_success && Control::DIAG_FIT) {
-      DiagLorentzResultsCeres diagResults = DiagLorentzCeres(
-        x_coords, y_coords, charge_values,
-        nearestPixel.x(), nearestPixel.y(),
-        pixelSpacing, false, false);
-      
-      fRunAction->SetDiagLorentzResults(
-        diagResults.main_diag_x_center, diagResults.main_diag_x_gamma, diagResults.main_diag_x_amp,
-        diagResults.main_diag_x_center_err, diagResults.main_diag_x_gamma_err, diagResults.main_diag_x_amp_err,
-        diagResults.main_diag_x_vert_offset, diagResults.main_diag_x_vert_offset_err,
-        diagResults.main_diag_x_chi2red, diagResults.main_diag_x_pp, diagResults.main_diag_x_dof, diagResults.main_diag_x_fit_success,
-        diagResults.main_diag_y_center, diagResults.main_diag_y_gamma, diagResults.main_diag_y_amp,
-        diagResults.main_diag_y_center_err, diagResults.main_diag_y_gamma_err, diagResults.main_diag_y_amp_err,
-        diagResults.main_diag_y_vert_offset, diagResults.main_diag_y_vert_offset_err,
-        diagResults.main_diag_y_chi2red, diagResults.main_diag_y_pp, diagResults.main_diag_y_dof, diagResults.main_diag_y_fit_success,
-        diagResults.sec_diag_x_center, diagResults.sec_diag_x_gamma, diagResults.sec_diag_x_amp,
-        diagResults.sec_diag_x_center_err, diagResults.sec_diag_x_gamma_err, diagResults.sec_diag_x_amp_err,
-        diagResults.sec_diag_x_vert_offset, diagResults.sec_diag_x_vert_offset_err,
-        diagResults.sec_diag_x_chi2red, diagResults.sec_diag_x_pp, diagResults.sec_diag_x_dof, diagResults.sec_diag_x_fit_success,
-        diagResults.sec_diag_y_center, diagResults.sec_diag_y_gamma, diagResults.sec_diag_y_amp,
-        diagResults.sec_diag_y_center_err, diagResults.sec_diag_y_gamma_err, diagResults.sec_diag_y_amp_err,
-        diagResults.sec_diag_y_vert_offset, diagResults.sec_diag_y_vert_offset_err,
-        diagResults.sec_diag_y_chi2red, diagResults.sec_diag_y_pp, diagResults.sec_diag_y_dof, diagResults.sec_diag_y_fit_success,
-        diagResults.fit_success);
-    } else {
-      // Set default diagonal Lorentz values if main 2D fitting failed
-      fRunAction->SetDiagLorentzResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false);
-    }
-  } else {
-    // Set default Lorentz values if not enough data or disabled
-    if (Control::LORENTZ_FIT) {
-      fRunAction->Set2DLorentzResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false);
-      fRunAction->SetDiagLorentzResults(
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false);
-    }
-  }
-
-}
-
-void EventAction::GetHitValidationSummary(G4bool& pureSiliconHit, G4bool& aluminumContaminated,
-                                          G4bool& chargeCalculationEnabled, G4String& firstInteractionVolume,
-                                          G4bool& hasAluminumInteraction, G4bool& hasAluminumPreContact) const
-{
-  // Get EventAction validation results
-  pureSiliconHit = fPureSiliconHit;
-  aluminumContaminated = fAluminumContaminated;
-  chargeCalculationEnabled = fChargeCalculationEnabled;
-  
-  // Get SteppingAction trajectory analysis results
-  if (fSteppingAction) {
-    firstInteractionVolume = fSteppingAction->GetFirstInteractionVolume();
-    hasAluminumInteraction = fSteppingAction->HasAluminumInteraction();
-    hasAluminumPreContact = fSteppingAction->HasAluminumPreContact();
-  } else {
-    // Fallback if SteppingAction is not available
-    firstInteractionVolume = "UNKNOWN";
-    hasAluminumInteraction = false;
-    hasAluminumPreContact = false;
-  }
-}
-
-void EventAction::ValidateSteppingActionIntegration() const
-{
-  // Validate that SteppingAction is properly connected
-  if (!fSteppingAction) {
-    G4cerr << "ERROR: SteppingAction integration validation failed!" << G4endl;
-    G4cerr << "SteppingAction pointer is null - hit validation cannot proceed properly" << G4endl;
-    G4cerr << "This indicates an initialization problem in ActionInitialization" << G4endl;
-    return;
-  }
-  
-  // Validate that SteppingAction trajectory analysis methods are available
-  try {
-    // Test basic trajectory analysis methods
-    G4bool testAluminumInteraction = fSteppingAction->HasAluminumInteraction();
-    G4bool testValidSiliconHit = fSteppingAction->IsValidSiliconHit();
-    G4String testFirstInteractionVolume = fSteppingAction->GetFirstInteractionVolume();
-    G4bool testAluminumPreContact = fSteppingAction->HasAluminumPreContact();
-    
-    G4cout << "✓ SteppingAction integration validation successful" << G4endl;
-    G4cout << "✓ All trajectory analysis methods accessible" << G4endl;
-    G4cout << "✓ Current state - Aluminum interaction: " << (testAluminumInteraction ? "YES" : "NO") << G4endl;
-    G4cout << "✓ Current state - Valid silicon hit: " << (testValidSiliconHit ? "YES" : "NO") << G4endl;
-    G4cout << "✓ Current state - First interaction volume: " << testFirstInteractionVolume << G4endl;
-    G4cout << "✓ Current state - Aluminum pre-contact: " << (testAluminumPreContact ? "YES" : "NO") << G4endl;
-    
-  } catch (const std::exception& e) {
-    G4cerr << "ERROR: SteppingAction integration validation failed!" << G4endl;
-    G4cerr << "Exception while testing trajectory analysis methods: " << e.what() << G4endl;
-  } catch (...) {
-    G4cerr << "ERROR: SteppingAction integration validation failed!" << G4endl;
-    G4cerr << "Unknown exception while testing trajectory analysis methods" << G4endl;
-  }
-}
-
-void EventAction::DemonstrateIntegrationWorkflow() const
-{
-  G4cout << "\n=== SteppingAction ↔ EventAction Integration Workflow ===" << G4endl;
-  G4cout << "Task 9: Integration between SteppingAction and EventAction for hit validation" << G4endl;
-  G4cout << "========================================================" << G4endl;
-  
-  // Step 1: Initialization and cleanup
-  G4cout << "1. Initialization & Cleanup:" << G4endl;
-  G4cout << "   - BeginOfEventAction() calls fSteppingAction->ResetInteractionTracking()" << G4endl;
-  G4cout << "   - This ensures clean state for each event" << G4endl;
-  G4cout << "   - Integration validation performed for first event" << G4endl;
-  
-  // Step 2: Data transfer mechanism
-  G4cout << "2. Data Transfer Mechanism:" << G4endl;
-  G4cout << "   - SteppingAction performs trajectory analysis during particle steps" << G4endl;
-  G4cout << "   - EventAction retrieves hit purity status via getter methods:" << G4endl;
-  G4cout << "     * HasAluminumInteraction() → " << (fSteppingAction ? std::string(fSteppingAction->HasAluminumInteraction() ? "Available" : "Available") : "Not connected") << G4endl;
-  G4cout << "     * IsValidSiliconHit() → " << (fSteppingAction ? std::string(fSteppingAction->IsValidSiliconHit() ? "Available" : "Available") : "Not connected") << G4endl;
-  G4cout << "     * GetFirstInteractionVolume() → " << (fSteppingAction ? "Available" : "Not connected") << G4endl;
-  G4cout << "     * HasAluminumPreContact() → " << (fSteppingAction ? std::string(fSteppingAction->HasAluminumPreContact() ? "Available" : "Available") : "Not connected") << G4endl;
-  
-  // Step 3: Hit validation process
-  G4cout << "3. Hit Validation Process:" << G4endl;
-  G4cout << "   - ValidateHitPurity() combines SteppingAction trajectory analysis" << G4endl;
-  G4cout << "   - with EventAction Multi-Functional Detector data" << G4endl;
-  G4cout << "   - Determines: Pure Silicon Hit, Aluminum Contaminated, Charge Calculation Enabled" << G4endl;
-  
-  // Step 4: Integration status
-  G4cout << "4. Integration Status:" << G4endl;
-  G4cout << "   - SteppingAction connected: " << (fSteppingAction ? "YES" : "NO") << G4endl;
-  G4cout << "   - Hit purity getter methods: Available" << G4endl;
-  G4cout << "   - Comprehensive validation summary: Available" << G4endl;
-  G4cout << "   - Integration workflow: Complete" << G4endl;
-  
-  // Step 5: Available methods for external access
-  G4cout << "5. Available Methods for External Access:" << G4endl;
-  G4cout << "   - GetPureSiliconHit() → Current: " << (fPureSiliconHit ? "YES" : "NO") << G4endl;
-  G4cout << "   - GetAluminumContaminated() → Current: " << (fAluminumContaminated ? "YES" : "NO") << G4endl;
-  G4cout << "   - GetChargeCalculationEnabled() → Current: " << (fChargeCalculationEnabled ? "YES" : "NO") << G4endl;
-  G4cout << "   - GetHitPurityStatus() → Current: " << (GetHitPurityStatus() ? "PURE" : "CONTAMINATED") << G4endl;
-  G4cout << "   - GetHitValidationSummary() → Comprehensive status available" << G4endl;
-  
-  G4cout << "\n✓ Task 9 Integration Complete: SteppingAction ↔ EventAction" << G4endl;
-  G4cout << "========================================================\n" << G4endl;
+  // Data is considered valid if there were any hits recorded by the scorer.
+  // This is the primary condition for enabling downstream processing like charge sharing.
+  fScorerDataValid = (fScorerHitCount > 0);
 }
 
