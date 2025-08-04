@@ -1,10 +1,8 @@
 #include "SimulationLogger.hh"
 #include "GaussFit2D.hh"
 #include "LorentzFit2D.hh"
-#include "PowerLorentzFit2D.hh"
 #include "GaussFit3D.hh"
 #include "LorentzFit3D.hh"
-#include "PowerLorentzFit3D.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <iostream>
@@ -320,112 +318,7 @@ void SimulationLogger::LogLorentzResults(G4int eventID, const Lorentz2DResultsCe
     }
 }
 
-void SimulationLogger::LogPowerLorentzResults(G4int eventID, const PowerLorentz2DResultsCeres& results) {
-    if (ftingLog) {
-        *ftingLog << "\n=== EVENT " << eventID << " - POWER LORENTZ FIT RESULTS ===\n";
-        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
-        if (results.fit_success) {
-            *ftingLog << "X Direction:\n";
-            *ftingLog << "  Center: " << results.x_center/mm << " ± " << results.x_center_err/mm << " mm\n";
-            *ftingLog << "  Gamma: " << results.x_gamma/mm << " ± " << results.x_gamma_err/mm << " mm\n";
-            *ftingLog << "  Beta: " << results.x_beta << " ± " << results.x_beta_err << "\n";
-            *ftingLog << "  Amp: " << results.x_amp << " ± " << results.x_amp_err << "\n";
-            *ftingLog << "  Chi2/DOF: " << results.x_chi2red << " (DOF: " << results.x_dof << ")\n";
-            
-            *ftingLog << "Y Direction:\n";
-            *ftingLog << "  Center: " << results.y_center/mm << " ± " << results.y_center_err/mm << " mm\n";
-            *ftingLog << "  Gamma: " << results.y_gamma/mm << " ± " << results.y_gamma_err/mm << " mm\n";
-            *ftingLog << "  Beta: " << results.y_beta << " ± " << results.y_beta_err << "\n";
-            *ftingLog << "  Amp: " << results.y_amp << " ± " << results.y_amp_err << "\n";
-            *ftingLog << "  Chi2/DOF: " << results.y_chi2red << " (DOF: " << results.y_dof << ")\n";
-        }
-        *ftingLog << "==========================================================\n\n";
-        ftingLog->flush();
-    }
-    
-    fTotalFits++;
-    if (results.fit_success) {
-        fSuccessFits++;
-    } else {
-        fFailFits++;
-    }
-}
 
-void SimulationLogger::Log3DLorentzResults(G4int eventID, const Lorentz3DResultsCeres& results) {
-    if (ftingLog) {
-        *ftingLog << "\n=== EVENT " << eventID << " - 3D LORENTZ FIT RESULTS ===\n";
-        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
-        if (results.fit_success) {
-            *ftingLog << "3D  Parameters:\n";
-            *ftingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
-            *ftingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
-            *ftingLog << "  Gamma X: " << results.gamma_x/mm << " ± " << results.gamma_x_err/mm << " mm\n";
-            *ftingLog << "  Gamma Y: " << results.gamma_y/mm << " ± " << results.gamma_y_err/mm << " mm\n";
-            *ftingLog << "  Amp: " << results.amp << " ± " << results.amp_err << "\n";
-            *ftingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
-        }
-        *ftingLog << "=======================================================\n\n";
-        ftingLog->flush();
-    }
-    
-    fTotalFits++;
-    if (results.fit_success) {
-        fSuccessFits++;
-    } else {
-        fFailFits++;
-    }
-}
-
-void SimulationLogger::Log3DGaussResults(G4int eventID, const Gauss3DResultsCeres& results) {
-    if (ftingLog) {
-        *ftingLog << "\n=== EVENT " << eventID << " - 3D GAUSS FIT RESULTS ===\n";
-        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
-        if (results.fit_success) {
-            *ftingLog << "3D Gauss Parameters:\n";
-            *ftingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
-            *ftingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
-            *ftingLog << "  Sigma X: " << results.sigma_x/mm << " ± " << results.sigma_x_err/mm << " mm\n";
-            *ftingLog << "  Sigma Y: " << results.sigma_y/mm << " ± " << results.sigma_y_err/mm << " mm\n";
-            *ftingLog << "  Amp: " << results.amp << " ± " << results.amp_err << "\n";
-            *ftingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
-        }
-        *ftingLog << "======================================================\n\n";
-        ftingLog->flush();
-    }
-    
-    fTotalFits++;
-    if (results.fit_success) {
-        fSuccessFits++;
-    } else {
-        fFailFits++;
-    }
-}
-
-void SimulationLogger::Log3DPowerLorentzResults(G4int eventID, const PowerLorentz3DResultsCeres& results) {
-    if (ftingLog) {
-        *ftingLog << "\n=== EVENT " << eventID << " - 3D POWER LORENTZ FIT RESULTS ===\n";
-        *ftingLog << "Success: " << (results.fit_success ? "YES" : "NO") << "\n";
-        if (results.fit_success) {
-            *ftingLog << "3D Power-Law Lorentz Parameters:\n";
-            *ftingLog << "  Center X: " << results.center_x/mm << " ± " << results.center_x_err/mm << " mm\n";
-            *ftingLog << "  Center Y: " << results.center_y/mm << " ± " << results.center_y_err/mm << " mm\n";
-            *ftingLog << "  Gamma X: " << results.gamma_x/mm << " ± " << results.gamma_x_err/mm << " mm\n";
-            *ftingLog << "  Gamma Y: " << results.gamma_y/mm << " ± " << results.gamma_y_err/mm << " mm\n";
-            *ftingLog << "  Beta: " << results.beta << " ± " << results.beta_err << "\n";
-            *ftingLog << "  Amp: " << results.amp << " ± " << results.amp_err << "\n";
-            *ftingLog << "  Chi2/DOF: " << results.chi2red << " (DOF: " << results.dof << ")\n";
-        }
-        *ftingLog << "=============================================================\n\n";
-        ftingLog->flush();
-    }
-    
-    fTotalFits++;
-    if (results.fit_success) {
-        fSuccessFits++;
-    } else {
-        fFailFits++;
-    }
-}
 
 void SimulationLogger::LogPerformanceMetrics(G4int eventID, G4double eventProcessingTime,
                                            G4double totalSimulationTime, G4double memoryUsage) {

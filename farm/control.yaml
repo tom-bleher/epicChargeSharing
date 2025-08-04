@@ -43,12 +43,10 @@ constant_parameters:
   # Fitting control flags
   GAUSS_FIT: true
   LORENTZ_FIT: true
-  POWER_LORENTZ_FIT: false
   ROWCOL_FIT: true
   DIAG_FIT: false
   GAUSS_FIT_3D: true
   LORENTZ_FIT_3D: true
-  POWER_LORENTZ_FIT_3D: false
   CHARGE_ERR: true
 
   # Automatic radius selection

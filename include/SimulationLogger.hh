@@ -15,10 +15,8 @@
 // Forward declarations for fitting results
 struct Gauss2DResultsCeres;
 struct Lorentz2DResultsCeres;
-struct PowerLorentz2DResultsCeres;
 struct Gauss3DResultsCeres;
 struct Lorentz3DResultsCeres;
-struct PowerLorentz3DResultsCeres;
 
 class SimulationLogger {
 public:
@@ -53,10 +51,8 @@ public:
     // Fitting results logging
     void LogGaussResults(G4int eventID, const Gauss2DResultsCeres& results);
     void LogLorentzResults(G4int eventID, const Lorentz2DResultsCeres& results);
-    void LogPowerLorentzResults(G4int eventID, const PowerLorentz2DResultsCeres& results);
     void Log3DLorentzResults(G4int eventID, const Lorentz3DResultsCeres& results);
     void Log3DGaussResults(G4int eventID, const Gauss3DResultsCeres& results);
-    void Log3DPowerLorentzResults(G4int eventID, const PowerLorentz3DResultsCeres& results);
     
     // Performance and statistics logging
     void LogPerformanceMetrics(G4int eventID, G4double eventProcessingTime,

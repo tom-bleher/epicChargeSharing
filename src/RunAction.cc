@@ -252,190 +252,8 @@ RunAction::RunAction()
   fLorentzSecDiagYCenterErr(0),
   fLorentzSecDiagYChi2red(0),
   fLorentzSecDiagYPp(0),
-  fLorentzSecDiagYDOF(0),
-  // Initialize Power-Law Lorentz fit variables
-  fPowerLorentzRowAmp(0),
-  fPowerLorentzRowAmpErr(0),
-  fPowerLorentzRowBeta(0),
-  fPowerLorentzRowBetaErr(0),
-  fPowerLorentzRowGamma(0),
-  fPowerLorentzRowGammaErr(0),
-  fPowerLorentzRowVertOffset(0),
-  fPowerLorentzRowVertOffsetErr(0),
-  fPowerLorentzRowCenter(0),
-  fPowerLorentzRowCenterErr(0),
-  fPowerLorentzRowChi2red(0),
-  fPowerLorentzRowPp(0),
-  fPowerLorentzRowDOF(0),
-  fPowerLorentzColAmp(0),
-  fPowerLorentzColAmpErr(0),
-  fPowerLorentzColBeta(0),
-  fPowerLorentzColBetaErr(0),
-  fPowerLorentzColGamma(0),
-  fPowerLorentzColGammaErr(0),
-  fPowerLorentzColVertOffset(0),
-  fPowerLorentzColVertOffsetErr(0),
-  fPowerLorentzColCenter(0),
-  fPowerLorentzColCenterErr(0),
-  fPowerLorentzColChi2red(0),
-  fPowerLorentzColPp(0),
-  fPowerLorentzColDOF(0),
-  fPowerLorentzMainDiagXAmp(0),
-  fPowerLorentzMainDiagXAmpErr(0),
-  fPowerLorentzMainDiagXBeta(0),
-  fPowerLorentzMainDiagXBetaErr(0),
-  fPowerLorentzMainDiagXGamma(0),
-  fPowerLorentzMainDiagXGammaErr(0),
-  fPowerLorentzMainDiagXVertOffset(0),
-  fPowerLorentzMainDiagXVertOffsetErr(0),
-  fPowerLorentzMainDiagXCenter(0),
-  fPowerLorentzMainDiagXCenterErr(0),
-  fPowerLorentzMainDiagXChi2red(0),
-  fPowerLorentzMainDiagXPp(0),
-  fPowerLorentzMainDiagXDOF(0),
-  fPowerLorentzMainDiagYAmp(0),
-  fPowerLorentzMainDiagYAmpErr(0),
-  fPowerLorentzMainDiagYBeta(0),
-  fPowerLorentzMainDiagYBetaErr(0),
-  fPowerLorentzMainDiagYGamma(0),
-  fPowerLorentzMainDiagYGammaErr(0),
-  fPowerLorentzMainDiagYVertOffset(0),
-  fPowerLorentzMainDiagYVertOffsetErr(0),
-  fPowerLorentzMainDiagYCenter(0),
-  fPowerLorentzMainDiagYCenterErr(0),
-  fPowerLorentzMainDiagYChi2red(0),
-  fPowerLorentzMainDiagYPp(0),
-  fPowerLorentzMainDiagYDOF(0),
-  fPowerLorentzSecDiagXAmp(0),
-  fPowerLorentzSecDiagXAmpErr(0),
-  fPowerLorentzSecDiagXBeta(0),
-  fPowerLorentzSecDiagXBetaErr(0),
-  fPowerLorentzSecDiagXGamma(0),
-  fPowerLorentzSecDiagXGammaErr(0),
-  fPowerLorentzSecDiagXVertOffset(0),
-  fPowerLorentzSecDiagXVertOffsetErr(0),
-  fPowerLorentzSecDiagXCenter(0),
-  fPowerLorentzSecDiagXCenterErr(0),
-  fPowerLorentzSecDiagXChi2red(0),
-  fPowerLorentzSecDiagXPp(0),
-  fPowerLorentzSecDiagXDOF(0),
-  fPowerLorentzSecDiagYAmp(0),
-  fPowerLorentzSecDiagYAmpErr(0),
-  fPowerLorentzSecDiagYBeta(0),
-  fPowerLorentzSecDiagYBetaErr(0),
-  fPowerLorentzSecDiagYGamma(0),
-  fPowerLorentzSecDiagYGammaErr(0),
-  fPowerLorentzSecDiagYVertOffset(0),
-  fPowerLorentzSecDiagYVertOffsetErr(0),
-  fPowerLorentzSecDiagYCenter(0),
-  fPowerLorentzSecDiagYCenterErr(0),
-  fPowerLorentzSecDiagYChi2red(0),
-  fPowerLorentzSecDiagYPp(0),
-  fPowerLorentzSecDiagYDOF(0),
-  // Initialize Power-Law Lorentz delta variables
-  fPowerLorentzRowDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzColDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize Power-Law Lorentz Trans diagonal coordinate variables
-  fPowerLorentzMainDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzMainDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzSecDiagTransformedX(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzSecDiagTransformedY(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzMainDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzMainDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzSecDiagTransformedDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzSecDiagTransformedDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize Power-Law Lorentz mean estimation variables
-  fPowerLorentzMeanTrueDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  fPowerLorentzMeanTrueDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize 3D fitting delta variables
-  f3DLorentzDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  f3DLorentzDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  f3DPowerLorentzDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  f3DPowerLorentzDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize 3D Lorentz fit variables
-  f3DLorentzCenterX(0),
-  f3DLorentzCenterY(0),
-  f3DLorentzGammaX(0),
-  f3DLorentzGammaY(0),
-  f3DLorentzAmp(0),
-  f3DLorentzVertOffset(0),
-  f3DLorentzCenterXErr(0),
-  f3DLorentzCenterYErr(0),
-  f3DLorentzGammaXErr(0),
-  f3DLorentzGammaYErr(0),
-  f3DLorentzAmpErr(0),
-  f3DLorentzVertOffsetErr(0),
-  f3DLorentzChi2red(0),
-  f3DLorentzPp(0),
-  f3DLorentzDOF(0),
-  f3DLorentzChargeErr(0),
-  f3DLorentzSuccess(false),
-  // Initialize 3D Power-Law Lorentz fit variables
-  f3DPowerLorentzCenterX(0),
-  f3DPowerLorentzCenterY(0),
-  f3DPowerLorentzGammaX(0),
-  f3DPowerLorentzGammaY(0),
-  f3DPowerLorentzBeta(0),
-  f3DPowerLorentzAmp(0),
-  f3DPowerLorentzVertOffset(0),
-  f3DPowerLorentzCenterXErr(0),
-  f3DPowerLorentzCenterYErr(0),
-  f3DPowerLorentzGammaXErr(0),
-  f3DPowerLorentzGammaYErr(0),
-  f3DPowerLorentzBetaErr(0),
-  f3DPowerLorentzAmpErr(0),
-  f3DPowerLorentzVertOffsetErr(0),
-  f3DPowerLorentzChi2red(0),
-  f3DPowerLorentzPp(0),
-  f3DPowerLorentzDOF(0),
-  f3DPowerLorentzChargeErr(0),
-  f3DPowerLorentzSuccess(false),
-  // Initialize 3D Gauss fitting delta variables
-  f3DGaussDeltaX(std::numeric_limits<G4double>::quiet_NaN()),
-  f3DGaussDeltaY(std::numeric_limits<G4double>::quiet_NaN()),
-  // Initialize 3D Gauss fit variables
-  f3DGaussCenterX(0),
-  f3DGaussCenterY(0),
-  f3DGaussSigmaX(0),
-  f3DGaussSigmaY(0),
-  f3DGaussAmp(0),
-  f3DGaussVertOffset(0),
-  f3DGaussCenterXErr(0),
-  f3DGaussCenterYErr(0),
-  f3DGaussSigmaXErr(0),
-  f3DGaussSigmaYErr(0),
-  f3DGaussAmpErr(0),
-  f3DGaussVertOffsetErr(0),
-  f3DGaussChi2red(0),
-  f3DGaussPp(0),
-  f3DGaussDOF(0),
-  f3DGaussChargeErr(0),
-  f3DGaussSuccess(false),
-  // Legacy variables
-  fIsPixelHit(false),
-  fInitialEnergy(0),
-  fGridPixelSize(0),
-  fGridPixelSpacing(0),
-  fGridPixelCornerOffset(0),
-  fGridDetSize(0),
-  fGridNumBlocksPerSide(0),
-  
-  // Charge uncertainties for Power-Law Lorentz fits (5% of max charge)
-  fPowerLorentzRowChargeErr(0),
-  fPowerLorentzColChargeErr(0),
-  
-  // Set automatic radius selection variables
-  fSelectedRadius(4),
-  
-  // Initialize scorer data variables
-  fScorerEnergyDeposit(0.0),
-  fScorerHitCount(0),
-  fScorerDataValid(false),
-  
-  // Initialize hit purity tracking variables
-  fPureSiliconHit(false),
-  fAluminumContaminated(false),
-  fChargeCalculationEnabled(false)
+  fLorentzSecDiagYDOF(0)
+    
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
   // Initialize step energy depositionition vectors (they are automatically initialized empty)
@@ -531,12 +349,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         G4cout << "RunAction: Creating branches with fitting configuration:" << G4endl;
         G4cout << "  - Gauss fitting: " << (Control::GAUSS_FIT ? "ENABLED" : "DISABLED") << G4endl;
         G4cout << "  - Lorentz fitting: " << (Control::LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - Power-Law Lorentz fitting: " << (Control::POWER_LORENTZ_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - 2D fitting: " << (Control::ROWCOL_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - Diag fitting: " << (Control::DIAG_FIT ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - 3D Gauss fitting: " << (Control::GAUSS_FIT_3D ? "ENABLED" : "DISABLED") << G4endl;
         G4cout << "  - 3D Lorentz fitting: " << (Control::LORENTZ_FIT_3D ? "ENABLED" : "DISABLED") << G4endl;
-        G4cout << "  - 3D Power-Law Lorentz fitting: " << (Control::POWER_LORENTZ_FIT_3D ? "ENABLED" : "DISABLED") << G4endl;
         G4cout << "  - Vert charge uncertainties: " << (Control::CHARGE_ERR ? "ENABLED" : "DISABLED") << G4endl;
         
         // Track number of branches created for validation
@@ -584,11 +397,6 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             fTree->Branch("LorentzColDeltaY", &fLorentzColDeltaY, "LorentzColDeltaY/D")->SetTitle("Lorentz Col  Delta Y [mm] (fit - true)");
         }
         
-        if (Control::POWER_LORENTZ_FIT && Control::ROWCOL_FIT) {
-            fTree->Branch("PowerLorentzRowDeltaX", &fPowerLorentzRowDeltaX, "PowerLorentzRowDeltaX/D")->SetTitle("Power Lorentz Row  Delta X [mm] (fit - true)");
-            fTree->Branch("PowerLorentzColDeltaY", &fPowerLorentzColDeltaY, "PowerLorentzColDeltaY/D")->SetTitle("Power Lorentz Col  Delta Y [mm] (fit - true)");
-        }
-        
         // Diag fit deltas (Trans coordinates)
         if (Control::GAUSS_FIT && Control::DIAG_FIT) {
             fTree->Branch("GaussMainDiagTransDeltaX", &fGaussMainDiagTransformedDeltaX, "GaussMainDiagTransDeltaX/D")->SetTitle("Gauss Main Diag Trans Delta X [mm] (fit - true)");
@@ -604,29 +412,6 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             fTree->Branch("LorentzSecDiagTransDeltaY", &fLorentzSecDiagTransformedDeltaY, "LorentzSecDiagTransDeltaY/D")->SetTitle("Lorentz Secondary Diag Trans Delta Y [mm] (fit - true)");
         }
         
-        if (Control::POWER_LORENTZ_FIT && Control::DIAG_FIT) {
-            fTree->Branch("PowerLorentzMainDiagTransDeltaX", &fPowerLorentzMainDiagTransformedDeltaX, "PowerLorentzMainDiagTransDeltaX/D")->SetTitle("Power Lorentz Main Diag Trans Delta X [mm] (fit - true)");
-            fTree->Branch("PowerLorentzMainDiagTransDeltaY", &fPowerLorentzMainDiagTransformedDeltaY, "PowerLorentzMainDiagTransDeltaY/D")->SetTitle("Power Lorentz Main Diag Trans Delta Y [mm] (fit - true)");
-            fTree->Branch("PowerLorentzSecDiagTransDeltaX", &fPowerLorentzSecDiagTransformedDeltaX, "PowerLorentzSecDiagTransDeltaX/D")->SetTitle("Power Lorentz Secondary Diag Trans Delta X [mm] (fit - true)");
-            fTree->Branch("PowerLorentzSecDiagTransDeltaY", &fPowerLorentzSecDiagTransformedDeltaY, "PowerLorentzSecDiagTransDeltaY/D")->SetTitle("Power Lorentz Secondary Diag Trans Delta Y [mm] (fit - true)");
-        }
-        
-        // 3D fit deltas
-        if (Control::GAUSS_FIT_3D) {
-            fTree->Branch("3DGaussDeltaX", &f3DGaussDeltaX, "3DGaussDeltaX/D")->SetTitle("3D Gauss  Delta X [mm] (fit - true)");
-            fTree->Branch("3DGaussDeltaY", &f3DGaussDeltaY, "3DGaussDeltaY/D")->SetTitle("3D Gauss  Delta Y [mm] (fit - true)");
-        }
-        
-        if (Control::LORENTZ_FIT_3D) {
-            fTree->Branch("3DLorentzDeltaX", &f3DLorentzDeltaX, "3DLorentzDeltaX/D")->SetTitle("3D Lorentz  Delta X [mm] (fit - true)");
-            fTree->Branch("3DLorentzDeltaY", &f3DLorentzDeltaY, "3DLorentzDeltaY/D")->SetTitle("3D Lorentz  Delta Y [mm] (fit - true)");
-        }
-        
-        if (Control::POWER_LORENTZ_FIT_3D) {
-            fTree->Branch("3DPowerLorentzDeltaX", &f3DPowerLorentzDeltaX, "3DPowerLorentzDeltaX/D")->SetTitle("3D Power Lorentz  Delta X [mm] (fit - true)");
-            fTree->Branch("3DPowerLorentzDeltaY", &f3DPowerLorentzDeltaY, "3DPowerLorentzDeltaY/D")->SetTitle("3D Power Lorentz  Delta Y [mm] (fit - true)");
-        }
-        
         // Mean estimators (key resolution metrics) - only create if corresponding fitting is enabled
         if (Control::GAUSS_FIT && (Control::DIAG_FIT || Control::GAUSS_FIT_3D)) {
             fTree->Branch("GaussMeanTrueDeltaX", &fGaussMeanTrueDeltaX, "GaussMeanTrueDeltaX/D")->SetTitle("Gauss Mean Estimator Delta X [mm] (mean_fit - true)");
@@ -638,10 +423,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             fTree->Branch("LorentzMeanTrueDeltaY", &fLorentzMeanTrueDeltaY, "LorentzMeanTrueDeltaY/D")->SetTitle("Lorentz Mean Estimator Delta Y [mm] (mean_fit - true)");
         }
         
-        if (Control::POWER_LORENTZ_FIT && (Control::DIAG_FIT || Control::POWER_LORENTZ_FIT_3D)) {
-            fTree->Branch("PowerLorentzMeanTrueDeltaX", &fPowerLorentzMeanTrueDeltaX, "PowerLorentzMeanTrueDeltaX/D")->SetTitle("Power Lorentz Mean Estimator Delta X [mm] (mean_fit - true)");
-            fTree->Branch("PowerLorentzMeanTrueDeltaY", &fPowerLorentzMeanTrueDeltaY, "PowerLorentzMeanTrueDeltaY/D")->SetTitle("Power Lorentz Mean Estimator Delta Y [mm] (mean_fit - true)");
-        }
+
         
         // =============================================
         // GAUSS FIT PARAMETERS BRANCHES
@@ -822,107 +604,6 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         
         // =============================================
-        // POWER-LAW Lorentz FIT PARAMETERS BRANCHES
-        // =============================================
-        if (Control::POWER_LORENTZ_FIT) {
-            // Only create central row/column (2D) branches when 2D fitting is enabled
-            if (Control::ROWCOL_FIT) {
-                // Row fit parameters
-                fTree->Branch("PowerLorentzRowAmp", &fPowerLorentzRowAmp, "PowerLorentzRowAmp/D")->SetTitle("Power-Law Lorentz Row  Amp");
-                fTree->Branch("PowerLorentzRowAmpErr", &fPowerLorentzRowAmpErr, "PowerLorentzRowAmpErr/D")->SetTitle("Power-Law Lorentz Row  Amp Error");
-                fTree->Branch("PowerLorentzRowBeta", &fPowerLorentzRowBeta, "PowerLorentzRowBeta/D")->SetTitle("Power-Law Lorentz Row  Beta (Power-Law Exponent)");
-                fTree->Branch("PowerLorentzRowBetaErr", &fPowerLorentzRowBetaErr, "PowerLorentzRowBetaErr/D")->SetTitle("Power-Law Lorentz Row  Beta Error");
-                fTree->Branch("PowerLorentzRowGamma", &fPowerLorentzRowGamma, "PowerLorentzRowGamma/D")->SetTitle("Power-Law Lorentz Row  Gamma (HWHM)");
-                fTree->Branch("PowerLorentzRowGammaErr", &fPowerLorentzRowGammaErr, "PowerLorentzRowGammaErr/D")->SetTitle("Power-Law Lorentz Row  Gamma Error");
-                fTree->Branch("PowerLorentzRowVertOffset", &fPowerLorentzRowVertOffset, "PowerLorentzRowVertOffset/D")->SetTitle("Power-Law Lorentz Row  Vert Offset");
-                fTree->Branch("PowerLorentzRowVertOffsetErr", &fPowerLorentzRowVertOffsetErr, "PowerLorentzRowVertOffsetErr/D")->SetTitle("Power-Law Lorentz Row  Vert Offset Error");
-                fTree->Branch("PowerLorentzRowCenter", &fPowerLorentzRowCenter, "PowerLorentzRowCenter/D")->SetTitle("Power-Law Lorentz Row  Center");
-                fTree->Branch("PowerLorentzRowCenterErr", &fPowerLorentzRowCenterErr, "PowerLorentzRowCenterErr/D")->SetTitle("Power-Law Lorentz Row  Center Error");
-                fTree->Branch("PowerLorentzRowChi2red", &fPowerLorentzRowChi2red, "PowerLorentzRowChi2red/D")->SetTitle("Power-Law Lorentz Row  Reduced Chi-squared");
-                fTree->Branch("PowerLorentzRowPp", &fPowerLorentzRowPp, "PowerLorentzRowPp/D")->SetTitle("Power-Law Lorentz Row  P-value");
-                fTree->Branch("PowerLorentzRowDOF", &fPowerLorentzRowDOF, "PowerLorentzRowDOF/I")->SetTitle("Power-Law Lorentz Row  Degrees of Freedom");
-                fTree->Branch("PowerLorentzRowChargeErr", &fPowerLorentzRowChargeErr, "PowerLorentzRowChargeErr/D")->SetTitle("Power-Law Lorentz Row  Charge Err");
-                
-                // Col fit parameters
-                fTree->Branch("PowerLorentzColAmp", &fPowerLorentzColAmp, "PowerLorentzColAmp/D")->SetTitle("Power-Law Lorentz Col  Amp");
-                fTree->Branch("PowerLorentzColAmpErr", &fPowerLorentzColAmpErr, "PowerLorentzColAmpErr/D")->SetTitle("Power-Law Lorentz Col  Amp Error");
-                fTree->Branch("PowerLorentzColBeta", &fPowerLorentzColBeta, "PowerLorentzColBeta/D")->SetTitle("Power-Law Lorentz Col  Beta (Power-Law Exponent)");
-                fTree->Branch("PowerLorentzColBetaErr", &fPowerLorentzColBetaErr, "PowerLorentzColBetaErr/D")->SetTitle("Power-Law Lorentz Col  Beta Error");
-                fTree->Branch("PowerLorentzColGamma", &fPowerLorentzColGamma, "PowerLorentzColGamma/D")->SetTitle("Power-Law Lorentz Col  Gamma (HWHM)");
-                fTree->Branch("PowerLorentzColGammaErr", &fPowerLorentzColGammaErr, "PowerLorentzColGammaErr/D")->SetTitle("Power-Law Lorentz Col  Gamma Error");
-                fTree->Branch("PowerLorentzColVertOffset", &fPowerLorentzColVertOffset, "PowerLorentzColVertOffset/D")->SetTitle("Power-Law Lorentz Col  Vert Offset");
-                fTree->Branch("PowerLorentzColVertOffsetErr", &fPowerLorentzColVertOffsetErr, "PowerLorentzColVertOffsetErr/D")->SetTitle("Power-Law Lorentz Col  Vert Offset Error");
-                fTree->Branch("PowerLorentzColCenter", &fPowerLorentzColCenter, "PowerLorentzColCenter/D")->SetTitle("Power-Law Lorentz Col  Center");
-                fTree->Branch("PowerLorentzColCenterErr", &fPowerLorentzColCenterErr, "PowerLorentzColCenterErr/D")->SetTitle("Power-Law Lorentz Col  Center Error");
-                fTree->Branch("PowerLorentzColChi2red", &fPowerLorentzColChi2red, "PowerLorentzColChi2red/D")->SetTitle("Power-Law Lorentz Col  Reduced Chi-squared");
-                fTree->Branch("PowerLorentzColPp", &fPowerLorentzColPp, "PowerLorentzColPp/D")->SetTitle("Power-Law Lorentz Col  P-value");
-                fTree->Branch("PowerLorentzColDOF", &fPowerLorentzColDOF, "PowerLorentzColDOF/I")->SetTitle("Power-Law Lorentz Col  Degrees of Freedom");
-                fTree->Branch("PowerLorentzColChargeErr", &fPowerLorentzColChargeErr, "PowerLorentzColChargeErr/D")->SetTitle("Power-Law Lorentz Col  Charge Err");
-            } // end 2D Power-Law Lorentz branches
-            
-            // Create diagonal fit branches only when diagonal fitting is enabled
-            if (Control::DIAG_FIT) {
-                // Main diagonal fit parameters
-                fTree->Branch("PowerLorentzMainDiagXAmp", &fPowerLorentzMainDiagXAmp, "PowerLorentzMainDiagXAmp/D")->SetTitle("Power-Law Lorentz Main Diag X  Amp");
-                fTree->Branch("PowerLorentzMainDiagXAmpErr", &fPowerLorentzMainDiagXAmpErr, "PowerLorentzMainDiagXAmpErr/D")->SetTitle("Power-Law Lorentz Main Diag X  Amp Error");
-                fTree->Branch("PowerLorentzMainDiagXBeta", &fPowerLorentzMainDiagXBeta, "PowerLorentzMainDiagXBeta/D")->SetTitle("Power-Law Lorentz Main Diag X  Beta");
-                fTree->Branch("PowerLorentzMainDiagXBetaErr", &fPowerLorentzMainDiagXBetaErr, "PowerLorentzMainDiagXBetaErr/D")->SetTitle("Power-Law Lorentz Main Diag X  Beta Error");
-                fTree->Branch("PowerLorentzMainDiagXGamma", &fPowerLorentzMainDiagXGamma, "PowerLorentzMainDiagXGamma/D")->SetTitle("Power-Law Lorentz Main Diag X  Gamma");
-                fTree->Branch("PowerLorentzMainDiagXGammaErr", &fPowerLorentzMainDiagXGammaErr, "PowerLorentzMainDiagXGammaErr/D")->SetTitle("Power-Law Lorentz Main Diag X  Gamma Error");
-                fTree->Branch("PowerLorentzMainDiagXVertOffset", &fPowerLorentzMainDiagXVertOffset, "PowerLorentzMainDiagXVertOffset/D")->SetTitle("Power-Law Lorentz Main Diag X  Vert Offset");
-                fTree->Branch("PowerLorentzMainDiagXVertOffsetErr", &fPowerLorentzMainDiagXVertOffsetErr, "PowerLorentzMainDiagXVertOffsetErr/D")->SetTitle("Power-Law Lorentz Main Diag X  Vert Offset Error");
-                fTree->Branch("PowerLorentzMainDiagXCenter", &fPowerLorentzMainDiagXCenter, "PowerLorentzMainDiagXCenter/D")->SetTitle("Power-Law Lorentz Main Diag X  Center");
-                fTree->Branch("PowerLorentzMainDiagXCenterErr", &fPowerLorentzMainDiagXCenterErr, "PowerLorentzMainDiagXCenterErr/D")->SetTitle("Power-Law Lorentz Main Diag X  Center Error");
-                fTree->Branch("PowerLorentzMainDiagXChi2red", &fPowerLorentzMainDiagXChi2red, "PowerLorentzMainDiagXChi2red/D")->SetTitle("Power-Law Lorentz Main Diag X  Reduced Chi-squared");
-                fTree->Branch("PowerLorentzMainDiagXPp", &fPowerLorentzMainDiagXPp, "PowerLorentzMainDiagXPp/D")->SetTitle("Power-Law Lorentz Main Diag X  P-value");
-                fTree->Branch("PowerLorentzMainDiagXDOF", &fPowerLorentzMainDiagXDOF, "PowerLorentzMainDiagXDOF/I")->SetTitle("Power-Law Lorentz Main Diag X  Degrees of Freedom");
-                
-                fTree->Branch("PowerLorentzMainDiagYAmp", &fPowerLorentzMainDiagYAmp, "PowerLorentzMainDiagYAmp/D")->SetTitle("Power-Law Lorentz Main Diag Y  Amp");
-                fTree->Branch("PowerLorentzMainDiagYAmpErr", &fPowerLorentzMainDiagYAmpErr, "PowerLorentzMainDiagYAmpErr/D")->SetTitle("Power-Law Lorentz Main Diag Y  Amp Error");
-                fTree->Branch("PowerLorentzMainDiagYBeta", &fPowerLorentzMainDiagYBeta, "PowerLorentzMainDiagYBeta/D")->SetTitle("Power-Law Lorentz Main Diag Y  Beta");
-                fTree->Branch("PowerLorentzMainDiagYBetaErr", &fPowerLorentzMainDiagYBetaErr, "PowerLorentzMainDiagYBetaErr/D")->SetTitle("Power-Law Lorentz Main Diag Y  Beta Error");
-                fTree->Branch("PowerLorentzMainDiagYGamma", &fPowerLorentzMainDiagYGamma, "PowerLorentzMainDiagYGamma/D")->SetTitle("Power-Law Lorentz Main Diag Y  Gamma");
-                fTree->Branch("PowerLorentzMainDiagYGammaErr", &fPowerLorentzMainDiagYGammaErr, "PowerLorentzMainDiagYGammaErr/D")->SetTitle("Power-Law Lorentz Main Diag Y  Gamma Error");
-                fTree->Branch("PowerLorentzMainDiagYVertOffset", &fPowerLorentzMainDiagYVertOffset, "PowerLorentzMainDiagYVertOffset/D")->SetTitle("Power-Law Lorentz Main Diag Y  Vert Offset");
-                fTree->Branch("PowerLorentzMainDiagYVertOffsetErr", &fPowerLorentzMainDiagYVertOffsetErr, "PowerLorentzMainDiagYVertOffsetErr/D")->SetTitle("Power-Law Lorentz Main Diag Y  Vert Offset Error");
-                fTree->Branch("PowerLorentzMainDiagYCenter", &fPowerLorentzMainDiagYCenter, "PowerLorentzMainDiagYCenter/D")->SetTitle("Power-Law Lorentz Main Diag Y  Center");
-                fTree->Branch("PowerLorentzMainDiagYCenterErr", &fPowerLorentzMainDiagYCenterErr, "PowerLorentzMainDiagYCenterErr/D")->SetTitle("Power-Law Lorentz Main Diag Y  Center Error");
-                fTree->Branch("PowerLorentzMainDiagYChi2red", &fPowerLorentzMainDiagYChi2red, "PowerLorentzMainDiagYChi2red/D")->SetTitle("Power-Law Lorentz Main Diag Y  Reduced Chi-squared");
-                fTree->Branch("PowerLorentzMainDiagYPp", &fPowerLorentzMainDiagYPp, "PowerLorentzMainDiagYPp/D")->SetTitle("Power-Law Lorentz Main Diag Y  P-value");
-                fTree->Branch("PowerLorentzMainDiagYDOF", &fPowerLorentzMainDiagYDOF, "PowerLorentzMainDiagYDOF/I")->SetTitle("Power-Law Lorentz Main Diag Y  Degrees of Freedom");
-                
-                // Secondary diagonal fit parameters
-                fTree->Branch("PowerLorentzSecDiagXAmp", &fPowerLorentzSecDiagXAmp, "PowerLorentzSecDiagXAmp/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Amp");
-                fTree->Branch("PowerLorentzSecDiagXAmpErr", &fPowerLorentzSecDiagXAmpErr, "PowerLorentzSecDiagXAmpErr/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Amp Error");
-                fTree->Branch("PowerLorentzSecDiagXBeta", &fPowerLorentzSecDiagXBeta, "PowerLorentzSecDiagXBeta/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Beta");
-                fTree->Branch("PowerLorentzSecDiagXBetaErr", &fPowerLorentzSecDiagXBetaErr, "PowerLorentzSecDiagXBetaErr/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Beta Error");
-                fTree->Branch("PowerLorentzSecDiagXGamma", &fPowerLorentzSecDiagXGamma, "PowerLorentzSecDiagXGamma/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Gamma");
-                fTree->Branch("PowerLorentzSecDiagXGammaErr", &fPowerLorentzSecDiagXGammaErr, "PowerLorentzSecDiagXGammaErr/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Gamma Error");
-                fTree->Branch("PowerLorentzSecDiagXVertOffset", &fPowerLorentzSecDiagXVertOffset, "PowerLorentzSecDiagXVertOffset/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Vert Offset");
-                fTree->Branch("PowerLorentzSecDiagXVertOffsetErr", &fPowerLorentzSecDiagXVertOffsetErr, "PowerLorentzSecDiagXVertOffsetErr/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Vert Offset Error");
-                fTree->Branch("PowerLorentzSecDiagXCenter", &fPowerLorentzSecDiagXCenter, "PowerLorentzSecDiagXCenter/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Center");
-                fTree->Branch("PowerLorentzSecDiagXCenterErr", &fPowerLorentzSecDiagXCenterErr, "PowerLorentzSecDiagXCenterErr/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Center Error");
-                fTree->Branch("PowerLorentzSecDiagXChi2red", &fPowerLorentzSecDiagXChi2red, "PowerLorentzSecDiagXChi2red/D")->SetTitle("Power-Law Lorentz Secondary Diag X  Reduced Chi-squared");
-                fTree->Branch("PowerLorentzSecDiagXPp", &fPowerLorentzSecDiagXPp, "PowerLorentzSecDiagXPp/D")->SetTitle("Power-Law Lorentz Secondary Diag X  P-value");
-                fTree->Branch("PowerLorentzSecDiagXDOF", &fPowerLorentzSecDiagXDOF, "PowerLorentzSecDiagXDOF/I")->SetTitle("Power-Law Lorentz Secondary Diag X  Degrees of Freedom");
-                
-                fTree->Branch("PowerLorentzSecDiagYAmp", &fPowerLorentzSecDiagYAmp, "PowerLorentzSecDiagYAmp/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Amp");
-                fTree->Branch("PowerLorentzSecDiagYAmpErr", &fPowerLorentzSecDiagYAmpErr, "PowerLorentzSecDiagYAmpErr/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Amp Error");
-                fTree->Branch("PowerLorentzSecDiagYBeta", &fPowerLorentzSecDiagYBeta, "PowerLorentzSecDiagYBeta/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Beta");
-                fTree->Branch("PowerLorentzSecDiagYBetaErr", &fPowerLorentzSecDiagYBetaErr, "PowerLorentzSecDiagYBetaErr/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Beta Error");
-                fTree->Branch("PowerLorentzSecDiagYGamma", &fPowerLorentzSecDiagYGamma, "PowerLorentzSecDiagYGamma/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Gamma");
-                fTree->Branch("PowerLorentzSecDiagYGammaErr", &fPowerLorentzSecDiagYGammaErr, "PowerLorentzSecDiagYGammaErr/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Gamma Error");
-                fTree->Branch("PowerLorentzSecDiagYVertOffset", &fPowerLorentzSecDiagYVertOffset, "PowerLorentzSecDiagYVertOffset/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Vert Offset");
-                fTree->Branch("PowerLorentzSecDiagYVertOffsetErr", &fPowerLorentzSecDiagYVertOffsetErr, "PowerLorentzSecDiagYVertOffsetErr/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Vert Offset Error");
-                fTree->Branch("PowerLorentzSecDiagYCenter", &fPowerLorentzSecDiagYCenter, "PowerLorentzSecDiagYCenter/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Center");
-                fTree->Branch("PowerLorentzSecDiagYCenterErr", &fPowerLorentzSecDiagYCenterErr, "PowerLorentzSecDiagYCenterErr/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Center Error");
-                fTree->Branch("PowerLorentzSecDiagYChi2red", &fPowerLorentzSecDiagYChi2red, "PowerLorentzSecDiagYChi2red/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  Reduced Chi-squared");
-                fTree->Branch("PowerLorentzSecDiagYPp", &fPowerLorentzSecDiagYPp, "PowerLorentzSecDiagYPp/D")->SetTitle("Power-Law Lorentz Secondary Diag Y  P-value");
-                fTree->Branch("PowerLorentzSecDiagYDOF", &fPowerLorentzSecDiagYDOF, "PowerLorentzSecDiagYDOF/I")->SetTitle("Power-Law Lorentz Secondary Diag Y  Degrees of Freedom");
-            } // end diagonal Power-Law Lorentz branches
-        }
-        
-        // =============================================
         // 3D FIT PARAMETERS BRANCHES
         // =============================================
         // 3D Gauss fit parameters
@@ -967,29 +648,6 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->Branch("3DLorentzSuccess", &f3DLorentzSuccess, "3DLorentzSuccess/O")->SetTitle("3DLorentzSuccess/O");
         }
         
-        // 3D Power-Law Lorentz fit parameters
-        if (Control::POWER_LORENTZ_FIT_3D) {
-        fTree->Branch("3DPowerLorentzCenterX", &f3DPowerLorentzCenterX, "3DPowerLorentzCenterX/D")->SetTitle("3D Power-Law Lorentz  Center X");
-        fTree->Branch("3DPowerLorentzCenterY", &f3DPowerLorentzCenterY, "3DPowerLorentzCenterY/D")->SetTitle("3D Power-Law Lorentz  Center Y");
-        fTree->Branch("3DPowerLorentzGammaX", &f3DPowerLorentzGammaX, "3DPowerLorentzGammaX/D")->SetTitle("3D Power-Law Lorentz  Gamma X");
-        fTree->Branch("3DPowerLorentzGammaY", &f3DPowerLorentzGammaY, "3DPowerLorentzGammaY/D")->SetTitle("3D Power-Law Lorentz  Gamma Y");
-        fTree->Branch("3DPowerLorentzBeta", &f3DPowerLorentzBeta, "3DPowerLorentzBeta/D")->SetTitle("3D Power-Law Lorentz  Beta (Power-Law Exponent)");
-        fTree->Branch("3DPowerLorentzAmp", &f3DPowerLorentzAmp, "3DPowerLorentzAmp/D")->SetTitle("3D Power-Law Lorentz  Amp");
-        fTree->Branch("3DPowerLorentzVertOffset", &f3DPowerLorentzVertOffset, "3DPowerLorentzVertOffset/D")->SetTitle("3D Power-Law Lorentz  Vert Offset");
-        fTree->Branch("3DPowerLorentzCenterXErr", &f3DPowerLorentzCenterXErr, "3DPowerLorentzCenterXErr/D")->SetTitle("3D Power-Law Lorentz  Center X Error");
-        fTree->Branch("3DPowerLorentzCenterYErr", &f3DPowerLorentzCenterYErr, "3DPowerLorentzCenterYErr/D")->SetTitle("3D Power-Law Lorentz  Center Y Error");
-        fTree->Branch("3DPowerLorentzGammaXErr", &f3DPowerLorentzGammaXErr, "3DPowerLorentzGammaXErr/D")->SetTitle("3D Power-Law Lorentz  Gamma X Error");
-        fTree->Branch("3DPowerLorentzGammaYErr", &f3DPowerLorentzGammaYErr, "3DPowerLorentzGammaYErr/D")->SetTitle("3D Power-Law Lorentz  Gamma Y Error");
-        fTree->Branch("3DPowerLorentzBetaErr", &f3DPowerLorentzBetaErr, "3DPowerLorentzBetaErr/D")->SetTitle("3D Power-Law Lorentz  Beta Error");
-        fTree->Branch("3DPowerLorentzAmpErr", &f3DPowerLorentzAmpErr, "3DPowerLorentzAmpErr/D")->SetTitle("3D Power-Law Lorentz  Amp Error");
-        fTree->Branch("3DPowerLorentzVertOffsetErr", &f3DPowerLorentzVertOffsetErr, "3DPowerLorentzVertOffsetErr/D")->SetTitle("3D Power-Law Lorentz  Vert Offset Error");
-        fTree->Branch("3DPowerLorentzChi2red", &f3DPowerLorentzChi2red, "3DPowerLorentzChi2red/D")->SetTitle("3DPowerLorentzChi2red/D");
-        fTree->Branch("3DPowerLorentzPp", &f3DPowerLorentzPp, "3DPowerLorentzPp/D")->SetTitle("3DPowerLorentzPp/D");
-        fTree->Branch("3DPowerLorentzDOF", &f3DPowerLorentzDOF, "3DPowerLorentzDOF/I")->SetTitle("3DPowerLorentzDOF/I");
-        fTree->Branch("3DPowerLorentzChargeErr", &f3DPowerLorentzChargeErr, "3DPowerLorentzChargeErr/D")->SetTitle("3DPowerLorentzChargeErr/D");
-        fTree->Branch("3DPowerLorentzSuccess", &f3DPowerLorentzSuccess, "3DPowerLorentzSuccess/O")->SetTitle("3DPowerLorentzSuccess/O");
-        }
-        
         // =============================================
         // Trans COORDINATE BRANCHES
         // =============================================
@@ -1007,14 +665,6 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->Branch("LorentzMainDiagTransY", &fLorentzMainDiagTransformedY, "LorentzMainDiagTransY/D")->SetTitle("Lorentz Main Diag Trans Y Coord [mm]");
         fTree->Branch("LorentzSecDiagTransX", &fLorentzSecDiagTransformedX, "LorentzSecDiagTransX/D")->SetTitle("Lorentz Secondary Diag Trans X Coord [mm]");
         fTree->Branch("LorentzSecDiagTransY", &fLorentzSecDiagTransformedY, "LorentzSecDiagTransY/D")->SetTitle("Lorentz Secondary Diag Trans Y Coord [mm]");
-        }
-        
-        // Power-Law Lorentz diagonal Trans coordinates
-        if (Control::POWER_LORENTZ_FIT && Control::DIAG_FIT) {
-        fTree->Branch("PowerLorentzMainDiagTransX", &fPowerLorentzMainDiagTransformedX, "PowerLorentzMainDiagTransX/D")->SetTitle("Power-Law Lorentz Main Diag Trans X Coord [mm]");
-        fTree->Branch("PowerLorentzMainDiagTransY", &fPowerLorentzMainDiagTransformedY, "PowerLorentzMainDiagTransY/D")->SetTitle("Power-Law Lorentz Main Diag Trans Y Coord [mm]");
-        fTree->Branch("PowerLorentzSecDiagTransX", &fPowerLorentzSecDiagTransformedX, "PowerLorentzSecDiagTransX/D")->SetTitle("Power-Law Lorentz Secondary Diag Trans X Coord [mm]");
-        fTree->Branch("PowerLorentzSecDiagTransY", &fPowerLorentzSecDiagTransformedY, "PowerLorentzSecDiagTransY/D")->SetTitle("Power-Law Lorentz Secondary Diag Trans Y Coord [mm]");
         }
         
         // =============================================
@@ -1815,41 +1465,6 @@ void RunAction::CalcTransformedDiagCoords()
               fLorentzSecDiagTransformedX, fLorentzSecDiagTransformedY,
               fLorentzSecDiagTransformedDeltaX, fLorentzSecDiagTransformedDeltaY);
     }
-
-    // -------------------------------
-    // P O W E R - L A W   L O R E N T Z I A N
-    // -------------------------------
-    // FIX: Power Lorentz diagonal fits also return diagonal coordinates that need transformation
-    
-    // Main diagonal
-    double sMainPowerLorentz = NaN;
-    if (fPowerLorentzMainDiagXDOF > 0)       sMainPowerLorentz = fPowerLorentzMainDiagXCenter;
-    else if (fPowerLorentzMainDiagYDOF > 0)  sMainPowerLorentz = fPowerLorentzMainDiagYCenter;
-    if (!std::isnan(sMainPowerLorentz)) {
-        auto [dx,dy] = sToDxDyMain(sMainPowerLorentz);
-        setXY(fPixelX+dx, fPixelY+dy,
-              fPowerLorentzMainDiagTransformedX, fPowerLorentzMainDiagTransformedY,
-              fPowerLorentzMainDiagTransformedDeltaX, fPowerLorentzMainDiagTransformedDeltaY);
-    } else {
-        setXY(NaN,NaN,
-              fPowerLorentzMainDiagTransformedX, fPowerLorentzMainDiagTransformedY,
-              fPowerLorentzMainDiagTransformedDeltaX, fPowerLorentzMainDiagTransformedDeltaY);
-    }
-
-    // Secondary diagonal
-    double sSecPowerLorentz = NaN;
-    if (fPowerLorentzSecDiagXDOF > 0)       sSecPowerLorentz = fPowerLorentzSecDiagXCenter;
-    else if (fPowerLorentzSecDiagYDOF > 0)  sSecPowerLorentz = fPowerLorentzSecDiagYCenter;
-    if (!std::isnan(sSecPowerLorentz)) {
-        auto [dx,dy] = sToDxDySec(sSecPowerLorentz);
-        setXY(fPixelX+dx, fPixelY+dy,
-              fPowerLorentzSecDiagTransformedX, fPowerLorentzSecDiagTransformedY,
-              fPowerLorentzSecDiagTransformedDeltaX, fPowerLorentzSecDiagTransformedDeltaY);
-    } else {
-        setXY(NaN,NaN,
-              fPowerLorentzSecDiagTransformedX, fPowerLorentzSecDiagTransformedY,
-              fPowerLorentzSecDiagTransformedDeltaX, fPowerLorentzSecDiagTransformedDeltaY);
-    }
 }
 
 void RunAction::CalcMeanEstimations()
@@ -1862,15 +1477,12 @@ void RunAction::CalcMeanEstimations()
         fGaussMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         fLorentzMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-        fPowerLorentzMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fPowerLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
         return;
     }
     
     // Vectors to collect valid coordinate estimations
     std::vector<G4double> gauss_x_coords, gauss_y_coords;
     std::vector<G4double> lorentz_x_coords, lorentz_y_coords;
-    std::vector<G4double> power_lorentz_x_coords, power_lorentz_y_coords;
     
     // For Gauss estimations, collect X coordinates:
     // ONLY use Trans diagonal coordinates (exclude row/column fits)
@@ -1924,32 +1536,6 @@ void RunAction::CalcMeanEstimations()
         lorentz_y_coords.push_back(fLorentzSecDiagTransformedY);
     }
     
-    // For Power-Law Lorentz estimations, collect X coordinates:
-    // ONLY use Trans diagonal coordinates (exclude row/column fits)
-    
-    // 1. Main diagonal Trans X
-    if (!std::isnan(fPowerLorentzMainDiagTransformedX)) {
-        power_lorentz_x_coords.push_back(fPowerLorentzMainDiagTransformedX);
-    }
-    
-    // 2. Secondary diagonal Trans X
-    if (!std::isnan(fPowerLorentzSecDiagTransformedX)) {
-        power_lorentz_x_coords.push_back(fPowerLorentzSecDiagTransformedX);
-    }
-    
-    // For Power-Law Lorentz estimations, collect Y coordinates:
-    // ONLY use Trans diagonal coordinates (exclude row/column fits)
-    
-    // 1. Main diagonal Trans Y
-    if (!std::isnan(fPowerLorentzMainDiagTransformedY)) {
-        power_lorentz_y_coords.push_back(fPowerLorentzMainDiagTransformedY);
-    }
-    
-    // 2. Secondary diagonal Trans Y
-    if (!std::isnan(fPowerLorentzSecDiagTransformedY)) {
-        power_lorentz_y_coords.push_back(fPowerLorentzSecDiagTransformedY);
-    }
-    
     // =============================================
     // ADD 3D FIT RESULTS TO MEAN CALCULATIONS
     // =============================================
@@ -1969,16 +1555,7 @@ void RunAction::CalcMeanEstimations()
     if (!std::isnan(f3DLorentzCenterY) && f3DLorentzSuccess) {
         lorentz_y_coords.push_back(f3DLorentzCenterY);
     }
-    
-    // Add 3D Power-Law Lorentz fit results to Power-Law Lorentz estimation collections
-    if (!std::isnan(f3DPowerLorentzCenterX) && f3DPowerLorentzSuccess) {
-        power_lorentz_x_coords.push_back(f3DPowerLorentzCenterX);
-    }
-    if (!std::isnan(f3DPowerLorentzCenterY) && f3DPowerLorentzSuccess) {
-        power_lorentz_y_coords.push_back(f3DPowerLorentzCenterY);
-    }
 
-    
     // Calc mean X coordinate estimations and their deltas
     if (!gauss_x_coords.empty()) {
         G4double sum = 0.0;
@@ -2023,39 +1600,7 @@ void RunAction::CalcMeanEstimations()
     } else {
         fLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
-    
-    // Calc Power-Law Lorentz mean coordinate estimations and their deltas
-    if (!power_lorentz_x_coords.empty()) {
-        G4double sum = 0.0;
-        for (const auto& coord : power_lorentz_x_coords) {
-            sum += coord;
-        }
-        G4double mean_x = sum / power_lorentz_x_coords.size();
-        fPowerLorentzMeanTrueDeltaX = std::abs(mean_x - fTrueX);
-    } else {
-        fPowerLorentzMeanTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-    }
-    
-    if (!power_lorentz_y_coords.empty()) {
-        G4double sum = 0.0;
-        for (const auto& coord : power_lorentz_y_coords) {
-            sum += coord;
-        }
-        G4double mean_y = sum / power_lorentz_y_coords.size();
-        fPowerLorentzMeanTrueDeltaY = std::abs(mean_y - fTrueY);
-    } else {
-        fPowerLorentzMeanTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
-
 }
-
-// =============================================
-// LAPLACE FIT RESULTS SETTER METHODS
-// =============================================
-
-
-
-
 
 // Store automatic radius selection results
 void RunAction::SetAutoRadiusResults(G4int selectedRadius)
@@ -2169,272 +1714,8 @@ void RunAction::VerifyScorerDataInTree()
 }
 
 // =============================================
-// POWER Lorentz FIT RESULTS SETTER METHODS
-// =============================================
-
-void RunAction::Set2DPowerLorentzResults(G4double x_center, G4double x_gamma, G4double x_beta, G4double x_Amp,
-                                               G4double x_center_err, G4double x_gamma_err, G4double x_beta_err, G4double x_Amp_err,
-                                               G4double x_Vert_offset, G4double x_Vert_offset_err,
-                                               G4double x_chi2red, G4double x_pp, G4int x_dof,
-                                               G4double y_center, G4double y_gamma, G4double y_beta, G4double y_Amp,
-                                               G4double y_center_err, G4double y_gamma_err, G4double y_beta_err, G4double y_Amp_err,
-                                               G4double y_Vert_offset, G4double y_Vert_offset_err,
-                                               G4double y_chi2red, G4double y_pp, G4int y_dof,
-                                               G4double x_charge_err, G4double y_charge_err,
-                                               G4bool fit_success)
-{
-    // Store X direction (row) fit results - Power-Law Lorentz model
-    fPowerLorentzRowCenter = x_center;
-    fPowerLorentzRowGamma = x_gamma;
-    fPowerLorentzRowBeta = x_beta;
-    fPowerLorentzRowAmp = x_Amp;
-    fPowerLorentzRowCenterErr = x_center_err;
-    fPowerLorentzRowGammaErr = x_gamma_err;
-    fPowerLorentzRowBetaErr = x_beta_err;
-    fPowerLorentzRowAmpErr = x_Amp_err;
-    fPowerLorentzRowVertOffset = x_Vert_offset;
-    fPowerLorentzRowVertOffsetErr = x_Vert_offset_err;
-    fPowerLorentzRowChi2red = x_chi2red;
-    fPowerLorentzRowPp = x_pp;
-    fPowerLorentzRowDOF = x_dof;
-    
-    // Store Y direction (column) fit results - Power-Law Lorentz model
-    fPowerLorentzColCenter = y_center;
-    fPowerLorentzColGamma = y_gamma;
-    fPowerLorentzColBeta = y_beta;
-    fPowerLorentzColAmp = y_Amp;
-    fPowerLorentzColCenterErr = y_center_err;
-    fPowerLorentzColGammaErr = y_gamma_err;
-    fPowerLorentzColBetaErr = y_beta_err;
-    fPowerLorentzColAmpErr = y_Amp_err;
-    fPowerLorentzColVertOffset = y_Vert_offset;
-    fPowerLorentzColVertOffsetErr = y_Vert_offset_err;
-    fPowerLorentzColChi2red = y_chi2red;
-    fPowerLorentzColPp = y_pp;
-    fPowerLorentzColDOF = y_dof;
-    
-    // Store charge uncertainties (5% of max charge) only if feature is enabled
-    if (Control::CHARGE_ERR) {
-        fPowerLorentzRowChargeErr = x_charge_err;
-        fPowerLorentzColChargeErr = y_charge_err;
-    } else {
-        fPowerLorentzRowChargeErr = 0.0;
-        fPowerLorentzColChargeErr = 0.0;
-    }
-    
-    // Calc delta values for row and column fits vs true position
-    if (fit_success) {
-        // Check X fit validity (row fit) - use dof as success indicator
-        if (x_dof > 0) {
-            fPowerLorentzRowDeltaX = std::abs(x_center - fTrueX);      // x_row_fit - x_true
-        } else {
-            fPowerLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        }
-        
-        // Check Y fit validity (column fit) - use dof as success indicator  
-        if (y_dof > 0) {
-            fPowerLorentzColDeltaY = std::abs(y_center - fTrueY);   // y_column_fit - y_true
-        } else {
-            fPowerLorentzColDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-        }
-    } else {
-        // Set row and column delta values to NaN for failed overall fits
-        fPowerLorentzRowDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fPowerLorentzColDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
-    
-    // Calc mean estimations from all fitting methods
-    CalcMeanEstimations();
-}
-
-void RunAction::SetDiagPowerLorentzResults(G4double main_diag_x_center, G4double main_diag_x_gamma, G4double main_diag_x_beta, G4double main_diag_x_Amp,
-                                                     G4double main_diag_x_center_err, G4double main_diag_x_gamma_err, G4double main_diag_x_beta_err, G4double main_diag_x_Amp_err,
-                                                     G4double main_diag_x_Vert_offset, G4double main_diag_x_Vert_offset_err,
-                                                     G4double main_diag_x_chi2red, G4double main_diag_x_pp, G4int main_diag_x_dof, G4bool main_diag_x_fit_success,
-                                                     G4double main_diag_y_center, G4double main_diag_y_gamma, G4double main_diag_y_beta, G4double main_diag_y_Amp,
-                                                     G4double main_diag_y_center_err, G4double main_diag_y_gamma_err, G4double main_diag_y_beta_err, G4double main_diag_y_Amp_err,
-                                                     G4double main_diag_y_Vert_offset, G4double main_diag_y_Vert_offset_err,
-                                                     G4double main_diag_y_chi2red, G4double main_diag_y_pp, G4int main_diag_y_dof, G4bool main_diag_y_fit_success,
-                                                     G4double sec_diag_x_center, G4double sec_diag_x_gamma, G4double sec_diag_x_beta, G4double sec_diag_x_Amp,
-                                                     G4double sec_diag_x_center_err, G4double sec_diag_x_gamma_err, G4double sec_diag_x_beta_err, G4double sec_diag_x_Amp_err,
-                                                     G4double sec_diag_x_Vert_offset, G4double sec_diag_x_Vert_offset_err,
-                                                     G4double sec_diag_x_chi2red, G4double sec_diag_x_pp, G4int sec_diag_x_dof, G4bool sec_diag_x_fit_success,
-                                                     G4double sec_diag_y_center, G4double sec_diag_y_gamma, G4double sec_diag_y_beta, G4double sec_diag_y_Amp,
-                                                     G4double sec_diag_y_center_err, G4double sec_diag_y_gamma_err, G4double sec_diag_y_beta_err, G4double sec_diag_y_Amp_err,
-                                                     G4double sec_diag_y_Vert_offset, G4double sec_diag_y_Vert_offset_err,
-                                                     G4double sec_diag_y_chi2red, G4double sec_diag_y_pp, G4int sec_diag_y_dof, G4bool sec_diag_y_fit_success,
-                                                     G4bool fit_success)
-{
-    // Store main diagonal X fit results - Power-Law Lorentz model
-    fPowerLorentzMainDiagXCenter = main_diag_x_center;
-    fPowerLorentzMainDiagXGamma = main_diag_x_gamma;
-    fPowerLorentzMainDiagXBeta = main_diag_x_beta;
-    fPowerLorentzMainDiagXAmp = main_diag_x_Amp;
-    fPowerLorentzMainDiagXCenterErr = main_diag_x_center_err;
-    fPowerLorentzMainDiagXGammaErr = main_diag_x_gamma_err;
-    fPowerLorentzMainDiagXBetaErr = main_diag_x_beta_err;
-    fPowerLorentzMainDiagXAmpErr = main_diag_x_Amp_err;
-    fPowerLorentzMainDiagXVertOffset = main_diag_x_Vert_offset;
-    fPowerLorentzMainDiagXVertOffsetErr = main_diag_x_Vert_offset_err;
-    fPowerLorentzMainDiagXChi2red = main_diag_x_chi2red;
-    fPowerLorentzMainDiagXPp = main_diag_x_pp;
-    fPowerLorentzMainDiagXDOF = main_diag_x_dof;
-    
-    // Store main diagonal Y fit results - Power-Law Lorentz model
-    fPowerLorentzMainDiagYCenter = main_diag_y_center;
-    fPowerLorentzMainDiagYGamma = main_diag_y_gamma;
-    fPowerLorentzMainDiagYBeta = main_diag_y_beta;
-    fPowerLorentzMainDiagYAmp = main_diag_y_Amp;
-    fPowerLorentzMainDiagYCenterErr = main_diag_y_center_err;
-    fPowerLorentzMainDiagYGammaErr = main_diag_y_gamma_err;
-    fPowerLorentzMainDiagYBetaErr = main_diag_y_beta_err;
-    fPowerLorentzMainDiagYAmpErr = main_diag_y_Amp_err;
-    fPowerLorentzMainDiagYVertOffset = main_diag_y_Vert_offset;
-    fPowerLorentzMainDiagYVertOffsetErr = main_diag_y_Vert_offset_err;
-    fPowerLorentzMainDiagYChi2red = main_diag_y_chi2red;
-    fPowerLorentzMainDiagYPp = main_diag_y_pp;
-    fPowerLorentzMainDiagYDOF = main_diag_y_dof;
-    
-    // Store Secondary diagonal X fit results - Power-Law Lorentz model
-    fPowerLorentzSecDiagXCenter = sec_diag_x_center;
-    fPowerLorentzSecDiagXGamma = sec_diag_x_gamma;
-    fPowerLorentzSecDiagXBeta = sec_diag_x_beta;
-    fPowerLorentzSecDiagXAmp = sec_diag_x_Amp;
-    fPowerLorentzSecDiagXCenterErr = sec_diag_x_center_err;
-    fPowerLorentzSecDiagXGammaErr = sec_diag_x_gamma_err;
-    fPowerLorentzSecDiagXBetaErr = sec_diag_x_beta_err;
-    fPowerLorentzSecDiagXAmpErr = sec_diag_x_Amp_err;
-    fPowerLorentzSecDiagXVertOffset = sec_diag_x_Vert_offset;
-    fPowerLorentzSecDiagXVertOffsetErr = sec_diag_x_Vert_offset_err;
-    fPowerLorentzSecDiagXChi2red = sec_diag_x_chi2red;
-    fPowerLorentzSecDiagXPp = sec_diag_x_pp;
-    fPowerLorentzSecDiagXDOF = sec_diag_x_dof;
-    
-    // Store Secondary diagonal Y fit results - Power-Law Lorentz model
-    fPowerLorentzSecDiagYCenter = sec_diag_y_center;
-    fPowerLorentzSecDiagYGamma = sec_diag_y_gamma;
-    fPowerLorentzSecDiagYBeta = sec_diag_y_beta;
-    fPowerLorentzSecDiagYAmp = sec_diag_y_Amp;
-    fPowerLorentzSecDiagYCenterErr = sec_diag_y_center_err;
-    fPowerLorentzSecDiagYGammaErr = sec_diag_y_gamma_err;
-    fPowerLorentzSecDiagYBetaErr = sec_diag_y_beta_err;
-    fPowerLorentzSecDiagYAmpErr = sec_diag_y_Amp_err;
-    fPowerLorentzSecDiagYVertOffset = sec_diag_y_Vert_offset;
-    fPowerLorentzSecDiagYVertOffsetErr = sec_diag_y_Vert_offset_err;
-    fPowerLorentzSecDiagYChi2red = sec_diag_y_chi2red;
-    fPowerLorentzSecDiagYPp = sec_diag_y_pp;
-    fPowerLorentzSecDiagYDOF = sec_diag_y_dof;
-
-    // Calc Trans diagonal coordinates using rotation matrix
-    CalcTransformedDiagCoords();
-    
-    // Calc mean estimations from all fitting methods
-    CalcMeanEstimations();
-}
-
-// =============================================
 // 3D FIT RESULTS SETTER METHODS
 // =============================================
-
-void RunAction::Set3DLorentzResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double Amp, G4double Vert_offset,
-                                           G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double Amp_err, G4double Vert_offset_err,
-                                           G4double chi2red, G4double pp, G4int dof,
-                                           G4double charge_err,
-                                           G4bool fit_success)
-{
-    // Store 3D Lorentz fit parameters
-    f3DLorentzCenterX = center_x;
-    f3DLorentzCenterY = center_y;
-    f3DLorentzGammaX = gamma_x;
-    f3DLorentzGammaY = gamma_y;
-    f3DLorentzAmp = Amp;
-    f3DLorentzVertOffset = Vert_offset;
-    
-    // Store 3D Lorentz fit parameter errors
-    f3DLorentzCenterXErr = center_x_err;
-    f3DLorentzCenterYErr = center_y_err;
-    f3DLorentzGammaXErr = gamma_x_err;
-    f3DLorentzGammaYErr = gamma_y_err;
-    f3DLorentzAmpErr = Amp_err;
-    f3DLorentzVertOffsetErr = Vert_offset_err;
-    
-    // Store 3D Lorentz fit statistics
-    f3DLorentzChi2red = chi2red;
-    f3DLorentzPp = pp;
-    f3DLorentzDOF = dof;
-    f3DLorentzSuccess = fit_success;
-    
-    // Store charge err (5% of max charge) only if feature is enabled
-    if (Control::CHARGE_ERR) {
-        f3DLorentzChargeErr = charge_err;
-    } else {
-        f3DLorentzChargeErr = 0.0;
-    }
-    
-    // Calc delta values vs true position
-    if (fit_success && dof > 0) {
-        f3DLorentzDeltaX = std::abs(center_x - fTrueX);      // x_3D_fit - x_true
-        f3DLorentzDeltaY = std::abs(center_y - fTrueY);      // y_3D_fit - y_true
-    } else {
-        // Set delta values to NaN for failed fits
-        f3DLorentzDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        f3DLorentzDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
-    
-    // Calc mean estimations from all fitting methods (including 3D)
-    CalcMeanEstimations();
-}
-
-void RunAction::Set3DPowerLorentzResults(G4double center_x, G4double center_y, G4double gamma_x, G4double gamma_y, G4double beta, G4double Amp, G4double Vert_offset,
-                                               G4double center_x_err, G4double center_y_err, G4double gamma_x_err, G4double gamma_y_err, G4double beta_err, G4double Amp_err, G4double Vert_offset_err,
-                                               G4double chi2red, G4double pp, G4int dof,
-                                               G4double charge_err,
-                                               G4bool fit_success)
-{
-    // Store 3D Power-Law Lorentz fit parameters
-    f3DPowerLorentzCenterX = center_x;
-    f3DPowerLorentzCenterY = center_y;
-    f3DPowerLorentzGammaX = gamma_x;
-    f3DPowerLorentzGammaY = gamma_y;
-    f3DPowerLorentzBeta = beta;
-    f3DPowerLorentzAmp = Amp;
-    f3DPowerLorentzVertOffset = Vert_offset;
-    
-    // Store 3D Power-Law Lorentz fit parameter errors
-    f3DPowerLorentzCenterXErr = center_x_err;
-    f3DPowerLorentzCenterYErr = center_y_err;
-    f3DPowerLorentzGammaXErr = gamma_x_err;
-    f3DPowerLorentzGammaYErr = gamma_y_err;
-    f3DPowerLorentzBetaErr = beta_err;
-    f3DPowerLorentzAmpErr = Amp_err;
-    f3DPowerLorentzVertOffsetErr = Vert_offset_err;
-    
-    // Store 3D Power-Law Lorentz fit statistics
-    f3DPowerLorentzChi2red = chi2red;
-    f3DPowerLorentzPp = pp;
-    f3DPowerLorentzDOF = dof;
-    f3DPowerLorentzSuccess = fit_success;
-    
-    // Store charge err (5% of max charge) only if feature is enabled
-    if (Control::CHARGE_ERR) {
-        f3DPowerLorentzChargeErr = charge_err;
-    } else {
-        f3DPowerLorentzChargeErr = 0.0;
-    }
-    
-    // Calc delta values vs true position
-    if (fit_success && dof > 0) {
-        f3DPowerLorentzDeltaX = std::abs(center_x - fTrueX);      // x_3D_fit - x_true
-        f3DPowerLorentzDeltaY = std::abs(center_y - fTrueY);      // y_3D_fit - y_true
-    } else {
-        // Set delta values to NaN for failed fits
-        f3DPowerLorentzDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        f3DPowerLorentzDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
-    
-    // Calc mean estimations from all fitting methods (including 3D)
-    CalcMeanEstimations();
-}
 
 void RunAction::Set3DGaussResults(G4double center_x, G4double center_y, G4double sigma_x, G4double sigma_y, G4double Amp, G4double Vert_offset,
                                         G4double center_x_err, G4double center_y_err, G4double sigma_x_err, G4double sigma_y_err, G4double Amp_err, G4double Vert_offset_err,

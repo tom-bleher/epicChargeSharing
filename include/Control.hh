@@ -27,7 +27,6 @@ namespace Control {
     // Enable/disable different fitting models
     const G4bool GAUSS_FIT = true;         // Enable Gauss fitting (2D and diagonal)
     const G4bool LORENTZ_FIT = false;       // Enable Lorentz fitting (2D and diagonal) 
-    const G4bool POWER_LORENTZ_FIT = false; // Enable Power Lorentz fitting (2D and diagonal)
     
     // Individual fitting type control (only used if main model is enabled)
     const G4bool ROWCOL_FIT = true;               // Enable central row/column fitting
@@ -36,7 +35,6 @@ namespace Control {
     // 3D fitting control flags (fit entire neighborhood surface directly)
     const G4bool GAUSS_FIT_3D = false;      // Enable 3D Gauss surface fitting
     const G4bool LORENTZ_FIT_3D = false;    // Enable 3D Lorentz surface fitting
-    const G4bool POWER_LORENTZ_FIT_3D = false; // Enable 3D Power-Law Lorentz surface fitting
     
     // ========================
     // VERTICAL CHARGE UNCERTAINTIES CONTROL

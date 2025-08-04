@@ -92,7 +92,6 @@ EpicChargeSharingAnalysis/
 │   ├── EventAction.cc            # Event processing & charge sharing
 │   ├── GaussFit2D.cc            # 2D Gaussian fitting
 │   ├── LorentzFit2D.cc          # 2D Lorentzian fitting
-│   ├── PowerLorentzFit2D.cc     # 2D Power-Lorentz fitting
 │   ├── *Fit3D.cc                # 3D fitting implementations
 │   └── ...
 ├── include/                      # Header files
@@ -118,11 +117,11 @@ The simulation utilizes the analytical model for signal pad sharing as presented
 ## Cite
 
 ```
-@misc{bleher2024epicchargesharinganalysis,
+@misc{bleher2024epicchargesharing,
   author = {Tom Bleher, Igor Korover},
-  title = {epicChargeSharingAnalysis: Geant4 simulation to study charge sharing reconstruction in pixel detectors},
+  title = {epicChargeSharing: Geant4 simulation to study charge sharing reconstruction in pixel detectors},
   year = {2025},
-  howpublished = {\url{https://github.com/tom-bleher/epicChargeSharingAnalysis}},
+  howpublished = {\url{https://github.com/tom-bleher/epicChargeSharing}},
   note = {A GEANT4-based simulation for charge sharing studies in AC-LGAD pixel sensors with a focus on position reconstruction}
 }
 ```
