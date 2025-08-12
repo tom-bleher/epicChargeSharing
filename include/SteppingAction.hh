@@ -25,6 +25,8 @@ public:
   
   // Enhanced trajectory analysis methods
   G4bool IsValidSiliconHit() const;
+    // First-contact classification (true if first entered volume is pixel aluminum)
+    G4bool FirstContactIsPixel() const { return fFirstInteractionVolume == "logicBlock"; }
   
   // Volume-based detection methods (replacing IsPosOnPixel logic)
   G4bool IsInSiliconVolume(const G4Step* step) const;

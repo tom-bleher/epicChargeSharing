@@ -185,7 +185,10 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->Branch("y_px", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
         fTree->Branch("e_dep", &fEdep, "e_dep/D");
         fTree->Branch("e_init", &fInitialEnergy, "E_init/D")->SetTitle("Initial Particle Energy [MeV]");
-        fTree->Branch("is_pixel_hit", &fIsPixelHit, "isPixelHit/O")->SetTitle("1 if hit had first contact with a pixel-pad, 0 otherwise");
+        // Pixel hit flags: first-contact, geometric, and combined (AND)
+        fTree->Branch("first_contact_is_pixel", &fFirstContactIsPixel, "first_contact_is_pixel/O");
+        fTree->Branch("geometric_is_pixel", &fGeometricIsPixel, "geometric_is_pixel/O");
+        fTree->Branch("is_pixel_hit", &fIsPixelHit, "is_pixel_hit/O");
         fTree->Branch("px_hit_delta_x", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
         fTree->Branch("px_hit_delta_y", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]");
         //fTree->Branch("NonPixelPadRadiusCheck", &fNonPixelPadRadiusCheck, "NonPixelPadRadiusCheck/O")->SetTitle("For non-pixel hits: |dx|>PIXEL_SIZE/2 && |dy|>PIXEL_SIZE/2");
@@ -432,6 +435,8 @@ void RunAction::SetPixelHitStatus(G4bool isPixelHit)
     // Store pixel hit status (true if on pixel)
     fIsPixelHit = isPixelHit;
 }
+
+// Note: setters for first/geometric/combined flags are inline in header
 
 void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
                                  const std::vector<G4double>& chargeCoulombs)

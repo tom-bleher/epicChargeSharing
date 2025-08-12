@@ -52,10 +52,21 @@ void SteppingAction::TrackVolumeInteractions(const G4Step* step)
   if (postPoint->GetStepStatus() == fGeomBoundary) {
     // We have crossed a boundary and entered postVol
     if (fFirstInteractionVolume == "NONE" && postVol) {
-      fFirstInteractionVolume = postVol->GetLogicalVolume()->GetName();
-      if (fFirstInteractionVolume == "logicBlock") {
-        // Pixel electrode was encountered before silicon
-        fAluminumPreContact = true;
+      const G4String enteredName = postVol->GetLogicalVolume()->GetName();
+
+      // Only register first contact for detector-relevant volumes
+      if (enteredName == "logicBlock" || enteredName == "logicCube") {
+        fFirstInteractionVolume = enteredName;
+
+        // Register first-contact position (use post-point at boundary entrance)
+        if (fEventAction) {
+          fEventAction->RegisterFirstContact(postPoint->GetPosition());
+        }
+
+        if (enteredName == "logicBlock") {
+          // Pixel electrode was encountered before silicon
+          fAluminumPreContact = true;
+        }
       }
     }
   }
