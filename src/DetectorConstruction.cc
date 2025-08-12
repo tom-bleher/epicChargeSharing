@@ -1,5 +1,4 @@
 #include "DetectorConstruction.hh"
-#include "DetectorMessenger.hh"
 #include "EventAction.hh"
 #include "RunAction.hh"
 #include "Constants.hh"
@@ -10,7 +9,6 @@
 #include <sstream>
 #include <string>
 #include <filesystem>  // For portable directory creation
-#include <memory>      // For std::unique_ptr
 
 // Add step limiter includes
 #include "G4UserLimits.hh"
@@ -28,68 +26,21 @@ DetectorConstruction::DetectorConstruction()
       fNumBlocksPerSide(0),    // Will be calculated
       fCheckOverlaps(true),
       fEventAction(nullptr),   // Initialize EventAction pointer
-      fDetectorMessenger(nullptr),
-      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),   // Default neighborhood radius for 9x9 grid
-      fMultiFunctionalDetector(nullptr),
-      fEnergyScorer(nullptr),
-      fHitCountScorer(nullptr)
+      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS)   // Default neighborhood radius for 9x9 grid
 {
     // Values for pixel grid set at constants.hh
     
     // Will be calculated in Construct() based on symmetry constraint
     fNumBlocksPerSide = 0;
-    
-    // Create the messenger
-    fDetectorMessenger = new DetectorMessenger(this);
 }
 
 DetectorConstruction::~DetectorConstruction()
 {
-    delete fDetectorMessenger;
     
-    // Multi-Functional Detector cleanup
-    // Note: Primitive scorers are owned by the Multi-Functional Detector
-    // and will be cleaned up automatically when the detector is deleted
-    delete fMultiFunctionalDetector;
+
 }
 
-void DetectorConstruction::SetGridParameters(G4double pixelSize, G4double pixelSpacing, G4double pixelCornerOffset, G4int numPixels)
-{
-    // Update the parameters for pixel grid placement
-    fPixelSize = pixelSize;
-    fPixelSpacing = pixelSpacing;
-    // NOTE: fPixelCornerOffset is now FIXED and not changed by this method
-    
-    // Store the original detector size for comparison
-    G4double originalDetSize = fDetSize;
-    
-    // Calc the number of pixels that would fit with current parameters
-    fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
-    
-    // Calc the required detector size to accommodate the pixel grid with FIXED corner offset
-    G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
-    
-    // Update detector size if it differs significantly (more than 1 μm tolerance)
-    if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
-        G4cout << "\n=== DETECTOR SIZE ADJUSTMENT ===\n"
-               << "Original detector size: " << originalDetSize/mm << " mm\n"
-               << "Required detector size for " << fNumBlocksPerSide << "×" << fNumBlocksPerSide 
-               << " pixel grid: " << requiredDetSize/mm << " mm\n"
-               << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm\n";
-        
-        fDetSize = requiredDetSize;
-        
-        G4cout << "Detector size adjusted to: " << fDetSize/mm << " mm\n"
-               << "=================================" << G4endl;
-    }
-    
-    // Verify the calculation
-    G4double actualCornerOffset = (fDetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
-    if (std::abs(actualCornerOffset - fPixelCornerOffset) > Constants::PRECISION_TOLERANCE) {
-        G4cerr << "WARNING: Corner offset calculation mismatch!" << G4endl;
-        G4cerr << "Expected: " << fPixelCornerOffset/mm << " mm, Got: " << actualCornerOffset/mm << " mm" << G4endl;
-    }
-}
+
 
 void DetectorConstruction::SetPixelCornerOffset(G4double cornerOffset)
 {
@@ -127,9 +78,10 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     fLogicSilicon = new G4LogicalVolume(detCube, siliconMat, "logicCube");
     G4LogicalVolume* logicCube = fLogicSilicon; // alias for readability
     
-    // Set visualization attributes for the detector (semi-transparent) - RAII
-    auto cubeVisAtt = std::make_unique<G4VisAttributes>(G4Colour(0.7, 0.7, 0.7, 0.5)); // Grey, semi-transparent
-    logicCube->SetVisAttributes(cubeVisAtt.get());
+    // Set visualization attributes for the detector (semi-transparent)
+    // Note: G4 stores the pointer; keep ownership with Geant4 to ensure lifetime
+    auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7, 0.5));
+    logicCube->SetVisAttributes(cubeVisAtt);
     
     // Place the silicon detector at fixed pos
     G4ThreeVector detectorPos(0., 0., Constants::DETECTOR_Z_POSITION);
@@ -162,7 +114,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         detCube = new G4Box("detCube", fDetSize/2, fDetSize/2, fDetWidth/2);
         delete logicCube;
         logicCube = new G4LogicalVolume(detCube, siliconMat, "logicCube");
-        logicCube->SetVisAttributes(cubeVisAtt.get());
+        logicCube->SetVisAttributes(cubeVisAtt);
         fLogicSilicon = logicCube; // keep pointer up-to-date
     }
     
@@ -182,10 +134,9 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4LogicalVolume *logicBlock = new G4LogicalVolume(pixelBlock, aluminumMat, "logicBlock");
     
     // Add step limiting for fine tracking - force steps to be at most 10 micrometers
-    G4UserLimits* stepLimit = new G4UserLimits(Constants::MAX_STEP_SIZE);  // Max step size
-    logicCube->SetUserLimits(stepLimit);   // Apply to detector volume
-    logicBlock->SetUserLimits(stepLimit);  // Apply to pixel volumes
-    logicWorld->SetUserLimits(stepLimit);  // Apply to world volume
+    // Apply only to active/sensitive materials (silicon). Keep world and aluminum unrestricted.
+    G4UserLimits* stepLimit = new G4UserLimits(Constants::MAX_STEP_SIZE);
+    logicCube->SetUserLimits(stepLimit);
     
     G4cout << "✓ Step limiting enabled: maximum step size = 10 micrometers" << G4endl;
     
@@ -225,9 +176,9 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         G4cerr << "Attached detector: " << pixelSensitiveDetector->GetName() << G4endl;
     }
     
-    // Set visualization attributes for pixels - RAII
-    auto blockVisAtt = std::make_unique<G4VisAttributes>(G4Colour(0.0, 0.0, 1.0)); // Blue color
-    logicBlock->SetVisAttributes(blockVisAtt.get());
+    // Set visualization attributes for pixels
+    auto* blockVisAtt = new G4VisAttributes(G4Colour(0.0, 0.0, 1.0));
+    logicBlock->SetVisAttributes(blockVisAtt);
     
     // Set the world volume to be invisible
     logicWorld->SetVisAttributes(G4VisAttributes::GetInvisible());
@@ -375,49 +326,7 @@ void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
     }
 }
 
-// Set automatic radius selection enabled
-void DetectorConstruction::SetAutoRadiusEnabled(G4bool enabled)
-{
-    G4cout << "Setting automatic radius selection enabled: " << (enabled ? "Enabled" : "Disabled") << G4endl;
-    
-    // Pass the setting to EventAction if it's available
-    if (fEventAction) {
-        fEventAction->SetAutoRadiusEnabled(enabled);
-        G4cout << "Updated EventAction with auto radius enabled: " << (enabled ? "Enabled" : "Disabled") << G4endl;
-    } else {
-        G4cout << "EventAction not yet available - auto radius enabled will be set when EventAction is connected" << G4endl;
-    }
-}
 
-// Set minimum automatic radius
-void DetectorConstruction::SetMinAutoRadius(G4int minRadius)
-{
-    G4cout << "Setting minimum automatic radius to: " << minRadius << G4endl;
-    
-    // Pass the setting to EventAction if it's available
-    if (fEventAction) {
-        fEventAction->SetAutoRadiusRange(minRadius, fEventAction->GetAutoRadiusEnabled() ? 
-                                        Constants::MAX_AUTO_RADIUS : minRadius);
-        G4cout << "Updated EventAction with minimum auto radius: " << minRadius << G4endl;
-    } else {
-        G4cout << "EventAction not yet available - minimum auto radius will be set when EventAction is connected" << G4endl;
-    }
-}
-
-// Set maximum automatic radius
-void DetectorConstruction::SetMaxAutoRadius(G4int maxRadius)
-{
-    G4cout << "Setting maximum automatic radius to: " << maxRadius << G4endl;
-    
-    // Pass the setting to EventAction if it's available
-    if (fEventAction) {
-        fEventAction->SetAutoRadiusRange(fEventAction->GetAutoRadiusEnabled() ? 
-                                        Constants::MIN_AUTO_RADIUS : maxRadius, maxRadius);
-        G4cout << "Updated EventAction with maximum auto radius: " << maxRadius << G4endl;
-    } else {
-        G4cout << "EventAction not yet available - maximum auto radius will be set when EventAction is connected" << G4endl;
-    }
-}
 
 void DetectorConstruction::ConstructSDandField() {
     G4ScoringManager::GetScoringManager();  // Activate scoring manager
@@ -444,15 +353,10 @@ void DetectorConstruction::ConstructSDandField() {
         G4cerr << "ERROR: Failed to attach Multi-Functional Detector to silicon volume" << G4endl;
     }
 
-    // Final validation summary for Multi-Functional Detector integration
     G4cout << "\n=== MULTI-FUNCTIONAL DETECTOR VALIDATION SUMMARY ===" << G4endl;
-    if (mfd) {
-        G4cout << "✓ Multi-Functional Detector: Created and initialized" << G4endl;
-        G4cout << "✓ Silicon Volume Sensitivity: Attached (logicCube)" << G4endl;
-        G4cout << "✓ Primitive Scorers: " << mfd->GetNumberOfPrimitives() << " attached" << G4endl;
-        G4cout << "✓ Selective Sensitivity: Requirements met" << G4endl;
-    } else {
-        G4cout << "⚠ Multi-Functional Detector: Not created - using traditional stepping only" << G4endl;
-    }
+    G4cout << "✓ Multi-Functional Detector: Created and initialized" << G4endl;
+    G4cout << "✓ Silicon Volume Sensitivity: Attached (logicCube)" << G4endl;
+    G4cout << "✓ Primitive Scorers: " << mfd->GetNumberOfPrimitives() << " attached" << G4endl;
+    G4cout << "✓ Selective Sensitivity: Requirements met" << G4endl;
     G4cout << "=================================================" << G4endl;
 }

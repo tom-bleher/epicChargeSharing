@@ -41,26 +41,12 @@ namespace Constants {
     const G4int NEIGHBORHOOD_RADIUS = 4;                 // Default neighborhood radius for 9x9 grid
     
     // ========================
-    // AUTOMATIC RADIUS SELECTION CONSTANTS
-    // ========================
-    
-    // Automatic radius selection parameters
-    const G4int MIN_AUTO_RADIUS = 4;                     // Minimum radius for auto selection (5x5 grid)
-    const G4int MAX_AUTO_RADIUS = 10;                     // Maximum radius for auto selection (13x13 grid)
-    
-    // Fit quality thresholds for radius selection
-    const G4int MIN_POINTS_FOR_FIT = 3;                  // Minimum number of points required for fitting
-    
-    // ========================
     // SIMULATION CONSTANTS
     // ========================
     
     // Step limiting
     const G4double MAX_STEP_SIZE = 10.0*micrometer;      // Maximum step size for tracking
-    
-    // Charge sharing calculations
-    const G4double ALPHA_WEIGHT_MULTIPLIER = 1000.0;     // Weight for very close pixels
-    
+        
     // Primary generator constants
     const G4double PRIMARY_PARTICLE_Z_POSITION = 2.0*cm; // Z position for primary particle generation
         
@@ -74,22 +60,14 @@ namespace Constants {
     const G4double MIN_LOG_VALUE = 1e-6;                 // Minimum allowed log value for numerical stability
     const G4double MIN_DENOMINATOR_VALUE = 1e-10;        // Minimum allowed denominator value
     
-    // Ceres solver default tolerances
-    const G4double DEFAULT_FUNCTION_TOLERANCE = 1e-12;   // Default function tolerance for Ceres
-    const G4double DEFAULT_GRADIENT_TOLERANCE = 1e-12;   // Default gradient tolerance for Ceres  
-    const G4double DEFAULT_PARAMETER_TOLERANCE = 1e-15;  // Default parameter tolerance for Ceres
-    const G4double HIGH_PRECISION_TOLERANCE = 1e-15;     // High precision tolerance for critical fits
-    const G4double MEDIUM_PRECISION_TOLERANCE = 1e-12;   // Medium precision tolerance
-    const G4double LOW_PRECISION_TOLERANCE = 1e-10;      // Lower precision tolerance for fallback
-    
     // ========================
     // PHYSICS CONSTANTS
     // ========================
     
     // AC-LGAD physics parameters
     const G4double IONIZATION_ENERGY = 3.6;              // eV per electron-hole pair in silicon
-    const G4double AMPLIFICATION_FACTOR = 10.0;          // AC-LGAD amplification factor
-    const G4double D0_CHARGE_SHARING = 10.0;             // d0 constant for charge sharing (microns)
+    const G4double AMPLIFICATION_FACTOR = 20.0;          // AC-LGAD amplification factor (N_e' = N_e * 20)
+    const G4double D0_CHARGE_SHARING = 10.0;             // x displacement in silicon (microns)
     const G4double ELEMENTARY_CHARGE = 1.602176634e-19;  // Elementary charge in Coulombs
 
 } // namespace Constants
