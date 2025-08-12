@@ -7,6 +7,7 @@
 #include <TBranch.h>
 #include <TNamed.h>
 #include <TGraph2D.h>
+#include <TGraph2DErrors.h>
 #include <TF2.h>
 #include <TROOT.h>
 #include <TError.h>
@@ -37,7 +38,11 @@ namespace {
   inline bool IsFinite(double v) { return std::isfinite(v); }
 }
 
-int processing3D(const char* filename = "../build/epicChargeSharingOutput.root") {
+// errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
+// of the event's maximum charge within the neighborhood. The same error is
+// applied to all data points used in the fit for that event.
+int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
+                 double errorPercentOfMax = 5.0) {
   // Use Minuit2 by default
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-6);
@@ -219,6 +224,12 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root")
     const double mux0 = g2d.GetX()[idxMax];
     const double muy0 = g2d.GetY()[idxMax];
 
+    // Optional uniform vertical uncertainty from percent-of-max
+    const double relErr = std::max(0.0, errorPercentOfMax) * 0.01;
+    const double uniformSigma = (zmax > 0 && relErr > 0.0)
+                              ? relErr * zmax
+                              : 0.0;
+
     f2D.SetParameters(A0, mux0, muy0, std::max(0.25*pixelSpacing, 1e-6), std::max(0.25*pixelSpacing, 1e-6), B0);
     // Fractions bounded in [0,1]
     f2D.SetParLimits(0, 0.0, 1.0);                    // A >= 0
@@ -226,12 +237,26 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root")
     f2D.SetParLimits(4, 1e-6, 5.0*pixelSpacing);
     f2D.SetParLimits(5, 0.0, 1.0);                    // B in [0,1]
 
-    // Fit quietly, allow improved strategy
-    int status = g2d.Fit(&f2D, "QNS");
-    if (status != 0) {
-      // Retry with different widths
-      f2D.SetParameters(A0, mux0, muy0, std::max(0.5*pixelSpacing, 1e-6), std::max(0.5*pixelSpacing, 1e-6), B0);
-      status = g2d.Fit(&f2D, "QNSR");
+    // Fit quietly, allow improved strategy; use weights if provided
+    int status = -1;
+    if (uniformSigma > 0.0) {
+      TGraph2DErrors ge2d;
+      for (int k = 0; k < g2d.GetN(); ++k) {
+        ge2d.SetPoint(k, g2d.GetX()[k], g2d.GetY()[k], g2d.GetZ()[k]);
+        ge2d.SetPointError(k, 0.0, 0.0, uniformSigma);
+      }
+      status = ge2d.Fit(&f2D, "QNSW");
+      if (status != 0) {
+        f2D.SetParameters(A0, mux0, muy0, std::max(0.5*pixelSpacing, 1e-6), std::max(0.5*pixelSpacing, 1e-6), B0);
+        status = ge2d.Fit(&f2D, "QNSRW");
+      }
+    } else {
+      status = g2d.Fit(&f2D, "QNS");
+      if (status != 0) {
+        // Retry with different widths
+        f2D.SetParameters(A0, mux0, muy0, std::max(0.5*pixelSpacing, 1e-6), std::max(0.5*pixelSpacing, 1e-6), B0);
+        status = g2d.Fit(&f2D, "QNSR");
+      }
     }
     if (status == 0) {
       x_rec_3d = f2D.GetParameter(1);

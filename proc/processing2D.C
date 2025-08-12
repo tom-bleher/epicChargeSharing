@@ -7,6 +7,7 @@
 #include <TBranch.h>
 #include <TNamed.h>
 #include <TGraph.h>
+#include <TGraphErrors.h>
 #include <TF1.h>
 #include <TROOT.h>
 #include <TError.h>
@@ -35,7 +36,11 @@ namespace {
   }
 }
 
-int processing2D(const char* filename = "../build/epicChargeSharingOutput.root") {
+// errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
+// of the event's maximum charge within the neighborhood. The same error is
+// applied to all data points used in the fits for that event.
+int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
+                 double errorPercentOfMax = 5.0) {
   // Use Minuit2 by default
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-6);
@@ -203,6 +208,9 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root")
     x_row.reserve(N); q_row.reserve(N);
     y_col.reserve(N); q_col.reserve(N);
 
+    // Track maximum valid charge in the full neighborhood for error scaling
+    double qmaxNeighborhood = -1e300;
+
     // Mapping note: di indexes X (i), dj indexes Y (j)
     // - Central ROW: fixed Y (dj==0), vary di across X → x = x_px + di*pixelSpacing
     // - Central COLUMN: fixed X (di==0), vary dj across Y → y = y_px + dj*pixelSpacing
@@ -215,6 +223,8 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root")
 
         // skip clearly invalid entries (negative sentinel or non-finite)
         if (!IsFinite(q) || q < 0) continue;
+
+        if (q > qmaxNeighborhood) qmaxNeighborhood = q;
 
         // Central row: vary X with di at fixed Y
         if (dj == 0) {
@@ -242,11 +252,11 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root")
       continue;
     }
 
-    // Build TGraphs
-    TGraph gRow(static_cast<int>(x_row.size()));
-    TGraph gCol(static_cast<int>(y_col.size()));
-    for (int k = 0; k < gRow.GetN(); ++k) gRow.SetPoint(k, x_row[k], q_row[k]);
-    for (int k = 0; k < gCol.GetN(); ++k) gCol.SetPoint(k, y_col[k], q_col[k]);
+    // Build graphs with optional vertical uncertainties
+    const double relErr = std::max(0.0, errorPercentOfMax) * 0.01;
+    const double uniformSigma = (qmaxNeighborhood > 0 && relErr > 0.0)
+                              ? relErr * qmaxNeighborhood
+                              : 0.0;
 
     // Initial parameters (robust seeding from maxima)
     auto minmaxRow = std::minmax_element(q_row.begin(), q_row.end());
@@ -275,25 +285,60 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root")
     fCol.SetParLimits(3, 0.0, 1.0);
 
     // Fit quietly, store result
-    auto resRow = gRow.Fit(&fRow, "QNS");
-    auto resCol = gCol.Fit(&fCol, "QNS");
-    int statusRow = int(resRow);
-    int statusCol = int(resCol);
-
-    // Fallback retry with different seeds if needed
-    if (statusRow != 0) {
-      double wsum = 0, xw = 0;
-      for (size_t k=0;k<x_row.size();++k){ double w = std::max(0.0, q_row[k]-B0_row); wsum += w; xw += w * x_row[k]; }
-      double muW = (wsum>0)? xw/wsum : mu0_row;
-      fRow.SetParameters(A0_row, muW, std::max(0.5*pixelSpacing, 1e-6), B0_row);
-      statusRow = gRow.Fit(&fRow, "QNSR");
-    }
-    if (statusCol != 0) {
-      double wsum = 0, yw = 0;
-      for (size_t k=0;k<y_col.size();++k){ double w = std::max(0.0, q_col[k]-B0_col); wsum += w; yw += w * y_col[k]; }
-      double muW = (wsum>0)? yw/wsum : mu0_col;
-      fCol.SetParameters(A0_col, muW, std::max(0.5*pixelSpacing, 1e-6), B0_col);
-      statusCol = gCol.Fit(&fCol, "QNSR");
+    int statusRow = -1;
+    int statusCol = -1;
+    if (uniformSigma > 0.0) {
+      TGraphErrors gRow(static_cast<int>(x_row.size()));
+      TGraphErrors gCol(static_cast<int>(y_col.size()));
+      for (int k = 0; k < gRow.GetN(); ++k) {
+        gRow.SetPoint(k, x_row[k], q_row[k]);
+        gRow.SetPointError(k, 0.0, uniformSigma);
+      }
+      for (int k = 0; k < gCol.GetN(); ++k) {
+        gCol.SetPoint(k, y_col[k], q_col[k]);
+        gCol.SetPointError(k, 0.0, uniformSigma);
+      }
+      auto resRow = gRow.Fit(&fRow, "QNSW");
+      auto resCol = gCol.Fit(&fCol, "QNSW");
+      statusRow = int(resRow);
+      statusCol = int(resCol);
+      if (statusRow != 0) {
+        double wsum = 0, xw = 0;
+        for (size_t k=0;k<x_row.size();++k){ double w = std::max(0.0, q_row[k]-B0_row); wsum += w; xw += w * x_row[k]; }
+        double muW = (wsum>0)? xw/wsum : mu0_row;
+        fRow.SetParameters(A0_row, muW, std::max(0.5*pixelSpacing, 1e-6), B0_row);
+        statusRow = gRow.Fit(&fRow, "QNSRW");
+      }
+      if (statusCol != 0) {
+        double wsum = 0, yw = 0;
+        for (size_t k=0;k<y_col.size();++k){ double w = std::max(0.0, q_col[k]-B0_col); wsum += w; yw += w * y_col[k]; }
+        double muW = (wsum>0)? yw/wsum : mu0_col;
+        fCol.SetParameters(A0_col, muW, std::max(0.5*pixelSpacing, 1e-6), B0_col);
+        statusCol = gCol.Fit(&fCol, "QNSRW");
+      }
+    } else {
+      TGraph gRow(static_cast<int>(x_row.size()));
+      TGraph gCol(static_cast<int>(y_col.size()));
+      for (int k = 0; k < gRow.GetN(); ++k) gRow.SetPoint(k, x_row[k], q_row[k]);
+      for (int k = 0; k < gCol.GetN(); ++k) gCol.SetPoint(k, y_col[k], q_col[k]);
+      auto resRow = gRow.Fit(&fRow, "QNS");
+      auto resCol = gCol.Fit(&fCol, "QNS");
+      statusRow = int(resRow);
+      statusCol = int(resCol);
+      if (statusRow != 0) {
+        double wsum = 0, xw = 0;
+        for (size_t k=0;k<x_row.size();++k){ double w = std::max(0.0, q_row[k]-B0_row); wsum += w; xw += w * x_row[k]; }
+        double muW = (wsum>0)? xw/wsum : mu0_row;
+        fRow.SetParameters(A0_row, muW, std::max(0.5*pixelSpacing, 1e-6), B0_row);
+        statusRow = gRow.Fit(&fRow, "QNSR");
+      }
+      if (statusCol != 0) {
+        double wsum = 0, yw = 0;
+        for (size_t k=0;k<y_col.size();++k){ double w = std::max(0.0, q_col[k]-B0_col); wsum += w; yw += w * y_col[k]; }
+        double muW = (wsum>0)? yw/wsum : mu0_col;
+        fCol.SetParameters(A0_col, muW, std::max(0.5*pixelSpacing, 1e-6), B0_col);
+        statusCol = gCol.Fit(&fCol, "QNSR");
+      }
     }
 
     // Decide reconstructed positions
