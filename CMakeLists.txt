@@ -225,65 +225,25 @@ include(${Geant4_USE_FILE})
 # Set include directories
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
-# Find Ceres Solver with version checking to prevent ABI mismatches
-find_package(Ceres 2.0 REQUIRED)
-if(Ceres_FOUND)
-    message(STATUS "Found Ceres Solver version ${Ceres_VERSION}")
-    message(STATUS "Ceres include dirs: ${CERES_INCLUDE_DIRS}")
-    message(STATUS "Ceres libraries: ${CERES_LIBRARIES}")
-    
-    # Check for potential ABI compatibility issues
-    if(Ceres_VERSION VERSION_LESS "2.0.0")
-        message(WARNING "Ceres version ${Ceres_VERSION} is older than recommended (2.0+). Consider upgrading to avoid potential ABI issues.")
-    elseif(Ceres_VERSION VERSION_GREATER_EQUAL "3.0.0")
-        message(WARNING "Ceres version ${Ceres_VERSION} is very new. Monitor for potential compatibility issues.")
-    endif()
-else()
-    message(FATAL_ERROR "Ceres Solver not found! Please install Ceres Solver version 2.0 or later.")
-endif()
-
-# Add Ceres include directories
-include_directories(${CERES_INCLUDE_DIRS})
-
 # Ensure our new utility files are included
 list(APPEND sources
     ${PROJECT_SOURCE_DIR}/src/ActionInitialization.cc
-    ${PROJECT_SOURCE_DIR}/src/CeresLoggingInit.cc
-    ${PROJECT_SOURCE_DIR}/src/CeresUtils.cc
-    ${PROJECT_SOURCE_DIR}/src/CrashHandler.cc
     ${PROJECT_SOURCE_DIR}/src/DetectorConstruction.cc
-    ${PROJECT_SOURCE_DIR}/src/DetectorMessenger.cc
     ${PROJECT_SOURCE_DIR}/src/EventAction.cc
-    ${PROJECT_SOURCE_DIR}/src/GaussFit2D.cc
-    ${PROJECT_SOURCE_DIR}/src/GaussFit3D.cc
-    ${PROJECT_SOURCE_DIR}/src/LorentzFit2D.cc
-    ${PROJECT_SOURCE_DIR}/src/LorentzFit3D.cc
     ${PROJECT_SOURCE_DIR}/src/PhysicsList.cc
     ${PROJECT_SOURCE_DIR}/src/PrimaryGenerator.cc
     ${PROJECT_SOURCE_DIR}/src/RunAction.cc
-    ${PROJECT_SOURCE_DIR}/src/SimulationLogger.cc
-    ${PROJECT_SOURCE_DIR}/src/StatsUtils.cc
     ${PROJECT_SOURCE_DIR}/src/SteppingAction.cc
 )
 list(APPEND headers 
     ${PROJECT_SOURCE_DIR}/include/ActionInitialization.hh
-    ${PROJECT_SOURCE_DIR}/include/CeresLoggingInit.hh
-    ${PROJECT_SOURCE_DIR}/include/CeresUtils.hh
     ${PROJECT_SOURCE_DIR}/include/Constants.hh
     ${PROJECT_SOURCE_DIR}/include/Control.hh
-    ${PROJECT_SOURCE_DIR}/include/CrashHandler.hh
     ${PROJECT_SOURCE_DIR}/include/DetectorConstruction.hh
-    ${PROJECT_SOURCE_DIR}/include/DetectorMessenger.hh
     ${PROJECT_SOURCE_DIR}/include/EventAction.hh
-    ${PROJECT_SOURCE_DIR}/include/GaussFit2D.hh
-    ${PROJECT_SOURCE_DIR}/include/GaussFit3D.hh
-    ${PROJECT_SOURCE_DIR}/include/LorentzFit2D.hh
-    ${PROJECT_SOURCE_DIR}/include/LorentzFit3D.hh
     ${PROJECT_SOURCE_DIR}/include/PhysicsList.hh
     ${PROJECT_SOURCE_DIR}/include/PrimaryGenerator.hh
     ${PROJECT_SOURCE_DIR}/include/RunAction.hh
-    ${PROJECT_SOURCE_DIR}/include/SimulationLogger.hh
-    ${PROJECT_SOURCE_DIR}/include/StatsUtils.hh
     ${PROJECT_SOURCE_DIR}/include/SteppingAction.hh
 )
 
@@ -313,7 +273,6 @@ target_compile_features(epicChargeSharing PRIVATE cxx_std_17)
 target_link_libraries(epicChargeSharing 
     ${Geant4_LIBRARIES} 
     ${ROOT_LIBRARIES} 
-    ${CERES_LIBRARIES}
     Threads::Threads
 )
 

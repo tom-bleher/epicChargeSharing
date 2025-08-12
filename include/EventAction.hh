@@ -22,18 +22,12 @@ public:
     // Method to set SteppingAction pointer for aluminum interaction tracking
     void SetSteppingAction(SteppingAction* steppingAction) { fSteppingAction = steppingAction; }
     
-    // Method to accumulate energy deposition and pos
-    void AddEdep(G4double edep, G4ThreeVector pos);
+    // Method to accumulate silicon step positions (unweighted)
+    void AddSiliconPos(const G4ThreeVector& pos);
     
     // Method to calculate the nearest pixel pos
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
-    
-    // Method to calculate the pixel alpha angle
-    G4double CalcPixelAlpha(const G4ThreeVector& hitPos, G4int pixelI, G4int pixelJ);
-    
-    // Method to calculate angles from hit to neighborhood (9x9) grid around hit pixel
-    void CalcNeighborhoodGridAngles(const G4ThreeVector& hitPos, G4int hitPixelI, G4int hitPixelJ);
-    
+        
     // Method to calculate the angular size subtended by a pixel as seen from a hit point (2D calculation)
     G4double CalcPixelAlphaSubtended(G4double hitX, G4double hitY,
                                          G4double pixelCenterX, G4double pixelCenterY,
@@ -50,8 +44,6 @@ public:
     void CollectScorerData(const G4Event* event);
     G4bool IsScorerDataValid() const { return fScorerDataValid; }
 
-
-    
 private:
     RunAction* fRunAction;
     DetectorConstruction* fDetector;
@@ -60,9 +52,9 @@ private:
     // Neighborhood configuration
     G4int fNeighborhoodRadius;  // Radius of neighborhood grid (4 = 9x9, 3 = 7x7, etc.)
     
-    G4double fEdep;   // Total energy depositionit in the event
-    G4ThreeVector fPos;  // Pos of energy depositionit (weighted average)
-    G4ThreeVector fInitialPos; // Initial particle pos
+    G4ThreeVector fPos;  // Representative hit position (average of silicon step midpoints)
+    G4int fNumPosSamples; // Number of silicon step samples accumulated
+    
     G4bool fHasHit;   // Flag to indicate if any energy was deposited
     
     // Pixel mapping information
@@ -73,12 +65,8 @@ private:
     G4double fActualPixelDistance; // Actual distance from hit to pixel center (always calculated)
     G4bool fPixelHit;     // Flag to indicate if the hit was on a pixel
     
-    // Neighborhood (9x9) grid angle information (for non-pixel hits)
-    std::vector<G4double> fNeighborhoodAngles; // Angles from hit to each pixel in neighborhood grid
-    
     // Neighborhood (9x9) grid charge sharing information (for non-pixel hits)
     std::vector<G4double> fNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid
-    std::vector<G4double> fNeighborhoodDistances;       // Distance from hit to each pixel center in neighborhood grid
     std::vector<G4double> fNeighborhoodCharge;  // Actual charge value for each pixel in neighborhood grid (Coulombs)
     
     // Physics constants for charge sharing calculation
@@ -87,13 +75,14 @@ private:
     G4double fD0;                  // microns - reference distance for charge sharing
     G4double fElementaryCharge;    // Coulombs - elementary charge
     
-    // Scorer data storage
+    // Scorer data storage (authoritative energy deposition from MFD)
     G4double fScorerEnergyDeposit;
     G4int fScorerHitCount;
     G4bool fScorerDataValid;
-
+    
     // Hit purity tracking
     G4bool fPureSiliconHit;
+    G4bool fAluminumContaminated;
     G4bool fChargeCalculationEnabled;
 };
 

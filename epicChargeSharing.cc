@@ -12,8 +12,7 @@
 #include "PhysicsList.hh"
 #include "DetectorConstruction.hh"
 #include "ActionInitialization.hh"
-#include "CrashHandler.hh"
-#include "SimulationLogger.hh"
+
 #include "Control.hh"
 
 int main(int argc, char** argv)
@@ -142,43 +141,6 @@ int main(int argc, char** argv)
     // Action Initialization with detector construction
     runManager->SetUserInitialization(new ActionInitialization(detConstruction));
 
-    // Initialize crash recovery system
-    CrashHandler& crashHandler = CrashHandler::GetInstance();
-    crashHandler.Initialize(runManager);
-    
-    // Configure crash handler
-    crashHandler.SetAutoSaveEnabled(false, 0);
-    crashHandler.SetBackupDirectory("crash_recovery");
-    
-    G4cout << "Crash recovery system initialized successfully" << G4endl;
-    
-    // Initialize comprehensive simulation logging system
-    SimulationLogger* logger = SimulationLogger::GetInstance();
-    logger->Initialize("logs");
-    logger->LogSimulationStart();
-    
-    // Log system and configuration information
-    std::map<std::string, std::string> config;
-    config["Mode"] = isBatch ? "Batch" : "Interactive";
-    config["Threading"] = (requestedThreads == 1) ? "Single-threaded" : "Multi-threaded";
-    #ifdef G4MULTITHREADED
-    if (requestedThreads != 1) {
-        G4MTRunManager* mtRunManager = dynamic_cast<G4MTRunManager*>(runManager);
-        if (mtRunManager) {
-            config["Threads"] = std::to_string(mtRunManager->GetNumberOfThreads());
-        }
-    }
-    #endif
-    config["Auto-save Enabled"] = "Yes";
-    config["Auto-save Interval"] = "1000 events";
-    config["Backup Directory"] = "crash_recovery";
-    if (isBatch && !macroFile.empty()) {
-        config["Macro File"] = macroFile;
-    }
-    
-    logger->LogConfiguration(config);
-    
-    G4cout << "Comprehensive logging system initialized successfully" << G4endl;
 
     // Get pointer to UI manager
     G4UImanager *uiManager = G4UImanager::GetUIpointer();
@@ -250,11 +212,6 @@ int main(int argc, char** argv)
             }
         }
     }
-    
-    // Finalize logging and crash recovery systems before cleanup
-    logger->Finalize();
-    
-    CrashHandler::GetInstance().Finalize();
     
     // Clean up
     if (visManager) delete visManager;

@@ -1,6 +1,4 @@
 #include "ActionInitialization.hh"
-#include "DetectorMessenger.hh"
-#include "CrashHandler.hh"
 
 ActionInitialization::ActionInitialization(DetectorConstruction* detector)
 : fDetector(detector)
@@ -16,10 +14,7 @@ void ActionInitialization::BuildForMaster() const
     // Create RunAction for the master thread
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
-    
-    // Register RunAction with crash recovery system (master thread)
-    CrashHandler::GetInstance().RegisterRunAction(runAction);
-    
+
     // Set detector grid parameters in RunAction for saving to ROOT metadata
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
@@ -40,9 +35,6 @@ void ActionInitialization::Build() const
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
     
-    // Register RunAction with crash recovery system
-    CrashHandler::GetInstance().RegisterRunAction(runAction);
-    
     // Set detector grid parameters in RunAction for saving to ROOT metadata
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
@@ -62,13 +54,6 @@ void ActionInitialization::Build() const
     
     // Set the current neighborhood radius in EventAction
     eventAction->SetNeighborhoodRadius(fDetector->GetNeighborhoodRadius());
-    
-    // Set up DetectorMessenger with EventAction for neighborhood configuration
-    // Note: The DetectorMessenger is created in DetectorConstruction constructor,
-    // but we need to connect it to EventAction here
-    if (fDetector->GetDetectorMessenger()) {
-        fDetector->GetDetectorMessenger()->SetEventAction(eventAction);
-    }
     
     // Create and register SteppingAction
     SteppingAction* steppingAction = new SteppingAction(eventAction, fDetector);

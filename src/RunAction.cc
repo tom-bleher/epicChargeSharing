@@ -77,14 +77,18 @@ RunAction::RunAction()
   // Initialize HITS variables
   fTrueX(0),
   fTrueY(0),
-  fInitX(0),
-  fInitY(0),
-  fInitZ(0),
   fPixelX(0),
   fPixelY(0),
   fEdep(0),
   fPixelTrueDeltaX(0),
   fPixelTrueDeltaY(0)
+
+  ,fScorerEnergyDeposit(0.0)
+  ,fScorerNhit(0)
+  ,fPureSiliconHit(false)
+  ,fAluminumContaminated(false)
+  ,fChargeCalculationEnabled(false)
+  ,fNonPixelPadRadiusCheck(false)
 
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
@@ -175,31 +179,20 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         // HITS BRANCHES
         // =============================================
-        fTree->Branch("TrueX", &fTrueX, "TrueX/D")->SetTitle("True Position X [mm]");
-        fTree->Branch("TrueY", &fTrueY, "TrueY/D")->SetTitle("True Position Y [mm]");
-        fTree->Branch("InitX", &fInitX, "InitX/D")->SetTitle("Initial X [mm]");
-        fTree->Branch("InitY", &fInitY, "InitY/D")->SetTitle("Initial Y [mm]");
-        fTree->Branch("InitZ", &fInitZ, "InitZ/D")->SetTitle("Initial Z [mm]");
-        fTree->Branch("PixelX", &fPixelX, "PixelX/D")->SetTitle("Nearest Pixel X [mm]");
-        fTree->Branch("PixelY", &fPixelY, "PixelY/D")->SetTitle("Nearest Pixel Y [mm]");
-        fTree->Branch("Edep", &fEdep, "Edep/D");
-        fTree->Branch("InitEnergy", &fInitialEnergy, "InitialEnergy/D")->SetTitle("Initial Particle Energy [MeV]");
-        fTree->Branch("InitialParticleName", &fInitialParticleName);
-        fTree->Branch("IsPixelHit", &fIsPixelHit, "IsPixelHit/O")->SetTitle("True if hit is on pixel OR distance <= D0");
-        fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "PixelTrueDeltaX/D")->SetTitle("Delta X from Pixel Center to True Position [mm] (x_pixel - x_true)");
-        fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "PixelTrueDeltaY/D")->SetTitle("Delta Y from Pixel Center to True Position [mm] (y_pixel - y_true)");
+        fTree->Branch("x_hit", &fTrueX, "x_hit/D")->SetTitle("True Position X [mm]");
+        fTree->Branch("y_hit", &fTrueY, "y_hit/D")->SetTitle("True Position Y [mm]");
+        fTree->Branch("x_px", &fPixelX, "x_px/D")->SetTitle("Nearest Pixel Center X [mm]");
+        fTree->Branch("y_px", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
+        fTree->Branch("e_dep", &fEdep, "e_dep/D");
+        fTree->Branch("e_init", &fInitialEnergy, "E_init/D")->SetTitle("Initial Particle Energy [MeV]");
+        fTree->Branch("is_pixel_hit", &fIsPixelHit, "isPixelHit/O")->SetTitle("1 if hit had first contact with a pixel-pad, 0 otherwise");
+        fTree->Branch("px_hit_delta_x", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
+        fTree->Branch("px_hit_delta_y", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]");
+        //fTree->Branch("NonPixelPadRadiusCheck", &fNonPixelPadRadiusCheck, "NonPixelPadRadiusCheck/O")->SetTitle("For non-pixel hits: |dx|>PIXEL_SIZE/2 && |dy|>PIXEL_SIZE/2");
         
-        // GRIDNEIGHBORHOOD BRANCHES
-        fTree->Branch("NeighborhoodAngles", &fNeighborhoodAngles)->SetTitle("Angles from Hit to Neighborhood Grid Pixels [deg]");
-        fTree->Branch("NeighborhoodChargeFractions", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions for Neighborhood Grid Pixels");
-        fTree->Branch("NeighborhoodDistances", &fNeighborhoodDistances)->SetTitle("Distances from Hit to Neighborhood Grid Pixels [mm]");
-        fTree->Branch("NeighborhoodCharges", &fNeighborhoodCharge)->SetTitle("Charge Coulombs for Neighborhood Grid Pixels");
-        
-        // =============================================
-        // HIT PURITY TRACKING BRANCHES
-        // =============================================
-        fTree->Branch("PureSiliconHit", &fPureSiliconHit, "PureSiliconHit/O")->SetTitle("True if hit is purely in silicon (no aluminum contamination)");
-        fTree->Branch("ChargeCalculationEnabled", &fChargeCalculationEnabled, "ChargeCalculationEnabled/O")->SetTitle("True if charge sharing calculation was enabled");
+        // Neighborhood charge sharing results
+        fTree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
+        fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
         
         G4cout << "Created ROOT tree with " << fTree->GetNbranches() << " branches" << G4endl;
     
@@ -408,13 +401,6 @@ void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
     fTrueY = y;
 }
 
-void RunAction::SetInitialPos(G4double x, G4double y, G4double z)
-{
-    fInitialX = x;
-    fInitialY = y;
-    fInitialZ = z;
-}
-
 void RunAction::SetNearestPixelPos(G4double x, G4double y)
 {
     // Store nearest pixel centre coordinates
@@ -428,41 +414,30 @@ void RunAction::SetInitialEnergy(G4double energy)
     fInitialEnergy = energy;
 }
 
-void RunAction::SetInitialParticleName(const G4String& name)
-{
-    fInitialParticleName = name;
-}
-
-
-
-void RunAction::SetPixelClassification(G4bool isWithinD0, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY)
+void RunAction::SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY)
 {
     // Store the classification and delta values from pixel center to true position
-    fIsPixelHit = isWithinD0;
+    fIsPixelHit = isPixelHit;
     fPixelTrueDeltaX = pixelTrueDeltaX;
     fPixelTrueDeltaY = pixelTrueDeltaY;
 }
 
+void RunAction::SetNonPixelPadRadiusCheck(G4bool passed)
+{
+    fNonPixelPadRadiusCheck = passed;
+}
+
 void RunAction::SetPixelHitStatus(G4bool isPixelHit)
 {
-    // Store pixel hit status (true if on pixel OR distance <= D0)
+    // Store pixel hit status (true if on pixel)
     fIsPixelHit = isPixelHit;
 }
 
-void RunAction::SetNeighborhoodGridData(const std::vector<G4double>& angles)
-{
-    // Store the neighborhood (9x9) grid angle data for non-pixel hits
-    fNeighborhoodAngles = angles;
-}
-
 void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
-                                 const std::vector<G4double>& distances,
-                                 const std::vector<G4double>& chargeValues,
                                  const std::vector<G4double>& chargeCoulombs)
 {
     // Store the neighborhood (9x9) grid charge sharing data for non-pixel hits
     fNeighborhoodChargeFractions = chargeFractions;
-    fNeighborhoodDistances = distances;
     fNeighborhoodCharge = chargeCoulombs;
 }
 
@@ -516,9 +491,22 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
     G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
 }
 
-void RunAction::SetHitPurityData(G4bool pureSiliconHit, G4bool chargeCalculationEnabled)
+// Set scorer data from Multi-Functional Detector
+void RunAction::SetScorerData(G4double energyDeposit)
+{
+    fScorerEnergyDeposit = energyDeposit;
+}
+
+void RunAction::SetScorerHitCount(G4int hitCount)
+{
+    fScorerNhit = hitCount;
+}
+
+// Set hit purity tracking data from EventAction
+void RunAction::SetHitPurityData(G4bool pureSiliconHit, G4bool aluminumContaminated, G4bool chargeCalculationEnabled)
 {
     fPureSiliconHit = pureSiliconHit;
+    fAluminumContaminated = aluminumContaminated;
     fChargeCalculationEnabled = chargeCalculationEnabled;
 }
 
@@ -699,4 +687,3 @@ void RunAction::CleanupRootObjects()
         fTree = nullptr;
     }
 }
-

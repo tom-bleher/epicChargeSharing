@@ -14,7 +14,6 @@
 #include "G4PSEnergyDeposit.hh"
 #include "G4PSNofStep.hh"
 
-class DetectorMessenger;
 class EventAction;
 
 class DetectorConstruction : public G4VUserDetectorConstruction
@@ -29,9 +28,6 @@ public:
     // Method to set EventAction pointer for neighborhood configuration
     void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
     
-    // Method to set the grid parameters
-    void SetGridParameters(G4double pixelSize, G4double pixelSpacing, G4double pixelCornerOffset, G4int numPixels);
-    
     // Method to set the corner offset directly (requires geometry rebuild)
     void SetPixelCornerOffset(G4double cornerOffset);
     
@@ -40,19 +36,6 @@ public:
     
     // Method to get neighborhood radius  
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
-    
-    // Methods for automatic radius selection
-    void SetAutoRadiusEnabled(G4bool enabled);
-    void SetMinAutoRadius(G4int minRadius);
-    void SetMaxAutoRadius(G4int maxRadius);
-    
-    // Getter method for DetectorMessenger
-    DetectorMessenger* GetDetectorMessenger() const { return fDetectorMessenger; }
-    
-    // Multi-Functional Detector methods
-    void SetupMultiFunctionalDetector();
-    void AttachPrimitiveScorers();
-    G4MultiFunctionalDetector* GetMultiFunctionalDetector() const { return fMultiFunctionalDetector; }
     
     // Getter methods for parameters needed to calculate nearest pixel
     G4double GetPixelSize() const { return fPixelSize; }
@@ -84,16 +67,9 @@ private:
     // EventAction pointer for neighborhood configuration
     EventAction* fEventAction;
     
-    // Messenger for UI commands
-    DetectorMessenger* fDetectorMessenger;
-    
     // Neighborhood radius
     G4int fNeighborhoodRadius;
     
-    // Multi-Functional Detector and Primitive Scorers
-    G4MultiFunctionalDetector* fMultiFunctionalDetector;
-    G4PSEnergyDeposit* fEnergyScorer;
-    G4PSNofStep* fHitCountScorer;
     G4LogicalVolume* fLogicSilicon;
 };
 
