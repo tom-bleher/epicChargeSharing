@@ -49,6 +49,10 @@ public:
     
     // Method to set pixel hit status
     void SetPixelHitStatus(G4bool isPixelHit);
+    // New: set first-contact flag, geometric flag, and combined flag
+    void SetFirstContactIsPixel(G4bool v) { fFirstContactIsPixel = v; }
+    void SetGeometricIsPixel(G4bool v) { fGeometricIsPixel = v; }
+    void SetIsPixelHitCombined(G4bool v) { fIsPixelHit = v; }
     
     // Method to set pixel classification data (hit status and delta values)
     void SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY);
@@ -100,8 +104,10 @@ private:
     G4double fPixelTrueDeltaX; // Delta X from pixel center to true pos [mm] (x_pixel - x_true)
     G4double fPixelTrueDeltaY; // Delta Y from pixel center to true pos [mm] (y_pixel - y_true)
 
-    // Legacy variables that may still be used
-    G4bool fIsPixelHit;  // True if hit is on pixel
+    // Pixel flags
+    G4bool fFirstContactIsPixel{false};  // First boundary entry was pixel
+    G4bool fGeometricIsPixel{false};     // Orthogonal radius test indicates pixel region
+    G4bool fIsPixelHit{false};           // OR of first-contact and geometric tests
     
     // NON-PIXEL HIT DATA (not on pixel)
     std::vector<G4double> fNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels

@@ -24,6 +24,9 @@ public:
     
     // Method to accumulate silicon step positions (unweighted)
     void AddSiliconPos(const G4ThreeVector& pos);
+
+      // Record the very first contact position (aluminum pixel or silicon)
+      void RegisterFirstContact(const G4ThreeVector& pos) { fFirstContactPos = pos; fHasFirstContactPos = true; }
     
     // Method to calculate the nearest pixel pos
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
@@ -54,6 +57,9 @@ private:
     
     G4ThreeVector fPos;  // Representative hit position (average of silicon step midpoints)
     G4int fNumPosSamples; // Number of silicon step samples accumulated
+      // First-contact position and flag
+      G4ThreeVector fFirstContactPos; // Position at the first volume entry (pixel or silicon)
+      G4bool       fHasFirstContactPos{false};
     
     G4bool fHasHit;   // Flag to indicate if any energy was deposited
     
