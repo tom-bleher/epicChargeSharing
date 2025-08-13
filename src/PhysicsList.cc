@@ -5,8 +5,7 @@
 
 PhysicsList::PhysicsList()
 {
-    // Set appropriate cut value for fine tracking in silicon detectors (10 microns)
-    // This ensures good resolution for the pixel detector simulation
+    // Fine tracking in silicon (10 μm cut) for pixel-pad resolution
     SetDefaultCutValue(10.0*micrometer);
     
     // Use standard EM physics - simpler and no extra data files required

@@ -12,6 +12,10 @@
 #include <TROOT.h>
 #include <TError.h>
 #include <Math/MinimizerOptions.h>
+// Minuit2 least-squares API
+#include <Math/Factory.h>
+#include <Math/Minimizer.h>
+#include <Math/Functor.h>
 
 #include <vector>
 #include <string>
@@ -43,7 +47,11 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
                  double errorPercentOfMax = 5.0) {
   // Use Minuit2 by default
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2");
-  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-6);
+  // Slightly relax tolerance for speed, preserving accuracy
+  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-5);
+  // Reduce per-fit effort to speed up processing
+  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(200);
+  ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
 
   // Open file for update
   TFile* file = TFile::Open(filename, "UPDATE");
@@ -118,6 +126,16 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
   std::vector<double>* Fi = nullptr; // used for fits (fractions 0..1)
   std::vector<double>* Qi = nullptr; // retained for compatibility but unused
 
+  // Speed up I/O: deactivate all branches, then enable only what we read
+  tree->SetBranchStatus("*", 0);
+  tree->SetBranchStatus("x_hit", 1);
+  tree->SetBranchStatus("y_hit", 1);
+  tree->SetBranchStatus("x_px", 1);
+  tree->SetBranchStatus("y_px", 1);
+  tree->SetBranchStatus("is_pixel_hit", 1);
+  tree->SetBranchStatus("F_i", 1);
+  tree->SetBranchStatus("Q_i", 1); // kept for compatibility
+
   tree->SetBranchAddress("x_hit", &x_hit);
   tree->SetBranchAddress("y_hit", &y_hit);
   tree->SetBranchAddress("x_px", &x_px);
@@ -136,6 +154,9 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
   // Also store signed deltas (not absolute): (hit - rec)
   double rec_hit_signed_delta_x_2d = INVALID_VALUE;
   double rec_hit_signed_delta_y_2d = INVALID_VALUE;
+  // Squared errors: (x_hit - x_rec_2d)^2 and (y_hit - y_rec_2d)^2
+  double rec_hit_delta_x_sq_2d = INVALID_VALUE;
+  double rec_hit_delta_y_sq_2d = INVALID_VALUE;
 
   // If branches already exist, we will overwrite their contents
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
@@ -159,6 +180,8 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
   TBranch* br_dy    = ensureAndResetBranch("rec_hit_delta_y_2d", &rec_hit_delta_y_2d);
   TBranch* br_sdx   = ensureAndResetBranch("rec_hit_signed_delta_x_2d", &rec_hit_signed_delta_x_2d);
   TBranch* br_sdy   = ensureAndResetBranch("rec_hit_signed_delta_y_2d", &rec_hit_signed_delta_y_2d);
+  TBranch* br_dx2   = ensureAndResetBranch("rec_hit_delta_x_sq_2d", &rec_hit_delta_x_sq_2d);
+  TBranch* br_dy2   = ensureAndResetBranch("rec_hit_delta_y_sq_2d", &rec_hit_delta_y_sq_2d);
 
   // Fitting function for 1D gaussian + const
   TF1 fRow("fRow", GaussPlusB, -1e9, 1e9, 4);
@@ -174,6 +197,7 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     // Default outputs: set to finite invalid sentinel (not NaN)
     x_rec_2d = y_rec_2d = INVALID_VALUE;
     rec_hit_delta_x_2d = rec_hit_delta_y_2d = INVALID_VALUE;
+    rec_hit_delta_x_sq_2d = rec_hit_delta_y_sq_2d = INVALID_VALUE;
 
     // Only attempt fit for non-pixel-pad hits and valid vectors
     if (is_pixel_hit || !Fi || Fi->empty()) {
@@ -184,6 +208,8 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_dy->Fill();
       br_sdx->Fill();
       br_sdy->Fill();
+      br_dx2->Fill();
+      br_dy2->Fill();
       continue;
     }
 
@@ -197,6 +223,8 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_dy->Fill();
       br_sdx->Fill();
       br_sdy->Fill();
+      br_dx2->Fill();
+      br_dy2->Fill();
       continue;
     }
 
@@ -266,97 +294,137 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     const double A0_col = std::max(1e-18, *minmaxCol.second - *minmaxCol.first);
     const double B0_col = std::max(0.0, *minmaxCol.first);
 
+    // Very low contrast: fall back to fast weighted centroids (skip fit)
+    if (A0_row < 1e-6 && A0_col < 1e-6) {
+      double wsumx = 0.0, xw = 0.0;
+      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k]); wsumx += w; xw += w * x_row[k]; }
+      double wsumy = 0.0, yw = 0.0;
+      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k]); wsumy += w; yw += w * y_col[k]; }
+      if (wsumx > 0 && wsumy > 0) {
+        x_rec_2d = xw / wsumx;
+        y_rec_2d = yw / wsumy;
+        rec_hit_delta_x_2d = std::abs(x_hit - x_rec_2d);
+        rec_hit_delta_y_2d = std::abs(y_hit - y_rec_2d);
+        rec_hit_signed_delta_x_2d = (x_hit - x_rec_2d);
+        rec_hit_signed_delta_y_2d = (y_hit - y_rec_2d);
+        rec_hit_delta_x_sq_2d = rec_hit_signed_delta_x_2d * rec_hit_signed_delta_x_2d;
+        rec_hit_delta_y_sq_2d = rec_hit_signed_delta_y_2d * rec_hit_signed_delta_y_2d;
+      }
+      br_x_rec->Fill();
+      br_y_rec->Fill();
+      br_dx->Fill();
+      br_dy->Fill();
+      br_sdx->Fill();
+      br_sdy->Fill();
+      br_dx2->Fill();
+      br_dy2->Fill();
+      continue;
+    }
+
     // mu guess from maximum
     int idxMaxRow = std::distance(q_row.begin(), std::max_element(q_row.begin(), q_row.end()));
     int idxMaxCol = std::distance(q_col.begin(), std::max_element(q_col.begin(), q_col.end()));
     double mu0_row = x_row[idxMaxRow];
     double mu0_col = y_col[idxMaxCol];
 
+    // Fit on the FULL data ranges (no trimming)
+    const std::vector<double>& x_row_fit = x_row;
+    const std::vector<double>& q_row_fit = q_row;
+    const std::vector<double>& y_col_fit = y_col;
+    const std::vector<double>& q_col_fit = q_col;
+
     fRow.SetParameters(A0_row, mu0_row, std::max(0.25*pixelSpacing, 1e-6), B0_row);
     fCol.SetParameters(A0_col, mu0_col, std::max(0.25*pixelSpacing, 1e-6), B0_col);
 
+    // Restrict function ranges to the full data span
+    auto minmaxX = std::minmax_element(x_row_fit.begin(), x_row_fit.end());
+    auto minmaxY = std::minmax_element(y_col_fit.begin(), y_col_fit.end());
+    const double xMin = *minmaxX.first - 0.5 * pixelSpacing;
+    const double xMax = *minmaxX.second + 0.5 * pixelSpacing;
+    const double yMin = *minmaxY.first - 0.5 * pixelSpacing;
+    const double yMax = *minmaxY.second + 0.5 * pixelSpacing;
+    fRow.SetRange(xMin, xMax);
+    fCol.SetRange(yMin, yMax);
+    // Keep means inside full span
+    fRow.SetParLimits(1, xMin, xMax);
+    fCol.SetParLimits(1, yMin, yMax);
+
     // Fractions are unitless and bounded [0,1]
     fRow.SetParLimits(0, 0.0, 1.0);                   // A >= 0
-    fRow.SetParLimits(2, 1e-6, 5.0*pixelSpacing);     // wider sigma range
-    fRow.SetParLimits(3, 0.0, 1.0);                   // B in [0,1]
+    fRow.SetParLimits(2, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing); // tighter sigma range
+    fRow.SetParLimits(3, 0.0, std::max(0.0, *minmaxRow.first));               // B up to observed minimum
 
     fCol.SetParLimits(0, 0.0, 1.0);
-    fCol.SetParLimits(2, 1e-6, 5.0*pixelSpacing);
-    fCol.SetParLimits(3, 0.0, 1.0);
+    fCol.SetParLimits(2, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);
+    fCol.SetParLimits(3, 0.0, std::max(0.0, *minmaxCol.first));
 
-    // Fit quietly, store result
-    int statusRow = -1;
-    int statusCol = -1;
-    if (uniformSigma > 0.0) {
-      TGraphErrors gRow(static_cast<int>(x_row.size()));
-      TGraphErrors gCol(static_cast<int>(y_col.size()));
-      for (int k = 0; k < gRow.GetN(); ++k) {
-        gRow.SetPoint(k, x_row[k], q_row[k]);
-        gRow.SetPointError(k, 0.0, uniformSigma);
+    // Minuit2 least-squares on compact windows (faster/more stable)
+    auto chi2Row = [&](const double* p) -> double {
+      const double A = p[0], mu = p[1], sig = p[2], B = p[3];
+      const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
+      double sum = 0.0;
+      for (size_t k=0;k<q_row_fit.size();++k) {
+        const double dx = (x_row_fit[k] - mu)/sig;
+        const double model = A * std::exp(-0.5*dx*dx) + B;
+        const double r = (q_row_fit[k] - model);
+        sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
       }
-      for (int k = 0; k < gCol.GetN(); ++k) {
-        gCol.SetPoint(k, y_col[k], q_col[k]);
-        gCol.SetPointError(k, 0.0, uniformSigma);
+      return sum;
+    };
+    auto chi2Col = [&](const double* p) -> double {
+      const double A = p[0], mu = p[1], sig = p[2], B = p[3];
+      const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
+      double sum = 0.0;
+      for (size_t k=0;k<q_col_fit.size();++k) {
+        const double dy = (y_col_fit[k] - mu)/sig;
+        const double model = A * std::exp(-0.5*dy*dy) + B;
+        const double r = (q_col_fit[k] - model);
+        sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
       }
-      auto resRow = gRow.Fit(&fRow, "QNSW");
-      auto resCol = gCol.Fit(&fCol, "QNSW");
-      statusRow = int(resRow);
-      statusCol = int(resCol);
-      if (statusRow != 0) {
-        double wsum = 0, xw = 0;
-        for (size_t k=0;k<x_row.size();++k){ double w = std::max(0.0, q_row[k]-B0_row); wsum += w; xw += w * x_row[k]; }
-        double muW = (wsum>0)? xw/wsum : mu0_row;
-        fRow.SetParameters(A0_row, muW, std::max(0.5*pixelSpacing, 1e-6), B0_row);
-        statusRow = gRow.Fit(&fRow, "QNSRW");
-      }
-      if (statusCol != 0) {
-        double wsum = 0, yw = 0;
-        for (size_t k=0;k<y_col.size();++k){ double w = std::max(0.0, q_col[k]-B0_col); wsum += w; yw += w * y_col[k]; }
-        double muW = (wsum>0)? yw/wsum : mu0_col;
-        fCol.SetParameters(A0_col, muW, std::max(0.5*pixelSpacing, 1e-6), B0_col);
-        statusCol = gCol.Fit(&fCol, "QNSRW");
-      }
-    } else {
-      TGraph gRow(static_cast<int>(x_row.size()));
-      TGraph gCol(static_cast<int>(y_col.size()));
-      for (int k = 0; k < gRow.GetN(); ++k) gRow.SetPoint(k, x_row[k], q_row[k]);
-      for (int k = 0; k < gCol.GetN(); ++k) gCol.SetPoint(k, y_col[k], q_col[k]);
-      auto resRow = gRow.Fit(&fRow, "QNS");
-      auto resCol = gCol.Fit(&fCol, "QNS");
-      statusRow = int(resRow);
-      statusCol = int(resCol);
-      if (statusRow != 0) {
-        double wsum = 0, xw = 0;
-        for (size_t k=0;k<x_row.size();++k){ double w = std::max(0.0, q_row[k]-B0_row); wsum += w; xw += w * x_row[k]; }
-        double muW = (wsum>0)? xw/wsum : mu0_row;
-        fRow.SetParameters(A0_row, muW, std::max(0.5*pixelSpacing, 1e-6), B0_row);
-        statusRow = gRow.Fit(&fRow, "QNSR");
-      }
-      if (statusCol != 0) {
-        double wsum = 0, yw = 0;
-        for (size_t k=0;k<y_col.size();++k){ double w = std::max(0.0, q_col[k]-B0_col); wsum += w; yw += w * y_col[k]; }
-        double muW = (wsum>0)? yw/wsum : mu0_col;
-        fCol.SetParameters(A0_col, muW, std::max(0.5*pixelSpacing, 1e-6), B0_col);
-        statusCol = gCol.Fit(&fCol, "QNSR");
-      }
-    }
+      return sum;
+    };
 
-    // Decide reconstructed positions
-    bool okRow = (statusRow == 0);
-    bool okCol = (statusCol == 0);
+    std::unique_ptr<ROOT::Math::Minimizer> mRow(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+    std::unique_ptr<ROOT::Math::Minimizer> mCol(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+    mRow->SetMaxFunctionCalls(200);
+    mCol->SetMaxFunctionCalls(200);
+    mRow->SetTolerance(1e-5);
+    mCol->SetTolerance(1e-5);
 
-    double muX = okRow ? fRow.GetParameter(1) : NAN;
-    double muY = okCol ? fCol.GetParameter(1) : NAN;
+    ROOT::Math::Functor fRowChi2(chi2Row, 4);
+    ROOT::Math::Functor fColChi2(chi2Col, 4);
+    mRow->SetFunction(fRowChi2);
+    mCol->SetFunction(fColChi2);
+
+    const double sigInit = std::max(0.25*pixelSpacing, 1e-6);
+    const double sigLo   = std::max(1e-6, 0.05*pixelSpacing);
+    const double sigHi   = 2.0*pixelSpacing;
+
+    mRow->SetLimitedVariable(0, "A", A0_row, 1e-3, 0.0, 1.0);
+    mRow->SetLimitedVariable(1, "mu", mu0_row, 1e-4*pixelSpacing, xMin, xMax);
+    mRow->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
+    mRow->SetLimitedVariable(3, "B", B0_row, 1e-3, 0.0, std::max(0.0, *minmaxRow.first));
+
+    mCol->SetLimitedVariable(0, "A", A0_col, 1e-3, 0.0, 1.0);
+    mCol->SetLimitedVariable(1, "mu", mu0_col, 1e-4*pixelSpacing, yMin, yMax);
+    mCol->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
+    mCol->SetLimitedVariable(3, "B", B0_col, 1e-3, 0.0, std::max(0.0, *minmaxCol.first));
+
+    bool okRow = mRow->Minimize();
+    bool okCol = mCol->Minimize();
+
+    double muX = okRow ? mRow->X()[1] : NAN;
+    double muY = okCol ? mCol->X()[1] : NAN;
 
     // Fallback: weighted centroid if fit did not converge
     if (!okRow) {
       double wsum = 0.0, xw = 0.0;
-      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k]); wsum += w; xw += w * x_row[k]; }
+      for (size_t k=0;k<x_row_fit.size();++k) { double w = std::max(0.0, q_row_fit[k]); wsum += w; xw += w * x_row_fit[k]; }
       if (wsum > 0) { muX = xw / wsum; okRow = true; }
     }
     if (!okCol) {
       double wsum = 0.0, yw = 0.0;
-      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k]); wsum += w; yw += w * y_col[k]; }
+      for (size_t k=0;k<y_col_fit.size();++k) { double w = std::max(0.0, q_col_fit[k]); wsum += w; yw += w * y_col_fit[k]; }
       if (wsum > 0) { muY = yw / wsum; okCol = true; }
     }
 
@@ -367,11 +435,14 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       rec_hit_delta_y_2d = std::abs(y_hit - y_rec_2d);
       rec_hit_signed_delta_x_2d = (x_hit - x_rec_2d);
       rec_hit_signed_delta_y_2d = (y_hit - y_rec_2d);
+      rec_hit_delta_x_sq_2d = rec_hit_signed_delta_x_2d * rec_hit_signed_delta_x_2d;
+      rec_hit_delta_y_sq_2d = rec_hit_signed_delta_y_2d * rec_hit_signed_delta_y_2d;
       nFitted++;
     } else {
       x_rec_2d = y_rec_2d = INVALID_VALUE;
       rec_hit_delta_x_2d = rec_hit_delta_y_2d = INVALID_VALUE;
       rec_hit_signed_delta_x_2d = rec_hit_signed_delta_y_2d = INVALID_VALUE;
+      rec_hit_delta_x_sq_2d = rec_hit_delta_y_sq_2d = INVALID_VALUE;
     }
 
     br_x_rec->Fill();
@@ -380,6 +451,8 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     br_dy->Fill();
     br_sdx->Fill();
     br_sdy->Fill();
+    br_dx2->Fill();
+    br_dy2->Fill();
   }
 
   // Overwrite tree in file

@@ -100,7 +100,7 @@ private:
     G4double fTrueY;   // True Hit pos Y [mm]
     G4double fPixelX; // Nearest to hit pixel center X [mm]
     G4double fPixelY; // Nearest to hit pixel center Y [mm]
-    G4double fEdep;   // Energy depositionit [MeV]
+    G4double fEdep;   // Energy deposition [MeV]
     G4double fPixelTrueDeltaX; // Delta X from pixel center to true pos [mm] (x_pixel - x_true)
     G4double fPixelTrueDeltaY; // Delta Y from pixel center to true pos [mm] (y_pixel - y_true)
 

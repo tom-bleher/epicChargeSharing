@@ -24,13 +24,9 @@
 #include <limits>
 #include <cstdlib>
 
-// Alpha calculation method: ANALYTICAL
-// This implementation uses the analytical formula for calculating the alpha angle:
-// α = tan^(-1) [(l/2 * √2) / (l/2 * √2 + d)]
-// where:
-//   l = side length of the pixel pad (pixel_size)
-//   d = distance from event hit to center of pixel pad
-// See Page 9: https://indico.cern.ch/event/813597/contributions/3727782/attachments/1989546/3540780/TREDI_Cartiglia.pdf
+// Viewing angle α (analytical):
+// α = arctan[(l/2·√2) / (l/2·√2 + d)]
+// with l the pixel-pad side and d the hit–to–pad-center distance.
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
 : G4UserEventAction(),
@@ -109,7 +105,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     
     // Prefer MFD energy when available; otherwise fall back to internal accumulation (which may be ~0 if not used)
     G4double finalEdep = fScorerEnergyDeposit;
-    // Use the FIRST-CONTACT position for x_hit/y_hit as per guide; fallback to averaged silicon position
+  // Use the first-contact position for x_hit/y_hit; fallback to averaged silicon position
     G4ThreeVector hitPos = fHasFirstContactPos
                              ? fFirstContactPos
                              : ((fNumPosSamples > 0) ? (fPos / (G4double)fNumPosSamples) : G4ThreeVector(0,0,0));
@@ -122,7 +118,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     // Calculate nearest pixel and other pixel-related data based on first-contact position
     G4ThreeVector nearestPixel = CalcNearestPixel(hitPos);
     
-    // Geometric pixel classification: inside pad if both |dx|,|dy| <= l/2
+    // Geometric pixel classification: inside pixel-pad if max(|dx|,|dy|) <= l/2
     // IMPORTANT: compute deltas directly from the authoritative hit position and the
     // returned nearest pixel center to avoid any dependency on earlier sentinel values.
     const G4double halfPixel = fDetector->GetPixelSize()/2.0;
@@ -134,13 +130,10 @@ void EventAction::EndOfEventAction(const G4Event* event)
     // Geometric pixel test per request: max(|dx|,|dy|) <= pixel_size/2
     const bool geometricIsPixel = (std::max(dxAbs, dyAbs) <= halfPixel);
 
-    // Combined pixel flag (OR of first-contact and geometric tests)
-    // A hit is considered a pixel hit if EITHER the first-contact volume is a pixel
-    // OR the hit position lies inside the pixel geometrically.
+    // Pixel-hit flag: first-contact is pixel-pad OR geometric test is inside pad
     const bool isPixelHitCombined = firstContactIsPixel || geometricIsPixel;
 
-    // Enable charge sharing only for NON-pixel-pad hits per combined classification.
-    // Use scorer if valid; still allow charge sharing with zero edep to fill structure with zeros for diagnostics.
+    // Enable charge sharing only for non–pixel-pad hits.
     fChargeCalculationEnabled = (!isPixelHitCombined);
 
     // Calculate neighborhood angles and charge sharing if applicable
@@ -193,11 +186,11 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
   G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
   G4ThreeVector detectorPos = fDetector->GetDetectorPos();
   
-  // Calc the pos relative to the detector face
+  // Calc the position relative to the detector face
   G4ThreeVector relativePos = pos - detectorPos;
   
   // For the AC-LGAD, pixels are on the front surface (z > detector z)
-  // Calc the first pixel pos (corner)
+  // Calc the first pixel position (corner)
   G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
   
   // Calc which pixel grid pos is closest (i and j indices)
@@ -211,7 +204,7 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
   i = std::max(0, std::min(i, numBlocksPerSide - 1));
   j = std::max(0, std::min(j, numBlocksPerSide - 1));
   
-  // Calc the actual pixel center pos
+  // Calc the actual pixel center position
   G4double pixelX = firstPixelPos + i * pixelSpacing;
   G4double pixelY = firstPixelPos + j * pixelSpacing;
   // Pixels are on the detector front surface
@@ -254,7 +247,7 @@ G4double EventAction::CalcPixelAlphaSubtended(G4double hitX, G4double hitY,
                                                   G4double pixelCenterX, G4double pixelCenterY,
                                                   G4double pixelWidth, G4double pixelHeight)
 {
-  // Calc distance from hit pos to pixel center (2D distance in XY plane)
+  // Calc distance from hit position to pixel center (2D distance in XY plane)
   G4double dx = hitX - pixelCenterX;
   G4double dy = hitY - pixelCenterY;
   G4double d = std::sqrt(dx*dx + dy*dy);
@@ -285,26 +278,14 @@ void EventAction::CalcNeighborhoodChargeSharing()
   fNeighborhoodChargeFractions.clear();
   fNeighborhoodCharge.clear();
   
-  // Check if no energy was deposited
-  if (fScorerEnergyDeposit <= 0) {
-    // Fill all pos with zero for no-energy events
-    for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
-      for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
-        G4int gridPixelI = fPixelIndexI + di;
-        G4int gridPixelJ = fPixelIndexJ + dj;
-        
-        fNeighborhoodChargeFractions.push_back(0.0);
-        fNeighborhoodCharge.push_back(0.0);
-      }
-    }
-    return;
-  }
+  // Note: Even if no energy was deposited, we still compute F_i fractions
+  // so that they sum to 1 for in-bounds cells. Q_i will be zero in that case.
   
   // Charge sharing is executed only for events whose FIRST contact is silicon.
   // This function is called conditionally from EndOfEventAction based on
   // fChargeCalculationEnabled, so no additional pixel-hit checks are needed here.
   
-  // Convert energy depositionit to number of electrons
+  // Convert energy deposition to number of electrons
   // fScorerEnergyDeposit is in MeV, fIonizationEnergy is in eV
   // Use explicit CLHEP units instead of manual conversion
   G4double edepInEV = fScorerEnergyDeposit * MeV / eV; // Convert MeV to eV using CLHEP units
@@ -328,14 +309,6 @@ void EventAction::CalcNeighborhoodChargeSharing()
   // fD0 is in microns, distances are in mm, so convert using CLHEP units
   G4double d0_mm = fD0 * micrometer / mm; // Convert microns to mm using CLHEP units
   
-  // Proceed with charge sharing calculation for non-pixel hits
-  // First pass: collect valid pixels and calculate weights
-  std::vector<G4double> weights;
-  std::vector<G4double> distances;
-  std::vector<G4double> angles;
-  std::vector<G4int> validPixelI;
-  std::vector<G4int> validPixelJ;
-
   // Use first-contact position for charge sharing geometry consistently with x_hit/y_hit
   const G4double hitX = fHasFirstContactPos
                           ? fFirstContactPos.x()
@@ -344,90 +317,70 @@ void EventAction::CalcNeighborhoodChargeSharing()
                           ? fFirstContactPos.y()
                           : ((fNumPosSamples > 0) ? (fPos.y() / static_cast<G4double>(fNumPosSamples)) : fPos.y());
   
-  // Define the neighborhood grid: fNeighborhoodRadius pixels in each direction from the center
-  for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
-    for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
-      // Calc the pixel indices for this grid pos
-      G4int gridPixelI = fPixelIndexI + di;
-      G4int gridPixelJ = fPixelIndexJ + dj;
+  // Prepare row-major grids for weights and in-bounds flags
+  const G4int gridRadius = fNeighborhoodRadius;
+  const G4int gridDim = 2 * gridRadius + 1;
+  const G4int totalCells = gridDim * gridDim;
+  std::vector<G4double> weightGrid(totalCells, 0.0);
+  std::vector<G4bool>   inBoundsGrid(totalCells, false);
+  
+  // First pass: compute weights per grid cell, store into pre-sized arrays by index
+  for (G4int di = -gridRadius; di <= gridRadius; ++di) {
+    for (G4int dj = -gridRadius; dj <= gridRadius; ++dj) {
+      const G4int idx = (di + gridRadius) * gridDim + (dj + gridRadius);
+      const G4int gridPixelI = fPixelIndexI + di;
+      const G4int gridPixelJ = fPixelIndexJ + dj;
       
-      // Check if this pixel is within the detector bounds
-      if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
+      // Bounds check
+      if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide ||
           gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
-        // Store invalid data for out-of-bounds pixels
-        fNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker
-        fNeighborhoodCharge.push_back(0.0);
+        inBoundsGrid[idx] = false;
+        weightGrid[idx] = 0.0;
         continue;
       }
       
-      // Calc the center pos of this grid pixel
-      G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
-      G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
+      // Pixel center
+      const G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
+      const G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
       
-      // Calc the distance from the averaged hit position to the pixel center (in mm)
-      G4double dx = hitX - pixelCenterX;
-      G4double dy = hitY - pixelCenterY;
-      G4double distance = std::sqrt(dx*dx + dy*dy);
+      // Geometry
+      const G4double dx = hitX - pixelCenterX;
+      const G4double dy = hitY - pixelCenterY;
+      const G4double distance = std::sqrt(dx*dx + dy*dy);
+      const G4double alpha = CalcPixelAlphaSubtended(hitX, hitY, pixelCenterX, pixelCenterY, pixelSize, pixelSize);
       
-      // Calc the alpha angle for this pixel using the same algorithm as elsewhere
-      G4double alpha = CalcPixelAlphaSubtended(hitX, hitY, 
-                                                   pixelCenterX, pixelCenterY, 
-                                                   pixelSize, pixelSize);
-      
-      // Store data for valid pixels
-      distances.push_back(distance);
-      angles.push_back(alpha);
-      validPixelI.push_back(gridPixelI);
-      validPixelJ.push_back(gridPixelJ);
-      
-      // Calc weight according to formula: α_i * ln(d_i/d_0)^(-1)
-      // Handle the case where distance might be very small or zero
+      // Weight: α_i * 1/ln(d_i/d0) with numerical guard
       G4double weight = 0.0;
-      // Clamp the logarithm to avoid infinite weights when d ≈ d0
       G4double logArg = distance / d0_mm;
       G4double logValue = std::log(logArg);
-      // Clamp log value to avoid division by very small numbers
       logValue = std::max(logValue, Constants::MIN_LOG_VALUE);
       weight = alpha * (1.0 / logValue);
-      weights.push_back(weight);
+      
+      inBoundsGrid[idx] = true;
+      weightGrid[idx] = weight;
     }
   }
   
-  // Calc total weight
+  // Total weight over in-bounds cells
   G4double totalWeight = 0.0;
-  for (G4double weight : weights) {
-    totalWeight += weight;
+  for (G4int idx = 0; idx < totalCells; ++idx) {
+    if (inBoundsGrid[idx]) totalWeight += weightGrid[idx];
   }
   
-  // Sec pass: calculate charge fractions and values
-  size_t validIndex = 0;
-  for (G4int di = -fNeighborhoodRadius; di <= fNeighborhoodRadius; di++) {
-    for (G4int dj = -fNeighborhoodRadius; dj <= fNeighborhoodRadius; dj++) {
-      // Calc the pixel indices for this grid pos
-      G4int gridPixelI = fPixelIndexI + di;
-      G4int gridPixelJ = fPixelIndexJ + dj;
-      
-      // Check if this pixel is within bounds
-      if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || 
-          gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
-        // Already stored invalid data in first pass
-        continue;
-      }
-      
-      // Calc charge fraction and value
-      G4double chargeFraction = 0.0;
-      G4double chargeValue = 0.0;
-      
-      if (totalWeight > 0) {
-        chargeFraction = weights[validIndex] / totalWeight;
-        chargeValue = chargeFraction * totalCharge;
-      }
-      
-      fNeighborhoodChargeFractions.push_back(chargeFraction);
-      fNeighborhoodCharge.push_back(chargeValue * fElementaryCharge);
-      
-      validIndex++;
+  // Reserve and build output vectors in a single ordered pass (row-major),
+  // always pushing exactly one value per grid cell
+  fNeighborhoodChargeFractions.reserve(totalCells);
+  fNeighborhoodCharge.reserve(totalCells);
+  for (G4int idx = 0; idx < totalCells; ++idx) {
+    if (!inBoundsGrid[idx]) {
+      fNeighborhoodChargeFractions.push_back(-999.0); // Invalid marker for OOB
+      fNeighborhoodCharge.push_back(0.0);
+      continue;
     }
+    G4double fraction = (totalWeight > 0.0) ? (weightGrid[idx] / totalWeight) : 0.0;
+    G4double chargeCoulombs = fraction * totalCharge * fElementaryCharge;
+    fNeighborhoodChargeFractions.push_back(fraction);
+    fNeighborhoodCharge.push_back(chargeCoulombs);
   }
 }
 

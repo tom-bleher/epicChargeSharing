@@ -13,13 +13,10 @@ SteppingAction::SteppingAction(EventAction* eventAction, DetectorConstruction* d
 : G4UserSteppingAction(),
   fEventAction(eventAction),
   fDetector(detector),
-  fAluminumInteractionDetected(false),
-  fSiliconInteractionOccurred(false),
-  fInteractionSequence(0),
-  fFirstInteractionVolume("NONE"),
-  fAluminumPreContact(false),
-  fValidSiliconHit(false),
-  fCurrentHitIsPixel(false)
+  fFirstContactVolume("NONE"),
+  fEverTouchedPixel(false),
+  fEverTouchedSilicon(false),
+  fValidSiliconHit(false)
 {}
 
 SteppingAction::~SteppingAction()
@@ -27,13 +24,10 @@ SteppingAction::~SteppingAction()
 
 void SteppingAction::Reset()
 {
-    fAluminumInteractionDetected = false;
-    fSiliconInteractionOccurred = false;
-    fInteractionSequence = 0;
-    fFirstInteractionVolume = "NONE";
-    fAluminumPreContact = false;
+    fFirstContactVolume = "NONE";
+    fEverTouchedPixel = false;
+    fEverTouchedSilicon = false;
     fValidSiliconHit = false;
-    fCurrentHitIsPixel = false;
 }
 
 void SteppingAction::TrackVolumeInteractions(const G4Step* step)
@@ -48,45 +42,41 @@ void SteppingAction::TrackVolumeInteractions(const G4Step* step)
   G4String preVolName  = preVol  ? preVol->GetLogicalVolume()->GetName()  : "UNKNOWN";
   G4String postVolName = postVol ? postVol->GetLogicalVolume()->GetName() : "UNKNOWN";
 
-  // Track first volume ENTERED irrespective of energy deposit. Use fGeomBoundary to detect entry.
+  // Track first volume entered irrespective of energy deposit (fGeomBoundary).
   if (postPoint->GetStepStatus() == fGeomBoundary) {
     // We have crossed a boundary and entered postVol
-    if (fFirstInteractionVolume == "NONE" && postVol) {
+    if (fFirstContactVolume == "NONE" && postVol) {
       const G4String enteredName = postVol->GetLogicalVolume()->GetName();
 
       // Only register first contact for detector-relevant volumes
       if (enteredName == "logicBlock" || enteredName == "logicCube") {
-        fFirstInteractionVolume = enteredName;
+        fFirstContactVolume = enteredName;
 
         // Register first-contact position (use post-point at boundary entrance)
         if (fEventAction) {
           fEventAction->RegisterFirstContact(postPoint->GetPosition());
         }
-
-        if (enteredName == "logicBlock") {
-          // Pixel electrode was encountered before silicon
-          fAluminumPreContact = true;
-        }
       }
     }
   }
 
-  // Keep chronological count for debug/analysis
-  fInteractionSequence++;
-
-  // Record if the track ever touches aluminum pixel volume
+  // Sticky flags: track touched pixel-pad/silicon at any point
   if (preVolName == "logicBlock" || postVolName == "logicBlock") {
-    fAluminumInteractionDetected = true;
+    fEverTouchedPixel = true;
+  }
+  if (preVolName == "logicCube" || postVolName == "logicCube") {
+    fEverTouchedSilicon = true;
   }
 
-  // Record first time we are in silicon and finalize validity based on pre-contact
-  if ((preVolName == "logicCube" || postVolName == "logicCube") && !fSiliconInteractionOccurred) {
-    fSiliconInteractionOccurred = true;
-    fValidSiliconHit = !fAluminumPreContact;
+  // Valid silicon hit iff first contact was silicon (not pixel-pad)
+  if (fFirstContactVolume == "logicBlock") {
+    fValidSiliconHit = false;
+  } else if (fFirstContactVolume == "logicCube") {
+    fValidSiliconHit = true;
   }
 }
 
-// Volume-based detection methods (replacing IsPosOnPixel logic)
+  // Volume-based detection methods (replacing geometric-only pixel tests)
 G4bool SteppingAction::IsInSiliconVolume(const G4Step* step) const
 {
   G4StepPoint* prePoint = step->GetPreStepPoint();
@@ -118,12 +108,7 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
   G4String postVolName = postVol ? postVol->GetLogicalVolume()->GetName() : "UNKNOWN";
   
   // Track if current step touches pixel volume (aluminum)
-  // Use a sticky flag for the entire event so EventAction can classify it even
-  // when no silicon edep occurs. This guarantees IsPixelHit branch has 1s for
-  // events that interacted only with pixels.
-  if (preVolName == "logicBlock" || postVolName == "logicBlock") {
-    fCurrentHitIsPixel = true;
-  }
+  // Sticky flag recorded in TrackVolumeInteractions()
   
   // Accumulate position data for pure silicon hits.
   // The MFD scorer will handle the energy summation.
@@ -145,5 +130,5 @@ G4bool SteppingAction::IsValidSiliconHit() const
 
 G4bool SteppingAction::IsPixelHit() const
 {
-  return fCurrentHitIsPixel;
+  return fEverTouchedPixel;
 }

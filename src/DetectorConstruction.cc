@@ -83,13 +83,13 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7, 0.5));
     logicCube->SetVisAttributes(cubeVisAtt);
     
-    // Place the silicon detector at fixed pos
+    // Place the silicon detector at fixed position
     G4ThreeVector detectorPos(0., 0., Constants::DETECTOR_Z_POSITION);
     
     // Store original detector size for comparison
     G4double originalDetSize = fDetSize;
     
-    // Calc number of pixels that would fit with current parameters and FIXED corner offset
+    // Calc the number of pixels that would fit with current parameters and FIXED corner offset
     fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
     
     // Calc the required detector size to accommodate the pixel grid with FIXED corner offset
@@ -99,7 +99,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
         G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===\n"
                << "Original detector size: " << originalDetSize/mm << " mm\n"
-               << "Calcd pixel grid requires: " << fNumBlocksPerSide << "×" << fNumBlocksPerSide << " pixels\n"
+                << "Calculated pixel grid requires: " << fNumBlocksPerSide << "×" << fNumBlocksPerSide << " pixels\n"
                << "Required detector size: " << requiredDetSize/mm << " mm\n"
                << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm\n";
         
@@ -125,7 +125,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         G4cerr << "Expected: " << fPixelCornerOffset/mm << " mm, Got: " << actualCornerOffset/mm << " mm" << G4endl;
     }
     
-    // Place the silicon detector at fixed pos (only once)
+    // Place the silicon detector at fixed position (only once)
     new G4PVPlacement(0, detectorPos,
                       logicCube, "physCube", logicWorld, false, 0, checkOverlaps);
     
@@ -138,21 +138,16 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4UserLimits* stepLimit = new G4UserLimits(Constants::MAX_STEP_SIZE);
     logicCube->SetUserLimits(stepLimit);
     
-    G4cout << "✓ Step limiting enabled: maximum step size = 10 micrometers" << G4endl;
+    G4cout << "Step limiting: max step " << Constants::MAX_STEP_SIZE/um << " \xCE\xBCm" << G4endl;
     
-    // GEOMETRY UPDATE (2025-07): Pixel-pad aluminium must be the FIRST layer seen by the
-    // incoming particle.  Therefore pixels are now placed on the FRONT face of the
-    // silicon sensor (i.e. upstream along the particle direction).  SteppingAction
-    // logic will mark events that traverse this metal layer before reaching the
-    // silicon as aluminium-contaminated so that charge sharing is skipped.
+    // AC-LGAD layout: aluminum pixel-pads are the first layer seen by the
+    // incoming particle. Place pads on the front (upstream) face of the silicon.
+    // First-contact with a pixel-pad is flagged so charge sharing is skipped.
     G4int copyNo = 0;
     G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
-    // Calculate Z position for the aluminium pads – FRONT face of the silicon
-    // The primary particles start at +z and travel towards –z (momentum (0,0,-1)).
-    // The silicon detector centre is at detectorPos.z(), so its front face is at
-    //   detectorPos.z() + fDetWidth/2.  We add half the pad thickness to sit the
-    // pads flush on top of that face.
+    // Z position for aluminum pixel-pads on the front face of the silicon.
+    // Primaries start at +z and travel toward −z. Pads sit flush on the silicon.
     G4double pixelZ = detectorPos.z() + fDetWidth/2 + fPixelWidth/2;
     
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
@@ -165,11 +160,11 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         }
     }
     
-    // Validate aluminum pixels remain passive (no sensitive detectors attached)
+    // Validate aluminum pixel-pads remain passive (no sensitive detectors attached)
     G4VSensitiveDetector* pixelSensitiveDetector = logicBlock->GetSensitiveDetector();
     if (pixelSensitiveDetector == nullptr) {
-        G4cout << "✓ Aluminum pixels confirmed passive - no sensitive detectors attached" << G4endl;
-        G4cout << "✓ Total aluminum pixels placed: " << copyNo << " (" << fNumBlocksPerSide << "×" << fNumBlocksPerSide << ")" << G4endl;
+        G4cout << "Aluminum pixel-pads passive (no sensitive detector attached)" << G4endl;
+        G4cout << "Pixel-pad count: " << copyNo << " (" << fNumBlocksPerSide << "×" << fNumBlocksPerSide << ")" << G4endl;
     } else {
         G4cerr << "ERROR: Aluminum pixels have sensitive detector attached!" << G4endl;
         G4cerr << "This violates the selective sensitivity requirement!" << G4endl;
@@ -188,20 +183,18 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4double detectorArea = fDetSize * fDetSize;
     G4double pixelAreaRatio = totalPixelArea / detectorArea;
     
-    G4cout << "\n=== FINAL DETECTOR CONFIGURATION ===\n"
-           << "Detector Statistics:\n"
-           << "  Final detector size: " << fDetSize/mm << " mm × " << fDetSize/mm << " mm\n";
+    G4cout << "\nDetector configuration" << G4endl
+           << "  size: " << fDetSize/mm << " mm × " << fDetSize/mm << " mm" << G4endl;
     if (std::abs(fDetSize - originalDetSize) > Constants::GEOMETRY_TOLERANCE) {
-        G4cout << "  (Adjusted from original: " << originalDetSize/mm << " mm)\n";
+        G4cout << "  (adjusted from original " << originalDetSize/mm << " mm)" << G4endl;
     }
-    G4cout << "  Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm\n"
-           << "  Total number of pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << "\n"
-           << "  Pixel grid: " << fNumBlocksPerSide << " × " << fNumBlocksPerSide << "\n"
-           << "  Single pixel area: " << fPixelSize * fPixelSize / (mm*mm) << " mm²\n"
-           << "  Total pixel area: " << totalPixelArea / (mm*mm) << " mm²\n"
-           << "  Detector area: " << detectorArea / (mm*mm) << " mm²\n"
-           << "  Pixel area / Detector area ratio: " << pixelAreaRatio << "\n"
-           << "====================================" << G4endl;
+    G4cout << "  pixel corner offset (fixed): " << fPixelCornerOffset/mm << " mm" << G4endl
+           << "  pixels: " << fNumBlocksPerSide << " × " << fNumBlocksPerSide
+           << " (" << fNumBlocksPerSide * fNumBlocksPerSide << ")" << G4endl
+           << "  pixel area (single): " << fPixelSize * fPixelSize / (mm*mm) << " mm²" << G4endl
+           << "  pixel area (total):  " << totalPixelArea / (mm*mm) << " mm²" << G4endl
+           << "  detector area:       " << detectorArea / (mm*mm) << " mm²" << G4endl
+           << "  coverage:            " << pixelAreaRatio << G4endl;
 
     // Save all simulation parameters to a log file
     SaveSimulationParameters(totalPixelArea, detectorArea, pixelAreaRatio);
