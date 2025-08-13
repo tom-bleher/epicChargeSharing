@@ -117,7 +117,7 @@ The simulation utilizes the analytical model for signal pad sharing as presented
 ## Cite
 
 ```
-@misc{bleher2024epicchargesharing,
+@misc{bleher2025,
   author = {Tom Bleher, Igor Korover},
   title = {epicChargeSharing: Geant4 simulation to study charge sharing reconstruction in pixel detectors},
   year = {2025},
