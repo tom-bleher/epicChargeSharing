@@ -8,6 +8,9 @@
 class DetectorConstruction;
 class G4Event;
 
+// Shoots the primary particle toward the detector; constrains
+// emission position to ensure a full charge neighborhood around
+// the nearest pixel-pad.
 class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
 {
 public:

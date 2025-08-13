@@ -16,6 +16,9 @@
 
 class EventAction;
 
+// Builds the AC-LGAD detector geometry: silicon bulk with aluminum
+// pixel-pads on the upstream face. Exposes geometry parameters and
+// charge-neighborhood radius used across actions.
 class DetectorConstruction : public G4VUserDetectorConstruction
 {
 public:
