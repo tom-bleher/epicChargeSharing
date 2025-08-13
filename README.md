@@ -108,11 +108,11 @@ epicChargeSharing/
 
 ## Contact
 
-For questions or contributions, please open an issue on GitHub.
+For questions or contributions, please open an issue on GitHub or contact in [tombleher@tauex.tau.ac.il](mailto:tombleher@tauex.tau.ac.il)
 
 ## Acknowledgements
 
-The simulation utilizes the analytical model for signal pad sharing as presented in arXiv:2007.09528, M. Tornago et al.
+The simulation utilizes the analytical model for signal pad sharing as presented in arXiv:2007.09528 by M. Tornago et al.
 
 ## Cite
 
