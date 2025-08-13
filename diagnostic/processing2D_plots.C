@@ -17,12 +17,16 @@
 #include <TLatex.h>
 #include <TStyle.h>
 #include <Math/MinimizerOptions.h>
+#include <Math/Factory.h>
+#include <Math/Minimizer.h>
+#include <Math/Functor.h>
 
 #include <vector>
 #include <string>
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <memory>
 
 namespace {
   // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
@@ -147,7 +151,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
   c.Print("row.pdf[");
   c.Print("column.pdf[");
 
-  // Fitting functions reused per event
+  // Functions for visualization (parameters will be set from the new fitter)
   TF1 fRow("fRow", GaussPlusB, -1e9, 1e9, 4);
   TF1 fCol("fCol", GaussPlusB, -1e9, 1e9, 4);
 
@@ -217,32 +221,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
                               ? relErr * qmaxNeighborhood
                               : 0.0;
 
-    // Common initial params via robust seeding and fit invocation
-    auto setupAndFit = [&](TGraph& g, TF1& f, const std::vector<double>& xs, const std::vector<double>& qs, bool useWeights) -> int {
-      auto minmax = std::minmax_element(qs.begin(), qs.end());
-      const double A0 = std::max(1e-18, *minmax.second - *minmax.first);
-      const double B0 = std::max(0.0, *minmax.first);
-      int idxMax = std::distance(qs.begin(), std::max_element(qs.begin(), qs.end()));
-      double mu0 = xs[idxMax];
-
-      f.SetParameters(A0, mu0, std::max(0.25*pixelSpacing, 1e-6), B0);
-      // Fractions are unitless in [0,1]
-      f.SetParLimits(0, 0.0, 1.0);
-      f.SetParLimits(2, 1e-6, 5.0*pixelSpacing);
-      f.SetParLimits(3, 0.0, 1.0);
-
-      int status = g.Fit(&f, useWeights ? "QNSW" : "QNS");
-      if (status != 0) {
-        double wsum = 0, xw = 0;
-        for (size_t k=0;k<xs.size();++k){ double w = std::max(0.0, qs[k]-B0); wsum += w; xw += w * xs[k]; }
-        double muW = (wsum>0)? xw/wsum : mu0;
-        f.SetParameters(A0, muW, std::max(0.5*pixelSpacing, 1e-6), B0);
-        status = g.Fit(&f, useWeights ? "QNSRW" : "QNSR");
-      }
-      return status;
-    };
-
-    // Build graphs (weighted or unweighted) for BOTH row and column and perform fits
+    // Build graphs (weighted or unweighted) for BOTH row and column
     bool useWeights = (uniformSigma > 0.0);
     // Row graph
     TGraph* baseRowPtr = nullptr;
@@ -284,59 +263,158 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
     baseColPtr->SetMarkerSize(0.9);
     baseColPtr->SetLineColor(kBlue+2);
 
-    // Restrict function draw range to data spans and style for visibility
-    auto [xminIt, xmaxIt] = std::minmax_element(x_row.begin(), x_row.end());
-    double xmin = *xminIt, xmax = *xmaxIt;
-    fRow.SetRange(xmin - 0.1*pixelSpacing, xmax + 0.1*pixelSpacing);
-    fRow.SetNpx(600);
-    fRow.SetLineWidth(2);
+    // New fitter logic (mirror of processing2D.C)
+    // Seed parameters from min/max
+    auto minmaxRow = std::minmax_element(q_row.begin(), q_row.end());
+    auto minmaxCol = std::minmax_element(q_col.begin(), q_col.end());
+    const double A0_row = std::max(1e-18, *minmaxRow.second - *minmaxRow.first);
+    const double B0_row = std::max(0.0, *minmaxRow.first);
+    const double A0_col = std::max(1e-18, *minmaxCol.second - *minmaxCol.first);
+    const double B0_col = std::max(0.0, *minmaxCol.first);
 
-    auto [yminIt, ymaxIt] = std::minmax_element(y_col.begin(), y_col.end());
-    double ymin = *yminIt, ymax = *ymaxIt;
-    fCol.SetRange(ymin - 0.1*pixelSpacing, ymax + 0.1*pixelSpacing);
-    fCol.SetNpx(600);
-    fCol.SetLineWidth(2);
+    bool haveFitRow = false, haveFitCol = false;
+    double muRow = NAN, muCol = NAN;
+    double A_row = A0_row, B_row = B0_row, S_row = std::max(0.25*pixelSpacing, 1e-6);
+    double A_col = A0_col, B_col = B0_col, S_col = std::max(0.25*pixelSpacing, 1e-6);
 
-    // Initial fits
-    int statusRow = setupAndFit(*baseRowPtr, fRow, x_row, q_row, useWeights);
-    int statusCol = setupAndFit(*baseColPtr, fCol, y_col, q_col, useWeights);
+    // Very low contrast: fallback to fast weighted centroids (skip fit)
+    if (A0_row < 1e-6 && A0_col < 1e-6) {
+      double wsumx = 0.0, xw = 0.0;
+      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k]); wsumx += w; xw += w * x_row[k]; }
+      double wsumy = 0.0, yw = 0.0;
+      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k]); wsumy += w; yw += w * y_col[k]; }
+      if (wsumx > 0 && wsumy > 0) {
+        muRow = xw / wsumx;
+        muCol = yw / wsumy;
+        haveFitRow = haveFitCol = true; // we have reconstructions, but will not draw model curves
+      }
+    } else {
+      // mu guess from maximum index
+      int idxMaxRow = std::distance(q_row.begin(), std::max_element(q_row.begin(), q_row.end()));
+      int idxMaxCol = std::distance(q_col.begin(), std::max_element(q_col.begin(), q_col.end()));
+      double mu0_row = x_row[idxMaxRow];
+      double mu0_col = y_col[idxMaxCol];
 
-    bool okRow = (statusRow == 0);
-    bool okCol = (statusCol == 0);
-    double muRow = okRow ? fRow.GetParameter(1) : NAN;
-    double muCol = okCol ? fCol.GetParameter(1) : NAN;
+      // Use FULL data ranges (no trimming) for visualization fits
+      const std::vector<double>& x_row_fit = x_row;
+      const std::vector<double>& q_row_fit = q_row;
+      const std::vector<double>& y_col_fit = y_col;
+      const std::vector<double>& q_col_fit = q_col;
 
-    // Centroid fallback identical to processing2D.C when fit fails
-    if (!okRow) {
-      double wsum = 0.0, xw = 0.0;
-      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k]); wsum += w; xw += w * x_row[k]; }
-      if (wsum > 0) { muRow = xw / wsum; okRow = true; }
-    }
-    if (!okCol) {
-      double wsum = 0.0, yw = 0.0;
-      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k]); wsum += w; yw += w * y_col[k]; }
-      if (wsum > 0) { muCol = yw / wsum; okCol = true; }
+      auto minmaxX = std::minmax_element(x_row_fit.begin(), x_row_fit.end());
+      auto minmaxY = std::minmax_element(y_col_fit.begin(), y_col_fit.end());
+      const double xMin = *minmaxX.first - 0.5 * pixelSpacing;
+      const double xMax = *minmaxX.second + 0.5 * pixelSpacing;
+      const double yMin = *minmaxY.first - 0.5 * pixelSpacing;
+      const double yMax = *minmaxY.second + 0.5 * pixelSpacing;
+
+      // Chi2 objectives (weighted if uniformSigma > 0)
+      auto chi2Row = [&](const double* p) -> double {
+        const double A = p[0], mu = p[1], sig = p[2], B = p[3];
+        const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
+        double sum = 0.0;
+        for (size_t k=0;k<q_row_fit.size();++k) {
+          const double dx = (x_row_fit[k] - mu)/sig;
+          const double model = A * std::exp(-0.5*dx*dx) + B;
+          const double r = (q_row_fit[k] - model);
+          sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
+        }
+        return sum;
+      };
+      auto chi2Col = [&](const double* p) -> double {
+        const double A = p[0], mu = p[1], sig = p[2], B = p[3];
+        const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
+        double sum = 0.0;
+        for (size_t k=0;k<q_col_fit.size();++k) {
+          const double dy = (y_col_fit[k] - mu)/sig;
+          const double model = A * std::exp(-0.5*dy*dy) + B;
+          const double r = (q_col_fit[k] - model);
+          sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
+        }
+        return sum;
+      };
+
+      std::unique_ptr<ROOT::Math::Minimizer> mRow(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+      std::unique_ptr<ROOT::Math::Minimizer> mCol(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+      mRow->SetMaxFunctionCalls(200);
+      mCol->SetMaxFunctionCalls(200);
+      mRow->SetTolerance(1e-5);
+      mCol->SetTolerance(1e-5);
+
+      ROOT::Math::Functor fRowChi2(chi2Row, 4);
+      ROOT::Math::Functor fColChi2(chi2Col, 4);
+      mRow->SetFunction(fRowChi2);
+      mCol->SetFunction(fColChi2);
+
+      const double sigInit = std::max(0.25*pixelSpacing, 1e-6);
+      const double sigLo   = std::max(1e-6, 0.05*pixelSpacing);
+      const double sigHi   = 2.0*pixelSpacing;
+
+      mRow->SetLimitedVariable(0, "A", A0_row, 1e-3, 0.0, 1.0);
+      mRow->SetLimitedVariable(1, "mu", mu0_row, 1e-4*pixelSpacing, xMin, xMax);
+      mRow->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
+      mRow->SetLimitedVariable(3, "B", B0_row, 1e-3, 0.0, std::max(0.0, *minmaxRow.first));
+
+      mCol->SetLimitedVariable(0, "A", A0_col, 1e-3, 0.0, 1.0);
+      mCol->SetLimitedVariable(1, "mu", mu0_col, 1e-4*pixelSpacing, yMin, yMax);
+      mCol->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
+      mCol->SetLimitedVariable(3, "B", B0_col, 1e-3, 0.0, std::max(0.0, *minmaxCol.first));
+
+      haveFitRow = mRow->Minimize();
+      haveFitCol = mCol->Minimize();
+
+      if (haveFitRow) {
+        A_row = mRow->X()[0]; muRow = mRow->X()[1]; S_row = mRow->X()[2]; B_row = mRow->X()[3];
+        fRow.SetRange(xMin, xMax);
+        fRow.SetParameters(A_row, muRow, S_row, B_row);
+      } else {
+        // Fallback: weighted centroid on trimmed window
+        double wsum = 0.0, xw = 0.0;
+        for (size_t k=0;k<x_row_fit.size();++k) { double w = std::max(0.0, q_row_fit[k]); wsum += w; xw += w * x_row_fit[k]; }
+        if (wsum > 0) { muRow = xw / wsum; haveFitRow = true; }
+      }
+
+      if (haveFitCol) {
+        A_col = mCol->X()[0]; muCol = mCol->X()[1]; S_col = mCol->X()[2]; B_col = mCol->X()[3];
+        fCol.SetRange(yMin, yMax);
+        fCol.SetParameters(A_col, muCol, S_col, B_col);
+      } else {
+        // Fallback: weighted centroid on trimmed window
+        double wsum = 0.0, yw = 0.0;
+        for (size_t k=0;k<y_col_fit.size();++k) { double w = std::max(0.0, q_col_fit[k]); wsum += w; yw += w * y_col_fit[k]; }
+        if (wsum > 0) { muCol = yw / wsum; haveFitCol = true; }
+      }
     }
 
     // Only proceed when BOTH reconstructions are valid, matching processing2D.C behavior
-    if (!(okRow && okCol) || !IsFinite(muRow) || !IsFinite(muCol)) continue;
+    if (!(haveFitRow && haveFitCol) || !IsFinite(muRow) || !IsFinite(muCol)) continue;
 
     // Add headroom so curves are visible
     double dataMaxRow = *std::max_element(q_row.begin(), q_row.end());
-    double fitPeakRow = fRow.GetParameter(0) + fRow.GetParameter(3);
-    double yMaxRow = 1.20 * std::max(dataMaxRow, fitPeakRow);
+    double yMaxRow = 1.20 * dataMaxRow;
+    if (A_row > 0.0) {
+      double fitPeakRow = A_row + B_row;
+      yMaxRow = 1.20 * std::max(dataMaxRow, fitPeakRow);
+    }
     baseRowPtr->SetMaximum(yMaxRow);
 
     double dataMaxCol = *std::max_element(q_col.begin(), q_col.end());
-    double fitPeakCol = fCol.GetParameter(0) + fCol.GetParameter(3);
-    double yMaxCol = 1.20 * std::max(dataMaxCol, fitPeakCol);
+    double yMaxCol = 1.20 * dataMaxCol;
+    if (A_col > 0.0) {
+      double fitPeakCol = A_col + B_col;
+      yMaxCol = 1.20 * std::max(dataMaxCol, fitPeakCol);
+    }
     baseColPtr->SetMaximum(yMaxCol);
 
     // Draw row
     c.cd();
     baseRowPtr->Draw(useWeights ? "AP" : "AP");
-    fRow.SetLineColor(kRed+1);
-    fRow.Draw("L SAME");
+    if (A_row > 0.0) {
+      fRow.SetNpx(600);
+      fRow.SetLineWidth(2);
+      fRow.SetLineColor(kRed+1);
+      fRow.Draw("L SAME");
+    }
     gPad->Update();
     double yPadMin = gPad->GetUymin();
     double yPadMax = gPad->GetUymax();
@@ -374,8 +452,12 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
     // Draw column
     c.cd();
     baseColPtr->Draw(useWeights ? "AP" : "AP");
-    fCol.SetLineColor(kRed+1);
-    fCol.Draw("L SAME");
+    if (A_col > 0.0) {
+      fCol.SetNpx(600);
+      fCol.SetLineWidth(2);
+      fCol.SetLineColor(kRed+1);
+      fCol.Draw("L SAME");
+    }
     gPad->Update();
     double yPadMinC = gPad->GetUymin();
     double yPadMaxC = gPad->GetUymax();
