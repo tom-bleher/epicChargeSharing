@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
-project(ePIC_Toy_Detector)
+project(epicChargeSharing)
 
 # Set CMake policies for modern behavior
 if(POLICY CMP0069)
@@ -275,6 +275,9 @@ target_link_libraries(epicChargeSharing
     ${ROOT_LIBRARIES} 
     Threads::Threads
 )
+
+# Provide the project source dir to the code for locating resources (e.g., ROOT macros)
+target_compile_definitions(epicChargeSharing PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 # Set target-specific properties for optimization
 if(CMAKE_BUILD_TYPE STREQUAL "Release")

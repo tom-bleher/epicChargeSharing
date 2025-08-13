@@ -1,4 +1,4 @@
-# epicChargeSharingAnalysis
+# epicChargeSharing
 
 A GEANT4-based simulation for charge sharing studies in AC-LGAD pixel sensors.
 
@@ -9,14 +9,14 @@ A GEANT4-based simulation for charge sharing studies in AC-LGAD pixel sensors.
 - **ROOT** v6.20+ 
 - **CMake** v3.9+
 - **C++17** compatible compiler
-- **Ceres Solver** v2.0+ (non-linear optimization library)
+  
 
 ## Installation
 
 ### Build
 ```bash
-git clone https://github.com/tom-bleher/EpicChargeSharingAnalysis.git
-cd EpicChargeSharingAnalysis
+git clone https://github.com/tom-bleher/epicChargeSharing.git
+cd epicChargeSharing
 mkdir build && cd build
 cmake ..
 make -j$(nproc)
@@ -72,8 +72,7 @@ constant_parameters:
   NUMBER_OF_EVENTS: 10000
   PARTICLE_TYPE: "e-"
   DETECTOR_SIZE: 30.0
-  GAUSS_FIT: true
-  LORENTZ_FIT: true
+  
   # ...
 ```
 
@@ -86,13 +85,10 @@ python3 farm/farmer.py
 ## Repository Structure
 
 ```
-EpicChargeSharingAnalysis/
+epicChargeSharing/
 ├── src/                          # Source implementation
 │   ├── DetectorConstruction.cc   # Detector geometry
 │   ├── EventAction.cc            # Event processing & charge sharing
-│   ├── GaussFit2D.cc            # 2D Gaussian fitting
-│   ├── LorentzFit2D.cc          # 2D Lorentzian fitting
-│   ├── *Fit3D.cc                # 3D fitting implementations
 │   └── ...
 ├── include/                      # Header files
 │   ├── Control.hh               # Main configuration constants
@@ -100,6 +96,10 @@ EpicChargeSharingAnalysis/
 │   └── ...
 ├── macros/                       # GEANT4 macro files
 │   └── vis.mac                  # Visualization setup
+├── proc/                         # ROOT processing macros
+│   ├── processing2D.C
+│   ├── processing3D.C
+│   └── ...
 ├── analysis/                     # Analysis scripts
 │   ├── python/                  # Python analysis tools
 │   └── root/                    # ROOT analysis scripts
