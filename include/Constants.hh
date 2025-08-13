@@ -45,7 +45,7 @@ namespace Constants {
     // ========================
     
     // Step limiting
-    const G4double MAX_STEP_SIZE = 10.0*micrometer;      // Maximum step size for tracking
+    const G4double MAX_STEP_SIZE = 5.0*micrometer;      // Maximum step size for tracking
         
     // Primary generator constants
     const G4double PRIMARY_PARTICLE_Z_POSITION = 2.0*cm; // Z position for primary particle generation
@@ -69,6 +69,15 @@ namespace Constants {
     const G4double AMPLIFICATION_FACTOR = 20.0;          // AC-LGAD amplification factor (N_e' = N_e * 20)
     const G4double D0_CHARGE_SHARING = 10.0;             // x displacement in silicon (microns)
     const G4double ELEMENTARY_CHARGE = 1.602176634e-19;  // Elementary charge in Coulombs
+
+    // ========================
+    // POST-RUN PROCESSING (Gaussian fits over the charge neighborhood)
+    // ========================
+    // Control whether to run ROOT post-processing macros automatically after the run finishes
+    const G4bool RUN_PROCESSING_2D = true;   // Calls proc/processing2D.C
+    const G4bool RUN_PROCESSING_3D = false;  // Calls proc/processing3D.C
+    // Vertical uncertainty for the fits, as percent of the neighborhood max
+    const G4double PROCESSING_ERROR_PERCENT = 5.0;
 
 } // namespace Constants
 

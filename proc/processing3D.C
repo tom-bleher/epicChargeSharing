@@ -12,6 +12,10 @@
 #include <TROOT.h>
 #include <TError.h>
 #include <Math/MinimizerOptions.h>
+// Minuit2 least-squares API
+#include <Math/Factory.h>
+#include <Math/Minimizer.h>
+#include <Math/Functor.h>
 
 #include <vector>
 #include <string>
@@ -45,7 +49,11 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
                  double errorPercentOfMax = 5.0) {
   // Use Minuit2 by default
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2");
-  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-6);
+  // Slightly relax tolerance to speed up fits while keeping accuracy
+  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-5);
+  // Limit function evaluations and reduce strategy for speed
+  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(300);
+  ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
 
   // Open file for update
   TFile* file = TFile::Open(filename, "UPDATE");
@@ -120,6 +128,15 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
   // Switch to fitting charge fractions (unitless 0..1)
   std::vector<double>* Fi = nullptr;
 
+  // Speed up I/O: deactivate all branches, then enable only what we read
+  tree->SetBranchStatus("*", 0);
+  tree->SetBranchStatus("x_hit", 1);
+  tree->SetBranchStatus("y_hit", 1);
+  tree->SetBranchStatus("x_px", 1);
+  tree->SetBranchStatus("y_px", 1);
+  tree->SetBranchStatus("is_pixel_hit", 1);
+  tree->SetBranchStatus("F_i", 1);
+
   tree->SetBranchAddress("x_hit", &x_hit);
   tree->SetBranchAddress("y_hit", &y_hit);
   tree->SetBranchAddress("x_px", &x_px);
@@ -155,7 +172,7 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
   TBranch* br_dx    = ensureAndResetBranch("rec_hit_delta_x_3d", &rec_hit_delta_x_3d);
   TBranch* br_dy    = ensureAndResetBranch("rec_hit_delta_y_3d", &rec_hit_delta_y_3d);
 
-  // 2D fit function
+  // 2D fit function kept for reference. We use Minuit2 on a compact window.
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
 
   const Long64_t nEntries = tree->GetEntries();
@@ -189,9 +206,10 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
 
     const int R = (N - 1) / 2;
 
-    // Prepare TGraph2D points for valid pixels (Fi >= 0)
+    // Prepare TGraph2D points for valid pixels (Fi >= 0). Also track the max
     TGraph2D g2d;
     int p = 0;
+    double zmaxNeighborhood = -1e300;
     for (int di = -R; di <= R; ++di) {
       for (int dj = -R; dj <= R; ++dj) {
         const int idx = (di + R) * N + (dj + R);
@@ -201,6 +219,7 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
         const double x = x_px + di * pixelSpacing;
         const double y = y_px + dj * pixelSpacing;
         g2d.SetPoint(p++, x, y, f);
+        if (f > zmaxNeighborhood) zmaxNeighborhood = f;
       }
     }
 
@@ -226,41 +245,79 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
 
     // Optional uniform vertical uncertainty from percent-of-max
     const double relErr = std::max(0.0, errorPercentOfMax) * 0.01;
-    const double uniformSigma = (zmax > 0 && relErr > 0.0)
-                              ? relErr * zmax
+    const double uniformSigma = (zmaxNeighborhood > 0 && relErr > 0.0)
+                              ? relErr * zmaxNeighborhood
                               : 0.0;
 
     f2D.SetParameters(A0, mux0, muy0, std::max(0.25*pixelSpacing, 1e-6), std::max(0.25*pixelSpacing, 1e-6), B0);
     // Fractions bounded in [0,1]
     f2D.SetParLimits(0, 0.0, 1.0);                    // A >= 0
-    f2D.SetParLimits(3, 1e-6, 5.0*pixelSpacing);      // wider sigmas
-    f2D.SetParLimits(4, 1e-6, 5.0*pixelSpacing);
-    f2D.SetParLimits(5, 0.0, 1.0);                    // B in [0,1]
+    f2D.SetParLimits(3, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);  // tighter sigmas
+    f2D.SetParLimits(4, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);
+    f2D.SetParLimits(5, 0.0, std::max(0.0, zmin));     // B up to local minimum
 
-    // Fit quietly, allow improved strategy; use weights if provided
-    int status = -1;
-    if (uniformSigma > 0.0) {
-      TGraph2DErrors ge2d;
-      for (int k = 0; k < g2d.GetN(); ++k) {
-        ge2d.SetPoint(k, g2d.GetX()[k], g2d.GetY()[k], g2d.GetZ()[k]);
-        ge2d.SetPointError(k, 0.0, 0.0, uniformSigma);
-      }
-      status = ge2d.Fit(&f2D, "QNSW");
-      if (status != 0) {
-        f2D.SetParameters(A0, mux0, muy0, std::max(0.5*pixelSpacing, 1e-6), std::max(0.5*pixelSpacing, 1e-6), B0);
-        status = ge2d.Fit(&f2D, "QNSRW");
-      }
-    } else {
-      status = g2d.Fit(&f2D, "QNS");
-      if (status != 0) {
-        // Retry with different widths
-        f2D.SetParameters(A0, mux0, muy0, std::max(0.5*pixelSpacing, 1e-6), std::max(0.5*pixelSpacing, 1e-6), B0);
-        status = g2d.Fit(&f2D, "QNSR");
-      }
+    // Fit on FULL range covering all points present in the neighborhood
+    double xMinR =  1e300, xMaxR = -1e300;
+    double yMinR =  1e300, yMaxR = -1e300;
+    for (int k = 0; k < g2d.GetN(); ++k) {
+      xMinR = std::min(xMinR, g2d.GetX()[k]);
+      xMaxR = std::max(xMaxR, g2d.GetX()[k]);
+      yMinR = std::min(yMinR, g2d.GetY()[k]);
+      yMaxR = std::max(yMaxR, g2d.GetY()[k]);
     }
-    if (status == 0) {
-      x_rec_3d = f2D.GetParameter(1);
-      y_rec_3d = f2D.GetParameter(2);
+    // Add small padding
+    xMinR -= 0.5 * pixelSpacing; xMaxR += 0.5 * pixelSpacing;
+    yMinR -= 0.5 * pixelSpacing; yMaxR += 0.5 * pixelSpacing;
+    f2D.SetRange(xMinR, xMaxR, yMinR, yMaxR);
+    // Constrain means inside full span, too
+    f2D.SetParLimits(1, xMinR, xMaxR);
+    f2D.SetParLimits(2, yMinR, yMaxR);
+
+    // Minuit2 least-squares over the trimmed window
+    auto chi2 = [&](const double* p) -> double {
+      const double A = p[0];
+      const double mx = p[1];
+      const double my = p[2];
+      const double sx = p[3];
+      const double sy = p[4];
+      const double B = p[5];
+      const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
+      double sum = 0.0;
+      for (int k = 0; k < g2d.GetN(); ++k) {
+        const double xi = g2d.GetX()[k];
+        const double yi = g2d.GetY()[k];
+        const double dx = (xi - mx)/sx;
+        const double dy = (yi - my)/sy;
+        const double model = A * std::exp(-0.5*(dx*dx + dy*dy)) + B;
+        const double r = (g2d.GetZ()[k] - model);
+        sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
+      }
+      return sum;
+    };
+
+    std::unique_ptr<ROOT::Math::Minimizer> m(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+    m->SetMaxFunctionCalls(300);
+    m->SetTolerance(1e-5);
+    ROOT::Math::Functor fChi2(chi2, 6);
+    m->SetFunction(fChi2);
+
+    const double sxInit = std::max(0.25*pixelSpacing, 1e-6);
+    const double syInit = std::max(0.25*pixelSpacing, 1e-6);
+    const double sLo    = std::max(1e-6, 0.05*pixelSpacing);
+    const double sHi    = 2.0*pixelSpacing;
+
+    m->SetLimitedVariable(0, "A", A0, 1e-3, 0.0, 1.0);
+    m->SetLimitedVariable(1, "mux", mux0, 1e-4*pixelSpacing, xMinR, xMaxR);
+    m->SetLimitedVariable(2, "muy", muy0, 1e-4*pixelSpacing, yMinR, yMaxR);
+    m->SetLimitedVariable(3, "sigx", sxInit, 1e-4*pixelSpacing, sLo, sHi);
+    m->SetLimitedVariable(4, "sigy", syInit, 1e-4*pixelSpacing, sLo, sHi);
+    m->SetLimitedVariable(5, "B", B0, 1e-3, 0.0, std::max(0.0, zmin));
+
+    bool ok = m->Minimize();
+    if (ok) {
+      const double* X = m->X();
+      x_rec_3d = X[1];
+      y_rec_3d = X[2];
       rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
       rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
       nFitted++;

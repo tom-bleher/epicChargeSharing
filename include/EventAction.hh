@@ -28,10 +28,10 @@ public:
       // Record the very first contact position (aluminum pixel or silicon)
       void RegisterFirstContact(const G4ThreeVector& pos) { fFirstContactPos = pos; fHasFirstContactPos = true; }
     
-    // Method to calculate the nearest pixel pos
+    // Method to calculate the nearest pixel position
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
         
-    // Method to calculate the angular size subtended by a pixel as seen from a hit point (2D calculation)
+    // Viewing angle α: angular size subtended by a pixel-pad as seen from the hit (2D)
     G4double CalcPixelAlphaSubtended(G4double hitX, G4double hitY,
                                          G4double pixelCenterX, G4double pixelCenterY,
                                          G4double pixelWidth, G4double pixelHeight);

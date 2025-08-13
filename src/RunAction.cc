@@ -57,7 +57,7 @@ static void InitializeROOTThreading() {
             // ROOT 6.18+ supports implicit multi-threading
             if (!ROOT::IsImplicitMTEnabled()) {
                 ROOT::EnableImplicitMT();
-                G4cout << "ROOT implicit multi-threading enabled" << G4endl;
+                G4cout << "ROOT: implicit MT enabled" << G4endl;
             }
         } catch (...) {
             G4cout << "ROOT multi-threading not available in this version" << G4endl;
@@ -66,7 +66,31 @@ static void InitializeROOTThreading() {
         G4cout << "ROOT version < 6.18, using basic threading support" << G4endl;
         #endif
         
-        G4cout << "ROOT threading initialization complete" << G4endl;
+        G4cout << "ROOT threading: initialized" << G4endl;
+    }
+}
+
+// Helper to run ROOT post-processing macros on the produced ROOT file
+static void RunPostProcessingMacros(const G4String& rootFilePath)
+{
+    if (!(Constants::RUN_PROCESSING_2D || Constants::RUN_PROCESSING_3D)) {
+        return;
+    }
+
+    auto runMacro = [&](const char* macroPath, const char* funcName) {
+        if (!macroPath || !funcName) return;
+        // Load and (ACLiC) compile the macro, then call it
+        const G4String loadCmd = Form(".L %s+", macroPath);
+        gROOT->ProcessLine(loadCmd.c_str());
+        const G4String callCmd = Form("%s(\"%s\", %.9g);", funcName, rootFilePath.c_str(), Constants::PROCESSING_ERROR_PERCENT);
+        gROOT->ProcessLine(callCmd.c_str());
+    };
+
+    if (Constants::RUN_PROCESSING_2D) {
+        runMacro("/home/tom/Desktop/Putza/epicChargeSharing/proc/processing2D.C", "processing2D");
+    }
+    if (Constants::RUN_PROCESSING_3D) {
+        runMacro("/home/tom/Desktop/Putza/epicChargeSharing/proc/processing3D.C", "processing3D");
     }
 }
 
@@ -92,7 +116,7 @@ RunAction::RunAction()
 
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
-  // Initialize step energy depositionition vectors (they are automatically initialized empty)
+  // Initialize step energy deposition vectors (they are automatically initialized empty)
 }
 
 RunAction::~RunAction()
@@ -153,7 +177,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // Set auto-flush and auto-save for better performance and safety
         fRootFile->SetCompressionLevel(1);
         
-        G4cout << "Created ROOT file: " << fileName << G4endl;
+        G4cout << "ROOT file: " << fileName << G4endl;
         
         // Create the ROOT tree with optimized settings
         fTree = new TTree("Hits", "Particle hits and fitting results");
@@ -183,11 +207,12 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->Branch("y_hit", &fTrueY, "y_hit/D")->SetTitle("True Position Y [mm]");
         fTree->Branch("x_px", &fPixelX, "x_px/D")->SetTitle("Nearest Pixel Center X [mm]");
         fTree->Branch("y_px", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
-        fTree->Branch("e_dep", &fEdep, "e_dep/D");
-        fTree->Branch("e_init", &fInitialEnergy, "E_init/D")->SetTitle("Initial Particle Energy [MeV]");
-        // Pixel hit flags: first-contact, geometric, and combined (AND)
-        fTree->Branch("first_contact_is_pixel", &fFirstContactIsPixel, "first_contact_is_pixel/O");
-        fTree->Branch("geometric_is_pixel", &fGeometricIsPixel, "geometric_is_pixel/O");
+        // Energy branches use lowercase names per project guide
+        fTree->Branch("e_dep", &fEdep, "e_dep/D")->SetTitle("Energy deposit in silicon [MeV]");
+        fTree->Branch("e_init", &fInitialEnergy, "e_init/D")->SetTitle("Initial Particle Energy [MeV]");
+        // Pixel hit flags: first-contact, geometric, and combined (OR)
+        //fTree->Branch("first_contact_is_pixel", &fFirstContactIsPixel, "first_contact_is_pixel/O");
+        //fTree->Branch("geometric_is_pixel", &fGeometricIsPixel, "geometric_is_pixel/O");
         fTree->Branch("is_pixel_hit", &fIsPixelHit, "is_pixel_hit/O");
         fTree->Branch("px_hit_delta_x", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
         fTree->Branch("px_hit_delta_y", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]");
@@ -197,7 +222,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
         fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
         
-        G4cout << "Created ROOT tree with " << fTree->GetNbranches() << " branches" << G4endl;
+        G4cout << "ROOT tree 'Hits': " << fTree->GetNbranches() << " branches" << G4endl;
     
     }
 }
@@ -231,7 +256,11 @@ void RunAction::EndOfRunAction(const G4Run* run)
             
             // Use the new safe write method
             if (SafeWriteRootFile()) {
-                G4cout << "Worker thread: Successly wrote " << fileName << G4endl;
+            G4cout << "Worker thread: Successfully wrote " << fileName << G4endl;
+                // In single-threaded mode, run post-processing now on the produced file
+                if (!G4Threading::IsMultithreadedApplication()) {
+                    RunPostProcessingMacros(fileName);
+                }
             } else {
                 G4cerr << "Worker thread: Failed to write " << fileName << G4endl;
             }
@@ -368,7 +397,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             if (verifyFile && !verifyFile->IsZombie()) {
                 TTree* verifyTree = (TTree*)verifyFile->Get("Hits");
                 if (verifyTree) {
-                    G4cout << "Master thread: Successly created merged file with " 
+                    G4cout << "Master thread: Successfully created merged file with " 
                            << verifyTree->GetEntries() << " entries" << G4endl;
                 }
                 verifyFile->Close();
@@ -385,6 +414,9 @@ void RunAction::EndOfRunAction(const G4Run* run)
                     G4cerr << "Master thread: Failed to clean up " << file << G4endl;
                 }
             }
+
+            // After merging and metadata write, run post-processing macros on the final file
+            RunPostProcessingMacros("epicChargeSharingOutput.root");
             
         } catch (const std::exception& e) {
             G4cerr << "Master thread: Exception during robust file merging: " << e.what() << G4endl;
@@ -396,7 +428,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
 
 void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z) 
 {
-    // Store energy depositionit in MeV (Geant4 internal energy unit is MeV)
+    // Store energy deposition in MeV (Geant4 internal energy unit is MeV)
     fEdep = edep;
     
     // Store positions in mm (Geant4 internal length unit is mm)
@@ -406,7 +438,7 @@ void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
 
 void RunAction::SetNearestPixelPos(G4double x, G4double y)
 {
-    // Store nearest pixel centre coordinates
+    // Store nearest pixel center coordinates
     fPixelX = x;
     fPixelY = y;
 }
@@ -662,7 +694,7 @@ bool RunAction::SafeWriteRootFile()
         // Final flush for the file header / directory structure
         fRootFile->Flush();
         
-        G4cout << "RunAction: Successly wrote ROOT file with " << fTree->GetEntries() << " entries" << G4endl;
+        G4cout << "RunAction: Successfully wrote ROOT file with " << fTree->GetEntries() << " entries" << G4endl;
         return true;
         
     } catch (const std::exception& e) {
@@ -683,7 +715,7 @@ void RunAction::CleanupRootObjects()
             delete fRootFile;
             fRootFile = nullptr;
             fTree = nullptr; // Tree is owned by file
-            G4cout << "RunAction: Successly cleaned up ROOT objects" << G4endl;
+            G4cout << "RunAction: Successfully cleaned up ROOT objects" << G4endl;
         }
     } catch (const std::exception& e) {
         G4cerr << "RunAction: Exception during ROOT cleanup: " << e.what() << G4endl;

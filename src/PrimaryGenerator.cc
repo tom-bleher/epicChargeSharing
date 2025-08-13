@@ -32,11 +32,10 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     // Set particle momentum direction
     fParticleGun->SetParticleMomentumDirection(mom);
     
-    G4cout << "\n=== PARTICLE GUN CONFIGURED FROM HEADER FILES ===" << G4endl;
-    G4cout << "Particle type: " << Control::PARTICLE_TYPE << G4endl;
-    G4cout << "Particle energy: " << Control::PARTICLE_ENERGY << " GeV" << G4endl;
+    G4cout << "\nParticle gun (header-configured)" << G4endl;
+    G4cout << "  type: " << Control::PARTICLE_TYPE << ", E = " << Control::PARTICLE_ENERGY << " GeV" << G4endl;
 
-    // Particle gun now shoots uniformly across the entire detector surface
+    // Particle gun now shoots uniformly across the interior region that guarantees a full neighborhood
     G4double detSize = fDetector->GetDetSize();
     G4int radius      = fDetector->GetNeighborhoodRadius(); // typically 4 for a 9x9 grid
     G4double margin   = fDetector->GetPixelCornerOffset() +                     // fixed edge offset
@@ -49,12 +48,9 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
                     "Neighborhood radius larger than detector allows.");
     }
 
-    G4cout << "Full " << (2*radius+1) << "x" << (2*radius+1)
-           << " neighbourhood guarantee enabled" << G4endl;
-    G4cout << "Allowed XY range inside detector: [" << (-detSize/2 + margin)/mm << ", "
-           << (detSize/2 - margin)/mm << "] mm" << G4endl;
-    G4cout << "(Margin from edges: " << margin/mm << " mm)" << G4endl;
-    G4cout << "===============================================" << G4endl;
+    G4cout << "Neighborhood: full " << (2*radius+1) << "×" << (2*radius+1) << " guaranteed" << G4endl;
+    G4cout << "  allowed XY: [" << (-detSize/2 + margin)/mm << ", "
+           << (detSize/2 - margin)/mm << "] mm (margin " << margin/mm << " mm)" << G4endl;
 
     // Initial position will be set randomly on the detector surface
     GenerateRandomPos();
@@ -77,7 +73,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
 
 void PrimaryGenerator::GenerateRandomPos()
 {
-    // Generate random position ensuring the chosen pixel has a full neighbourhood
+    // Generate random position ensuring the chosen pixel has a full neighborhood
     G4double detSize = fDetector->GetDetSize();
     G4int radius      = fDetector->GetNeighborhoodRadius();
     G4double margin   = fDetector->GetPixelCornerOffset() +

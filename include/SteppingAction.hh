@@ -20,32 +20,27 @@ public:
   
   void Reset();
     
-  // New methods for aluminum interaction tracking
+  // Track volume transitions to classify first-contact and sticky pixel/silicon contact flags
   void TrackVolumeInteractions(const G4Step* step);
   
-  // Enhanced trajectory analysis methods
+  // Trajectory analysis methods
   G4bool IsValidSiliconHit() const;
-    // First-contact classification (true if first entered volume is pixel aluminum)
-    G4bool FirstContactIsPixel() const { return fFirstInteractionVolume == "logicBlock"; }
+  // First-contact classification (true if first entered volume is pixel aluminum)
+  G4bool FirstContactIsPixel() const { return fFirstContactVolume == "logicBlock"; }
   
-  // Volume-based detection methods (replacing IsPosOnPixel logic)
+  // Volume-based detection helpers
   G4bool IsInSiliconVolume(const G4Step* step) const;
-  G4bool IsPixelHit() const;  // Returns true if hit is in pixel volume (aluminum)
+  G4bool IsPixelHit() const;  // Returns true if track touched pixel volume at any point in the event
     
 private:
   EventAction* fEventAction;
   DetectorConstruction* fDetector; // geometry helper
   
-  // Enhanced aluminum interaction tracking variables
-  G4bool fAluminumInteractionDetected;
-  G4bool fSiliconInteractionOccurred;
-  G4int fInteractionSequence;
-  
-  // New trajectory analysis variables
-  G4String fFirstInteractionVolume;
-  G4bool fAluminumPreContact;
-  G4bool fValidSiliconHit;
-  G4bool fCurrentHitIsPixel;  // Track if current hit is in pixel volume
+  // Per-event classification state
+  G4String fFirstContactVolume; // "logicBlock" (pixel) or "logicCube" (silicon) on first boundary entry
+  G4bool   fEverTouchedPixel;   // true if any step involved the pixel volume
+  G4bool   fEverTouchedSilicon; // true if any step involved the silicon volume
+  G4bool   fValidSiliconHit;    // true only if first contact was NOT pixel
   
 };
 

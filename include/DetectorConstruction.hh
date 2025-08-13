@@ -28,7 +28,7 @@ public:
     // Method to set EventAction pointer for neighborhood configuration
     void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
     
-    // Method to set the corner offset directly (requires geometry rebuild)
+    // Set fixed pixel-pad corner offset (requires geometry rebuild)
     void SetPixelCornerOffset(G4double cornerOffset);
     
     // Method to set neighborhood radius
@@ -43,7 +43,7 @@ public:
     G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
-    G4ThreeVector GetDetectorPos() const; // Fixed pos from Construct()
+    G4ThreeVector GetDetectorPos() const; // Fixed position from Construct()
     
     // Method to save simulation parameters to a log file
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
