@@ -116,6 +116,7 @@ namespace {
     std::unique_ptr<ROOT::Math::Minimizer> m(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
     m->SetMaxFunctionCalls(300);
     m->SetTolerance(1e-5);
+    m->SetStrategy(0);
     ROOT::Math::Functor fChi2(chi2, 6);
     m->SetFunction(fChi2);
 
