@@ -170,6 +170,9 @@ namespace {
     mCol->SetMaxFunctionCalls(200);
     mRow->SetTolerance(1e-5);
     mCol->SetTolerance(1e-5);
+    // Match default strategy used in the non-parallel macro
+    mRow->SetStrategy(0);
+    mCol->SetStrategy(0);
 
     ROOT::Math::Functor fRowChi2(chi2Row, 4);
     ROOT::Math::Functor fColChi2(chi2Col, 4);
