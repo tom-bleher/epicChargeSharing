@@ -10,6 +10,9 @@ class RunAction;
 class DetectorConstruction;
 class SteppingAction;
 
+// Collects per-event data, performs pixel-pad classification using
+// first-contact and geometry tests, and computes charge sharing over
+// the charge neighborhood for non–pixel-pad hits.
 class EventAction : public G4UserEventAction
 {
 public:

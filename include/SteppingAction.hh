@@ -10,6 +10,9 @@ class EventAction;
 class DetectorConstruction;
 class G4Step;
 
+// Tracks volume transitions to detect first-contact and sticky
+// interactions with pixel-pad and silicon; forwards positions for
+// accurate x_hit/y_hit recording.
 class SteppingAction : public G4UserSteppingAction
 {
 public:

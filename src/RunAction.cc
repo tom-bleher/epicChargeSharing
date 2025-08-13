@@ -87,10 +87,12 @@ static void RunPostProcessingMacros(const G4String& rootFilePath)
     };
 
     if (Constants::RUN_PROCESSING_2D) {
-        runMacro("/home/tom/Desktop/Putza/epicChargeSharing/proc/processing2D.C", "processing2D");
+        const G4String macroPath2D = G4String(PROJECT_SOURCE_DIR) + "/proc/processing2D.C";
+        runMacro(macroPath2D.c_str(), "processing2D");
     }
     if (Constants::RUN_PROCESSING_3D) {
-        runMacro("/home/tom/Desktop/Putza/epicChargeSharing/proc/processing3D.C", "processing3D");
+        const G4String macroPath3D = G4String(PROJECT_SOURCE_DIR) + "/proc/processing3D.C";
+        runMacro(macroPath3D.c_str(), "processing3D");
     }
 }
 
@@ -190,8 +192,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->SetAutoFlush(10000);  // Flush every 10k entries
         fTree->SetAutoSave(50000);   // Save every 50k entries
         
-        // Create branches following the hierarchical structure
-        // Safety check before creating branches
+        // Create branches
         if (!fTree) {
             G4cerr << "RunAction: Error - ROOT tree is null, cannot create branches" << G4endl;
             return;
@@ -210,9 +211,9 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // Energy branches use lowercase names per project guide
         fTree->Branch("e_dep", &fEdep, "e_dep/D")->SetTitle("Energy deposit in silicon [MeV]");
         fTree->Branch("e_init", &fInitialEnergy, "e_init/D")->SetTitle("Initial Particle Energy [MeV]");
-        // Pixel hit flags: first-contact, geometric, and combined (OR)
-        //fTree->Branch("first_contact_is_pixel", &fFirstContactIsPixel, "first_contact_is_pixel/O");
-        //fTree->Branch("geometric_is_pixel", &fGeometricIsPixel, "geometric_is_pixel/O");
+        // Pixel-pad classification flags
+        fTree->Branch("first_contact_is_pixel", &fFirstContactIsPixel, "first_contact_is_pixel/O");
+        fTree->Branch("geometric_is_pixel", &fGeometricIsPixel, "geometric_is_pixel/O");
         fTree->Branch("is_pixel_hit", &fIsPixelHit, "is_pixel_hit/O");
         fTree->Branch("px_hit_delta_x", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
         fTree->Branch("px_hit_delta_y", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]");

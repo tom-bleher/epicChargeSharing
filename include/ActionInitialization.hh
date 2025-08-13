@@ -8,6 +8,9 @@
 #include "SteppingAction.hh"
 #include "DetectorConstruction.hh"
 
+// Initializes all user actions and wires dependencies between
+// generator, run, event, and stepping actions. Uses the project
+// terminology (pixel-pad, charge neighborhood, first-contact).
 class ActionInitialization : public G4VUserActionInitialization
 {
 public:
