@@ -98,6 +98,7 @@ private:
     // =============================================
     G4double fTrueX;   // True Hit pos X [mm]
     G4double fTrueY;   // True Hit pos Y [mm]
+    G4double fTrueZ;   // True Hit pos Z [mm]
     G4double fPixelX; // Nearest to hit pixel center X [mm]
     G4double fPixelY; // Nearest to hit pixel center Y [mm]
     G4double fEdep;   // Energy deposition [MeV]

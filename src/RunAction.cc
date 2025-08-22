@@ -103,6 +103,7 @@ RunAction::RunAction()
   // Initialize HITS variables
   fTrueX(0),
   fTrueY(0),
+  fTrueZ(0),
   fPixelX(0),
   fPixelY(0),
   fEdep(0),
@@ -206,6 +207,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         fTree->Branch("x_hit", &fTrueX, "x_hit/D")->SetTitle("True Position X [mm]");
         fTree->Branch("y_hit", &fTrueY, "y_hit/D")->SetTitle("True Position Y [mm]");
+        fTree->Branch("z_hit", &fTrueZ, "z_hit/D")->SetTitle("True Position Z [mm]");
         fTree->Branch("x_px", &fPixelX, "x_px/D")->SetTitle("Nearest Pixel Center X [mm]");
         fTree->Branch("y_px", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
         // Energy branches use lowercase names per project guide
@@ -435,6 +437,7 @@ void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
     // Store positions in mm (Geant4 internal length unit is mm)
     fTrueX = x;
     fTrueY = y;
+    fTrueZ = z;
 }
 
 void RunAction::SetNearestPixelPos(G4double x, G4double y)
