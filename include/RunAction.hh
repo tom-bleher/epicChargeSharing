@@ -56,7 +56,7 @@ public:
     
     // Method to set pixel classification data (hit status and delta values)
     void SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY);
-    void SetNonPixelPadRadiusCheck(G4bool passed);
+    void SetGeometricPixelCheck(G4bool passed);
     
     // Method to set neighborhood (9x9) grid charge sharing data for non-pixel hits
     void SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
@@ -70,12 +70,8 @@ public:
     // Fill the ROOT tree with current event data
     void FillTree();
     
-    // Method to set scorer data from Multi-Functional Detector
-    void SetScorerData(G4double energyDeposit);
-    void SetScorerHitCount(G4int hitCount);
-    
     // Method to set hit purity tracking data
-    void SetHitPurityData(G4bool pureSiliconHit, G4bool aluminumContaminated, G4bool chargeCalculationEnabled);
+    void SetHitPurityData(G4bool volumePixelCheck, G4bool chargeCalculationEnabled);
  
 private:
 
@@ -123,18 +119,13 @@ private:
     G4double fGridDetSize;          // Detector size [mm]
     G4int fGridNumBlocksPerSide;    // Number of blocks per side
     
-    // Scorer data variables
-    G4double fScorerEnergyDeposit;  // Energy deposit from Multi-Functional Detector [MeV]
-    G4int    fScorerNhit;           // Hit count from Multi-Functional Detector
-
     
     // Hit purity tracking variables for Multi-Functional Detector validation
-    G4bool fPureSiliconHit;         // True if hit is purely in silicon (no aluminum contamination)
-    G4bool fAluminumContaminated;   // True if hit has aluminum contamination
+    G4bool fVolumePixelCheck;       // True if first contact volume was aluminum pixel-pad; false if silicon
     G4bool fChargeCalculationEnabled; // True if charge sharing calculation was enabled
 
-    // QA: for non-pixel-pad hits, check |dx|>PIXEL_SIZE/2 and |dy|>PIXEL_SIZE/2
-    G4bool fNonPixelPadRadiusCheck;
+    // Geometric pixel check flag (check |dx|>PIXEL_SIZE/2 and |dy|>PIXEL_SIZE/2)
+    G4bool fGeometricPixelCheck;
 };
 
 #endif

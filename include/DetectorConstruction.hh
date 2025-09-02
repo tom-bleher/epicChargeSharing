@@ -3,22 +3,18 @@
 
 #include "G4VUserDetectorConstruction.hh"
 #include "G4VPhysicalVolume.hh"
-#include "G4LogicalVolume.hh"
-#include "G4Box.hh"
-#include "G4NistManager.hh"
 #include "G4ThreeVector.hh"
-#include "G4PVPlacement.hh"
-#include "G4VisAttributes.hh"
-// Multi-Functional Detector includes
-#include "G4MultiFunctionalDetector.hh"
-#include "G4PSEnergyDeposit.hh"
-#include "G4PSNofStep.hh"
 
 class EventAction;
+class G4LogicalVolume;
+class G4Box;
+class G4NistManager;
+class G4PVPlacement;
+class G4VisAttributes;
+class G4MultiFunctionalDetector;
+class G4VPrimitiveScorer;
 
-// Builds the AC-LGAD detector geometry: silicon bulk with aluminum
-// pixel-pads on the upstream face. Exposes geometry parameters and
-// charge-neighborhood radius used across actions.
+// Builds AC-LGAD geometry and exposes parameters.
 class DetectorConstruction : public G4VUserDetectorConstruction
 {
 public:
@@ -28,19 +24,19 @@ public:
     virtual G4VPhysicalVolume* Construct();
     void ConstructSDandField() override;
     
-    // Method to set EventAction pointer for neighborhood configuration
+    // Set EventAction
     void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
     
-    // Set fixed pixel-pad corner offset (requires geometry rebuild)
+    // Set fixed pixel corner offset
     void SetPixelCornerOffset(G4double cornerOffset);
     
-    // Method to set neighborhood radius
+    // Set neighborhood radius
     void SetNeighborhoodRadius(G4int radius);
     
-    // Method to get neighborhood radius  
+    // Get neighborhood radius  
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
     
-    // Getter methods for parameters needed to calculate nearest pixel
+    // Geometry getters
     G4double GetPixelSize() const { return fPixelSize; }
     G4double GetPixelSpacing() const { return fPixelSpacing; }
     G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
@@ -48,7 +44,7 @@ public:
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
     G4ThreeVector GetDetectorPos() const; // Fixed position from Construct()
     
-    // Method to save simulation parameters to a log file
+    // Save parameters to log
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
     
 private:

@@ -1,4 +1,9 @@
 #include "ActionInitialization.hh"
+#include "PrimaryGenerator.hh"
+#include "RunAction.hh"
+#include "EventAction.hh"
+#include "SteppingAction.hh"
+#include "DetectorConstruction.hh"
 
 ActionInitialization::ActionInitialization(DetectorConstruction* detector)
 : fDetector(detector)
@@ -11,11 +16,11 @@ ActionInitialization::~ActionInitialization()
 
 void ActionInitialization::BuildForMaster() const 
 {
-    // Create RunAction for the master thread
+    // RunAction for master
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
 
-    // Set detector grid parameters in RunAction for saving to ROOT metadata
+    // Set detector grid parameters
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
         fDetector->GetPixelSpacing(), 
@@ -27,15 +32,15 @@ void ActionInitialization::BuildForMaster() const
 
 void ActionInitialization::Build() const
 {
-    // Create and register the primary generator with detector information
+    // Primary generator
     PrimaryGenerator *generator = new PrimaryGenerator(fDetector);
     SetUserAction(generator);
     
-    // Create and register RunAction
+    // RunAction
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
     
-    // Set detector grid parameters in RunAction for saving to ROOT metadata
+    // Set detector grid parameters
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
         fDetector->GetPixelSpacing(), 
@@ -44,21 +49,21 @@ void ActionInitialization::Build() const
         fDetector->GetNumBlocksPerSide()
     );
     
-    // Create and register EventAction with detector information
+    // EventAction
     EventAction* eventAction = new EventAction(runAction, fDetector);
-    // Don't set initial position here - it will be updated for each event
+    // Initial position set per-event
     SetUserAction(eventAction);
     
-    // Connect EventAction and DetectorConstruction bidirectionally
+    // Wire EventAction <-> DetectorConstruction
     fDetector->SetEventAction(eventAction);
     
-    // Set the current neighborhood radius in EventAction
+    // Neighborhood radius
     eventAction->SetNeighborhoodRadius(fDetector->GetNeighborhoodRadius());
     
-    // Create and register SteppingAction
+    // SteppingAction
     SteppingAction* steppingAction = new SteppingAction(eventAction, fDetector);
     SetUserAction(steppingAction);
     
-    // Connect SteppingAction to EventAction for aluminum interaction tracking
+    // Wire SteppingAction -> EventAction
     eventAction->SetSteppingAction(steppingAction);
 }

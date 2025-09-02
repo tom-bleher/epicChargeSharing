@@ -6,7 +6,6 @@
 #include "Control.hh"
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
-#include "G4ParticleTable.hh"
 #include "G4PrimaryParticle.hh"
 #include "G4PrimaryVertex.hh"
 #include "G4MultiFunctionalDetector.hh"
@@ -14,19 +13,13 @@
 #include "G4SDManager.hh"
 #include "G4HCofThisEvent.hh"
 #include "G4VHitsCollection.hh"
-#include "G4PrimaryVertex.hh"
 #include "G4RunManager.hh"
-#include <exception>
-#include <stdexcept>
 #include <cmath>
 #include <vector>
 #include <algorithm>
 #include <limits>
-#include <cstdlib>
 
-// Viewing angle α (analytical):
-// α = arctan[(l/2·√2) / (l/2·√2 + d)]
-// with l the pixel-pad side and d the hit–to–pad-center distance.
+// Viewing angle (analytic): alpha = atan((l/2*sqrt(2)) / (l/2*sqrt(2) + d))
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
 : G4UserEventAction(),
@@ -34,8 +27,6 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fDetector(detector),
   fSteppingAction(nullptr),
   fNeighborhoodRadius(4), // Default to 9x9 grid (radius 4)
-  
-
   fIonizationEnergy(Constants::IONIZATION_ENERGY),
   fAmplificationFactor(Constants::AMPLIFICATION_FACTOR),
   fD0(Constants::D0_CHARGE_SHARING),
@@ -43,8 +34,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fScorerEnergyDeposit(0.0),
   fScorerHitCount(0),
   fScorerDataValid(false),
-  fPureSiliconHit(false),
-  fAluminumContaminated(false),
+  fVolumePixelCheck(false),
   fChargeCalculationEnabled(false)
 { 
 }
@@ -55,7 +45,7 @@ EventAction::~EventAction()
 
 void EventAction::BeginOfEventAction(const G4Event* event)
 {
-  // Reset all per-event variables.
+  // Reset per-event state
   if (fSteppingAction) {
       fSteppingAction->Reset();
   }
@@ -74,14 +64,13 @@ void EventAction::BeginOfEventAction(const G4Event* event)
   fNeighborhoodChargeFractions.clear();
   fNeighborhoodCharge.clear();
 
-  // Reset scorer data.
+  // Reset scorer accumulators
   fScorerEnergyDeposit = 0.0;
   fScorerHitCount = 0;
   fScorerDataValid = false;
 
-  // Reset hit purity data.
-  fPureSiliconHit = false;
-  fAluminumContaminated = false;
+  // Reset hit purity flags
+  fVolumePixelCheck = false;
   fChargeCalculationEnabled = false;
   // Reset first-contact position tracking
   fFirstContactPos = G4ThreeVector(0.,0.,0.);
@@ -90,11 +79,9 @@ void EventAction::BeginOfEventAction(const G4Event* event)
 
 void EventAction::EndOfEventAction(const G4Event* event)
 {
-    // ========================================
-    // DATA COLLECTION AND PROCESSING
-    // ========================================
+    // Collect and persist event data
     
-    // Collect scorer data from MFD (prioritized)
+    // Scorer data from MFD (authoritative)
     CollectScorerData(event);
     
     // Get primary particle info
@@ -103,46 +90,27 @@ void EventAction::EndOfEventAction(const G4Event* event)
     G4double initialEnergy = primaryParticle ? primaryParticle->GetKineticEnergy() : 0.0;
     
     
-    // Prefer MFD energy when available; otherwise fall back to internal accumulation (which may be ~0 if not used)
+    // Prepare energy deposition and hit position
     G4double finalEdep = fScorerEnergyDeposit;
-  // Use the first-contact position for x_hit/y_hit; fallback to averaged silicon position
-    G4ThreeVector hitPos = fHasFirstContactPos
-                             ? fFirstContactPos
-                             : ((fNumPosSamples > 0) ? (fPos / (G4double)fNumPosSamples) : G4ThreeVector(0,0,0));
-    
-    // Determine hit purity via first-contact classification and geometric test
-    const bool firstContactIsPixel = fSteppingAction ? fSteppingAction->FirstContactIsPixel() : false;
-    fPureSiliconHit = !firstContactIsPixel; // legacy naming retained
-    fAluminumContaminated = firstContactIsPixel;
-    
-    // Calculate nearest pixel and other pixel-related data based on first-contact position
-    G4ThreeVector nearestPixel = CalcNearestPixel(hitPos);
-    
-    // Geometric pixel classification: inside pixel-pad if max(|dx|,|dy|) <= l/2
-    // IMPORTANT: compute deltas directly from the authoritative hit position and the
-    // returned nearest pixel center to avoid any dependency on earlier sentinel values.
-    const G4double halfPixel = fDetector->GetPixelSize()/2.0;
-    const G4double dxAbs = std::abs(hitPos.x() - nearestPixel.x());
-    const G4double dyAbs = std::abs(hitPos.y() - nearestPixel.y());
-    // Persist deltas for downstream consumers and ROOT output
-    fPixelTrueDeltaX = dxAbs;
-    fPixelTrueDeltaY = dyAbs;
-    // Geometric pixel test per request: max(|dx|,|dy|) <= pixel_size/2
-    const bool geometricIsPixel = (std::max(dxAbs, dyAbs) <= halfPixel);
+    const G4ThreeVector hitPos = DetermineHitPosition();
 
-    // Pixel-hit flag: first-contact is pixel-pad OR geometric test is inside pad
-    const bool isPixelHitCombined = firstContactIsPixel || geometricIsPixel;
+    // Pixel/silicon classification and nearest pixel
+    G4ThreeVector nearestPixel(0,0,0);
+    G4bool firstContactIsPixel = false;
+    G4bool geometricIsPixel = false;
+    G4bool isPixelHitCombined = false;
+    UpdatePixelAndHitClassification(hitPos, nearestPixel,
+                                    firstContactIsPixel,
+                                    geometricIsPixel,
+                                    isPixelHitCombined);
 
-    // Enable charge sharing only for non–pixel-pad hits.
+    // Compute charge sharing only for non-pixel hits
     fChargeCalculationEnabled = (!isPixelHitCombined);
-
-    // Calculate neighborhood angles and charge sharing if applicable
     if (fChargeCalculationEnabled) {
-        CalcNeighborhoodChargeSharing();
+        ComputeChargeSharingForEvent(hitPos);
     }
     
-    // Pass all data to RunAction for storage
-
+    // Persist to RunAction
     fRunAction->SetInitialEnergy(initialEnergy);
     fRunAction->SetEventData(finalEdep, hitPos.x(), hitPos.y(), hitPos.z());
     fRunAction->SetNearestPixelPos(nearestPixel.x(), nearestPixel.y());
@@ -152,19 +120,14 @@ void EventAction::EndOfEventAction(const G4Event* event)
     fRunAction->SetIsPixelHitCombined(isPixelHitCombined);
     fRunAction->SetPixelClassification(isPixelHitCombined, fPixelTrueDeltaX, fPixelTrueDeltaY);
 
-    // Optional: radius check for non-pixel hits can be persisted if needed (kept for compatibility)
-    bool radiusCheck = (!geometricIsPixel) && (std::isfinite(fPixelTrueDeltaX) && std::isfinite(fPixelTrueDeltaY))
-                       && (std::max(fPixelTrueDeltaX, fPixelTrueDeltaY) > halfPixel);
-    fRunAction->SetNonPixelPadRadiusCheck(radiusCheck);
+    // Persist geometric pixel check (true if geometry indicates pixel)
+    fRunAction->SetGeometricPixelCheck(geometricIsPixel);
     fRunAction->SetNeighborhoodChargeData(fNeighborhoodChargeFractions, fNeighborhoodCharge);
-    fRunAction->SetScorerData(fScorerEnergyDeposit);
-    fRunAction->SetScorerHitCount(fScorerHitCount);
 
     // Persist hit purity/tracking
-    fRunAction->SetHitPurityData(fPureSiliconHit, fAluminumContaminated, fChargeCalculationEnabled);
+    fRunAction->SetHitPurityData(fVolumePixelCheck, fChargeCalculationEnabled);
     
-    // Always record the event, including pixel-pad only interactions
-    // Pixel-pad hits purposefully have no silicon edep but should be logged
+    // Always record the event
     fRunAction->FillTree();
 }
 
@@ -219,9 +182,6 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
   G4double dy = pos.y() - pixelY;
   fActualPixelDistance = std::sqrt(dx*dx + dy*dy);
   
-  // Determine if the hit was on a pixel using volume-based detection
-  G4bool isOnPixel = fSteppingAction ? fSteppingAction->IsPixelHit() : false;
-  
   // Calc and store delta values (pixel center - true pos) for all hits
   // within detector bounds (regardless of pixel contact)
   if (isWithinDetector) {
@@ -233,8 +193,8 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
     fPixelTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
   }
   
-  // Store the pixel hit status
-  fPixelHit = isOnPixel;
+  // Pixel hit status determined by first-contact and geometric checks only
+  // fPixelHit is set later via UpdatePixelAndHitClassification
   
   return G4ThreeVector(pixelX, pixelY, pixelZ);
 }
@@ -382,6 +342,52 @@ void EventAction::CalcNeighborhoodChargeSharing()
     fNeighborhoodChargeFractions.push_back(fraction);
     fNeighborhoodCharge.push_back(chargeCoulombs);
   }
+}
+
+// Decide on x_hit/y_hit position for the event
+G4ThreeVector EventAction::DetermineHitPosition() const
+{
+  if (fHasFirstContactPos) {
+    return fFirstContactPos;
+  }
+  if (fNumPosSamples > 0) {
+    return fPos / static_cast<G4double>(fNumPosSamples);
+  }
+  return G4ThreeVector(0.,0.,0.);
+}
+
+// Update nearest pixel, flags, and deltas based on hit position
+void EventAction::UpdatePixelAndHitClassification(const G4ThreeVector& hitPos,
+                                                  G4ThreeVector& nearestPixel,
+                                                  G4bool& firstContactIsPixel,
+                                                  G4bool& geometricIsPixel,
+                                                  G4bool& isPixelHitCombined)
+{
+  // First-contact classification
+  firstContactIsPixel = fSteppingAction ? fSteppingAction->FirstContactIsPixel() : false;
+  fVolumePixelCheck = firstContactIsPixel;
+
+  // Nearest pixel center
+  nearestPixel = CalcNearestPixel(hitPos);
+
+  // Geometry-based pixel check
+  const G4double halfPixel = fDetector->GetPixelSize()/2.0;
+  const G4double dxAbs = std::abs(hitPos.x() - nearestPixel.x());
+  const G4double dyAbs = std::abs(hitPos.y() - nearestPixel.y());
+
+  // Persist deltas for downstream consumers and ROOT output
+  fPixelTrueDeltaX = dxAbs;
+  fPixelTrueDeltaY = dyAbs;
+
+  geometricIsPixel = (std::max(dxAbs, dyAbs) <= halfPixel);
+  isPixelHitCombined = firstContactIsPixel || geometricIsPixel;
+}
+
+// Wrap charge sharing computation with provided hit position
+void EventAction::ComputeChargeSharingForEvent(const G4ThreeVector& /*hitPos*/)
+{
+  // Internals use member state already set prior to this call
+  CalcNeighborhoodChargeSharing();
 }
 
 void EventAction::CollectScorerData(const G4Event* event)
