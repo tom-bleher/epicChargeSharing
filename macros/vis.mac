@@ -1,14 +1,5 @@
 /run/initialize 
 
-# Detector configuration
-# Set the grid parameters for AC-LGAD detector
-# Parameter A: Size of each pixel - realistic for AC-LGAD
-/epicToy/detector/setBlockSize 100 um
-# Parameter B: Distance between pixel centers - realistic spacing
-/epicToy/detector/setBlockSpacing 500 um
-# Parameter C: Distance from detector edge to first pixel edge
-/epicToy/detector/setCornerOffset 100 um
-
 # Visualization settings
 /vis/open OGL 800x800-0+0
 
@@ -25,8 +16,8 @@
 #/vis/scene/add/axes 0 0 0 1 cm
 
 # Improve visibility of trajectories
-/vis/modeling/trajectories/drawByCharge-0/default/setDrawStepPts true
-/vis/modeling/trajectories/drawByCharge-0/default/setStepPtsSize 2
+/tracking/storeTrajectory 1
+/vis/scene/add/hits
 /vis/scene/add/hits
 
 # Adjust colors and styles for better visibility
