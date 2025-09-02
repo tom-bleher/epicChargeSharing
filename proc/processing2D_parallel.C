@@ -39,8 +39,6 @@ namespace {
     double dy_abs;
     double dx_signed;
     double dy_signed;
-    double dx_sq;
-    double dy_sq;
   };
 
   // Perform per-entry 1D Gaussian fits on the central row and column
@@ -56,7 +54,7 @@ namespace {
       double errorPercentOfMax)
   {
     const double INVALID = std::numeric_limits<double>::quiet_NaN();
-    Fit2DResult out{INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID};
+    Fit2DResult out{INVALID, INVALID, INVALID, INVALID, INVALID, INVALID};
 
     if (is_pixel_hit || Fi.empty()) {
       return out;
@@ -117,8 +115,6 @@ namespace {
         out.dy_signed = (y_hit - out.y_rec);
         out.dx_abs = std::abs(out.dx_signed);
         out.dy_abs = std::abs(out.dy_signed);
-        out.dx_sq = out.dx_signed * out.dx_signed;
-        out.dy_sq = out.dy_signed * out.dy_signed;
       }
       return out;
     }
@@ -213,8 +209,6 @@ namespace {
       out.dy_signed = (y_hit - out.y_rec);
       out.dx_abs = std::abs(out.dx_signed);
       out.dy_abs = std::abs(out.dy_signed);
-      out.dx_sq = out.dx_signed * out.dx_signed;
-      out.dy_sq = out.dy_signed * out.dy_signed;
     }
     return out;
   }
@@ -307,11 +301,10 @@ int processing2D_parallel(const char* filename = "../build/epicChargeSharingOutp
                                                          const std::vector<double>& Fi) {
                          Fit2DResult r = Compute2DFits(x_hit, y_hit, x_px, y_px, is_pixel_hit, Fi,
                                                        pixelSpacing, errorPercentOfMax);
-                         ROOT::RVec<double> v(8);
+                         ROOT::RVec<double> v(6);
                          v[0] = r.x_rec; v[1] = r.y_rec;
                          v[2] = r.dx_abs; v[3] = r.dy_abs;
                          v[4] = r.dx_signed; v[5] = r.dy_signed;
-                         v[6] = r.dx_sq; v[7] = r.dy_sq;
                          return v;
                        }, {"x_hit","y_hit","x_px","y_px","is_pixel_hit","F_i"})
                  ;
@@ -328,14 +321,11 @@ int processing2D_parallel(const char* filename = "../build/epicChargeSharingOutp
   node = hasCol("rec_hit_delta_y_2d")       ? node.Redefine("rec_hit_delta_y_2d",       "__fit2d__[3]") : node.Define("rec_hit_delta_y_2d",       "__fit2d__[3]");
   node = hasCol("rec_hit_signed_delta_x_2d")? node.Redefine("rec_hit_signed_delta_x_2d","__fit2d__[4]") : node.Define("rec_hit_signed_delta_x_2d","__fit2d__[4]");
   node = hasCol("rec_hit_signed_delta_y_2d")? node.Redefine("rec_hit_signed_delta_y_2d","__fit2d__[5]") : node.Define("rec_hit_signed_delta_y_2d","__fit2d__[5]");
-  node = hasCol("rec_hit_delta_x_sq_2d")    ? node.Redefine("rec_hit_delta_x_sq_2d",    "__fit2d__[6]") : node.Define("rec_hit_delta_x_sq_2d",    "__fit2d__[6]");
-  node = hasCol("rec_hit_delta_y_sq_2d")    ? node.Redefine("rec_hit_delta_y_sq_2d",    "__fit2d__[7]") : node.Define("rec_hit_delta_y_sq_2d",    "__fit2d__[7]");
 
   const std::vector<std::string> cols = {
     "x_rec_2d","y_rec_2d",
     "rec_hit_delta_x_2d","rec_hit_delta_y_2d",
-    "rec_hit_signed_delta_x_2d","rec_hit_signed_delta_y_2d",
-    "rec_hit_delta_x_sq_2d","rec_hit_delta_y_sq_2d"
+    "rec_hit_signed_delta_x_2d","rec_hit_signed_delta_y_2d"
   };
 
   // Snapshot only derived columns to a new file/tree
