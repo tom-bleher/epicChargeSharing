@@ -154,9 +154,6 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
   // Also store signed deltas (not absolute): (hit - rec)
   double rec_hit_signed_delta_x_2d = INVALID_VALUE;
   double rec_hit_signed_delta_y_2d = INVALID_VALUE;
-  // Squared errors: (x_hit - x_rec_2d)^2 and (y_hit - y_rec_2d)^2
-  double rec_hit_delta_x_sq_2d = INVALID_VALUE;
-  double rec_hit_delta_y_sq_2d = INVALID_VALUE;
 
   // If branches already exist, we will overwrite their contents
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
@@ -180,8 +177,6 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
   TBranch* br_dy    = ensureAndResetBranch("rec_hit_delta_y_2d", &rec_hit_delta_y_2d);
   TBranch* br_sdx   = ensureAndResetBranch("rec_hit_signed_delta_x_2d", &rec_hit_signed_delta_x_2d);
   TBranch* br_sdy   = ensureAndResetBranch("rec_hit_signed_delta_y_2d", &rec_hit_signed_delta_y_2d);
-  TBranch* br_dx2   = ensureAndResetBranch("rec_hit_delta_x_sq_2d", &rec_hit_delta_x_sq_2d);
-  TBranch* br_dy2   = ensureAndResetBranch("rec_hit_delta_y_sq_2d", &rec_hit_delta_y_sq_2d);
 
   // Fitting function for 1D gaussian + const
   TF1 fRow("fRow", GaussPlusB, -1e9, 1e9, 4);
@@ -197,7 +192,6 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     // Default outputs: set to finite invalid sentinel (not NaN)
     x_rec_2d = y_rec_2d = INVALID_VALUE;
     rec_hit_delta_x_2d = rec_hit_delta_y_2d = INVALID_VALUE;
-    rec_hit_delta_x_sq_2d = rec_hit_delta_y_sq_2d = INVALID_VALUE;
 
     // Only attempt fit for non-pixel-pad hits and valid vectors
     if (is_pixel_hit || !Fi || Fi->empty()) {
@@ -208,8 +202,7 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_dy->Fill();
       br_sdx->Fill();
       br_sdy->Fill();
-      br_dx2->Fill();
-      br_dy2->Fill();
+      
       continue;
     }
 
@@ -223,8 +216,7 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_dy->Fill();
       br_sdx->Fill();
       br_sdy->Fill();
-      br_dx2->Fill();
-      br_dy2->Fill();
+      
       continue;
     }
 
@@ -307,8 +299,7 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
         rec_hit_delta_y_2d = std::abs(y_hit - y_rec_2d);
         rec_hit_signed_delta_x_2d = (x_hit - x_rec_2d);
         rec_hit_signed_delta_y_2d = (y_hit - y_rec_2d);
-        rec_hit_delta_x_sq_2d = rec_hit_signed_delta_x_2d * rec_hit_signed_delta_x_2d;
-        rec_hit_delta_y_sq_2d = rec_hit_signed_delta_y_2d * rec_hit_signed_delta_y_2d;
+        
       }
       br_x_rec->Fill();
       br_y_rec->Fill();
@@ -316,8 +307,7 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_dy->Fill();
       br_sdx->Fill();
       br_sdy->Fill();
-      br_dx2->Fill();
-      br_dy2->Fill();
+      
       continue;
     }
 
@@ -435,14 +425,13 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       rec_hit_delta_y_2d = std::abs(y_hit - y_rec_2d);
       rec_hit_signed_delta_x_2d = (x_hit - x_rec_2d);
       rec_hit_signed_delta_y_2d = (y_hit - y_rec_2d);
-      rec_hit_delta_x_sq_2d = rec_hit_signed_delta_x_2d * rec_hit_signed_delta_x_2d;
-      rec_hit_delta_y_sq_2d = rec_hit_signed_delta_y_2d * rec_hit_signed_delta_y_2d;
+      
       nFitted++;
     } else {
       x_rec_2d = y_rec_2d = INVALID_VALUE;
       rec_hit_delta_x_2d = rec_hit_delta_y_2d = INVALID_VALUE;
       rec_hit_signed_delta_x_2d = rec_hit_signed_delta_y_2d = INVALID_VALUE;
-      rec_hit_delta_x_sq_2d = rec_hit_delta_y_sq_2d = INVALID_VALUE;
+      
     }
 
     br_x_rec->Fill();
@@ -451,8 +440,7 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     br_dy->Fill();
     br_sdx->Fill();
     br_sdy->Fill();
-    br_dx2->Fill();
-    br_dy2->Fill();
+    
   }
 
   // Overwrite tree in file
