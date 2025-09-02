@@ -11,7 +11,6 @@
 
 #include <sstream>
 #include <fstream>
-#include <algorithm>
 #include <thread>
 #include <chrono>
 #include <limits>
@@ -70,7 +69,7 @@ static void InitializeROOTThreading() {
     }
 }
 
-// Helper to run ROOT post-processing macros on the produced ROOT file
+// Run ROOT post-processing macros on the produced ROOT file
 static void RunPostProcessingMacros(const G4String& rootFilePath)
 {
     if (!(Constants::RUN_PROCESSING_2D || Constants::RUN_PROCESSING_3D)) {
@@ -79,7 +78,6 @@ static void RunPostProcessingMacros(const G4String& rootFilePath)
 
     auto runMacro = [&](const char* macroPath, const char* funcName) {
         if (!macroPath || !funcName) return;
-        // Load and (ACLiC) compile the macro, then call it
         const G4String loadCmd = Form(".L %s+", macroPath);
         gROOT->ProcessLine(loadCmd.c_str());
         const G4String callCmd = Form("%s(\"%s\", %.9g);", funcName, rootFilePath.c_str(), Constants::PROCESSING_ERROR_PERCENT);
@@ -100,21 +98,16 @@ RunAction::RunAction()
 : G4UserRunAction(),
   fRootFile(nullptr),
   fTree(nullptr),
-  // Initialize HITS variables
   fTrueX(0),
   fTrueY(0),
   fPixelX(0),
   fPixelY(0),
   fEdep(0),
   fPixelTrueDeltaX(0),
-  fPixelTrueDeltaY(0)
-
-  ,fScorerEnergyDeposit(0.0)
-  ,fScorerNhit(0)
-  ,fPureSiliconHit(false)
-  ,fAluminumContaminated(false)
-  ,fChargeCalculationEnabled(false)
-  ,fNonPixelPadRadiusCheck(false)
+  fPixelTrueDeltaY(0),
+  fVolumePixelCheck(false),
+  fChargeCalculationEnabled(false),
+  fGeometricPixelCheck(false)
 
 { 
   // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
@@ -193,13 +186,6 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->SetAutoSave(50000);   // Save every 50k entries
         
         // Create branches
-        if (!fTree) {
-            G4cerr << "RunAction: Error - ROOT tree is null, cannot create branches" << G4endl;
-            return;
-        }
-        
-        // Track number of branches created for validation
-        G4int branchCount = 0;
         
         // =============================================
         // HITS BRANCHES
@@ -210,7 +196,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->Branch("y_px", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
         // Energy branches use lowercase names per project guide
         fTree->Branch("e_dep", &fEdep, "e_dep/D")->SetTitle("Energy deposit in silicon [MeV]");
-        fTree->Branch("e_init", &fInitialEnergy, "e_init/D")->SetTitle("Initial Particle Energy [MeV]");
+        //fTree->Branch("e_init", &fInitialEnergy, "e_init/D")->SetTitle("Initial Particle Energy [MeV]");
         // Pixel-pad classification flags
         fTree->Branch("first_contact_is_pixel", &fFirstContactIsPixel, "first_contact_is_pixel/O");
         fTree->Branch("geometric_is_pixel", &fGeometricIsPixel, "geometric_is_pixel/O");
@@ -458,9 +444,9 @@ void RunAction::SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDelt
     fPixelTrueDeltaY = pixelTrueDeltaY;
 }
 
-void RunAction::SetNonPixelPadRadiusCheck(G4bool passed)
+void RunAction::SetGeometricPixelCheck(G4bool passed)
 {
-    fNonPixelPadRadiusCheck = passed;
+    fGeometricPixelCheck = passed;
 }
 
 void RunAction::SetPixelHitStatus(G4bool isPixelHit)
@@ -529,22 +515,10 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
     G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
 }
 
-// Set scorer data from Multi-Functional Detector
-void RunAction::SetScorerData(G4double energyDeposit)
-{
-    fScorerEnergyDeposit = energyDeposit;
-}
-
-void RunAction::SetScorerHitCount(G4int hitCount)
-{
-    fScorerNhit = hitCount;
-}
-
 // Set hit purity tracking data from EventAction
-void RunAction::SetHitPurityData(G4bool pureSiliconHit, G4bool aluminumContaminated, G4bool chargeCalculationEnabled)
+void RunAction::SetHitPurityData(G4bool volumePixelCheck, G4bool chargeCalculationEnabled)
 {
-    fPureSiliconHit = pureSiliconHit;
-    fAluminumContaminated = aluminumContaminated;
+    fVolumePixelCheck = volumePixelCheck;
     fChargeCalculationEnabled = chargeCalculationEnabled;
 }
 

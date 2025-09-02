@@ -3,16 +3,26 @@
 #include "RunAction.hh"
 #include "Constants.hh"
 #include "G4RunManager.hh"
+#include "G4NistManager.hh"
+#include "G4Material.hh"
+#include "G4Box.hh"
+#include "G4PVPlacement.hh"
+#include "G4LogicalVolume.hh"
+#include "G4VisAttributes.hh"
+#include "G4Colour.hh"
 #include <fstream>
 #include <iomanip>
 #include <ctime>
 #include <sstream>
 #include <string>
-#include <filesystem>  // For portable directory creation
+#include <filesystem>
 
-// Add step limiter includes
 #include "G4UserLimits.hh"
 #include "G4SDManager.hh"
+#include "G4MultiFunctionalDetector.hh"
+#include "G4VPrimitiveScorer.hh"
+#include "G4PSNofStep.hh"
+#include "G4PSEnergyDeposit.hh"
 #include <G4ScoringManager.hh>
 
 DetectorConstruction::DetectorConstruction()
@@ -78,9 +88,9 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     fLogicSilicon = new G4LogicalVolume(detCube, siliconMat, "logicCube");
     G4LogicalVolume* logicCube = fLogicSilicon; // alias for readability
     
-    // Set visualization attributes for the detector (semi-transparent)
-    // Note: G4 stores the pointer; keep ownership with Geant4 to ensure lifetime
-    auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7, 0.5));
+    // Visualization attributes for the detector
+    auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7));
+    cubeVisAtt->SetForceSolid(true);
     logicCube->SetVisAttributes(cubeVisAtt);
     
     // Place the silicon detector at fixed position
@@ -89,13 +99,13 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     // Store original detector size for comparison
     G4double originalDetSize = fDetSize;
     
-    // Calc the number of pixels that would fit with current parameters and FIXED corner offset
+    // Number of pixels with fixed corner offset
     fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
     
-    // Calc the required detector size to accommodate the pixel grid with FIXED corner offset
+    // Required detector size with fixed corner offset
     G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
     
-    // Update detector size if needed and notify user
+    // Adjust detector size if needed
     if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
         G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===\n"
                << "Original detector size: " << originalDetSize/mm << " mm\n"
@@ -118,7 +128,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         fLogicSilicon = logicCube; // keep pointer up-to-date
     }
     
-    // Verify the corner offset calculation
+    // Verify corner offset
     G4double actualCornerOffset = (fDetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
     if (std::abs(actualCornerOffset - fPixelCornerOffset) > Constants::PRECISION_TOLERANCE) {
         G4cerr << "ERROR: Corner offset calculation failed!" << G4endl;
@@ -129,25 +139,21 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     new G4PVPlacement(0, detectorPos,
                       logicCube, "physCube", logicWorld, false, 0, checkOverlaps);
     
-    // Create aluminum pixels on the detector surface
+    // Aluminum pixels on detector surface
     G4Box *pixelBlock = new G4Box("pixelBlock", fPixelSize/2, fPixelSize/2, fPixelWidth/2);
     G4LogicalVolume *logicBlock = new G4LogicalVolume(pixelBlock, aluminumMat, "logicBlock");
     
-    // Add step limiting for fine tracking - force steps to be at most 10 micrometers
-    // Apply only to active/sensitive materials (silicon). Keep world and aluminum unrestricted.
+    // Step limiting (10 μm) on silicon only
     G4UserLimits* stepLimit = new G4UserLimits(Constants::MAX_STEP_SIZE);
     logicCube->SetUserLimits(stepLimit);
     
     G4cout << "Step limiting: max step " << Constants::MAX_STEP_SIZE/um << " \xCE\xBCm" << G4endl;
     
-    // AC-LGAD layout: aluminum pixel-pads are the first layer seen by the
-    // incoming particle. Place pads on the front (upstream) face of the silicon.
-    // First-contact with a pixel-pad is flagged so charge sharing is skipped.
+    // Pads on front face (first contact flags pixel)
     G4int copyNo = 0;
     G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
-    // Z position for aluminum pixel-pads on the front face of the silicon.
-    // Primaries start at +z and travel toward −z. Pads sit flush on the silicon.
+    // Pixel Z on front face; primaries start at +z and move toward −z
     G4double pixelZ = detectorPos.z() + fDetWidth/2 + fPixelWidth/2;
     
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
@@ -160,7 +166,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         }
     }
     
-    // Validate aluminum pixel-pads remain passive (no sensitive detectors attached)
+    // Validate aluminum pads remain passive
     G4VSensitiveDetector* pixelSensitiveDetector = logicBlock->GetSensitiveDetector();
     if (pixelSensitiveDetector == nullptr) {
         G4cout << "Aluminum pixel-pads passive (no sensitive detector attached)" << G4endl;
@@ -171,14 +177,15 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         G4cerr << "Attached detector: " << pixelSensitiveDetector->GetName() << G4endl;
     }
     
-    // Set visualization attributes for pixels
+    // Visualization for pixels (opaque)
     auto* blockVisAtt = new G4VisAttributes(G4Colour(0.0, 0.0, 1.0));
+    blockVisAtt->SetForceSolid(true);
     logicBlock->SetVisAttributes(blockVisAtt);
     
     // Set the world volume to be invisible
     logicWorld->SetVisAttributes(G4VisAttributes::GetInvisible());
     
-    // Calc and print the ratio of pixel area to detector area
+    // Print coverage stats
     G4double totalPixelArea = fNumBlocksPerSide * fNumBlocksPerSide * fPixelSize * fPixelSize;
     G4double detectorArea = fDetSize * fDetSize;
     G4double pixelAreaRatio = totalPixelArea / detectorArea;
@@ -237,7 +244,7 @@ void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4d
     
     // Create logs directory using portable std::filesystem
     std::filesystem::path logsDir = std::filesystem::current_path() / "logs";
-    G4cout << "Creating logs directory at: " << logsDir << G4endl;
+    // Create logs directory if needed
     
     std::error_code ec;
     if (!std::filesystem::create_directories(logsDir, ec)) {
@@ -346,10 +353,6 @@ void DetectorConstruction::ConstructSDandField() {
         G4cerr << "ERROR: Failed to attach Multi-Functional Detector to silicon volume" << G4endl;
     }
 
-    G4cout << "\n=== MULTI-FUNCTIONAL DETECTOR VALIDATION SUMMARY ===" << G4endl;
-    G4cout << "✓ Multi-Functional Detector: Created and initialized" << G4endl;
-    G4cout << "✓ Silicon Volume Sensitivity: Attached (logicCube)" << G4endl;
-    G4cout << "✓ Primitive Scorers: " << mfd->GetNumberOfPrimitives() << " attached" << G4endl;
-    G4cout << "✓ Selective Sensitivity: Requirements met" << G4endl;
-    G4cout << "=================================================" << G4endl;
+    G4cout << "MFD: created, attached to silicon, primitives: "
+           << mfd->GetNumberOfPrimitives() << G4endl;
 }

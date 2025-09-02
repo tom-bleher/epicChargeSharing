@@ -10,9 +10,7 @@ class RunAction;
 class DetectorConstruction;
 class SteppingAction;
 
-// Collects per-event data, performs pixel-pad classification using
-// first-contact and geometry tests, and computes charge sharing over
-// the charge neighborhood for non–pixel-pad hits.
+// Collects event data, classifies pixel hits, computes neighborhood charge for non-pixel hits.
 class EventAction : public G4UserEventAction
 {
 public:
@@ -51,6 +49,19 @@ public:
     G4bool IsScorerDataValid() const { return fScorerDataValid; }
 
 private:
+    // Helper: determine authoritative hit position (first contact if available, else averaged silicon position)
+    G4ThreeVector DetermineHitPosition() const;
+
+    // Helper: classify pixel vs silicon using first-contact and geometry tests; computes nearest pixel and deltas
+    void UpdatePixelAndHitClassification(const G4ThreeVector& hitPos,
+                                         G4ThreeVector& nearestPixel,
+                                         G4bool& firstContactIsPixel,
+                                         G4bool& geometricIsPixel,
+                                         G4bool& isPixelHitCombined);
+
+    // Helper: compute neighborhood charge sharing for current event if applicable
+    void ComputeChargeSharingForEvent(const G4ThreeVector& hitPos);
+
     RunAction* fRunAction;
     DetectorConstruction* fDetector;
     SteppingAction* fSteppingAction;
@@ -72,7 +83,7 @@ private:
     G4double fPixelTrueDeltaX; // Delta X from pixel center to hit (x_pixel - x_true) [mm]
     G4double fPixelTrueDeltaY; // Delta Y from pixel center to hit (y_pixel - y_true) [mm]
     G4double fActualPixelDistance; // Actual distance from hit to pixel center (always calculated)
-    G4bool fPixelHit;     // Flag to indicate if the hit was on a pixel
+    G4bool fPixelHit;     // Combined flag (first-contact OR geometric)
     
     // Neighborhood (9x9) grid charge sharing information (for non-pixel hits)
     std::vector<G4double> fNeighborhoodChargeFractions; // Charge fraction for each pixel in neighborhood grid
@@ -90,8 +101,7 @@ private:
     G4bool fScorerDataValid;
     
     // Hit purity tracking
-    G4bool fPureSiliconHit;
-    G4bool fAluminumContaminated;
+    G4bool fVolumePixelCheck; // True if first contact volume was aluminum pixel-pad; false if silicon
     G4bool fChargeCalculationEnabled;
 };
 
