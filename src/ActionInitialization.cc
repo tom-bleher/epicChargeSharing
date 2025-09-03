@@ -16,11 +16,9 @@ ActionInitialization::~ActionInitialization()
 
 void ActionInitialization::BuildForMaster() const 
 {
-    // RunAction for master
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
 
-    // Set detector grid parameters
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
         fDetector->GetPixelSpacing(), 
@@ -28,19 +26,17 @@ void ActionInitialization::BuildForMaster() const
         fDetector->GetDetSize(),
         fDetector->GetNumBlocksPerSide()
     );
+    runAction->SetNeighborhoodRadiusMeta(fDetector->GetNeighborhoodRadius());
 }
 
 void ActionInitialization::Build() const
 {
-    // Primary generator
     PrimaryGenerator *generator = new PrimaryGenerator(fDetector);
     SetUserAction(generator);
     
-    // RunAction
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
     
-    // Set detector grid parameters
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
         fDetector->GetPixelSpacing(), 
@@ -48,22 +44,17 @@ void ActionInitialization::Build() const
         fDetector->GetDetSize(),
         fDetector->GetNumBlocksPerSide()
     );
+    runAction->SetNeighborhoodRadiusMeta(fDetector->GetNeighborhoodRadius());
     
-    // EventAction
     EventAction* eventAction = new EventAction(runAction, fDetector);
-    // Initial position set per-event
     SetUserAction(eventAction);
     
-    // Wire EventAction <-> DetectorConstruction
     fDetector->SetEventAction(eventAction);
     
-    // Neighborhood radius
     eventAction->SetNeighborhoodRadius(fDetector->GetNeighborhoodRadius());
     
-    // SteppingAction
-    SteppingAction* steppingAction = new SteppingAction(eventAction, fDetector);
+    SteppingAction* steppingAction = new SteppingAction(eventAction);
     SetUserAction(steppingAction);
     
-    // Wire SteppingAction -> EventAction
     eventAction->SetSteppingAction(steppingAction);
 }

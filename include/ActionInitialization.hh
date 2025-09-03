@@ -3,22 +3,20 @@
 
 #include "G4VUserActionInitialization.hh"
 
-// Forward declarations to minimize header coupling
 class PrimaryGenerator;
 class RunAction;
 class EventAction;
 class SteppingAction;
 class DetectorConstruction;
 
-// Initializes user actions and wires dependencies.
 class ActionInitialization : public G4VUserActionInitialization
 {
 public:
-    ActionInitialization(DetectorConstruction* detector);
-    ~ActionInitialization();
+    explicit ActionInitialization(DetectorConstruction* detector);
+    ~ActionInitialization() override;
 
-    virtual void BuildForMaster() const;
-    virtual void Build() const;
+    void BuildForMaster() const override;
+    void Build() const override;
 
 private:
     DetectorConstruction* fDetector;

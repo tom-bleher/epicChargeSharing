@@ -176,12 +176,18 @@ namespace {
     mCol->SetFunction(fColChi2);
 
     mRow->SetLimitedVariable(0, "A", A0_row, 1e-3, 0.0, 1.0);
-    mRow->SetLimitedVariable(1, "mu", mu0_row, 1e-4*pixelSpacing, xMin, xMax);
+    // Constrain mean to ±1/2 pitch about nearest pixel center (row ~ X)
+    const double muXLo = x_px - 0.5 * pixelSpacing;
+    const double muXHi = x_px + 0.5 * pixelSpacing;
+    mRow->SetLimitedVariable(1, "mu", mu0_row, 1e-4*pixelSpacing, muXLo, muXHi);
     mRow->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
     mRow->SetLimitedVariable(3, "B", B0_row, 1e-3, 0.0, std::max(0.0, *minmaxRow.first));
 
     mCol->SetLimitedVariable(0, "A", A0_col, 1e-3, 0.0, 1.0);
-    mCol->SetLimitedVariable(1, "mu", mu0_col, 1e-4*pixelSpacing, yMin, yMax);
+    // Constrain mean to ±1/2 pitch about nearest pixel center (column ~ Y)
+    const double muYLo = y_px - 0.5 * pixelSpacing;
+    const double muYHi = y_px + 0.5 * pixelSpacing;
+    mCol->SetLimitedVariable(1, "mu", mu0_col, 1e-4*pixelSpacing, muYLo, muYHi);
     mCol->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
     mCol->SetLimitedVariable(3, "B", B0_col, 1e-3, 0.0, std::max(0.0, *minmaxCol.first));
 

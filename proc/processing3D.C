@@ -39,7 +39,7 @@ namespace {
     return A * std::exp(-0.5 * (dx*dx + dy*dy)) + B;
   }
 
-  inline bool IsFinite(double v) { return std::isfinite(v); }
+  inline bool IsFinite3D(double v) { return std::isfinite(v); }
 }
 
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
@@ -86,8 +86,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
     for (Long64_t i=0;i<nToScan;++i) {
       t->GetEntry(i);
-      if (IsFinite(x_px_tmp)) xs.push_back(x_px_tmp);
-      if (IsFinite(y_px_tmp)) ys.push_back(y_px_tmp);
+      if (IsFinite3D(x_px_tmp)) xs.push_back(x_px_tmp);
+      if (IsFinite3D(y_px_tmp)) ys.push_back(y_px_tmp);
     }
     auto computeGap = [](std::vector<double>& v)->double{
       if (v.size() < 2) return NAN;
@@ -97,7 +97,7 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
       std::vector<double> gaps; gaps.reserve(v.size());
       for (size_t i=1;i<v.size();++i) {
         double d = v[i]-v[i-1];
-        if (d > 1e-9 && IsFinite(d)) gaps.push_back(d);
+        if (d > 1e-9 && IsFinite3D(d)) gaps.push_back(d);
       }
       if (gaps.empty()) return NAN;
       std::nth_element(gaps.begin(), gaps.begin()+gaps.size()/2, gaps.end());
@@ -105,16 +105,16 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     };
     double gx = computeGap(xs);
     double gy = computeGap(ys);
-    if (IsFinite(gx) && gx>0 && IsFinite(gy) && gy>0) return 0.5*(gx+gy);
-    if (IsFinite(gx) && gx>0) return gx;
-    if (IsFinite(gy) && gy>0) return gy;
+    if (IsFinite3D(gx) && gx>0 && IsFinite3D(gy) && gy>0) return 0.5*(gx+gy);
+    if (IsFinite3D(gx) && gx>0) return gx;
+    if (IsFinite3D(gy) && gy>0) return gy;
     return NAN;
   };
 
-  if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
+  if (!IsFinite3D(pixelSpacing) || pixelSpacing <= 0) {
     pixelSpacing = inferSpacingFromTree(tree);
   }
-  if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
+  if (!IsFinite3D(pixelSpacing) || pixelSpacing <= 0) {
     ::Error("processing3D", "Pixel spacing not available (metadata missing and inference failed). Aborting.");
     file->Close();
     delete file;
@@ -214,7 +214,7 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
       for (int dj = -R; dj <= R; ++dj) {
         const int idx = (di + R) * N + (dj + R);
         const double f = (*Fi)[idx];
-        if (!IsFinite(f) || f < 0) continue; // skip invalid or sentinel
+        if (!IsFinite3D(f) || f < 0) continue; // skip invalid or sentinel
         // Mapping: di indexes X, dj indexes Y
         const double x = x_px + di * pixelSpacing;
         const double y = y_px + dj * pixelSpacing;
@@ -254,7 +254,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     f2D.SetParLimits(0, 0.0, 1.0);                    // A >= 0
     f2D.SetParLimits(3, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);  // tighter sigmas
     f2D.SetParLimits(4, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);
-    f2D.SetParLimits(5, 0.0, std::max(0.0, zmin));     // B up to local minimum
+    // Ensure non-negative baseline
+    f2D.SetParLimits(5, 0.0, std::max(0.0, zmin));
 
     // Fit on FULL range covering all points present in the neighborhood
     double xMinR =  1e300, xMaxR = -1e300;
@@ -269,9 +270,13 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     xMinR -= 0.5 * pixelSpacing; xMaxR += 0.5 * pixelSpacing;
     yMinR -= 0.5 * pixelSpacing; yMaxR += 0.5 * pixelSpacing;
     f2D.SetRange(xMinR, xMaxR, yMinR, yMaxR);
-    // Constrain means inside full span, too
-    f2D.SetParLimits(1, xMinR, xMaxR);
-    f2D.SetParLimits(2, yMinR, yMaxR);
+    // Constrain means to ±1/2 pitch about nearest pixel center
+    const double muXLo = x_px - 0.5 * pixelSpacing;
+    const double muXHi = x_px + 0.5 * pixelSpacing;
+    const double muYLo = y_px - 0.5 * pixelSpacing;
+    const double muYHi = y_px + 0.5 * pixelSpacing;
+    f2D.SetParLimits(1, muXLo, muXHi);
+    f2D.SetParLimits(2, muYLo, muYHi);
 
     // Minuit2 least-squares over the trimmed window
     auto chi2 = [&](const double* p) -> double {

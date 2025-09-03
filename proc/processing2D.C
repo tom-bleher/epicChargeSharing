@@ -335,17 +335,23 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     const double yMax = *minmaxY.second + 0.5 * pixelSpacing;
     fRow.SetRange(xMin, xMax);
     fCol.SetRange(yMin, yMax);
-    // Keep means inside full span
-    fRow.SetParLimits(1, xMin, xMax);
-    fCol.SetParLimits(1, yMin, yMax);
+    // Constrain means to ±1/2 pitch about nearest pixel center
+    const double muXLo = x_px - 0.5 * pixelSpacing;
+    const double muXHi = x_px + 0.5 * pixelSpacing;
+    const double muYLo = y_px - 0.5 * pixelSpacing;
+    const double muYHi = y_px + 0.5 * pixelSpacing;
+    fRow.SetParLimits(1, muXLo, muXHi);
+    fCol.SetParLimits(1, muYLo, muYHi);
 
     // Fractions are unitless and bounded [0,1]
     fRow.SetParLimits(0, 0.0, 1.0);                   // A >= 0
     fRow.SetParLimits(2, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing); // tighter sigma range
-    fRow.SetParLimits(3, 0.0, std::max(0.0, *minmaxRow.first));               // B up to observed minimum
+    // Ensure non-negative baseline
+    fRow.SetParLimits(3, 0.0, std::max(0.0, *minmaxRow.first));
 
     fCol.SetParLimits(0, 0.0, 1.0);
     fCol.SetParLimits(2, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);
+    // Ensure non-negative baseline
     fCol.SetParLimits(3, 0.0, std::max(0.0, *minmaxCol.first));
 
     // Minuit2 least-squares on compact windows (faster/more stable)

@@ -3,21 +3,18 @@
 
 #include "G4UserSteppingAction.hh"
 #include "globals.hh"
-#include <vector>
-#include <string>
 
 class EventAction;
-class DetectorConstruction;
 class G4Step;
 
 // Tracks first-contact and forwards positions.
 class SteppingAction : public G4UserSteppingAction
 {
 public:
-  SteppingAction(EventAction* eventAction, DetectorConstruction* detector);
-  virtual ~SteppingAction();
+  SteppingAction(EventAction* eventAction);
+  ~SteppingAction() override;
   
-  virtual void UserSteppingAction(const G4Step* step);
+  void UserSteppingAction(const G4Step* step) override;
   
   void Reset();
     
@@ -30,7 +27,6 @@ public:
     
 private:
   EventAction* fEventAction;
-  DetectorConstruction* fDetector; // geometry helper
   
   // Per-event classification state
   G4String fFirstContactVolume; // "logicBlock" (pixel) or "logicCube" (silicon) on first boundary entry

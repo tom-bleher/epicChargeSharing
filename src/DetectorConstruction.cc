@@ -11,17 +11,14 @@
 #include "G4VisAttributes.hh"
 #include "G4Colour.hh"
 #include <fstream>
-#include <iomanip>
+#include <cmath>
 #include <ctime>
-#include <sstream>
 #include <string>
 #include <filesystem>
 
 #include "G4UserLimits.hh"
 #include "G4SDManager.hh"
 #include "G4MultiFunctionalDetector.hh"
-#include "G4VPrimitiveScorer.hh"
-#include "G4PSNofStep.hh"
 #include "G4PSEnergyDeposit.hh"
 #include <G4ScoringManager.hh>
 
@@ -34,14 +31,9 @@ DetectorConstruction::DetectorConstruction()
       fDetWidth(Constants::DETECTOR_WIDTH),      // 50 microns thickness
       fPixelWidth(Constants::PIXEL_WIDTH),   // 1 micron thickness
       fNumBlocksPerSide(0),    // Will be calculated
-      fCheckOverlaps(true),
       fEventAction(nullptr),   // Initialize EventAction pointer
       fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS)   // Default neighborhood radius for 9x9 grid
 {
-    // Values for pixel grid set at constants.hh
-    
-    // Will be calculated in Construct() based on symmetry constraint
-    fNumBlocksPerSide = 0;
 }
 
 DetectorConstruction::~DetectorConstruction()
@@ -70,42 +62,32 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
 {
     G4bool checkOverlaps = true;
 
-    // Define materials
     G4NistManager *nist = G4NistManager::Instance();
     G4Material *worldMat = nist->FindOrBuildMaterial("G4_Galactic"); // World material
     G4Material *siliconMat = nist->FindOrBuildMaterial("G4_Si"); // Detector material
     G4Material *aluminumMat = nist->FindOrBuildMaterial("G4_Al"); // Pixel material
     
-    // Create world volume
     G4Box *solidWorld = new G4Box("solidWorld", Constants::WORLD_SIZE, Constants::WORLD_SIZE, Constants::WORLD_SIZE);
     G4LogicalVolume *logicWorld = new G4LogicalVolume(solidWorld, worldMat, "logicWorld");
     G4VPhysicalVolume *physWorld = new G4PVPlacement(0, G4ThreeVector(0., 0., 0.),
                                                      logicWorld, "physWorld", 0, false, 0, checkOverlaps);
 
-    // Create the main silicon detector
     G4Box* detCube = new G4Box("detCube", fDetSize/2, fDetSize/2, fDetWidth/2);
-    // Store logical volume pointer for use in sensitive detector setup
     fLogicSilicon = new G4LogicalVolume(detCube, siliconMat, "logicCube");
-    G4LogicalVolume* logicCube = fLogicSilicon; // alias for readability
+    G4LogicalVolume* logicCube = fLogicSilicon;
     
-    // Visualization attributes for the detector
     auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7));
     cubeVisAtt->SetForceSolid(true);
     logicCube->SetVisAttributes(cubeVisAtt);
     
-    // Place the silicon detector at fixed position
     G4ThreeVector detectorPos(0., 0., Constants::DETECTOR_Z_POSITION);
     
-    // Store original detector size for comparison
     G4double originalDetSize = fDetSize;
     
-    // Number of pixels with fixed corner offset
     fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
     
-    // Required detector size with fixed corner offset
     G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
     
-    // Adjust detector size if needed
     if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
         G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===\n"
                << "Original detector size: " << originalDetSize/mm << " mm\n"
@@ -113,13 +95,11 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
                << "Required detector size: " << requiredDetSize/mm << " mm\n"
                << "Pixel corner offset (FIXED): " << fPixelCornerOffset/mm << " mm\n";
         
-        // Update detector size
         fDetSize = requiredDetSize;
         
         G4cout << "✓ Detector size adjusted to: " << fDetSize/mm << " mm\n"
                << "==========================================" << G4endl;
         
-        // Recreate the detector with the correct size
         delete detCube;
         detCube = new G4Box("detCube", fDetSize/2, fDetSize/2, fDetWidth/2);
         delete logicCube;
@@ -128,32 +108,26 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         fLogicSilicon = logicCube; // keep pointer up-to-date
     }
     
-    // Verify corner offset
     G4double actualCornerOffset = (fDetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
     if (std::abs(actualCornerOffset - fPixelCornerOffset) > Constants::PRECISION_TOLERANCE) {
         G4cerr << "ERROR: Corner offset calculation failed!" << G4endl;
         G4cerr << "Expected: " << fPixelCornerOffset/mm << " mm, Got: " << actualCornerOffset/mm << " mm" << G4endl;
     }
     
-    // Place the silicon detector at fixed position (only once)
     new G4PVPlacement(0, detectorPos,
                       logicCube, "physCube", logicWorld, false, 0, checkOverlaps);
     
-    // Aluminum pixels on detector surface
     G4Box *pixelBlock = new G4Box("pixelBlock", fPixelSize/2, fPixelSize/2, fPixelWidth/2);
     G4LogicalVolume *logicBlock = new G4LogicalVolume(pixelBlock, aluminumMat, "logicBlock");
     
-    // Step limiting (10 μm) on silicon only
     G4UserLimits* stepLimit = new G4UserLimits(Constants::MAX_STEP_SIZE);
     logicCube->SetUserLimits(stepLimit);
     
     G4cout << "Step limiting: max step " << Constants::MAX_STEP_SIZE/um << " \xCE\xBCm" << G4endl;
     
-    // Pads on front face (first contact flags pixel)
     G4int copyNo = 0;
     G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
-    // Pixel Z on front face; primaries start at +z and move toward −z
     G4double pixelZ = detectorPos.z() + fDetWidth/2 + fPixelWidth/2;
     
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
@@ -166,7 +140,6 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         }
     }
     
-    // Validate aluminum pads remain passive
     G4VSensitiveDetector* pixelSensitiveDetector = logicBlock->GetSensitiveDetector();
     if (pixelSensitiveDetector == nullptr) {
         G4cout << "Aluminum pixel-pads passive (no sensitive detector attached)" << G4endl;
@@ -177,12 +150,10 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         G4cerr << "Attached detector: " << pixelSensitiveDetector->GetName() << G4endl;
     }
     
-    // Visualization for pixels (opaque)
     auto* blockVisAtt = new G4VisAttributes(G4Colour(0.0, 0.0, 1.0));
     blockVisAtt->SetForceSolid(true);
     logicBlock->SetVisAttributes(blockVisAtt);
     
-    // Set the world volume to be invisible
     logicWorld->SetVisAttributes(G4VisAttributes::GetInvisible());
     
     // Print coverage stats
@@ -338,9 +309,6 @@ void DetectorConstruction::ConstructSDandField() {
     // Attach scorers
     G4VPrimitiveScorer* energyScorer = new G4PSEnergyDeposit("EnergyDeposit");
     mfd->RegisterPrimitive(energyScorer);
-
-    G4VPrimitiveScorer* hitCountScorer = new G4PSNofStep("HitCount");
-    mfd->RegisterPrimitive(hitCountScorer);
 
     // Attach to silicon volume only
     SetSensitiveDetector("logicCube", mfd);
