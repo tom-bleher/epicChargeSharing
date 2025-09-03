@@ -1,6 +1,6 @@
 // ROOT macro: processing3D.C
 // Performs 2D Gaussian fit on the full charge neighborhood to reconstruct
-// (x_rec_3d, y_rec_3d) and deltas, and appends them as new branches.
+// deltas, and appends them as new branches. Signed deltas are also saved.
 
 #include <TFile.h>
 #include <TTree.h>
@@ -151,6 +151,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
   double y_rec_3d = INVALID_VALUE;
   double rec_hit_delta_x_3d = INVALID_VALUE;
   double rec_hit_delta_y_3d = INVALID_VALUE;
+  double rec_hit_signed_delta_x_3d = INVALID_VALUE;
+  double rec_hit_signed_delta_y_3d = INVALID_VALUE;
 
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
     TBranch* br = tree->GetBranch(name);
@@ -167,10 +169,10 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     return br;
   };
 
-  TBranch* br_x_rec = ensureAndResetBranch("x_rec_3d", &x_rec_3d);
-  TBranch* br_y_rec = ensureAndResetBranch("y_rec_3d", &y_rec_3d);
   TBranch* br_dx    = ensureAndResetBranch("rec_hit_delta_x_3d", &rec_hit_delta_x_3d);
   TBranch* br_dy    = ensureAndResetBranch("rec_hit_delta_y_3d", &rec_hit_delta_y_3d);
+  TBranch* br_sdx   = ensureAndResetBranch("rec_hit_signed_delta_x_3d", &rec_hit_signed_delta_x_3d);
+  TBranch* br_sdy   = ensureAndResetBranch("rec_hit_signed_delta_y_3d", &rec_hit_signed_delta_y_3d);
 
   // 2D fit function kept for reference. We use Minuit2 on a compact window.
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
@@ -185,22 +187,23 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     // Defaults: set to finite invalid sentinel
     x_rec_3d = y_rec_3d = INVALID_VALUE;
     rec_hit_delta_x_3d = rec_hit_delta_y_3d = INVALID_VALUE;
+    rec_hit_signed_delta_x_3d = rec_hit_signed_delta_y_3d = INVALID_VALUE;
 
     if (is_pixel_hit || !Fi || Fi->empty()) {
-      br_x_rec->Fill();
-      br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
+      br_sdx->Fill();
+      br_sdy->Fill();
       continue;
     }
 
     const size_t total = Fi->size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
     if (N * N != static_cast<int>(total) || N < 3) {
-      br_x_rec->Fill();
-      br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
+      br_sdx->Fill();
+      br_sdy->Fill();
       continue;
     }
 
@@ -224,10 +227,10 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     }
 
     if (g2d.GetN() < 5) {
-      br_x_rec->Fill();
-      br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
+      br_sdx->Fill();
+      br_sdy->Fill();
       continue;
     }
 
@@ -249,11 +252,44 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
                               ? relErr * zmaxNeighborhood
                               : 0.0;
 
-    f2D.SetParameters(A0, mux0, muy0, std::max(0.25*pixelSpacing, 1e-6), std::max(0.25*pixelSpacing, 1e-6), B0);
+    // Seed sigmas from baseline-subtracted second moments; loosen bounds
+    const double sigLoBound = std::max(1e-6, 0.02*pixelSpacing);
+    const double sigHiBound = 3.0*pixelSpacing;
+
+    auto sigmaSeed2D = [&](bool forX)->double {
+      double wsum = 0.0, m = 0.0;
+      const int n = g2d.GetN();
+      if (n <= 0) return std::max(0.25*pixelSpacing, 1e-6);
+      // mean
+      for (int k=0;k<n;++k) {
+        const double w = std::max(0.0, g2d.GetZ()[k] - B0);
+        const double coord = forX ? g2d.GetX()[k] : g2d.GetY()[k];
+        wsum += w; m += w * coord;
+      }
+      if (wsum <= 0.0) return std::max(0.25*pixelSpacing, 1e-6);
+      m /= wsum;
+      double var = 0.0;
+      for (int k=0;k<n;++k) {
+        const double w = std::max(0.0, g2d.GetZ()[k] - B0);
+        const double coord = forX ? g2d.GetX()[k] : g2d.GetY()[k];
+        const double d = coord - m;
+        var += w * d * d;
+      }
+      var = (wsum > 0.0) ? (var / wsum) : 0.0;
+      double s = std::sqrt(std::max(var, 1e-12));
+      if (s < sigLoBound) s = sigLoBound;
+      if (s > sigHiBound) s = sigHiBound;
+      return s;
+    };
+
+    const double sxInitMoment = sigmaSeed2D(true);
+    const double syInitMoment = sigmaSeed2D(false);
+
+    f2D.SetParameters(A0, mux0, muy0, sxInitMoment, syInitMoment, B0);
     // Fractions bounded in [0,1]
     f2D.SetParLimits(0, 0.0, 1.0);                    // A >= 0
-    f2D.SetParLimits(3, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);  // tighter sigmas
-    f2D.SetParLimits(4, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);
+    f2D.SetParLimits(3, sigLoBound, sigHiBound);  // looser sigma bounds
+    f2D.SetParLimits(4, sigLoBound, sigHiBound);
     // Ensure non-negative baseline
     f2D.SetParLimits(5, 0.0, std::max(0.0, zmin));
 
@@ -306,16 +342,11 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     ROOT::Math::Functor fChi2(chi2, 6);
     m->SetFunction(fChi2);
 
-    const double sxInit = std::max(0.25*pixelSpacing, 1e-6);
-    const double syInit = std::max(0.25*pixelSpacing, 1e-6);
-    const double sLo    = std::max(1e-6, 0.05*pixelSpacing);
-    const double sHi    = 2.0*pixelSpacing;
-
     m->SetLimitedVariable(0, "A", A0, 1e-3, 0.0, 1.0);
     m->SetLimitedVariable(1, "mux", mux0, 1e-4*pixelSpacing, xMinR, xMaxR);
     m->SetLimitedVariable(2, "muy", muy0, 1e-4*pixelSpacing, yMinR, yMaxR);
-    m->SetLimitedVariable(3, "sigx", sxInit, 1e-4*pixelSpacing, sLo, sHi);
-    m->SetLimitedVariable(4, "sigy", syInit, 1e-4*pixelSpacing, sLo, sHi);
+    m->SetLimitedVariable(3, "sigx", sxInitMoment, 1e-4*pixelSpacing, sigLoBound, sigHiBound);
+    m->SetLimitedVariable(4, "sigy", syInitMoment, 1e-4*pixelSpacing, sigLoBound, sigHiBound);
     m->SetLimitedVariable(5, "B", B0, 1e-3, 0.0, std::max(0.0, zmin));
 
     bool ok = m->Minimize();
@@ -325,6 +356,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
       y_rec_3d = X[2];
       rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
       rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
+      rec_hit_signed_delta_x_3d = (x_hit - x_rec_3d);
+      rec_hit_signed_delta_y_3d = (y_hit - y_rec_3d);
       nFitted++;
     } else {
       // Fallback: weighted centroid over the neighborhood
@@ -340,17 +373,20 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
         y_rec_3d = yw / wsum;
         rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
         rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
+        rec_hit_signed_delta_x_3d = (x_hit - x_rec_3d);
+        rec_hit_signed_delta_y_3d = (y_hit - y_rec_3d);
         nFitted++;
       } else {
         x_rec_3d = y_rec_3d = INVALID_VALUE;
         rec_hit_delta_x_3d = rec_hit_delta_y_3d = INVALID_VALUE;
+        rec_hit_signed_delta_x_3d = rec_hit_signed_delta_y_3d = INVALID_VALUE;
       }
     }
 
-    br_x_rec->Fill();
-    br_y_rec->Fill();
     br_dx->Fill();
     br_dy->Fill();
+    br_sdx->Fill();
+    br_sdy->Fill();
   }
 
   // Overwrite tree in file

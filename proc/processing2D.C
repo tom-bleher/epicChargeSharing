@@ -289,9 +289,9 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     // Very low contrast: fall back to fast weighted centroids (skip fit)
     if (A0_row < 1e-6 && A0_col < 1e-6) {
       double wsumx = 0.0, xw = 0.0;
-      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k]); wsumx += w; xw += w * x_row[k]; }
+      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k] - B0_row); wsumx += w; xw += w * x_row[k]; }
       double wsumy = 0.0, yw = 0.0;
-      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k]); wsumy += w; yw += w * y_col[k]; }
+      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k] - B0_col); wsumy += w; yw += w * y_col[k]; }
       if (wsumx > 0 && wsumy > 0) {
         x_rec_2d = xw / wsumx;
         y_rec_2d = yw / wsumy;
@@ -323,8 +323,29 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     const std::vector<double>& y_col_fit = y_col;
     const std::vector<double>& q_col_fit = q_col;
 
-    fRow.SetParameters(A0_row, mu0_row, std::max(0.25*pixelSpacing, 1e-6), B0_row);
-    fCol.SetParameters(A0_col, mu0_col, std::max(0.25*pixelSpacing, 1e-6), B0_col);
+    // Seed sigma from baseline-subtracted weighted second moments and loosen bounds
+    const double sigLoBound = std::max(1e-6, 0.02*pixelSpacing);
+    const double sigHiBound = 3.0*pixelSpacing;
+
+    auto sigmaSeed1D = [&](const std::vector<double>& xs, const std::vector<double>& qs, double B0)->double {
+      double wsum = 0.0, xw = 0.0;
+      for (size_t k=0;k<xs.size();++k) { double w = std::max(0.0, qs[k] - B0); wsum += w; xw += w * xs[k]; }
+      if (wsum <= 0.0) return std::max(0.25*pixelSpacing, 1e-6);
+      const double mean = xw / wsum;
+      double var = 0.0;
+      for (size_t k=0;k<xs.size();++k) { double w = std::max(0.0, qs[k] - B0); const double dx = xs[k] - mean; var += w * dx * dx; }
+      var = (wsum > 0.0) ? (var / wsum) : 0.0;
+      double s = std::sqrt(std::max(var, 1e-12));
+      if (s < sigLoBound) s = sigLoBound;
+      if (s > sigHiBound) s = sigHiBound;
+      return s;
+    };
+
+    const double sigInitRow = sigmaSeed1D(x_row, q_row, B0_row);
+    const double sigInitCol = sigmaSeed1D(y_col, q_col, B0_col);
+
+    fRow.SetParameters(A0_row, mu0_row, sigInitRow, B0_row);
+    fCol.SetParameters(A0_col, mu0_col, sigInitCol, B0_col);
 
     // Restrict function ranges to the full data span
     auto minmaxX = std::minmax_element(x_row_fit.begin(), x_row_fit.end());
@@ -345,12 +366,12 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
 
     // Fractions are unitless and bounded [0,1]
     fRow.SetParLimits(0, 0.0, 1.0);                   // A >= 0
-    fRow.SetParLimits(2, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing); // tighter sigma range
+    fRow.SetParLimits(2, sigLoBound, sigHiBound);
     // Ensure non-negative baseline
     fRow.SetParLimits(3, 0.0, std::max(0.0, *minmaxRow.first));
 
     fCol.SetParLimits(0, 0.0, 1.0);
-    fCol.SetParLimits(2, std::max(1e-6, 0.05*pixelSpacing), 2.0*pixelSpacing);
+    fCol.SetParLimits(2, sigLoBound, sigHiBound);
     // Ensure non-negative baseline
     fCol.SetParLimits(3, 0.0, std::max(0.0, *minmaxCol.first));
 
@@ -392,18 +413,14 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     mRow->SetFunction(fRowChi2);
     mCol->SetFunction(fColChi2);
 
-    const double sigInit = std::max(0.25*pixelSpacing, 1e-6);
-    const double sigLo   = std::max(1e-6, 0.05*pixelSpacing);
-    const double sigHi   = 2.0*pixelSpacing;
-
     mRow->SetLimitedVariable(0, "A", A0_row, 1e-3, 0.0, 1.0);
     mRow->SetLimitedVariable(1, "mu", mu0_row, 1e-4*pixelSpacing, xMin, xMax);
-    mRow->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
+    mRow->SetLimitedVariable(2, "sigma", sigInitRow, 1e-4*pixelSpacing, sigLoBound, sigHiBound);
     mRow->SetLimitedVariable(3, "B", B0_row, 1e-3, 0.0, std::max(0.0, *minmaxRow.first));
 
     mCol->SetLimitedVariable(0, "A", A0_col, 1e-3, 0.0, 1.0);
     mCol->SetLimitedVariable(1, "mu", mu0_col, 1e-4*pixelSpacing, yMin, yMax);
-    mCol->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
+    mCol->SetLimitedVariable(2, "sigma", sigInitCol, 1e-4*pixelSpacing, sigLoBound, sigHiBound);
     mCol->SetLimitedVariable(3, "B", B0_col, 1e-3, 0.0, std::max(0.0, *minmaxCol.first));
 
     bool okRow = mRow->Minimize();
@@ -412,15 +429,15 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     double muX = okRow ? mRow->X()[1] : NAN;
     double muY = okCol ? mCol->X()[1] : NAN;
 
-    // Fallback: weighted centroid if fit did not converge
+    // Fallback: baseline-subtracted weighted centroid if fit did not converge
     if (!okRow) {
       double wsum = 0.0, xw = 0.0;
-      for (size_t k=0;k<x_row_fit.size();++k) { double w = std::max(0.0, q_row_fit[k]); wsum += w; xw += w * x_row_fit[k]; }
+      for (size_t k=0;k<x_row_fit.size();++k) { double w = std::max(0.0, q_row_fit[k] - B0_row); wsum += w; xw += w * x_row_fit[k]; }
       if (wsum > 0) { muX = xw / wsum; okRow = true; }
     }
     if (!okCol) {
       double wsum = 0.0, yw = 0.0;
-      for (size_t k=0;k<y_col_fit.size();++k) { double w = std::max(0.0, q_col_fit[k]); wsum += w; yw += w * y_col_fit[k]; }
+      for (size_t k=0;k<y_col_fit.size();++k) { double w = std::max(0.0, q_col_fit[k] - B0_col); wsum += w; yw += w * y_col_fit[k]; }
       if (wsum > 0) { muY = yw / wsum; okCol = true; }
     }
 
