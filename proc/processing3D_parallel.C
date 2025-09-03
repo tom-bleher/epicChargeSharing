@@ -121,10 +121,16 @@ namespace {
     m->SetFunction(fChi2);
 
     m->SetLimitedVariable(0, "A", A0, 1e-3, 0.0, 1.0);
-    m->SetLimitedVariable(1, "mux", mux0, 1e-4*pixelSpacing, xMinR, xMaxR);
-    m->SetLimitedVariable(2, "muy", muy0, 1e-4*pixelSpacing, yMinR, yMaxR);
+    // Constrain means to ±1/2 pitch about nearest pixel center
+    const double muXLo = x_px - 0.5 * pixelSpacing;
+    const double muXHi = x_px + 0.5 * pixelSpacing;
+    const double muYLo = y_px - 0.5 * pixelSpacing;
+    const double muYHi = y_px + 0.5 * pixelSpacing;
+    m->SetLimitedVariable(1, "mux", mux0, 1e-4*pixelSpacing, muXLo, muXHi);
+    m->SetLimitedVariable(2, "muy", muy0, 1e-4*pixelSpacing, muYLo, muYHi);
     m->SetLimitedVariable(3, "sigx", sxInit, 1e-4*pixelSpacing, sLo, sHi);
     m->SetLimitedVariable(4, "sigy", syInit, 1e-4*pixelSpacing, sLo, sHi);
+    // Ensure non-negative baseline
     m->SetLimitedVariable(5, "B", B0, 1e-3, 0.0, std::max(0.0, zmin));
 
     bool ok = m->Minimize();

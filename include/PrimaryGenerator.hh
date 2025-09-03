@@ -8,14 +8,13 @@
 class DetectorConstruction;
 class G4Event;
 
-// Generates primaries toward the detector with constrained emission region.
 class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
 {
 public:
-    PrimaryGenerator(DetectorConstruction* detector);
-    ~PrimaryGenerator();
+    explicit PrimaryGenerator(DetectorConstruction* detector);
+    ~PrimaryGenerator() override;
 
-    virtual void GeneratePrimaries(G4Event*);
+    void GeneratePrimaries(G4Event*) override;
 
 private:
     G4ParticleGun* fParticleGun;

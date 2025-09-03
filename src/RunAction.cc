@@ -4,33 +4,24 @@
 
 #include "G4RunManager.hh"
 #include "G4Run.hh"
-#include "G4UnitsTable.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Threading.hh"
-#include "G4AutoLock.hh"
 
 #include <sstream>
 #include <fstream>
 #include <thread>
 #include <chrono>
-#include <limits>
-#include <cstdlib>
-#include <cmath>
+#include <cstdio>
 
-// ROOT includes
 #include "TFile.h"
 #include "TTree.h"
-#include "TBranch.h"
 #include "TNamed.h"
-#include "TChain.h"
-#include "TSystem.h"
 #include "TError.h"
 #include "TROOT.h"
 #include "TThread.h"
 #include "TFileMerger.h"
 #include "RVersion.h"
 
-// Initialize static synchronization variables
 std::mutex RunAction::fRootMutex;
 std::atomic<int> RunAction::fWorkersCompleted{0};
 std::atomic<int> RunAction::fTotalWorkers{0};
@@ -38,7 +29,6 @@ std::condition_variable RunAction::fWorkerCompletionCV;
 std::mutex RunAction::fSyncMutex;
 std::atomic<bool> RunAction::fAllWorkersCompleted{false};
 
-// Thread-safe ROOT initialization
 static std::once_flag gRootInitFlag;
 
 static void InitializeROOTThreading() {
@@ -69,12 +59,13 @@ static void InitializeROOTThreading() {
     }
 }
 
-// Run ROOT post-processing macros on the produced ROOT file
 static void RunPostProcessingMacros(const G4String& rootFilePath)
 {
     if (!(Constants::RUN_PROCESSING_2D || Constants::RUN_PROCESSING_3D)) {
         return;
     }
+
+    G4cout << "Starting fitting simulated data in " << rootFilePath << G4endl;
 
     auto runMacro = [&](const char* macroPath, const char* funcName) {
         if (!macroPath || !funcName) return;
@@ -104,39 +95,28 @@ RunAction::RunAction()
   fPixelY(0),
   fEdep(0),
   fPixelTrueDeltaX(0),
-  fPixelTrueDeltaY(0),
-  fVolumePixelCheck(false),
-  fChargeCalculationEnabled(false),
-  fGeometricPixelCheck(false)
+  fPixelTrueDeltaY(0)
 
-{ 
-  // Initialize neighborhood (9x9) grid vectors (they are automatically initialized empty)
-  // Initialize step energy deposition vectors (they are automatically initialized empty)
+{
 }
 
 RunAction::~RunAction()
 {
-  // File will be closed in EndOfRunAction
-  // No need to delete here as it could cause double deletion
 }
 
 void RunAction::BeginOfRunAction(const G4Run* run)
 { 
-    // Initialize ROOT threading once per application
     std::call_once(gRootInitFlag, InitializeROOTThreading);
     
-    // Reset synchronization for new run (master thread only)
     if (!G4Threading::IsWorkerThread()) {
         ResetSynchronization();
     }
     
-    // Safety check for valid run
     if (!run) {
         G4cerr << "RunAction: Error - Invalid run object in BeginOfRunAction" << G4endl;
         return;
     }
     
-    // Create unique filename for each thread
     G4String fileName;
     if (G4Threading::IsMultithreadedApplication()) {
         if (G4Threading::IsWorkerThread()) {
@@ -186,7 +166,6 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->SetAutoSave(50000);   // Save every 50k entries
         
         // Create branches
-        
         // =============================================
         // HITS BRANCHES
         // =============================================
@@ -196,14 +175,12 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         fTree->Branch("y_px", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
         // Energy branches use lowercase names per project guide
         fTree->Branch("e_dep", &fEdep, "e_dep/D")->SetTitle("Energy deposit in silicon [MeV]");
-        //fTree->Branch("e_init", &fInitialEnergy, "e_init/D")->SetTitle("Initial Particle Energy [MeV]");
         // Pixel-pad classification flags
         fTree->Branch("first_contact_is_pixel", &fFirstContactIsPixel, "first_contact_is_pixel/O");
         fTree->Branch("geometric_is_pixel", &fGeometricIsPixel, "geometric_is_pixel/O");
         fTree->Branch("is_pixel_hit", &fIsPixelHit, "is_pixel_hit/O");
         fTree->Branch("px_hit_delta_x", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
         fTree->Branch("px_hit_delta_y", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]");
-        //fTree->Branch("NonPixelPadRadiusCheck", &fNonPixelPadRadiusCheck, "NonPixelPadRadiusCheck/O")->SetTitle("For non-pixel hits: |dx|>PIXEL_SIZE/2 && |dy|>PIXEL_SIZE/2");
         
         // Neighborhood charge sharing results
         fTree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
@@ -361,7 +338,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
                     TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm", Form("%.6f", fGridPixelCornerOffset));
                     TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", fGridDetSize));
                     TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
-                    TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", Constants::NEIGHBORHOOD_RADIUS));
+                    TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", fGridNeighborhoodRadius > 0 ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS));
                     
                     pixelSizeMeta.Write();
                     pixelSpacingMeta.Write();
@@ -430,11 +407,7 @@ void RunAction::SetNearestPixelPos(G4double x, G4double y)
     fPixelY = y;
 }
 
-void RunAction::SetInitialEnergy(G4double energy) 
-{
-    // Store initial particle energy in MeV (Geant4 internal energy unit is MeV)
-    fInitialEnergy = energy;
-}
+// Initial energy is not persisted per igor.txt; no-op removed
 
 void RunAction::SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY)
 {
@@ -443,19 +416,6 @@ void RunAction::SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDelt
     fPixelTrueDeltaX = pixelTrueDeltaX;
     fPixelTrueDeltaY = pixelTrueDeltaY;
 }
-
-void RunAction::SetGeometricPixelCheck(G4bool passed)
-{
-    fGeometricPixelCheck = passed;
-}
-
-void RunAction::SetPixelHitStatus(G4bool isPixelHit)
-{
-    // Store pixel hit status (true if on pixel)
-    fIsPixelHit = isPixelHit;
-}
-
-// Note: setters for first/geometric/combined flags are inline in header
 
 void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
                                  const std::vector<G4double>& chargeCoulombs)
@@ -513,13 +473,6 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
     G4cout << "  Pixel Corner Offset: " << fGridPixelCornerOffset << " mm" << G4endl;
     G4cout << "  Detector Size: " << fGridDetSize << " mm" << G4endl;
     G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
-}
-
-// Set hit purity tracking data from EventAction
-void RunAction::SetHitPurityData(G4bool volumePixelCheck, G4bool chargeCalculationEnabled)
-{
-    fVolumePixelCheck = volumePixelCheck;
-    fChargeCalculationEnabled = chargeCalculationEnabled;
 }
 
 // =============================================
@@ -648,7 +601,7 @@ bool RunAction::SafeWriteRootFile()
             TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm", Form("%.6f", fGridPixelCornerOffset));
             TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", fGridDetSize));
             TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
-            TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", Constants::NEIGHBORHOOD_RADIUS));
+            TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", fGridNeighborhoodRadius > 0 ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS));
             
             pixelSizeMeta.Write();
             pixelSpacingMeta.Write();

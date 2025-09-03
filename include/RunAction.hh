@@ -7,7 +7,6 @@
 #include <vector>
 #include <string>
 
-// ROOT includes
 #include "TFile.h"
 #include "TTree.h"
 #include "G4Threading.hh"
@@ -19,113 +18,85 @@ class RunAction : public G4UserRunAction
 {
 public:
     RunAction();
-    virtual ~RunAction();
+    ~RunAction() override;
 
-    virtual void BeginOfRunAction(const G4Run*);
-    virtual void EndOfRunAction(const G4Run*);
+    void BeginOfRunAction(const G4Run*) override;
+    void EndOfRunAction(const G4Run*) override;
 
-    // Access methods for ROOT objects
     TFile* GetRootFile() const { return fRootFile; }
     TTree* GetTree() const { return fTree; }
     
-    // Thread synchronization for ROOT file operations
     static void WaitForAllWorkersToComplete();
     static void SignalWorkerCompletion();
     static void ResetSynchronization();
     
-    // Safe ROOT file operations
     bool SafeWriteRootFile();
     bool ValidateRootFile(const G4String& filename);
     void CleanupRootObjects();
     
-    // Variables for the branch (edep [MeV], positions [mm])
     void SetEventData(G4double edep, G4double x, G4double y, G4double z);
     
-    // Method to set nearest pixel position [mm]
     void SetNearestPixelPos(G4double x, G4double y);
     
-    // Method to set initial particle energy [MeV]
-    void SetInitialEnergy(G4double energy);
-    
-    // Method to set pixel hit status
-    void SetPixelHitStatus(G4bool isPixelHit);
-    // New: set first-contact flag, geometric flag, and combined flag
     void SetFirstContactIsPixel(G4bool v) { fFirstContactIsPixel = v; }
     void SetGeometricIsPixel(G4bool v) { fGeometricIsPixel = v; }
     void SetIsPixelHitCombined(G4bool v) { fIsPixelHit = v; }
     
-    // Method to set pixel classification data (hit status and delta values)
     void SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY);
-    void SetGeometricPixelCheck(G4bool passed);
     
-    // Method to set neighborhood (9x9) grid charge sharing data for non-pixel hits
+    
     void SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
                           const std::vector<G4double>& chargeCoulombs);
     
-    // Method to set detector grid parameters for saving to ROOT
     void SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, 
                                    G4double pixelCornerOffset, G4double detSize, 
                                    G4int numBlocksPerSide);
+    void SetNeighborhoodRadiusMeta(G4int radius) { fGridNeighborhoodRadius = radius; }
     
-    // Fill the ROOT tree with current event data
     void FillTree();
     
-    // Method to set hit purity tracking data
-    void SetHitPurityData(G4bool volumePixelCheck, G4bool chargeCalculationEnabled);
- 
 private:
-
     TFile* fRootFile;
     TTree* fTree;
     
-    // Thread-safety mutex for ROOT operations
     static std::mutex fRootMutex;
     
-    // Thread synchronization for robust file operations
     static std::atomic<int> fWorkersCompleted;
     static std::atomic<int> fTotalWorkers;
     static std::condition_variable fWorkerCompletionCV;
     static std::mutex fSyncMutex;
     static std::atomic<bool> fAllWorkersCompleted;
     
-
-    // =============================================
-    // HITS DATA VARIABLES
-    // =============================================
-    G4double fTrueX;   // True Hit pos X [mm]
-    G4double fTrueY;   // True Hit pos Y [mm]
-    G4double fPixelX; // Nearest to hit pixel center X [mm]
-    G4double fPixelY; // Nearest to hit pixel center Y [mm]
-    G4double fEdep;   // Energy deposition [MeV]
-    G4double fPixelTrueDeltaX; // Delta X from pixel center to true pos [mm] (x_pixel - x_true)
-    G4double fPixelTrueDeltaY; // Delta Y from pixel center to true pos [mm] (y_pixel - y_true)
-
-    // Pixel flags
-    G4bool fFirstContactIsPixel{false};  // First boundary entry was pixel
-    G4bool fGeometricIsPixel{false};     // Orthogonal radius test indicates pixel region
-    G4bool fIsPixelHit{false};           // OR of first-contact and geometric tests
+    G4double fTrueX;
+    G4double fTrueY;
+    G4double fPixelX;
+    G4double fPixelY;
+    G4double fEdep;
+    G4double fPixelTrueDeltaX;
+    G4double fPixelTrueDeltaY;
     
-    // NON-PIXEL HIT DATA (not on pixel)
-    std::vector<G4double> fNeighborhoodChargeFractions; // Charge fractions for neighborhood grid pixels
-    std::vector<G4double> fNeighborhoodCharge;       // Charge values in Coulombs for neighborhood grid pixels
+    G4bool fFirstContactIsPixel{false};
+    G4bool fGeometricIsPixel{false};
+    G4bool fIsPixelHit{false};
+    
+    std::vector<G4double> fNeighborhoodChargeFractions;
+    std::vector<G4double> fNeighborhoodCharge;
+    
+    G4double fGridPixelSize;
+    G4double fGridPixelSpacing;  
+    G4double fGridPixelCornerOffset;
+    G4double fGridDetSize;
+    G4int fGridNumBlocksPerSide;
+    G4int fGridNeighborhoodRadius{0};
 
-    // Variables for particle information (reduced set)
-    G4double fInitialEnergy;        // Initial particle energy [MeV]
-    
-    // Variables for detector grid parameters (stored as ROOT metadata)
-    G4double fGridPixelSize;        // Pixel size [mm]
-    G4double fGridPixelSpacing;     // Pixel spacing [mm]  
-    G4double fGridPixelCornerOffset; // Pixel corner offset [mm]
-    G4double fGridDetSize;          // Detector size [mm]
-    G4int fGridNumBlocksPerSide;    // Number of blocks per side
-    
-    
-    // Hit purity tracking variables for Multi-Functional Detector validation
-    G4bool fVolumePixelCheck;       // True if first contact volume was aluminum pixel-pad; false if silicon
-    G4bool fChargeCalculationEnabled; // True if charge sharing calculation was enabled
+    // Classification flags written to ROOT branches per igor.txt data spec:
+    // - first_contact_is_pixel: first entered volume is pixel-pad (logicalBlock)
+    // - geometric_is_pixel: |x_hit-x_px|<=l/2 && |y_hit-y_px|<=l/2
+    // - is_pixel_hit: OR of the above two
 
-    // Geometric pixel check flag (check |dx|>PIXEL_SIZE/2 and |dy|>PIXEL_SIZE/2)
-    G4bool fGeometricPixelCheck;
+    // Neighborhood charge vectors (flattened row-major, size (2r+1)^2):
+    // idx = (d_i + r) * (2r+1) + (d_j + r), for d_i,d_j in [-r, r]
+    // F_i uses Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL for OOB cells; Q_i=0 there.
 };
 
 #endif

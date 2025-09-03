@@ -14,61 +14,46 @@ class G4VisAttributes;
 class G4MultiFunctionalDetector;
 class G4VPrimitiveScorer;
 
-// Builds AC-LGAD geometry and exposes parameters.
 class DetectorConstruction : public G4VUserDetectorConstruction
 {
 public:
     DetectorConstruction();
-    virtual ~DetectorConstruction();
+    ~DetectorConstruction() override;
     
-    virtual G4VPhysicalVolume* Construct();
+    G4VPhysicalVolume* Construct() override;
     void ConstructSDandField() override;
     
-    // Set EventAction
     void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
     
-    // Set fixed pixel corner offset
     void SetPixelCornerOffset(G4double cornerOffset);
     
-    // Set neighborhood radius
     void SetNeighborhoodRadius(G4int radius);
     
-    // Get neighborhood radius  
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
     
-    // Geometry getters
     G4double GetPixelSize() const { return fPixelSize; }
     G4double GetPixelSpacing() const { return fPixelSpacing; }
     G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
-    G4ThreeVector GetDetectorPos() const; // Fixed position from Construct()
+    G4ThreeVector GetDetectorPos() const;
     
-    // Save parameters to log
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
     
 private:
-    // Pixel parameters
-    G4double fPixelSize;         // Size of each pixel
-    G4double fPixelWidth;        // Width/thickness of each pixel
-    G4double fPixelSpacing;      // Center-to-center spacing between pixels
-    G4double fPixelCornerOffset; // Edge-most pixel distance from edge of detector
+    G4double fPixelSize;
+    G4double fPixelWidth;
+    G4double fPixelSpacing;
+    G4double fPixelCornerOffset;
     
-    // Detector parameters
-    G4double fDetSize;           // Size of the detector
-    G4double fDetWidth;          // Width/thickness of the detector
-    
-    G4int fNumBlocksPerSide;     // Number of pixels per row/column
-    
-    // Control flags
-    G4bool fCheckOverlaps;       // Flag to check geometry overlaps
-    
-    // EventAction pointer for neighborhood configuration
+    G4double fDetSize;
+    G4double fDetWidth;
+    G4int fNumBlocksPerSide;
+
     EventAction* fEventAction;
     
-    // Neighborhood radius
     G4int fNeighborhoodRadius;
-    
+
     G4LogicalVolume* fLogicSilicon;
 };
 

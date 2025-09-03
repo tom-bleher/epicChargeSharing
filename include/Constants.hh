@@ -33,10 +33,6 @@ namespace Constants {
     const G4double GEOMETRY_TOLERANCE = 1*um;            // Geometry calculation tolerance
     const G4double PRECISION_TOLERANCE = 1*nm;           // High precision calculations
     
-    // Pixel boundary detection
-    const G4double PIXEL_BOUNDARY_TOLERANCE = 1*nanometer; // Tolerance for pixel boundary detection to handle floating point precision
-                                                            // Ensures hits exactly on pixel edges are consistently classified as pixel hits
-    
     // Grid and neighborhood configuration
     const G4int NEIGHBORHOOD_RADIUS = 4;                 // Default neighborhood radius for 9x9 grid
     
@@ -59,6 +55,9 @@ namespace Constants {
     const G4double MIN_SAFE_PARAMETER = 1e-12;           // Minimum safe value for denominators and parameters
     const G4double MIN_LOG_VALUE = 1e-6;                 // Minimum allowed log value for numerical stability
     const G4double MIN_DENOMINATOR_VALUE = 1e-10;        // Minimum allowed denominator value
+
+    // Neighborhood grid special markers
+    const G4double OUT_OF_BOUNDS_FRACTION_SENTINEL = -999.0; // Marks F_i as invalid (out-of-bounds)
     
     // ========================
     // PHYSICS CONSTANTS
@@ -75,7 +74,7 @@ namespace Constants {
     // ========================
     // Control whether to run ROOT post-processing macros automatically after the run finishes
     const G4bool RUN_PROCESSING_2D = true;   // Calls proc/processing2D.C
-    const G4bool RUN_PROCESSING_3D = false;  // Calls proc/processing3D.C
+    const G4bool RUN_PROCESSING_3D = true;  // Calls proc/processing3D.C
     // Vertical uncertainty for the fits, as percent of the neighborhood max
     const G4double PROCESSING_ERROR_PERCENT = 5.0;
 
