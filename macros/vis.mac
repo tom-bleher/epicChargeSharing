@@ -23,8 +23,8 @@
 # Adjust colors and styles for better visibility
 /vis/viewer/set/background white
 /vis/viewer/set/style surface
-/vis/viewer/set/hiddenEdge true
-/vis/viewer/set/auxiliaryEdge true
+/vis/viewer/set/hiddenEdge false
+/vis/viewer/set/auxiliaryEdge false
 
 # Adjust view for better visualization of the AC-LGAD detector
 /vis/viewer/zoom 1.5
