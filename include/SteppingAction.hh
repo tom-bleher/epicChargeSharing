@@ -12,7 +12,7 @@ class SteppingAction : public G4UserSteppingAction
 {
 public:
   SteppingAction(EventAction* eventAction);
-  ~SteppingAction() override;
+  ~SteppingAction() override = default;
   
   void UserSteppingAction(const G4Step* step) override;
   

@@ -36,7 +36,7 @@ public:
     
     void SetEventData(G4double edep, G4double x, G4double y, G4double z);
     
-    void SetNearestPixelPos(G4double x, G4double y);
+    void SetNearestPixelPos(G4double x, G4double y) { fPixelX = x; fPixelY = y; }
     
     void SetFirstContactIsPixel(G4bool v) { fFirstContactIsPixel = v; }
     void SetGeometricIsPixel(G4bool v) { fGeometricIsPixel = v; }
@@ -52,6 +52,11 @@ public:
                                    G4double pixelCornerOffset, G4double detSize, 
                                    G4int numBlocksPerSide);
     void SetNeighborhoodRadiusMeta(G4int radius) { fGridNeighborhoodRadius = radius; }
+    
+    // Neighborhood pixel geometry (per event)
+    void SetNeighborhoodPixelData(const std::vector<G4double>& xs,
+                                  const std::vector<G4double>& ys,
+                                  const std::vector<G4int>& ids);
     
     void FillTree();
     
@@ -82,12 +87,23 @@ private:
     std::vector<G4double> fNeighborhoodChargeFractions;
     std::vector<G4double> fNeighborhoodCharge;
     
+    // Per–event neighborhood pixel geometry
+    std::vector<G4double> fNeighborhoodPixelX;
+    std::vector<G4double> fNeighborhoodPixelY;
+    std::vector<G4int>    fNeighborhoodPixelID;   // flattened row-major IDs; -1 for OOB
+    
     G4double fGridPixelSize;
     G4double fGridPixelSpacing;  
     G4double fGridPixelCornerOffset;
     G4double fGridDetSize;
     G4int fGridNumBlocksPerSide;
     G4int fGridNeighborhoodRadius{0};
+    
+    // Full-grid pixel IDs (size = N^2, row-major 0..N^2-1)
+    std::vector<G4int> fGridPixelID;
+    // Full-grid pixel centers
+    std::vector<G4double> fGridPixelX; // mm, length N^2
+    std::vector<G4double> fGridPixelY; // mm, length N^2
 
     // Classification flags written to ROOT branches per igor.txt data spec:
     // - first_contact_is_pixel: first entered volume is pixel-pad (logicalBlock)

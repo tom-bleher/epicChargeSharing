@@ -10,11 +10,16 @@ class RunAction;
 class DetectorConstruction;
 class SteppingAction;
 
+/**
+ * Event-level bookkeeping and data extraction.
+ * - Tracks first contact, classifies pixel hits, computes charge sharing
+ *   in a (2r+1)x(2r+1) neighborhood around the nearest pixel.
+ */
 class EventAction : public G4UserEventAction
 {
 public:
     EventAction(RunAction* runAction, DetectorConstruction* detector);
-    ~EventAction() override;
+    ~EventAction() override = default;
 
     void BeginOfEventAction(const G4Event* event) override;
     void EndOfEventAction(const G4Event* event) override;
@@ -23,19 +28,20 @@ public:
     
     void RegisterFirstContact(const G4ThreeVector& pos) { fFirstContactPos = pos; fHasFirstContactPos = true; }
     
+    // Find center of nearest pixel to a given hit position (returns mm)
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
         
     G4double CalcPixelAlphaSubtended(G4double hitX, G4double hitY,
                                          G4double pixelCenterX, G4double pixelCenterY,
                                          G4double pixelWidth, G4double pixelHeight);
     
+    // Compute analytical charge sharing for current neighborhood
     void CalcNeighborhoodChargeSharing(const G4ThreeVector& hitPos);
+    // Compute neighborhood pixel geometry and IDs matching fraction layout
+    void CalcNeighborhoodPixelGeometryAndIDs(const G4ThreeVector& hitPos);
     
-    // Neighborhood grid configuration: radius r => (2r+1)x(2r+1) cells.
-    // Flattening: row-major with idx=(d_i+r)*(2r+1)+(d_j+r), d_i,d_j in [-r,r].
-    // F_i in [0,1], sums to ~1 for in-bounds cells; out-of-bounds cells set
-    // F_i=Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL, Q_i=0 (per igor.txt spec).
-    // Units: e_dep in MeV; internal conversion to eV via CLHEP units; Q_i in Coulombs.
+    // Neighborhood grid: r => (2r+1)x(2r+1); row-major flattening idx=(d_i+r)*(2r+1)+(d_j+r), d_i,d_j∈[-r,r].
+    // F_i ∈ [0,1], sums to ~1 for in-bounds; OOB => F_i=sentinel, Q_i=0. Units: E_dep [MeV], Q_i [C].
     void SetNeighborhoodRadius(G4int radius) { fNeighborhoodRadius = radius; }
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
     
@@ -66,6 +72,11 @@ private:
     
     std::vector<G4double> fNeighborhoodChargeFractions;
     std::vector<G4double> fNeighborhoodCharge;
+    
+    // Neighborhood geometry (aligned to fractions vector sizing and ordering)
+    std::vector<G4double> fNeighborhoodPixelX; // mm
+    std::vector<G4double> fNeighborhoodPixelY; // mm
+    std::vector<G4int>    fNeighborhoodPixelID; // global grid ID; -1 for OOB
     
     G4double fIonizationEnergy;
     G4double fAmplificationFactor;

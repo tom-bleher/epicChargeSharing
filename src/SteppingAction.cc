@@ -12,9 +12,6 @@ SteppingAction::SteppingAction(EventAction* eventAction)
   fFirstContactVolume("NONE")
 {}
 
-SteppingAction::~SteppingAction()
-{}
-
 void SteppingAction::Reset()
 {
     fFirstContactVolume = "NONE";

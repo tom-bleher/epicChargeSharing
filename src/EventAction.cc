@@ -18,16 +18,12 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
   fRunAction(runAction),
   fDetector(detector),
   fSteppingAction(nullptr),
-  fNeighborhoodRadius(4), // Default to 9x9 grid (radius 4)
+  fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),
   fIonizationEnergy(Constants::IONIZATION_ENERGY),
   fAmplificationFactor(Constants::AMPLIFICATION_FACTOR),
   fD0(Constants::D0_CHARGE_SHARING),
   fElementaryCharge(Constants::ELEMENTARY_CHARGE),
   fScorerEnergyDeposit(0.0)
-{ 
-}
-
-EventAction::~EventAction()
 { 
 }
 
@@ -44,6 +40,9 @@ void EventAction::BeginOfEventAction(const G4Event* event)
 
   fNeighborhoodChargeFractions.clear();
   fNeighborhoodCharge.clear();
+  fNeighborhoodPixelX.clear();
+  fNeighborhoodPixelY.clear();
+  fNeighborhoodPixelID.clear();
 
   fScorerEnergyDeposit = 0.0;
   fFirstContactPos = G4ThreeVector(0.,0.,0.);
@@ -71,6 +70,9 @@ void EventAction::EndOfEventAction(const G4Event* event)
     if (computeChargeSharing) {
         ComputeChargeSharingForEvent(hitPos);
     }
+
+    // Always compute neighborhood pixel geometry and IDs (independent of charge sharing)
+    CalcNeighborhoodPixelGeometryAndIDs(hitPos);
     
     fRunAction->SetEventData(finalEdep, hitPos.x(), hitPos.y(), hitPos.z());
     fRunAction->SetNearestPixelPos(nearestPixel.x(), nearestPixel.y());
@@ -80,6 +82,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     fRunAction->SetPixelClassification(isPixelHitCombined, fPixelTrueDeltaX, fPixelTrueDeltaY);
     
     fRunAction->SetNeighborhoodChargeData(fNeighborhoodChargeFractions, fNeighborhoodCharge);
+    fRunAction->SetNeighborhoodPixelData(fNeighborhoodPixelX, fNeighborhoodPixelY, fNeighborhoodPixelID);
     
     fRunAction->FillTree();
 }
@@ -306,6 +309,52 @@ void EventAction::CollectScorerData(const G4Event* event)
       {
         fScorerEnergyDeposit += *(kv.second);
       }
+    }
+  }
+}
+
+// Compute neighborhood pixel centers (X,Y) and global grid IDs around current pixel index
+void EventAction::CalcNeighborhoodPixelGeometryAndIDs(const G4ThreeVector& /*hitPos*/)
+{
+  fNeighborhoodPixelX.clear();
+  fNeighborhoodPixelY.clear();
+  fNeighborhoodPixelID.clear();
+
+  const G4double pixelSize = fDetector->GetPixelSize();
+  const G4double pixelSpacing = fDetector->GetPixelSpacing();
+  const G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
+  const G4double detSize = fDetector->GetDetSize();
+  const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
+
+  const G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
+
+  const G4int gridRadius = fNeighborhoodRadius;
+  const G4int gridDim = 2 * gridRadius + 1;
+  const G4int totalCells = gridDim * gridDim;
+  fNeighborhoodPixelX.reserve(totalCells);
+  fNeighborhoodPixelY.reserve(totalCells);
+  fNeighborhoodPixelID.reserve(totalCells);
+
+  for (G4int di = -gridRadius; di <= gridRadius; ++di) {
+    for (G4int dj = -gridRadius; dj <= gridRadius; ++dj) {
+      const G4int gridPixelI = fPixelIndexI + di;
+      const G4int gridPixelJ = fPixelIndexJ + dj;
+
+      if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide ||
+          gridPixelJ < 0 || gridPixelJ >= numBlocksPerSide) {
+        fNeighborhoodPixelX.push_back(std::numeric_limits<G4double>::quiet_NaN());
+        fNeighborhoodPixelY.push_back(std::numeric_limits<G4double>::quiet_NaN());
+        fNeighborhoodPixelID.push_back(-1);
+        continue;
+      }
+
+      const G4double pixelCenterX = firstPixelPos + gridPixelI * pixelSpacing;
+      const G4double pixelCenterY = firstPixelPos + gridPixelJ * pixelSpacing;
+      const G4int globalId = gridPixelI * numBlocksPerSide + gridPixelJ; // row-major
+
+      fNeighborhoodPixelX.push_back(pixelCenterX);
+      fNeighborhoodPixelY.push_back(pixelCenterY);
+      fNeighborhoodPixelID.push_back(globalId);
     }
   }
 }

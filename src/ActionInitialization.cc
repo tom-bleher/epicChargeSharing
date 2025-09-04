@@ -10,10 +10,6 @@ ActionInitialization::ActionInitialization(DetectorConstruction* detector)
 {
 }
 
-ActionInitialization::~ActionInitialization()
-{
-}
-
 void ActionInitialization::BuildForMaster() const 
 {
     RunAction* runAction = new RunAction();

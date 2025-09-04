@@ -34,7 +34,7 @@ namespace Constants {
     const G4double PRECISION_TOLERANCE = 1*nm;           // High precision calculations
     
     // Grid and neighborhood configuration
-    const G4int NEIGHBORHOOD_RADIUS = 4;                 // Default neighborhood radius for 9x9 grid
+    const G4int NEIGHBORHOOD_RADIUS = 2;                 // Default neighborhood radius for 9x9 grid
     
     // ========================
     // SIMULATION CONSTANTS
@@ -66,7 +66,7 @@ namespace Constants {
     // AC-LGAD physics parameters
     const G4double IONIZATION_ENERGY = 3.6;              // eV per electron-hole pair in silicon
     const G4double AMPLIFICATION_FACTOR = 20.0;          // AC-LGAD amplification factor (N_e' = N_e * 20)
-    const G4double D0_CHARGE_SHARING = 10.0;             // x displacement in silicon (microns)
+    const G4double D0_CHARGE_SHARING = 1.0;             // x displacement in silicon (microns)
     const G4double ELEMENTARY_CHARGE = 1.602176634e-19;  // Elementary charge in Coulombs
 
     // ========================

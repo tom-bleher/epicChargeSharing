@@ -3,11 +3,14 @@
 
 #include "G4VModularPhysicsList.hh"
 
+/**
+ * Minimal EM physics list with step limiter physics.
+ */
 class PhysicsList : public G4VModularPhysicsList
 {
 public:
     PhysicsList();
-    ~PhysicsList() override;
+    ~PhysicsList() override = default;
 
 };
 
