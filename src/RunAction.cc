@@ -1,6 +1,7 @@
 #include "RunAction.hh"
 #include "Constants.hh"
 #include "Control.hh"
+#include "DetectorConstruction.hh"
 
 #include "G4RunManager.hh"
 #include "G4Run.hh"
@@ -100,9 +101,7 @@ RunAction::RunAction()
 {
 }
 
-RunAction::~RunAction()
-{
-}
+RunAction::~RunAction() = default;
 
 void RunAction::BeginOfRunAction(const G4Run* run)
 { 
@@ -115,6 +114,22 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     if (!run) {
         G4cerr << "RunAction: Error - Invalid run object in BeginOfRunAction" << G4endl;
         return;
+    }
+    
+    // Synchronize detector grid parameters from the constructed geometry
+    // Ensures worker threads also get the final adjusted geometry parameters
+    if (auto* runMgr = G4RunManager::GetRunManager()) {
+        auto* userDet = runMgr->GetUserDetectorConstruction();
+        if (auto* det = dynamic_cast<const DetectorConstruction*>(userDet)) {
+            SetDetectorGridParameters(
+                det->GetPixelSize(),
+                det->GetPixelSpacing(),
+                det->GetPixelCornerOffset(),
+                det->GetDetSize(),
+                det->GetNumBlocksPerSide()
+            );
+            SetNeighborhoodRadiusMeta(det->GetNeighborhoodRadius());
+        }
     }
     
     G4String fileName;
@@ -169,22 +184,29 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         // =============================================
         // HITS BRANCHES
         // =============================================
-        fTree->Branch("x_hit", &fTrueX, "x_hit/D")->SetTitle("True Position X [mm]");
-        fTree->Branch("y_hit", &fTrueY, "y_hit/D")->SetTitle("True Position Y [mm]");
-        fTree->Branch("x_px", &fPixelX, "x_px/D")->SetTitle("Nearest Pixel Center X [mm]");
-        fTree->Branch("y_px", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
-        // Energy branches use lowercase names per project guide
-        fTree->Branch("e_dep", &fEdep, "e_dep/D")->SetTitle("Energy deposit in silicon [MeV]");
-        // Pixel-pad classification flags
-        fTree->Branch("first_contact_is_pixel", &fFirstContactIsPixel, "first_contact_is_pixel/O");
-        fTree->Branch("geometric_is_pixel", &fGeometricIsPixel, "geometric_is_pixel/O");
-        fTree->Branch("is_pixel_hit", &fIsPixelHit, "is_pixel_hit/O");
-        fTree->Branch("px_hit_delta_x", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
-        fTree->Branch("px_hit_delta_y", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]");
-        
-        // Neighborhood charge sharing results
+        fTree->Branch("TrueX", &fTrueX, "x_hit/D")->SetTitle("True Position X [mm]");
+        fTree->Branch("TrueY", &fTrueY, "y_hit/D")->SetTitle("True Position Y [mm]");
+        fTree->Branch("PixelX", &fPixelX, "x_px/D")->SetTitle("Nearest Pixel Center X [mm]");
+        fTree->Branch("PixelY", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
+        fTree->Branch("Edep", &fEdep, "e_dep/D")->SetTitle("Energy deposit in silicon [MeV]");
+        {
+            TBranch* b = fTree->Branch("isPixelHit", &fIsPixelHit, "isPixelHit/O");
+            if (b) b->SetTitle("Geometric or First Contact Pixel Hit");
+        }
+        fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
+        fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]"); 
         fTree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
-        fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
+        //fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
+        
+        // Full-grid pixel geometry and IDs (constant per run/thread)
+        fTree->Branch("GridPixelX", &fGridPixelX)->SetTitle("Full-grid pixel centers X [mm] (row-major, size N^2)");
+        fTree->Branch("GridPixelY", &fGridPixelY)->SetTitle("Full-grid pixel centers Y [mm] (row-major, size N^2)");
+        fTree->Branch("GridPixelID", &fGridPixelID)->SetTitle("Full-grid pixel IDs (row-major i*N + j, size N^2)");
+
+        // Neighborhood pixel geometry and IDs
+        fTree->Branch("NeighborhoodPixelX", &fNeighborhoodPixelX)->SetTitle("Neighborhood pixel centers X [mm] (row-major, size (2r+1)^2)");
+        fTree->Branch("NeighborhoodPixelY", &fNeighborhoodPixelY)->SetTitle("Neighborhood pixel centers Y [mm] (row-major, size (2r+1)^2)");
+        fTree->Branch("NeighborhoodPixelID", &fNeighborhoodPixelID)->SetTitle("Neighborhood pixel IDs (global grid IDs; -1 for OOB)");
         
         G4cout << "ROOT tree 'Hits': " << fTree->GetNbranches() << " branches" << G4endl;
     
@@ -400,15 +422,6 @@ void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
     fTrueY = y;
 }
 
-void RunAction::SetNearestPixelPos(G4double x, G4double y)
-{
-    // Store nearest pixel center coordinates
-    fPixelX = x;
-    fPixelY = y;
-}
-
-// Initial energy is not persisted per igor.txt; no-op removed
-
 void RunAction::SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY)
 {
     // Store the classification and delta values from pixel center to true position
@@ -473,6 +486,39 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpac
     G4cout << "  Pixel Corner Offset: " << fGridPixelCornerOffset << " mm" << G4endl;
     G4cout << "  Detector Size: " << fGridDetSize << " mm" << G4endl;
     G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
+
+    // Populate full-grid pixel IDs (row-major with i major)
+    fGridPixelID.clear();
+    fGridPixelX.clear();
+    fGridPixelY.clear();
+    const G4int n = fGridNumBlocksPerSide;
+    if (n > 0) {
+        const size_t total = static_cast<size_t>(n) * static_cast<size_t>(n);
+        fGridPixelID.reserve(total);
+        fGridPixelX.reserve(total);
+        fGridPixelY.reserve(total);
+
+        const G4double firstPixelPos = -fGridDetSize/2 + fGridPixelCornerOffset + fGridPixelSize/2;
+        for (G4int i = 0; i < n; ++i) {
+            for (G4int j = 0; j < n; ++j) {
+                const G4int id = i * n + j; // row-major: x-index major
+                fGridPixelID.push_back(id);
+                const G4double x = firstPixelPos + i * fGridPixelSpacing;
+                const G4double y = firstPixelPos + j * fGridPixelSpacing;
+                fGridPixelX.push_back(x);
+                fGridPixelY.push_back(y);
+            }
+        }
+    }
+}
+
+void RunAction::SetNeighborhoodPixelData(const std::vector<G4double>& xs,
+                                  const std::vector<G4double>& ys,
+                                  const std::vector<G4int>& ids)
+{
+    fNeighborhoodPixelX = xs;
+    fNeighborhoodPixelY = ys;
+    fNeighborhoodPixelID = ids;
 }
 
 // =============================================

@@ -11,8 +11,3 @@ PhysicsList::PhysicsList()
     
     RegisterPhysics(new G4StepLimiterPhysics());
 }
-
-PhysicsList::~PhysicsList()
-{
-    
-}

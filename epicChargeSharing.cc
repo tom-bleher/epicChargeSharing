@@ -21,7 +21,7 @@ int main(int argc, char** argv)
     G4bool isBatch = false;
     G4bool headerMode = false;
     G4String macroFile = "";
-    G4int requestedThreads = -1; // -1 means use all available cores
+    G4int requestedThreads = -1; // -1: use all available cores
     
     // Set QT_QPA_PLATFORM environment variable to avoid Qt issues in batch mode
     char* oldQtPlatform = getenv("QT_QPA_PLATFORM");
