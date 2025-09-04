@@ -1,5 +1,10 @@
-#ifndef DetectorConstruction_h
-#define DetectorConstruction_h 1
+/**
+ * @file DetectorConstruction.hh
+ * @brief Declares `DetectorConstruction`, which builds the detector geometry and
+ *        configures sensitive detectors and scoring for the silicon volume.
+ */
+#ifndef DETECTORCONSTRUCTION_HH
+#define DETECTORCONSTRUCTION_HH
 
 #include "G4VUserDetectorConstruction.hh"
 #include "G4VPhysicalVolume.hh"
@@ -57,4 +62,4 @@ private:
     G4LogicalVolume* fLogicSilicon;
 };
 
-#endif
+#endif // DETECTORCONSTRUCTION_HH

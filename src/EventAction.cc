@@ -1,3 +1,7 @@
+/**
+ * @file EventAction.cc
+ * @brief Per-event bookkeeping: first contact, pixel classification, charge sharing, and scorer readout.
+ */
 #include "EventAction.hh"
 #include "RunAction.hh"
 #include "DetectorConstruction.hh"
@@ -66,9 +70,14 @@ void EventAction::EndOfEventAction(const G4Event* event)
                                     geometricIsPixel,
                                     isPixelHitCombined);
 
-    const G4bool computeChargeSharing = (!isPixelHitCombined);
+    // Compute charge sharing only for non-pixel-pad hits and only if there was energy deposit
+    const G4bool computeChargeSharing = (!isPixelHitCombined) && (finalEdep > 0.0);
     if (computeChargeSharing) {
         ComputeChargeSharingForEvent(hitPos);
+    } else {
+        // Ensure vectors are empty when not computing sharing to avoid stale data
+        fNeighborhoodChargeFractions.clear();
+        fNeighborhoodCharge.clear();
     }
 
     // Always compute neighborhood pixel geometry and IDs (independent of charge sharing)
@@ -135,14 +144,14 @@ G4double EventAction::CalcPixelAlphaSubtended(G4double hitX, G4double hitY,
                                                   G4double pixelCenterX, G4double pixelCenterY,
                                                   G4double pixelWidth, G4double pixelHeight)
 {
-  G4double dx = hitX - pixelCenterX;
-  G4double dy = hitY - pixelCenterY;
-  G4double d = std::sqrt(dx*dx + dy*dy);
+  const G4double dx = hitX - pixelCenterX;
+  const G4double dy = hitY - pixelCenterY;
+  const G4double d = std::sqrt(dx*dx + dy*dy);
   
-  G4double l = (pixelWidth + pixelHeight) / 2.0;
+  const G4double l = (pixelWidth + pixelHeight) / 2.0;
   
-  G4double numerator = (l/2.0) * std::sqrt(2.0);
-  G4double denominator = numerator + d;
+  const G4double numerator = (l/2.0) * std::sqrt(2.0);
+  const G4double denominator = numerator + d;
   
   G4double alpha;
   if (denominator < Constants::MIN_DENOMINATOR_VALUE) {
@@ -160,20 +169,20 @@ void EventAction::CalcNeighborhoodChargeSharing(const G4ThreeVector& hitPos)
   fNeighborhoodChargeFractions.clear();
   fNeighborhoodCharge.clear();
   
-  G4double edepInEV = fScorerEnergyDeposit / eV; // Convert to eV using CLHEP units
-  G4double numElectrons = edepInEV / fIonizationEnergy;
+  const G4double edepInEV = fScorerEnergyDeposit / eV; // Convert to eV using CLHEP units
+  const G4double numElectrons = edepInEV / fIonizationEnergy;
   
-  G4double totalCharge = numElectrons * fAmplificationFactor;
+  const G4double totalCharge = numElectrons * fAmplificationFactor;
   
-  G4double pixelSize = fDetector->GetPixelSize();
-  G4double pixelSpacing = fDetector->GetPixelSpacing();
-  G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
-  G4double detSize = fDetector->GetDetSize();
-  G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
+  const G4double pixelSize = fDetector->GetPixelSize();
+  const G4double pixelSpacing = fDetector->GetPixelSpacing();
+  const G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
+  const G4double detSize = fDetector->GetDetSize();
+  const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
   
-  G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
+  const G4double firstPixelPos = -detSize/2 + pixelCornerOffset + pixelSize/2;
   
-  G4double d0_mm = fD0 * micrometer / mm; // Convert microns to mm using CLHEP units
+  const G4double d0 = fD0 * micrometer; // d0 in Geant4 length units (mm)
   
   const G4double hitX = hitPos.x();
   const G4double hitY = hitPos.y();
@@ -207,7 +216,7 @@ void EventAction::CalcNeighborhoodChargeSharing(const G4ThreeVector& hitPos)
       
       G4double weight = 0.0;
       const G4double minLogArg = std::exp(Constants::MIN_LOG_VALUE);
-      G4double logArg = (distance > 0.0 && d0_mm > 0.0) ? (distance / d0_mm) : minLogArg;
+      G4double logArg = (distance > 0.0 && d0 > 0.0) ? (distance / d0) : minLogArg;
       logArg = std::max(logArg, minLogArg);
       G4double logValue = std::log(logArg);
       logValue = std::max(logValue, Constants::MIN_LOG_VALUE);

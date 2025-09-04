@@ -1,12 +1,16 @@
+/**
+ * @file PrimaryGenerator.hh
+ * @brief Declares `PrimaryGenerator`, responsible for configuring the particle gun
+ *        and sampling primary vertex positions within a safe margin.
+ */
 #ifndef PRIMARYGENERATOR_HH
 #define PRIMARYGENERATOR_HH
 
 #include "G4VUserPrimaryGeneratorAction.hh"
-#include "G4ParticleDefinition.hh"
-#include "G4ParticleGun.hh"
 
 class DetectorConstruction;
 class G4Event;
+class G4ParticleGun;
 
 class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
 {
@@ -23,4 +27,4 @@ private:
     void GenerateRandomPos();
 };
 
-#endif
+#endif // PRIMARYGENERATOR_HH

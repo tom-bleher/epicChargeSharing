@@ -1,3 +1,7 @@
+/**
+ * @file DetectorConstruction.cc
+ * @brief Builds world, silicon detector, and pixel pads; attaches MFD and scorers.
+ */
 #include "DetectorConstruction.hh"
 #include "EventAction.hh"
 #include "RunAction.hh"
@@ -25,24 +29,21 @@
 DetectorConstruction::DetectorConstruction()
     : G4VUserDetectorConstruction(),
       fPixelSize(Constants::PIXEL_SIZE),      // 100 microns - default value
+      fPixelWidth(Constants::PIXEL_WIDTH),   // 1 micron thickness
       fPixelSpacing(Constants::PIXEL_SPACING),   // 500 microns - default value  
       fPixelCornerOffset(Constants::PIXEL_CORNER_OFFSET), // 100 microns - default value
       fDetSize(Constants::DETECTOR_SIZE),         // 30 mm - default value (may be adjusted)
       fDetWidth(Constants::DETECTOR_WIDTH),      // 50 microns thickness
-      fPixelWidth(Constants::PIXEL_WIDTH),   // 1 micron thickness
       fNumBlocksPerSide(0),    // Will be calculated
       fEventAction(nullptr),   // Initialize EventAction pointer
-      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS)   // Default neighborhood radius for 9x9 grid
+      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),   // Neighborhood radius r (size (2r+1)x(2r+1) pixels)
+      fLogicSilicon(nullptr)
 {
 }
 
 DetectorConstruction::~DetectorConstruction()
 {
-    
-
 }
-
-
 
 void DetectorConstruction::SetPixelCornerOffset(G4double cornerOffset)
 {
@@ -60,7 +61,7 @@ void DetectorConstruction::SetPixelCornerOffset(G4double cornerOffset)
 
 G4VPhysicalVolume* DetectorConstruction::Construct()
 {
-    G4bool checkOverlaps = true;
+    const G4bool checkOverlaps = true;
 
     G4NistManager *nist = G4NistManager::Instance();
     G4Material *worldMat = nist->FindOrBuildMaterial("G4_Galactic"); // World material
@@ -80,13 +81,13 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     cubeVisAtt->SetForceSolid(true);
     logicCube->SetVisAttributes(cubeVisAtt);
     
-    G4ThreeVector detectorPos(0., 0., Constants::DETECTOR_Z_POSITION);
+    const G4ThreeVector detectorPos(0., 0., Constants::DETECTOR_Z_POSITION);
     
-    G4double originalDetSize = fDetSize;
+    const G4double originalDetSize = fDetSize;
     
     fNumBlocksPerSide = static_cast<G4int>(std::round((fDetSize - 2*fPixelCornerOffset - fPixelSize)/fPixelSpacing + 1));
     
-    G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
+    const G4double requiredDetSize = 2*fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide-1)*fPixelSpacing;
     
     if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
         G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===\n"
@@ -108,7 +109,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
         fLogicSilicon = logicCube; // keep pointer up-to-date
     }
     
-    G4double actualCornerOffset = (fDetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
+    const G4double actualCornerOffset = (fDetSize - (fNumBlocksPerSide-1)*fPixelSpacing - fPixelSize)/2;
     if (std::abs(actualCornerOffset - fPixelCornerOffset) > Constants::PRECISION_TOLERANCE) {
         G4cerr << "ERROR: Corner offset calculation failed!" << G4endl;
         G4cerr << "Expected: " << fPixelCornerOffset/mm << " mm, Got: " << actualCornerOffset/mm << " mm" << G4endl;
@@ -126,9 +127,9 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4cout << "Step limiting: max step " << Constants::MAX_STEP_SIZE/um << " \xCE\xBCm" << G4endl;
     
     G4int copyNo = 0;
-    G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
+    const G4double firstPixelPos = -fDetSize/2 + fPixelCornerOffset + fPixelSize/2;
     
-    G4double pixelZ = detectorPos.z() + fDetWidth/2 + fPixelWidth/2;
+    const G4double pixelZ = detectorPos.z() + fDetWidth/2 + fPixelWidth/2;
     
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
         for (G4int j = 0; j < fNumBlocksPerSide; j++) {
@@ -237,7 +238,7 @@ void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea, G4d
         std::strftime(dateStr, sizeof(dateStr), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
         
         paramFile << "=========================================================" << std::endl;
-        paramFile << "EPIC TOY SIMULATION PARAMETERS" << std::endl;
+        paramFile << "SIMULATION PARAMETERS" << std::endl;
         paramFile << "Generated on: " << dateStr << std::endl;
         paramFile << "=========================================================" << std::endl << std::endl;
         

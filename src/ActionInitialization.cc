@@ -1,3 +1,7 @@
+/**
+ * @file ActionInitialization.cc
+ * @brief Wires together user actions: primary generator, run/event/stepping actions.
+ */
 #include "ActionInitialization.hh"
 #include "PrimaryGenerator.hh"
 #include "RunAction.hh"
@@ -35,7 +39,7 @@ void ActionInitialization::Build() const
     
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
-        fDetector->GetPixelSpacing(), 
+        fDetector->GetPixelSpacing(),
         fDetector->GetPixelCornerOffset(),
         fDetector->GetDetSize(),
         fDetector->GetNumBlocksPerSide()

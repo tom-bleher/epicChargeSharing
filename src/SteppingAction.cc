@@ -1,3 +1,7 @@
+/**
+ * @file SteppingAction.cc
+ * @brief Records first-contact volume transitions and forwards positions to `EventAction`.
+ */
 #include "SteppingAction.hh"
 #include "EventAction.hh"
 #include "G4Step.hh"
@@ -19,25 +23,25 @@ void SteppingAction::Reset()
 
 void SteppingAction::TrackVolumeInteractions(const G4Step* step)
 {
-  G4StepPoint* prePoint = step->GetPreStepPoint();
+  if (fFirstContactVolume != "NONE") {
+    return; // already recorded first-contact this event
+  }
+
   G4StepPoint* postPoint = step->GetPostStepPoint();
+  if (!postPoint || postPoint->GetStepStatus() != fGeomBoundary) {
+    return; // only care about boundary crossings
+  }
 
-  G4VPhysicalVolume* preVol = prePoint->GetTouchableHandle()->GetVolume();
   G4VPhysicalVolume* postVol = postPoint->GetTouchableHandle()->GetVolume();
-  G4String preVolName  = preVol  ? preVol->GetLogicalVolume()->GetName()  : "UNKNOWN";
-  G4String postVolName = postVol ? postVol->GetLogicalVolume()->GetName() : "UNKNOWN";
+  if (!postVol) {
+    return;
+  }
 
-  if (postPoint->GetStepStatus() == fGeomBoundary) {
-    if (fFirstContactVolume == "NONE" && postVol) {
-      const G4String enteredName = postVol->GetLogicalVolume()->GetName();
-
-      if (enteredName == "logicBlock" || enteredName == "logicCube") {
-        fFirstContactVolume = enteredName;
-
-        if (fEventAction) {
-          fEventAction->RegisterFirstContact(postPoint->GetPosition());
-        }
-      }
+  const G4String enteredName = postVol->GetLogicalVolume()->GetName();
+  if (enteredName == "logicBlock" || enteredName == "logicCube") {
+    fFirstContactVolume = enteredName;
+    if (fEventAction) {
+      fEventAction->RegisterFirstContact(postPoint->GetPosition());
     }
   }
 }
