@@ -23,7 +23,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # Add compiler optimization and multithreading support
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
 
 # Enable multithreading support
@@ -31,8 +31,19 @@ find_package(Threads REQUIRED)
 
 # Set build type to Release by default for optimal performance
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Release by default")
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+# Optional fast-math/native CPU optimizations (opt-in)
+option(EC_FAST_MATH "Enable fast-math" OFF)
+if(EC_FAST_MATH)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-ffast-math -fno-math-errno -march=native -mtune=native)
+        message(STATUS "EC_FAST_MATH enabled: adding -ffast-math -fno-math-errno -march=native -mtune=native")
+    else()
+        message(WARNING "EC_FAST_MATH is enabled, but not supported for ${CMAKE_CXX_COMPILER_ID}")
+    endif()
 endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
@@ -51,8 +62,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     
     # Add additional optimization flags for multithreaded performance
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffast-math -funroll-loops")
-        message(STATUS "Added performance optimization flags for ${CMAKE_CXX_COMPILER_ID}")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -funroll-loops")
+        message(STATUS "Added -funroll-loops for ${CMAKE_CXX_COMPILER_ID}")
     endif()
 endif()
 
@@ -287,7 +298,7 @@ target_compile_definitions(epicChargeSharing PRIVATE PROJECT_SOURCE_DIR="${CMAKE
 # Set target-specific properties for optimization
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set_target_properties(epicChargeSharing PROPERTIES
-        COMPILE_FLAGS "-O3 -march=native -mtune=native"
+        COMPILE_FLAGS "-O3"
     )
     
     # Enable interprocedural optimization for this target if supported
