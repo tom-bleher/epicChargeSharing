@@ -14,12 +14,18 @@
 #include <TCanvas.h>
 #include <TLegend.h>
 #include <TLine.h>
+#include <TBox.h>
 #include <TLatex.h>
 #include <TStyle.h>
 #include <Math/MinimizerOptions.h>
 #include <Math/Factory.h>
 #include <Math/Minimizer.h>
 #include <Math/Functor.h>
+
+// Match processing2D fitter pipeline
+#include <Fit/Fitter.h>
+#include <Fit/BinData.h>
+#include <Math/WrappedMultiTF1.h>
 
 #include <vector>
 #include <string>
@@ -49,9 +55,12 @@ namespace {
 // applied to all data points used in the fits for that event.
 int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.root",
                        double errorPercentOfMax = 5.0) {
-  // Use Minuit2 by default (match processing2D)
-  ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2");
-  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-6);
+  // Match processing2D configuration exactly
+  ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
+  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
+  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
+  ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
+  ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
   // Open file for read
   TFile* file = TFile::Open(filename, "READ");
@@ -83,8 +92,8 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
     std::vector<double> xs; xs.reserve(5000);
     std::vector<double> ys; ys.reserve(5000);
     double x_px_tmp = 0.0, y_px_tmp = 0.0;
-    t->SetBranchAddress("x_px", &x_px_tmp);
-    t->SetBranchAddress("y_px", &y_px_tmp);
+    t->SetBranchAddress("PixelX", &x_px_tmp);
+    t->SetBranchAddress("PixelY", &y_px_tmp);
     Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
     for (Long64_t i=0;i<nToScan;++i) {
       t->GetEntry(i);
@@ -134,11 +143,11 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
   Bool_t is_pixel_hit = kFALSE;
   std::vector<double>* Fi = nullptr; // use fractions for fitting
 
-  tree->SetBranchAddress("x_hit", &x_hit);
-  tree->SetBranchAddress("y_hit", &y_hit);
-  tree->SetBranchAddress("x_px",  &x_px);
-  tree->SetBranchAddress("y_px",  &y_px);
-  tree->SetBranchAddress("is_pixel_hit", &is_pixel_hit);
+  tree->SetBranchAddress("TrueX", &x_hit);
+  tree->SetBranchAddress("TrueY", &y_hit);
+  tree->SetBranchAddress("PixelX",  &x_px);
+  tree->SetBranchAddress("PixelY",  &y_px);
+  tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
   tree->SetBranchAddress("F_i", &Fi);
 
   // Prepare plotting objects
@@ -277,12 +286,12 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
     double A_row = A0_row, B_row = B0_row, S_row = std::max(0.25*pixelSpacing, 1e-6);
     double A_col = A0_col, B_col = B0_col, S_col = std::max(0.25*pixelSpacing, 1e-6);
 
-    // Very low contrast: fallback to fast weighted centroids (skip fit)
+    // Very low contrast: fallback to fast weighted centroids (skip fit), baseline-subtracted
     if (A0_row < 1e-6 && A0_col < 1e-6) {
       double wsumx = 0.0, xw = 0.0;
-      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k]); wsumx += w; xw += w * x_row[k]; }
+      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k] - B0_row); wsumx += w; xw += w * x_row[k]; }
       double wsumy = 0.0, yw = 0.0;
-      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k]); wsumy += w; yw += w * y_col[k]; }
+      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k] - B0_col); wsumy += w; yw += w * y_col[k]; }
       if (wsumx > 0 && wsumy > 0) {
         muRow = xw / wsumx;
         muCol = yw / wsumy;
@@ -307,81 +316,127 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
       const double xMax = *minmaxX.second + 0.5 * pixelSpacing;
       const double yMin = *minmaxY.first - 0.5 * pixelSpacing;
       const double yMax = *minmaxY.second + 0.5 * pixelSpacing;
+      // Tighten mu bounds to ±1/2 pitch about nearest pixel center (match processing2D)
+      const double muXLo = x_px - 0.5 * pixelSpacing;
+      const double muXHi = x_px + 0.5 * pixelSpacing;
+      const double muYLo = y_px - 0.5 * pixelSpacing;
+      const double muYHi = y_px + 0.5 * pixelSpacing;
 
-      // Chi2 objectives (weighted if uniformSigma > 0)
-      auto chi2Row = [&](const double* p) -> double {
-        const double A = p[0], mu = p[1], sig = p[2], B = p[3];
-        const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
-        double sum = 0.0;
-        for (size_t k=0;k<q_row_fit.size();++k) {
-          const double dx = (x_row_fit[k] - mu)/sig;
-          const double model = A * std::exp(-0.5*dx*dx) + B;
-          const double r = (q_row_fit[k] - model);
-          sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
-        }
-        return sum;
+      // Sigma seeding and bounds identical to processing2D.C
+      const double sigLoBound = std::max(1e-6, 0.02*pixelSpacing);
+      const double sigHiBound = 3.0*pixelSpacing;
+      auto sigmaSeed1D = [&](const std::vector<double>& xs, const std::vector<double>& qs, double B0)->double {
+        double wsum = 0.0, xw = 0.0;
+        for (size_t k=0;k<xs.size();++k) { double w = std::max(0.0, qs[k] - B0); wsum += w; xw += w * xs[k]; }
+        if (wsum <= 0.0) return std::max(0.25*pixelSpacing, 1e-6);
+        const double mean = xw / wsum;
+        double var = 0.0;
+        for (size_t k=0;k<xs.size();++k) { double w = std::max(0.0, qs[k] - B0); const double dx = xs[k] - mean; var += w * dx * dx; }
+        var = (wsum > 0.0) ? (var / wsum) : 0.0;
+        double s = std::sqrt(std::max(var, 1e-12));
+        if (s < sigLoBound) s = sigLoBound;
+        if (s > sigHiBound) s = sigHiBound;
+        return s;
       };
-      auto chi2Col = [&](const double* p) -> double {
-        const double A = p[0], mu = p[1], sig = p[2], B = p[3];
-        const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
-        double sum = 0.0;
-        for (size_t k=0;k<q_col_fit.size();++k) {
-          const double dy = (y_col_fit[k] - mu)/sig;
-          const double model = A * std::exp(-0.5*dy*dy) + B;
-          const double r = (q_col_fit[k] - model);
-          sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
-        }
-        return sum;
-      };
+      const double sigInitRow = sigmaSeed1D(x_row, q_row, B0_row);
+      const double sigInitCol = sigmaSeed1D(y_col, q_col, B0_col);
 
-      std::unique_ptr<ROOT::Math::Minimizer> mRow(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
-      std::unique_ptr<ROOT::Math::Minimizer> mCol(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
-      mRow->SetMaxFunctionCalls(200);
-      mCol->SetMaxFunctionCalls(200);
-      mRow->SetTolerance(1e-5);
-      mCol->SetTolerance(1e-5);
+      // Wrapped model functions for the fitter
+      ROOT::Math::WrappedMultiTF1 wRow(fRow, 1);
+      ROOT::Math::WrappedMultiTF1 wCol(fCol, 1);
 
-      ROOT::Math::Functor fRowChi2(chi2Row, 4);
-      ROOT::Math::Functor fColChi2(chi2Col, 4);
-      mRow->SetFunction(fRowChi2);
-      mCol->SetFunction(fColChi2);
+      // Build BinData with uniform errors (or 1.0 if not provided), matching processing2D
+      ROOT::Fit::BinData dataRow(static_cast<int>(x_row_fit.size()), 1);
+      ROOT::Fit::BinData dataCol(static_cast<int>(y_col_fit.size()), 1);
+      for (size_t k=0;k<x_row_fit.size();++k) {
+        const double ey = (uniformSigma > 0.0) ? uniformSigma : 1.0;
+        dataRow.Add(x_row_fit[k], q_row_fit[k], ey);
+      }
+      for (size_t k=0;k<y_col_fit.size();++k) {
+        const double ey = (uniformSigma > 0.0) ? uniformSigma : 1.0;
+        dataCol.Add(y_col_fit[k], q_col_fit[k], ey);
+      }
 
-      const double sigInit = std::max(0.25*pixelSpacing, 1e-6);
-      const double sigLo   = std::max(1e-6, 0.05*pixelSpacing);
-      const double sigHi   = 2.0*pixelSpacing;
+      ROOT::Fit::Fitter fitRow;
+      ROOT::Fit::Fitter fitCol;
+      fitRow.Config().SetMinimizer("Minuit2", "Fumili2");
+      fitCol.Config().SetMinimizer("Minuit2", "Fumili2");
+      fitRow.Config().MinimizerOptions().SetStrategy(0);
+      fitCol.Config().MinimizerOptions().SetStrategy(0);
+      fitRow.Config().MinimizerOptions().SetTolerance(1e-4);
+      fitCol.Config().MinimizerOptions().SetTolerance(1e-4);
+      fitRow.Config().MinimizerOptions().SetPrintLevel(0);
+      fitCol.Config().MinimizerOptions().SetPrintLevel(0);
 
-      mRow->SetLimitedVariable(0, "A", A0_row, 1e-3, 0.0, 1.0);
-      mRow->SetLimitedVariable(1, "mu", mu0_row, 1e-4*pixelSpacing, xMin, xMax);
-      mRow->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
-      mRow->SetLimitedVariable(3, "B", B0_row, 1e-3, 0.0, std::max(0.0, *minmaxRow.first));
+      fitRow.SetFunction(wRow);
+      fitCol.SetFunction(wCol);
 
-      mCol->SetLimitedVariable(0, "A", A0_col, 1e-3, 0.0, 1.0);
-      mCol->SetLimitedVariable(1, "mu", mu0_col, 1e-4*pixelSpacing, yMin, yMax);
-      mCol->SetLimitedVariable(2, "sigma", sigInit, 1e-4*pixelSpacing, sigLo, sigHi);
-      mCol->SetLimitedVariable(3, "B", B0_col, 1e-3, 0.0, std::max(0.0, *minmaxCol.first));
+      // Parameter settings and limits (match processing2D)
+      fitRow.Config().ParSettings(0).SetName("A");
+      fitRow.Config().ParSettings(1).SetName("mu");
+      fitRow.Config().ParSettings(2).SetName("sigma");
+      fitRow.Config().ParSettings(3).SetName("B");
+      fitCol.Config().ParSettings(0).SetName("A");
+      fitCol.Config().ParSettings(1).SetName("mu");
+      fitCol.Config().ParSettings(2).SetName("sigma");
+      fitCol.Config().ParSettings(3).SetName("B");
 
-      haveFitRow = mRow->Minimize();
-      haveFitCol = mCol->Minimize();
+      fitRow.Config().ParSettings(0).SetLowerLimit(0.0);
+      fitRow.Config().ParSettings(1).SetLimits(muXLo, muXHi);
+      fitRow.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
+      fitRow.Config().ParSettings(3).SetLowerLimit(0.0);
+      fitCol.Config().ParSettings(0).SetLowerLimit(0.0);
+      fitCol.Config().ParSettings(1).SetLimits(muYLo, muYHi);
+      fitCol.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
+      fitCol.Config().ParSettings(3).SetLowerLimit(0.0);
+
+      fitRow.Config().ParSettings(0).SetStepSize(1e-3);
+      fitRow.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
+      fitRow.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
+      fitRow.Config().ParSettings(3).SetStepSize(1e-3);
+      fitCol.Config().ParSettings(0).SetStepSize(1e-3);
+      fitCol.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
+      fitCol.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
+      fitCol.Config().ParSettings(3).SetStepSize(1e-3);
+
+      // Seed values
+      fitRow.Config().ParSettings(0).SetValue(A0_row);
+      fitRow.Config().ParSettings(1).SetValue(mu0_row);
+      fitRow.Config().ParSettings(2).SetValue(sigInitRow);
+      fitRow.Config().ParSettings(3).SetValue(B0_row);
+      fitCol.Config().ParSettings(0).SetValue(A0_col);
+      fitCol.Config().ParSettings(1).SetValue(mu0_col);
+      fitCol.Config().ParSettings(2).SetValue(sigInitCol);
+      fitCol.Config().ParSettings(3).SetValue(B0_col);
+
+      haveFitRow = fitRow.Fit(dataRow);
+      haveFitCol = fitCol.Fit(dataCol);
 
       if (haveFitRow) {
-        A_row = mRow->X()[0]; muRow = mRow->X()[1]; S_row = mRow->X()[2]; B_row = mRow->X()[3];
+        A_row = fitRow.Result().Parameter(0);
+        muRow = fitRow.Result().Parameter(1);
+        S_row = fitRow.Result().Parameter(2);
+        B_row = fitRow.Result().Parameter(3);
         fRow.SetRange(xMin, xMax);
         fRow.SetParameters(A_row, muRow, S_row, B_row);
       } else {
-        // Fallback: weighted centroid on trimmed window
+        // Fallback: baseline-subtracted weighted centroid on full window
         double wsum = 0.0, xw = 0.0;
-        for (size_t k=0;k<x_row_fit.size();++k) { double w = std::max(0.0, q_row_fit[k]); wsum += w; xw += w * x_row_fit[k]; }
+        for (size_t k=0;k<x_row_fit.size();++k) { double w = std::max(0.0, q_row_fit[k] - B0_row); wsum += w; xw += w * x_row_fit[k]; }
         if (wsum > 0) { muRow = xw / wsum; haveFitRow = true; }
       }
 
       if (haveFitCol) {
-        A_col = mCol->X()[0]; muCol = mCol->X()[1]; S_col = mCol->X()[2]; B_col = mCol->X()[3];
+        A_col = fitCol.Result().Parameter(0);
+        muCol = fitCol.Result().Parameter(1);
+        S_col = fitCol.Result().Parameter(2);
+        B_col = fitCol.Result().Parameter(3);
         fCol.SetRange(yMin, yMax);
         fCol.SetParameters(A_col, muCol, S_col, B_col);
       } else {
-        // Fallback: weighted centroid on trimmed window
+        // Fallback: baseline-subtracted weighted centroid on full window
         double wsum = 0.0, yw = 0.0;
-        for (size_t k=0;k<y_col_fit.size();++k) { double w = std::max(0.0, q_col_fit[k]); wsum += w; yw += w * y_col_fit[k]; }
+        for (size_t k=0;k<y_col_fit.size();++k) { double w = std::max(0.0, q_col_fit[k] - B0_col); wsum += w; yw += w * y_col_fit[k]; }
         if (wsum > 0) { muCol = yw / wsum; haveFitCol = true; }
       }
     }
@@ -418,6 +473,24 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
     gPad->Update();
     double yPadMin = gPad->GetUymin();
     double yPadMax = gPad->GetUymax();
+    // Draw horizontal pixel-width rectangles centered at each data point (outline only)
+    {
+      const double halfH = 0.015 * (yPadMax - yPadMin);
+      for (size_t k = 0; k < x_row.size(); ++k) {
+        const double xc = x_row[k];
+        const double yc = q_row[k];
+        const double xlo = xc - 0.5 * pixelSize;
+        const double xhi = xc + 0.5 * pixelSize;
+        const double ylo = yc - halfH;
+        const double yhi = yc + halfH;
+        TBox* box = new TBox(xlo, ylo, xhi, yhi);
+        box->SetFillStyle(0);
+        box->SetLineColor(kGray+2);
+        box->SetLineWidth(1);
+        box->SetBit(kCanDelete);
+        box->Draw("SAME L");
+      }
+    }
     TLine lineXhit(x_hit, yPadMin, x_hit, yPadMax);
     lineXhit.SetLineStyle(2);
     lineXhit.SetLineWidth(2);
@@ -461,6 +534,24 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.
     gPad->Update();
     double yPadMinC = gPad->GetUymin();
     double yPadMaxC = gPad->GetUymax();
+    // Draw horizontal pixel-width rectangles centered at each data point (outline only)
+    {
+      const double halfHc = 0.015 * (yPadMaxC - yPadMinC);
+      for (size_t k = 0; k < y_col.size(); ++k) {
+        const double xc = y_col[k]; // note: x-axis is Y coordinate here
+        const double yc = q_col[k];
+        const double xlo = xc - 0.5 * pixelSize;
+        const double xhi = xc + 0.5 * pixelSize;
+        const double ylo = yc - halfHc;
+        const double yhi = yc + halfHc;
+        TBox* box = new TBox(xlo, ylo, xhi, yhi);
+        box->SetFillStyle(0);
+        box->SetLineColor(kGray+2);
+        box->SetLineWidth(1);
+        box->SetBit(kCanDelete);
+        box->Draw("SAME L");
+      }
+    }
     TLine lineYhit(y_hit, yPadMinC, y_hit, yPadMaxC);
     lineYhit.SetLineStyle(2);
     lineYhit.SetLineWidth(2);

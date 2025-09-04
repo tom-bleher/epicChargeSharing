@@ -17,6 +17,12 @@
 #include <Math/Minimizer.h>
 #include <Math/Functor.h>
 
+// Fast least-squares fitter API (required for Fumili2)
+#include <Fit/Fitter.h>
+#include <Fit/BinData.h>
+#include <Fit/Chi2FCN.h>
+#include <Math/WrappedMultiTF1.h>
+
 #include <vector>
 #include <string>
 #include <cmath>
@@ -45,13 +51,12 @@ namespace {
 // applied to all data points used in the fits for that event.
 int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
                  double errorPercentOfMax = 5.0) {
-  // Use Minuit2 by default
-  ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2");
-  // Slightly relax tolerance for speed, preserving accuracy
-  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-5);
-  // Reduce per-fit effort to speed up processing
-  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(200);
+  // Favor faster least-squares: Minuit2 + Fumili2
+  ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
+  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
+  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
+  ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
   // Open file for update
   TFile* file = TFile::Open(filename, "UPDATE");
@@ -79,8 +84,8 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     std::vector<double> xs; xs.reserve(5000);
     std::vector<double> ys; ys.reserve(5000);
     double x_px_tmp = 0.0, y_px_tmp = 0.0;
-    t->SetBranchAddress("x_px", &x_px_tmp);
-    t->SetBranchAddress("y_px", &y_px_tmp);
+    t->SetBranchAddress("PixelX", &x_px_tmp);
+    t->SetBranchAddress("PixelY", &y_px_tmp);
     Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
     for (Long64_t i=0;i<nToScan;++i) {
       t->GetEntry(i);
@@ -124,25 +129,22 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
   double x_px  = 0.0, y_px  = 0.0;
   Bool_t is_pixel_hit = kFALSE;
   std::vector<double>* Fi = nullptr; // used for fits (fractions 0..1)
-  std::vector<double>* Qi = nullptr; // retained for compatibility but unused
 
   // Speed up I/O: deactivate all branches, then enable only what we read
   tree->SetBranchStatus("*", 0);
-  tree->SetBranchStatus("x_hit", 1);
-  tree->SetBranchStatus("y_hit", 1);
-  tree->SetBranchStatus("x_px", 1);
-  tree->SetBranchStatus("y_px", 1);
-  tree->SetBranchStatus("is_pixel_hit", 1);
+  tree->SetBranchStatus("TrueX", 1);
+  tree->SetBranchStatus("TrueY", 1);
+  tree->SetBranchStatus("PixelX", 1);
+  tree->SetBranchStatus("PixelY", 1);
+  tree->SetBranchStatus("isPixelHit", 1);
   tree->SetBranchStatus("F_i", 1);
-  tree->SetBranchStatus("Q_i", 1); // kept for compatibility
 
-  tree->SetBranchAddress("x_hit", &x_hit);
-  tree->SetBranchAddress("y_hit", &y_hit);
-  tree->SetBranchAddress("x_px", &x_px);
-  tree->SetBranchAddress("y_px", &y_px);
-  tree->SetBranchAddress("is_pixel_hit", &is_pixel_hit);
+  tree->SetBranchAddress("TrueX", &x_hit);
+  tree->SetBranchAddress("TrueY", &y_hit);
+  tree->SetBranchAddress("PixelX", &x_px);
+  tree->SetBranchAddress("PixelY", &y_px);
+  tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
   tree->SetBranchAddress("F_i", &Fi);
-  tree->SetBranchAddress("Q_i", &Qi);
 
   // New branches (outputs).
   // Use NaN sentinel so invalid/unfitted entries are ignored in ROOT histograms.
@@ -151,9 +153,6 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
   double y_rec_2d = INVALID_VALUE;
   double rec_hit_delta_x_2d = INVALID_VALUE;
   double rec_hit_delta_y_2d = INVALID_VALUE;
-  // Also store signed deltas (not absolute): (hit - rec)
-  double rec_hit_signed_delta_x_2d = INVALID_VALUE;
-  double rec_hit_signed_delta_y_2d = INVALID_VALUE;
 
   // If branches already exist, we will overwrite their contents
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
@@ -171,12 +170,10 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     return br;
   };
 
-  TBranch* br_x_rec = ensureAndResetBranch("x_rec_2d", &x_rec_2d);
-  TBranch* br_y_rec = ensureAndResetBranch("y_rec_2d", &y_rec_2d);
-  TBranch* br_dx    = ensureAndResetBranch("rec_hit_delta_x_2d", &rec_hit_delta_x_2d);
-  TBranch* br_dy    = ensureAndResetBranch("rec_hit_delta_y_2d", &rec_hit_delta_y_2d);
-  TBranch* br_sdx   = ensureAndResetBranch("rec_hit_signed_delta_x_2d", &rec_hit_signed_delta_x_2d);
-  TBranch* br_sdy   = ensureAndResetBranch("rec_hit_signed_delta_y_2d", &rec_hit_signed_delta_y_2d);
+  TBranch* br_x_rec = ensureAndResetBranch("ReconX", &x_rec_2d);
+  TBranch* br_y_rec = ensureAndResetBranch("ReconY", &y_rec_2d);
+  TBranch* br_dx    = ensureAndResetBranch("ReconTrueDeltaX", &rec_hit_delta_x_2d);
+  TBranch* br_dy    = ensureAndResetBranch("ReconTrueDeltaY", &rec_hit_delta_y_2d);
 
   // Fitting function for 1D gaussian + const
   TF1 fRow("fRow", GaussPlusB, -1e9, 1e9, 4);
@@ -200,8 +197,6 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
-      br_sdx->Fill();
-      br_sdy->Fill();
       
       continue;
     }
@@ -214,8 +209,6 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
-      br_sdx->Fill();
-      br_sdy->Fill();
       
       continue;
     }
@@ -267,8 +260,7 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
-      br_sdx->Fill();
-      br_sdy->Fill();
+      
       continue;
     }
 
@@ -297,16 +289,12 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
         y_rec_2d = yw / wsumy;
         rec_hit_delta_x_2d = std::abs(x_hit - x_rec_2d);
         rec_hit_delta_y_2d = std::abs(y_hit - y_rec_2d);
-        rec_hit_signed_delta_x_2d = (x_hit - x_rec_2d);
-        rec_hit_signed_delta_y_2d = (y_hit - y_rec_2d);
         
       }
       br_x_rec->Fill();
       br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
-      br_sdx->Fill();
-      br_sdy->Fill();
       
       continue;
     }
@@ -401,33 +389,82 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       return sum;
     };
 
-    std::unique_ptr<ROOT::Math::Minimizer> mRow(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
-    std::unique_ptr<ROOT::Math::Minimizer> mCol(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
-    mRow->SetMaxFunctionCalls(200);
-    mCol->SetMaxFunctionCalls(200);
-    mRow->SetTolerance(1e-5);
-    mCol->SetTolerance(1e-5);
+    // Wrap TF1 into a multi-dim function for the fitter
+    ROOT::Math::WrappedMultiTF1 wRow(fRow, 1);
+    ROOT::Math::WrappedMultiTF1 wCol(fCol, 1);
 
-    ROOT::Math::Functor fRowChi2(chi2Row, 4);
-    ROOT::Math::Functor fColChi2(chi2Col, 4);
-    mRow->SetFunction(fRowChi2);
-    mCol->SetFunction(fColChi2);
+    // Build BinData (Fumili2 requires FitMethodFunction via Chi2Function)
+    ROOT::Fit::BinData dataRow(static_cast<int>(x_row_fit.size()), 1);
+    ROOT::Fit::BinData dataCol(static_cast<int>(y_col_fit.size()), 1);
+    for (size_t k = 0; k < x_row_fit.size(); ++k) {
+      const double ey = (uniformSigma > 0.0) ? uniformSigma : 1.0;
+      dataRow.Add(x_row_fit[k], q_row_fit[k], ey);
+    }
+    for (size_t k = 0; k < y_col_fit.size(); ++k) {
+      const double ey = (uniformSigma > 0.0) ? uniformSigma : 1.0;
+      dataCol.Add(y_col_fit[k], q_col_fit[k], ey);
+    }
 
-    mRow->SetLimitedVariable(0, "A", A0_row, 1e-3, 0.0, 1.0);
-    mRow->SetLimitedVariable(1, "mu", mu0_row, 1e-4*pixelSpacing, xMin, xMax);
-    mRow->SetLimitedVariable(2, "sigma", sigInitRow, 1e-4*pixelSpacing, sigLoBound, sigHiBound);
-    mRow->SetLimitedVariable(3, "B", B0_row, 1e-3, 0.0, std::max(0.0, *minmaxRow.first));
+    ROOT::Fit::Fitter fitRow;
+    ROOT::Fit::Fitter fitCol;
+    fitRow.Config().SetMinimizer("Minuit2", "Fumili2");
+    fitCol.Config().SetMinimizer("Minuit2", "Fumili2");
+    fitRow.Config().MinimizerOptions().SetStrategy(0);
+    fitCol.Config().MinimizerOptions().SetStrategy(0);
+    fitRow.Config().MinimizerOptions().SetTolerance(1e-4);
+    fitCol.Config().MinimizerOptions().SetTolerance(1e-4);
+    fitRow.Config().MinimizerOptions().SetPrintLevel(0);
+    fitCol.Config().MinimizerOptions().SetPrintLevel(0);
 
-    mCol->SetLimitedVariable(0, "A", A0_col, 1e-3, 0.0, 1.0);
-    mCol->SetLimitedVariable(1, "mu", mu0_col, 1e-4*pixelSpacing, yMin, yMax);
-    mCol->SetLimitedVariable(2, "sigma", sigInitCol, 1e-4*pixelSpacing, sigLoBound, sigHiBound);
-    mCol->SetLimitedVariable(3, "B", B0_col, 1e-3, 0.0, std::max(0.0, *minmaxCol.first));
+    // Provide the model functions; Chi2 is built internally from BinData
+    fitRow.SetFunction(wRow);
+    fitCol.SetFunction(wCol);
 
-    bool okRow = mRow->Minimize();
-    bool okCol = mCol->Minimize();
+    // Parameter settings and limits
+    fitRow.Config().ParSettings(0).SetName("A");
+    fitRow.Config().ParSettings(1).SetName("mu");
+    fitRow.Config().ParSettings(2).SetName("sigma");
+    fitRow.Config().ParSettings(3).SetName("B");
+    fitCol.Config().ParSettings(0).SetName("A");
+    fitCol.Config().ParSettings(1).SetName("mu");
+    fitCol.Config().ParSettings(2).SetName("sigma");
+    fitCol.Config().ParSettings(3).SetName("B");
 
-    double muX = okRow ? mRow->X()[1] : NAN;
-    double muY = okCol ? mCol->X()[1] : NAN;
+    fitRow.Config().ParSettings(0).SetLowerLimit(0.0);
+    fitRow.Config().ParSettings(1).SetLimits(muXLo, muXHi);
+    fitRow.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
+    fitRow.Config().ParSettings(3).SetLowerLimit(0.0);
+    fitCol.Config().ParSettings(0).SetLowerLimit(0.0);
+    fitCol.Config().ParSettings(1).SetLimits(muYLo, muYHi);
+    fitCol.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
+    fitCol.Config().ParSettings(3).SetLowerLimit(0.0);
+
+    fitRow.Config().ParSettings(0).SetStepSize(1e-3);
+    fitRow.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
+    fitRow.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
+    fitRow.Config().ParSettings(3).SetStepSize(1e-3);
+    fitCol.Config().ParSettings(0).SetStepSize(1e-3);
+    fitCol.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
+    fitCol.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
+    fitCol.Config().ParSettings(3).SetStepSize(1e-3);
+
+    // Initial parameters (via ParSettings)
+    fitRow.Config().ParSettings(0).SetValue(A0_row);
+    fitRow.Config().ParSettings(1).SetValue(mu0_row);
+    fitRow.Config().ParSettings(2).SetValue(sigInitRow);
+    fitRow.Config().ParSettings(3).SetValue(B0_row);
+    fitCol.Config().ParSettings(0).SetValue(A0_col);
+    fitCol.Config().ParSettings(1).SetValue(mu0_col);
+    fitCol.Config().ParSettings(2).SetValue(sigInitCol);
+    fitCol.Config().ParSettings(3).SetValue(B0_col);
+
+    bool okRow = fitRow.Fit(dataRow);
+    bool okCol = fitCol.Fit(dataCol);
+
+    double muX = NAN;
+    double muY = NAN;
+    if (okRow) muX = fitRow.Result().Parameter(1);
+    if (okCol) muY = fitCol.Result().Parameter(1);
 
     // Fallback: baseline-subtracted weighted centroid if fit did not converge
     if (!okRow) {
@@ -446,14 +483,11 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
       y_rec_2d = muY;
       rec_hit_delta_x_2d = std::abs(x_hit - x_rec_2d);
       rec_hit_delta_y_2d = std::abs(y_hit - y_rec_2d);
-      rec_hit_signed_delta_x_2d = (x_hit - x_rec_2d);
-      rec_hit_signed_delta_y_2d = (y_hit - y_rec_2d);
-      
+       
       nFitted++;
     } else {
       x_rec_2d = y_rec_2d = INVALID_VALUE;
       rec_hit_delta_x_2d = rec_hit_delta_y_2d = INVALID_VALUE;
-      rec_hit_signed_delta_x_2d = rec_hit_signed_delta_y_2d = INVALID_VALUE;
       
     }
 
@@ -461,8 +495,6 @@ int processing2D(const char* filename = "../build/epicChargeSharingOutput.root",
     br_y_rec->Fill();
     br_dx->Fill();
     br_dy->Fill();
-    br_sdx->Fill();
-    br_sdy->Fill();
     
   }
 
