@@ -1,3 +1,7 @@
+/**
+ * @file PhysicsList.cc
+ * @brief Minimal EM physics with step limiter and default production cut.
+ */
 #include "PhysicsList.hh"
 #include "G4EmStandardPhysics.hh"
 #include "G4StepLimiterPhysics.hh"

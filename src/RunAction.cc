@@ -1,3 +1,7 @@
+/**
+ * @file RunAction.cc
+ * @brief Manages run lifecycle, ROOT I/O (thread-safe), and post-run merging/processing.
+ */
 #include "RunAction.hh"
 #include "Constants.hh"
 #include "Control.hh"
@@ -22,6 +26,8 @@
 #include "TThread.h"
 #include "TFileMerger.h"
 #include "RVersion.h"
+#include "TString.h"
+#include "TSystem.h"
 
 std::mutex RunAction::fRootMutex;
 std::atomic<int> RunAction::fWorkersCompleted{0};
@@ -68,10 +74,17 @@ static void RunPostProcessingMacros(const G4String& rootFilePath)
 
     G4cout << "Starting fitting simulated data in " << rootFilePath << G4endl;
 
+    // Build ACLiC outputs in a local cache under build/ to avoid writing into source tree
+    if (gSystem) {
+        gSystem->mkdir("proc_cache", true);
+        gSystem->SetBuildDir("proc_cache");
+    }
+
     auto runMacro = [&](const char* macroPath, const char* funcName) {
         if (!macroPath || !funcName) return;
-        const G4String loadCmd = Form(".L %s+", macroPath);
-        gROOT->ProcessLine(loadCmd.c_str());
+        // Force recompile each run ("++") to ensure fresh .so and corresponding .pcm are produced
+        const G4String loadCmdRebuild = Form(".L %s++", macroPath);
+        gROOT->ProcessLine(loadCmdRebuild.c_str());
         const G4String callCmd = Form("%s(\"%s\", %.9g);", funcName, rootFilePath.c_str(), Constants::PROCESSING_ERROR_PERCENT);
         gROOT->ProcessLine(callCmd.c_str());
     };
@@ -99,6 +112,12 @@ RunAction::RunAction()
   fPixelTrueDeltaY(0)
 
 {
+    fGridPixelSize = 0.0;
+    fGridPixelSpacing = 0.0;
+    fGridPixelCornerOffset = 0.0;
+    fGridDetSize = 0.0;
+    fGridNumBlocksPerSide = 0;
+    fGridNeighborhoodRadius = 0;
 }
 
 RunAction::~RunAction() = default;

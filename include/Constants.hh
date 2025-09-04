@@ -34,7 +34,7 @@ namespace Constants {
     const G4double PRECISION_TOLERANCE = 1*nm;           // High precision calculations
     
     // Grid and neighborhood configuration
-    const G4int NEIGHBORHOOD_RADIUS = 2;                 // Default neighborhood radius for 9x9 grid
+    const G4int NEIGHBORHOOD_RADIUS = 2;                 // Neighborhood radius r (grid size (2r+1)x(2r+1); r=2 -> 5x5)
     
     // ========================
     // SIMULATION CONSTANTS

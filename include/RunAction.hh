@@ -1,3 +1,8 @@
+/**
+ * @file RunAction.hh
+ * @brief Declares `RunAction`, which manages ROOT I/O, thread-safe file writes/merge,
+ *        and per-run metadata publication for detector grid configuration.
+ */
 #ifndef RUNACTION_HH
 #define RUNACTION_HH
 
@@ -6,13 +11,12 @@
 #include "globals.hh"
 #include <vector>
 #include <string>
-
-#include "TFile.h"
-#include "TTree.h"
-#include "G4Threading.hh"
 #include <mutex>
 #include <atomic>
 #include <condition_variable>
+
+class TFile;
+class TTree;
 
 class RunAction : public G4UserRunAction
 {
@@ -115,4 +119,4 @@ private:
     // F_i uses Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL for OOB cells; Q_i=0 there.
 };
 
-#endif
+#endif // RUNACTION_HH
