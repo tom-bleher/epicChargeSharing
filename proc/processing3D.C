@@ -1,6 +1,6 @@
 // ROOT macro: processing3D.C
 // Performs 2D Gaussian fit on the full charge neighborhood to reconstruct
-// deltas, and appends them as new branches. Signed deltas are also saved.
+// deltas, and appends them as new branches.
 
 #include <TFile.h>
 #include <TTree.h>
@@ -16,6 +16,12 @@
 #include <Math/Factory.h>
 #include <Math/Minimizer.h>
 #include <Math/Functor.h>
+
+// Fast least-squares fitter API (required for Fumili2)
+#include <Fit/Fitter.h>
+#include <Fit/BinData.h>
+#include <Fit/Chi2FCN.h>
+#include <Math/WrappedMultiTF1.h>
 
 #include <vector>
 #include <string>
@@ -47,13 +53,12 @@ namespace {
 // applied to all data points used in the fit for that event.
 int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
                  double errorPercentOfMax = 5.0) {
-  // Use Minuit2 by default
-  ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2");
-  // Slightly relax tolerance to speed up fits while keeping accuracy
-  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-5);
-  // Limit function evaluations and reduce strategy for speed
-  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(300);
+  // Favor faster least-squares: Minuit2 + Fumili2
+  ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
+  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
+  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(400);
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
+  ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
   // Open file for update
   TFile* file = TFile::Open(filename, "UPDATE");
@@ -81,8 +86,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     std::vector<double> xs; xs.reserve(5000);
     std::vector<double> ys; ys.reserve(5000);
     double x_px_tmp = 0.0, y_px_tmp = 0.0;
-    t->SetBranchAddress("x_px", &x_px_tmp);
-    t->SetBranchAddress("y_px", &y_px_tmp);
+    t->SetBranchAddress("PixelX", &x_px_tmp);
+    t->SetBranchAddress("PixelY", &y_px_tmp);
     Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
     for (Long64_t i=0;i<nToScan;++i) {
       t->GetEntry(i);
@@ -130,18 +135,18 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
 
   // Speed up I/O: deactivate all branches, then enable only what we read
   tree->SetBranchStatus("*", 0);
-  tree->SetBranchStatus("x_hit", 1);
-  tree->SetBranchStatus("y_hit", 1);
-  tree->SetBranchStatus("x_px", 1);
-  tree->SetBranchStatus("y_px", 1);
-  tree->SetBranchStatus("is_pixel_hit", 1);
+  tree->SetBranchStatus("TrueX", 1);
+  tree->SetBranchStatus("TrueY", 1);
+  tree->SetBranchStatus("PixelX", 1);
+  tree->SetBranchStatus("PixelY", 1);
+  tree->SetBranchStatus("isPixelHit", 1);
   tree->SetBranchStatus("F_i", 1);
 
-  tree->SetBranchAddress("x_hit", &x_hit);
-  tree->SetBranchAddress("y_hit", &y_hit);
-  tree->SetBranchAddress("x_px", &x_px);
-  tree->SetBranchAddress("y_px", &y_px);
-  tree->SetBranchAddress("is_pixel_hit", &is_pixel_hit);
+  tree->SetBranchAddress("TrueX", &x_hit);
+  tree->SetBranchAddress("TrueY", &y_hit);
+  tree->SetBranchAddress("PixelX", &x_px);
+  tree->SetBranchAddress("PixelY", &y_px);
+  tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
   tree->SetBranchAddress("F_i", &Fi);
 
   // New branches (outputs).
@@ -151,9 +156,7 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
   double y_rec_3d = INVALID_VALUE;
   double rec_hit_delta_x_3d = INVALID_VALUE;
   double rec_hit_delta_y_3d = INVALID_VALUE;
-  double rec_hit_signed_delta_x_3d = INVALID_VALUE;
-  double rec_hit_signed_delta_y_3d = INVALID_VALUE;
-
+  
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
     TBranch* br = tree->GetBranch(name);
     if (!br) {
@@ -169,11 +172,11 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     return br;
   };
 
-  TBranch* br_dx    = ensureAndResetBranch("rec_hit_delta_x_3d", &rec_hit_delta_x_3d);
-  TBranch* br_dy    = ensureAndResetBranch("rec_hit_delta_y_3d", &rec_hit_delta_y_3d);
-  TBranch* br_sdx   = ensureAndResetBranch("rec_hit_signed_delta_x_3d", &rec_hit_signed_delta_x_3d);
-  TBranch* br_sdy   = ensureAndResetBranch("rec_hit_signed_delta_y_3d", &rec_hit_signed_delta_y_3d);
-
+  TBranch* br_x_rec = ensureAndResetBranch("ReconX_3D", &x_rec_3d);
+  TBranch* br_y_rec = ensureAndResetBranch("ReconY_3D", &y_rec_3d);
+  TBranch* br_dx    = ensureAndResetBranch("ReconTrueDeltaX_3D", &rec_hit_delta_x_3d);
+  TBranch* br_dy    = ensureAndResetBranch("ReconTrueDeltaY_3D", &rec_hit_delta_y_3d);
+  
   // 2D fit function kept for reference. We use Minuit2 on a compact window.
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
 
@@ -187,23 +190,24 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     // Defaults: set to finite invalid sentinel
     x_rec_3d = y_rec_3d = INVALID_VALUE;
     rec_hit_delta_x_3d = rec_hit_delta_y_3d = INVALID_VALUE;
-    rec_hit_signed_delta_x_3d = rec_hit_signed_delta_y_3d = INVALID_VALUE;
 
     if (is_pixel_hit || !Fi || Fi->empty()) {
+      br_x_rec->Fill();
+      br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
-      br_sdx->Fill();
-      br_sdy->Fill();
+      
       continue;
     }
 
     const size_t total = Fi->size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
     if (N * N != static_cast<int>(total) || N < 3) {
+      br_x_rec->Fill();
+      br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
-      br_sdx->Fill();
-      br_sdy->Fill();
+      
       continue;
     }
 
@@ -227,10 +231,10 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     }
 
     if (g2d.GetN() < 5) {
+      br_x_rec->Fill();
+      br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
-      br_sdx->Fill();
-      br_sdy->Fill();
       continue;
     }
 
@@ -245,6 +249,29 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     const double B0 = std::max(0.0, zmin);
     const double mux0 = g2d.GetX()[idxMax];
     const double muy0 = g2d.GetY()[idxMax];
+
+    // Low-contrast neighborhood: skip iterative fit, use weighted centroid
+    if (A0 < 1e-6) {
+      double wsum = 0.0, xw = 0.0, yw = 0.0;
+      for (int k = 0; k < g2d.GetN(); ++k) {
+        const double w = std::max(0.0, g2d.GetZ()[k] - B0);
+        wsum += w;
+        xw += w * g2d.GetX()[k];
+        yw += w * g2d.GetY()[k];
+      }
+      if (wsum > 0.0) {
+        x_rec_3d = xw / wsum;
+        y_rec_3d = yw / wsum;
+        rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
+        rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
+        nFitted++;
+      }
+      br_x_rec->Fill();
+      br_y_rec->Fill();
+      br_dx->Fill();
+      br_dy->Fill();
+      continue;
+    }
 
     // Optional uniform vertical uncertainty from percent-of-max
     const double relErr = std::max(0.0, errorPercentOfMax) * 0.01;
@@ -285,13 +312,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     const double sxInitMoment = sigmaSeed2D(true);
     const double syInitMoment = sigmaSeed2D(false);
 
+    // Seed params retained for reference TF2, but Minimizer constraints used below
     f2D.SetParameters(A0, mux0, muy0, sxInitMoment, syInitMoment, B0);
-    // Fractions bounded in [0,1]
-    f2D.SetParLimits(0, 0.0, 1.0);                    // A >= 0
-    f2D.SetParLimits(3, sigLoBound, sigHiBound);  // looser sigma bounds
-    f2D.SetParLimits(4, sigLoBound, sigHiBound);
-    // Ensure non-negative baseline
-    f2D.SetParLimits(5, 0.0, std::max(0.0, zmin));
 
     // Fit on FULL range covering all points present in the neighborhood
     double xMinR =  1e300, xMaxR = -1e300;
@@ -315,6 +337,10 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     f2D.SetParLimits(2, muYLo, muYHi);
 
     // Minuit2 least-squares over the trimmed window
+    const double* Xarr = g2d.GetX();
+    const double* Yarr = g2d.GetY();
+    const double* Zarr = g2d.GetZ();
+    const int nPts = g2d.GetN();
     auto chi2 = [&](const double* p) -> double {
       const double A = p[0];
       const double mx = p[1];
@@ -324,40 +350,73 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
       const double B = p[5];
       const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
       double sum = 0.0;
-      for (int k = 0; k < g2d.GetN(); ++k) {
-        const double xi = g2d.GetX()[k];
-        const double yi = g2d.GetY()[k];
+      for (int k = 0; k < nPts; ++k) {
+        const double xi = Xarr[k];
+        const double yi = Yarr[k];
         const double dx = (xi - mx)/sx;
         const double dy = (yi - my)/sy;
         const double model = A * std::exp(-0.5*(dx*dx + dy*dy)) + B;
-        const double r = (g2d.GetZ()[k] - model);
+        const double r = (Zarr[k] - model);
         sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
       }
       return sum;
     };
 
-    std::unique_ptr<ROOT::Math::Minimizer> m(ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
-    m->SetMaxFunctionCalls(300);
-    m->SetTolerance(1e-5);
-    ROOT::Math::Functor fChi2(chi2, 6);
-    m->SetFunction(fChi2);
+    // Wrap model as TF1 for ROOT::Fit pipeline
+    TF2 fModel("fModel", Gauss2DPlusB, xMinR, xMaxR, yMinR, yMaxR, 6);
+    ROOT::Math::WrappedMultiTF1 wModel(fModel, 2);
 
-    m->SetLimitedVariable(0, "A", A0, 1e-3, 0.0, 1.0);
-    m->SetLimitedVariable(1, "mux", mux0, 1e-4*pixelSpacing, xMinR, xMaxR);
-    m->SetLimitedVariable(2, "muy", muy0, 1e-4*pixelSpacing, yMinR, yMaxR);
-    m->SetLimitedVariable(3, "sigx", sxInitMoment, 1e-4*pixelSpacing, sigLoBound, sigHiBound);
-    m->SetLimitedVariable(4, "sigy", syInitMoment, 1e-4*pixelSpacing, sigLoBound, sigHiBound);
-    m->SetLimitedVariable(5, "B", B0, 1e-3, 0.0, std::max(0.0, zmin));
+    // Build BinData (Fumili2 requires FitMethodFunction via Chi2Function)
+    ROOT::Fit::BinData data2D(nPts, 2);
+    for (int k = 0; k < nPts; ++k) {
+      const double ey = (uniformSigma > 0.0) ? uniformSigma : 1.0;
+      double xy[2] = {Xarr[k], Yarr[k]};
+      data2D.Add(xy, Zarr[k], ey);
+    }
+    ROOT::Fit::Fitter fitter;
+    fitter.Config().SetMinimizer("Minuit2", "Fumili2");
+    fitter.Config().MinimizerOptions().SetStrategy(0);
+    fitter.Config().MinimizerOptions().SetTolerance(1e-4);
+    fitter.Config().MinimizerOptions().SetPrintLevel(0);
+    // Provide the model; Chi2 will be constructed from BinData internally
+    fitter.SetFunction(wModel);
 
-    bool ok = m->Minimize();
+    // Parameter settings and limits
+    fitter.Config().ParSettings(0).SetName("A");
+    fitter.Config().ParSettings(1).SetName("mux");
+    fitter.Config().ParSettings(2).SetName("muy");
+    fitter.Config().ParSettings(3).SetName("sigx");
+    fitter.Config().ParSettings(4).SetName("sigy");
+    fitter.Config().ParSettings(5).SetName("B");
+    fitter.Config().ParSettings(0).SetLowerLimit(0.0);
+    fitter.Config().ParSettings(1).SetLimits(muXLo, muXHi);
+    fitter.Config().ParSettings(2).SetLimits(muYLo, muYHi);
+    fitter.Config().ParSettings(3).SetLimits(sigLoBound, sigHiBound);
+    fitter.Config().ParSettings(4).SetLimits(sigLoBound, sigHiBound);
+    fitter.Config().ParSettings(5).SetLowerLimit(0.0);
+
+    fitter.Config().ParSettings(0).SetStepSize(1e-3);
+    fitter.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
+    fitter.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
+    fitter.Config().ParSettings(3).SetStepSize(1e-4*pixelSpacing);
+    fitter.Config().ParSettings(4).SetStepSize(1e-4*pixelSpacing);
+    fitter.Config().ParSettings(5).SetStepSize(1e-3);
+
+    // Initial parameters (via ParSettings)
+    fitter.Config().ParSettings(0).SetValue(A0);
+    fitter.Config().ParSettings(1).SetValue(mux0);
+    fitter.Config().ParSettings(2).SetValue(muy0);
+    fitter.Config().ParSettings(3).SetValue(sxInitMoment);
+    fitter.Config().ParSettings(4).SetValue(syInitMoment);
+    fitter.Config().ParSettings(5).SetValue(B0);
+
+    bool ok = fitter.Fit(data2D);
     if (ok) {
-      const double* X = m->X();
-      x_rec_3d = X[1];
-      y_rec_3d = X[2];
+      x_rec_3d = fitter.Result().Parameter(1);
+      y_rec_3d = fitter.Result().Parameter(2);
       rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
       rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
-      rec_hit_signed_delta_x_3d = (x_hit - x_rec_3d);
-      rec_hit_signed_delta_y_3d = (y_hit - y_rec_3d);
+      
       nFitted++;
     } else {
       // Fallback: weighted centroid over the neighborhood
@@ -373,20 +432,20 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
         y_rec_3d = yw / wsum;
         rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
         rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
-        rec_hit_signed_delta_x_3d = (x_hit - x_rec_3d);
-        rec_hit_signed_delta_y_3d = (y_hit - y_rec_3d);
+        
         nFitted++;
       } else {
         x_rec_3d = y_rec_3d = INVALID_VALUE;
         rec_hit_delta_x_3d = rec_hit_delta_y_3d = INVALID_VALUE;
-        rec_hit_signed_delta_x_3d = rec_hit_signed_delta_y_3d = INVALID_VALUE;
+        
       }
     }
 
+    br_x_rec->Fill();
+    br_y_rec->Fill();
     br_dx->Fill();
     br_dy->Fill();
-    br_sdx->Fill();
-    br_sdy->Fill();
+    
   }
 
   // Overwrite tree in file
