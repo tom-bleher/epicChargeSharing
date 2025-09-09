@@ -53,7 +53,7 @@ namespace {
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
 // of the event's maximum charge within the neighborhood. The same error is
 // applied to all data points used in the fits for that event.
-int processing2D_plots(const char* filename = "../build/epicChargeSharingOutput.root",
+int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
                        double errorPercentOfMax = 5.0) {
   // Match processing2D configuration exactly
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
