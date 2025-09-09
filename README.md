@@ -1,6 +1,6 @@
 # epicChargeSharing
 
-A GEANT4-based simulation for charge sharing studies in AC-LGAD pixel sensors.
+A GEANT4-based simulation for spatial charge sharing studies in segmented pixel-pad sensors.
 
 ## Prerequisites
 
@@ -35,51 +35,8 @@ make -j$(nproc)
 
 ### Batch Mode
 ```bash
-# Multi-threaded with macro file (add -t flag to specify num of threads)
+# Multi-threaded with macro file
 ./epicChargeSharing -m ../macros/run.mac
-```
-
-### Command Line Options
-- `-m {file}.mac` : Run in batch mode with specified macro file
-- `-t {num}` : Set num of threads (default: all CPUs, use 1 for single-threaded)
-- `-header` : Run in batch mode using constants from `include/Control.hh` (no macro file needed)
-
-## Basic Configuration
-
-The simulation behavior is controlled by constants in `include/Control.hh`:
-- `PARTICLE_TYPE`: Type of particle to simulate (e.g., "e-", "mu-")
-- `PARTICLE_ENERGY`: Particle energy in GeV
-- `NUMBER_OF_EVENTS`: Number of events to simulate
-- Various fitting and analysis options
-
-### Farming
-
-The simulation includes a farming system for automated parameter studies. It allows to run systematic sweeps across multiple parameter combinations automatically. The farmer takes a Cartesian product of specified parameters and runs the simulation for every combination. Edit `farm/control.yaml` to specify your parameter study:
-
-```yaml
-# Global simulation settings
-simulation:
-  name: "pitch_resolution_study"
-  output_base_dir: "./pitch_resolution_study"
-  
-# Parameters to vary (Cartesian product)
-varied_parameters:
-  PIXEL_SPACING:
-    values: [0.5, 0.1, 0.2]  # in mm
-
-# Fixed parameters for all runs
-constant_parameters:
-  NUMBER_OF_EVENTS: 10000
-  PARTICLE_TYPE: "e-"
-  DETECTOR_SIZE: 30.0
-  
-  # ...
-```
-
-After configuring, run
-```bash
-# Run with default configuration
-python3 farm/farmer.py
 ```
 
 ## Repository Structure
