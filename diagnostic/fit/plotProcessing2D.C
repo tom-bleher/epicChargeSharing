@@ -1,7 +1,3 @@
-// ROOT macro: processing2D_plots.C
-// Produces multi-page PDFs with row and column fits for non-pixel-pad hits
-// Output files: row.pdf, column.pdf (each page corresponds to one event)
-
 #include <TFile.h>
 #include <TTree.h>
 #include <TBranch.h>
@@ -12,17 +8,18 @@
 #include <TROOT.h>
 #include <TError.h>
 #include <TCanvas.h>
+#include <TPad.h>
 #include <TLegend.h>
 #include <TLine.h>
 #include <TBox.h>
 #include <TLatex.h>
 #include <TStyle.h>
+#include <TSystem.h>
 #include <Math/MinimizerOptions.h>
 #include <Math/Factory.h>
 #include <Math/Minimizer.h>
 #include <Math/Functor.h>
 
-// Match processing2D fitter pipeline
 #include <Fit/Fitter.h>
 #include <Fit/BinData.h>
 #include <Math/WrappedMultiTF1.h>
@@ -50,11 +47,11 @@ namespace {
   }
 }
 
-// errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
-// of the event's maximum charge within the neighborhood. The same error is
-// applied to all data points used in the fits for that event.
+// processing2D_plots: Same logic as processing2D_plots, but draws
+// column (left) and row (right) on a single 1800x700 canvas per page.
+// Output: row_column.pdf (multi-page)
 int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
-                       double errorPercentOfMax = 5.0) {
+                           double errorPercentOfMax = 5.0) {
   // Match processing2D configuration exactly
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
@@ -62,11 +59,18 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
   ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
-  // Open file for read
+  // Open file for read (try provided path, then fallback relative to macro dir)
   TFile* file = TFile::Open(filename, "READ");
   if (!file || file->IsZombie()) {
-    ::Error("processing2D_plots", "Cannot open file: %s", filename);
-    return 1;
+    if (file) { file->Close(); delete file; file = nullptr; }
+    TString macroDir = gSystem->DirName(__FILE__);
+    TString fallback = macroDir + "/../../build/epicChargeSharing.root";
+    file = TFile::Open(fallback, "READ");
+    if (!file || file->IsZombie()) {
+      ::Error("processing2D_plots", "Cannot open file: %s or fallback: %s", filename, fallback.Data());
+      if (file) { file->Close(); delete file; }
+      return 1;
+    }
   }
 
   // Get tree
@@ -133,32 +137,38 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
   }
   // Pixel size: if not available in metadata, fall back to nominal 0.1 mm
   if (!IsFinite(pixelSize) || pixelSize <= 0) {
-    pixelSize = 0.1; // mm (100 µm)
+    pixelSize = 0.1; // mm
     ::Info("processing2D_plots", "Pixel size metadata missing. Falling back to nominal %.3f mm.", pixelSize);
   }
 
   // Set up branches
-  double x_hit = 0.0, y_hit = 0.0;
+  double x_true = 0.0, y_true = 0.0;
   double x_px  = 0.0, y_px  = 0.0;
-  Bool_t is_pixel_hit = kFALSE;
+  Bool_t is_pixel_true = kFALSE;
   std::vector<double>* Fi = nullptr; // use fractions for fitting
 
-  tree->SetBranchAddress("TrueX", &x_hit);
-  tree->SetBranchAddress("TrueY", &y_hit);
+  tree->SetBranchAddress("TrueX", &x_true);
+  tree->SetBranchAddress("TrueY", &y_true);
   tree->SetBranchAddress("PixelX",  &x_px);
   tree->SetBranchAddress("PixelY",  &y_px);
-  tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
+  tree->SetBranchAddress("isPixelHit", &is_pixel_true);
   tree->SetBranchAddress("F_i", &Fi);
 
   // Prepare plotting objects
   gROOT->SetBatch(true);
   gStyle->SetOptFit(0);
   gStyle->SetOptStat(0);
-  TCanvas c("c", "processing2D fits", 900, 700);
+  TCanvas c("c2up", "processing2D fits", 1800, 700);
+  // Create two pads so each panel matches the original 900x700 size
+  TPad pL("pL", "column-left", 0.0, 0.0, 0.5, 1.0);
+  TPad pR("pR", "row-right",  0.5, 0.0, 1.0, 1.0);
+  pL.SetTicks(1,1);
+  pR.SetTicks(1,1);
+  pL.Draw();
+  pR.Draw();
 
-  // Open multipage PDFs
-  c.Print("row.pdf[");
-  c.Print("column.pdf[");
+  // Open multipage PDF
+  c.Print("2Dfits.pdf[");
 
   // Functions for visualization (parameters will be set from the new fitter)
   TF1 fRow("fRow", GaussPlusB, -1e9, 1e9, 4);
@@ -166,13 +176,13 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
 
   const Long64_t nEntries = tree->GetEntries();
   const Long64_t nEntriesToPlot = std::min<Long64_t>(nEntries, 100);
-  Long64_t nPagesRow = 0, nPagesCol = 0, nConsidered = 0;
+  Long64_t nPages = 0, nConsidered = 0;
 
   for (Long64_t i = 0; i < nEntriesToPlot; ++i) {
     tree->GetEntry(i);
 
-    // Only non-pixel-pad hits with valid neighborhood (fractions 0..1)
-    if (is_pixel_hit || !Fi || Fi->empty()) continue;
+    // Only non-pixel-pad trues with valid neighborhood (fractions 0..1)
+    if (is_pixel_true || !Fi || Fi->empty()) continue;
 
     const size_t total = Fi->size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
@@ -180,13 +190,13 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     const int R = (N - 1) / 2;
 
     // Diagnostics: verify geometric non-pixel condition max(|dx|,|dy|) > size/2
-    const double dxAbs = std::abs(x_hit - x_px);
-    const double dyAbs = std::abs(y_hit - y_px);
+    const double dxAbs = std::abs(x_true - x_px);
+    const double dyAbs = std::abs(y_true - y_px);
     const double halfPixel = 0.5 * pixelSize;
     const double maxAbs = std::max(dxAbs, dyAbs);
     if (!(maxAbs > halfPixel)) {
       ::Warning("processing2D_plots",
-                "Event %lld marked non-pixel but max(|dx|,|dy|)=%.3f µm <= halfPixel=%.3f µm (dx=%.3f µm, dy=%.3f µm).",
+                "Event %lld marked non-pixel but max(|dx|,|dy|)=%.3f \u00b5m <= halfPixel=%.3f \u00b5m (dx=%.3f \u00b5m, dy=%.3f \u00b5m).",
                 i, 1000.0*maxAbs, 1000.0*halfPixel, 1000.0*dxAbs, 1000.0*dyAbs);
     }
 
@@ -316,7 +326,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
       const double xMax = *minmaxX.second + 0.5 * pixelSpacing;
       const double yMin = *minmaxY.first - 0.5 * pixelSpacing;
       const double yMax = *minmaxY.second + 0.5 * pixelSpacing;
-      // Tighten mu bounds to ±1/2 pitch about nearest pixel center (match processing2D)
+      // Tighten mu bounds to  b11/2 pitch about nearest pixel center (match processing2D)
       const double muXLo = x_px - 0.5 * pixelSpacing;
       const double muXHi = x_px + 0.5 * pixelSpacing;
       const double muYLo = y_px - 0.5 * pixelSpacing;
@@ -461,69 +471,8 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     }
     baseColPtr->SetMaximum(yMaxCol);
 
-    // Draw row
-    c.cd();
-    baseRowPtr->Draw(useWeights ? "AP" : "AP");
-    if (A_row > 0.0) {
-      fRow.SetNpx(600);
-      fRow.SetLineWidth(2);
-      fRow.SetLineColor(kRed+1);
-      fRow.Draw("L SAME");
-    }
-    gPad->Update();
-    double yPadMin = gPad->GetUymin();
-    double yPadMax = gPad->GetUymax();
-    // Draw horizontal pixel-width rectangles centered at each data point (outline only)
-    {
-      const double halfH = 0.015 * (yPadMax - yPadMin);
-      for (size_t k = 0; k < x_row.size(); ++k) {
-        const double xc = x_row[k];
-        const double yc = q_row[k];
-        const double xlo = xc - 0.5 * pixelSize;
-        const double xhi = xc + 0.5 * pixelSize;
-        const double ylo = yc - halfH;
-        const double yhi = yc + halfH;
-        TBox* box = new TBox(xlo, ylo, xhi, yhi);
-        box->SetFillStyle(0);
-        box->SetLineColor(kGray+2);
-        box->SetLineWidth(1);
-        box->SetBit(kCanDelete);
-        box->Draw("SAME L");
-      }
-    }
-    TLine lineXhit(x_hit, yPadMin, x_hit, yPadMax);
-    lineXhit.SetLineStyle(2);
-    lineXhit.SetLineWidth(2);
-    lineXhit.SetLineColor(kBlack);
-    lineXhit.Draw("SAME");
-    double fx1 = gPad->GetLeftMargin();
-    double fy1 = gPad->GetBottomMargin();
-    double fx2 = 1.0 - gPad->GetRightMargin();
-    double fy2 = 1.0 - gPad->GetTopMargin();
-    // Slightly increase legend height to accommodate extra entry (|x_hit - x_px|)
-    double legW = 0.22, legH = 0.18, inset = 0.008;
-    double lx1 = fx1 + inset, lx2 = lx1 + legW;
-    double ly2 = fy2 - inset, ly1 = ly2 - legH;
-    TLegend leg(lx1, ly1, lx2, ly2, "", "NDC");
-    leg.SetBorderSize(0);
-    leg.SetFillStyle(0);
-    leg.SetTextSize(0.03);
-    leg.AddEntry(&lineXhit, "x_{hit}", "l");
-    TLine lineXrec(muRow, yPadMin, muRow, yPadMax);
-    lineXrec.SetLineStyle(2);
-    lineXrec.SetLineWidth(2);
-    lineXrec.SetLineColor(kRed+1);
-    lineXrec.Draw("SAME");
-    leg.AddEntry(&lineXrec, "x_{rec}", "l");
-    // New: show pixel-centered delta as requested (|x_hit - x_px|)
-    leg.AddEntry((TObject*)nullptr, Form("|x_{hit}-x_{px}| = %.1f #mum", 1000.0*std::abs(x_hit - x_px)), "");
-    leg.AddEntry((TObject*)nullptr, Form("|x_{hit}-x_{rec,2d}| = %.1f #mum", 1000.0*std::abs(x_hit - muRow)), "");
-    leg.Draw();
-    c.Print("row.pdf");
-    nPagesRow++;
-
-    // Draw column
-    c.cd();
+    // Left pad: COLUMN plot
+    pL.cd();
     baseColPtr->Draw(useWeights ? "AP" : "AP");
     if (A_col > 0.0) {
       fCol.SetNpx(600);
@@ -552,16 +501,16 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
         box->Draw("SAME L");
       }
     }
-    TLine lineYhit(y_hit, yPadMinC, y_hit, yPadMaxC);
-    lineYhit.SetLineStyle(2);
-    lineYhit.SetLineWidth(2);
-    lineYhit.SetLineColor(kBlack);
-    lineYhit.Draw("SAME");
+    TLine lineYtrue(y_true, yPadMinC, y_true, yPadMaxC);
+    lineYtrue.SetLineStyle(2);
+    lineYtrue.SetLineWidth(2);
+    lineYtrue.SetLineColor(kBlack);
+    lineYtrue.Draw("SAME");
     double fx1c = gPad->GetLeftMargin();
     double fy1c = gPad->GetBottomMargin();
     double fx2c = 1.0 - gPad->GetRightMargin();
     double fy2c = 1.0 - gPad->GetTopMargin();
-    // Slightly increase legend height to accommodate extra entry (|y_hit - y_px|)
+    // Slightly increase legend height to accommodate extra entry (|y_true - y_px|)
     double legWc = 0.22, legHc = 0.18, insetc = 0.008;
     double lx1c = fx1c + insetc, lx2c = lx1c + legWc;
     double ly2c = fy2c - insetc, ly1c = ly2c - legHc;
@@ -569,29 +518,100 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     legC.SetBorderSize(0);
     legC.SetFillStyle(0);
     legC.SetTextSize(0.03);
-    legC.AddEntry(&lineYhit, "y_{hit}", "l");
+    legC.AddEntry(&lineYtrue, "y_{true}", "l");
     TLine lineYrec(muCol, yPadMinC, muCol, yPadMaxC);
     lineYrec.SetLineStyle(2);
     lineYrec.SetLineWidth(2);
     lineYrec.SetLineColor(kRed+1);
     lineYrec.Draw("SAME");
     legC.AddEntry(&lineYrec, "y_{rec}", "l");
-    // New: show pixel-centered delta as requested (|y_hit - y_px|)
-    legC.AddEntry((TObject*)nullptr, Form("|y_{hit}-y_{px}| = %.1f #mum", 1000.0*std::abs(y_hit - y_px)), "");
-    legC.AddEntry((TObject*)nullptr, Form("|y_{hit}-y_{rec,2d}| = %.1f #mum", 1000.0*std::abs(y_hit - muCol)), "");
+    // Show pixel-centered delta (|y_true - y_px|) and reconstruction delta
+    legC.AddEntry((TObject*)nullptr, Form("|y_{true}-y_{px}| = %.1f #mum", 1000.0*std::abs(y_true - y_px)), "");
+    legC.AddEntry((TObject*)nullptr, Form("|y_{true}-y_{rec,2d}| = %.1f #mum", 1000.0*std::abs(y_true - muCol)), "");
     legC.Draw();
-    c.Print("column.pdf");
-    nPagesCol++;
+
+    // Right pad: ROW plot
+    pR.cd();
+    baseRowPtr->Draw(useWeights ? "AP" : "AP");
+    if (A_row > 0.0) {
+      fRow.SetNpx(600);
+      fRow.SetLineWidth(2);
+      fRow.SetLineColor(kRed+1);
+      fRow.Draw("L SAME");
+    }
+    gPad->Update();
+    double yPadMin = gPad->GetUymin();
+    double yPadMax = gPad->GetUymax();
+    // Draw horizontal pixel-width rectangles centered at each data point (outline only)
+    {
+      const double halfH = 0.015 * (yPadMax - yPadMin);
+      for (size_t k = 0; k < x_row.size(); ++k) {
+        const double xc = x_row[k];
+        const double yc = q_row[k];
+        const double xlo = xc - 0.5 * pixelSize;
+        const double xhi = xc + 0.5 * pixelSize;
+        const double ylo = yc - halfH;
+        const double yhi = yc + halfH;
+        TBox* box = new TBox(xlo, ylo, xhi, yhi);
+        box->SetFillStyle(0);
+        box->SetLineColor(kGray+2);
+        box->SetLineWidth(1);
+        box->SetBit(kCanDelete);
+        box->Draw("SAME L");
+      }
+    }
+    TLine lineXtrue(x_true, yPadMin, x_true, yPadMax);
+    lineXtrue.SetLineStyle(2);
+    lineXtrue.SetLineWidth(2);
+    lineXtrue.SetLineColor(kBlack);
+    lineXtrue.Draw("SAME");
+    double fx1 = gPad->GetLeftMargin();
+    double fy1 = gPad->GetBottomMargin();
+    double fx2 = 1.0 - gPad->GetRightMargin();
+    double fy2 = 1.0 - gPad->GetTopMargin();
+    // Slightly increase legend height to accommodate extra entry (|x_true - x_px|)
+    double legW = 0.22, legH = 0.18, inset = 0.008;
+    double lx1 = fx1 + inset, lx2 = lx1 + legW;
+    double ly2 = fy2 - inset, ly1 = ly2 - legH;
+    TLegend leg(lx1, ly1, lx2, ly2, "", "NDC");
+    leg.SetBorderSize(0);
+    leg.SetFillStyle(0);
+    leg.SetTextSize(0.03);
+    leg.AddEntry(&lineXtrue, "x_{true}", "l");
+    TLine lineXrec(muRow, yPadMin, muRow, yPadMax);
+    lineXrec.SetLineStyle(2);
+    lineXrec.SetLineWidth(2);
+    lineXrec.SetLineColor(kRed+1);
+    lineXrec.Draw("SAME");
+    leg.AddEntry(&lineXrec, "x_{rec}", "l");
+    // Show pixel-centered delta (|x_true - x_px|) and reconstruction delta
+    leg.AddEntry((TObject*)nullptr, Form("|x_{true}-x_{px}| = %.1f #mum", 1000.0*std::abs(x_true - x_px)), "");
+    leg.AddEntry((TObject*)nullptr, Form("|x_{true}-x_{rec,2d}| = %.1f #mum", 1000.0*std::abs(x_true - muRow)), "");
+    leg.Draw();
+
+    // Print page
+    c.cd();
+    c.Print("2Dfits.pdf");
+    nPages++;
   }
 
-  // Close PDFs
-  c.Print("row.pdf]");
-  c.Print("column.pdf]");
+  // Close PDF
+  c.Print("2Dfits.pdf]");
 
   file->Close();
   delete file;
 
-  ::Info("processing2D_plots", "Generated %lld row pages and %lld column pages (considered %lld events).", nPagesRow, nPagesCol, nConsidered);
+  ::Info("processing2D_plots", "Generated %lld pages (considered %lld events).", nPages, nConsidered);
   return 0;
 }
 
+
+
+// ROOT auto-exec wrappers so `root -l -b -q plotProcessing2D.C` works
+int plotProcessing2D() {
+  return processing2D_plots();
+}
+
+int plotProcessing2D(const char* filename, double errorPercentOfMax) {
+  return processing2D_plots(filename, errorPercentOfMax);
+}
