@@ -170,11 +170,15 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     
     // Only create ROOT file for worker threads or single-threaded mode
     if (!G4Threading::IsMultithreadedApplication() || G4Threading::IsWorkerThread()) {
-        // Lock mutex during ROOT file operations
-        std::lock_guard<std::mutex> lock(fRootMutex);
+        // Global lock only needed on master; workers have independent files
+        const bool needGlobalLock = G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread();
+        std::unique_ptr<std::lock_guard<std::mutex>> maybeLock;
+        if (needGlobalLock) {
+            maybeLock.reset(new std::lock_guard<std::mutex>(fRootMutex));
+        }
         
         // Create the ROOT file with optimized settings
-        fRootFile = new TFile(fileName.c_str(), "RECREATE", "", 1); // Low compression for speed
+        fRootFile = new TFile(fileName.c_str(), "RECREATE", "", 1); // default compression setting; adjust below
         
         if (fRootFile->IsZombie()) {
             G4cerr << "Cannot create ROOT file: " << fileName << G4endl;
@@ -184,7 +188,12 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         
         // Set auto-flush and auto-save for better performance and safety
-        fRootFile->SetCompressionLevel(1);
+        if (G4Threading::IsMultithreadedApplication() && G4Threading::IsWorkerThread()) {
+            // Workers: maximize throughput (bigger baskets, no compression)
+            fRootFile->SetCompressionLevel(0);
+        } else {
+            fRootFile->SetCompressionLevel(1);
+        }
         
         G4cout << "ROOT file: " << fileName << G4endl;
         
@@ -196,8 +205,13 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             fRootFile = nullptr;
             return;
         }
-        fTree->SetAutoFlush(10000);  // Flush every 10k entries
-        fTree->SetAutoSave(50000);   // Save every 50k entries
+        if (G4Threading::IsMultithreadedApplication() && G4Threading::IsWorkerThread()) {
+            fTree->SetAutoFlush(100000);   // Larger baskets for worker throughput
+            fTree->SetAutoSave(200000);
+        } else {
+            fTree->SetAutoFlush(10000);
+            fTree->SetAutoSave(50000);
+        }
         
         // Create branches
         // =============================================
@@ -342,7 +356,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             merger.SetFastMethod(kTRUE);
             merger.SetNotrees(kFALSE);
             
-            // Set output file
+            // Set output file; compression can be enabled for final merged file
             if (!merger.OutputFile("epicChargeSharing.root", "RECREATE", 1)) {
                 G4cerr << "Master thread: Failed to set output file for merger!" << G4endl;
                 return;
@@ -647,7 +661,12 @@ bool RunAction::ValidateRootFile(const G4String& filename)
 
 bool RunAction::SafeWriteRootFile()
 {
-    std::lock_guard<std::mutex> lock(fRootMutex);
+    // Global lock only for master-thread operations; workers write independently
+    const bool needGlobalLock = G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread();
+    std::unique_ptr<std::lock_guard<std::mutex>> maybeLock;
+    if (needGlobalLock) {
+        maybeLock.reset(new std::lock_guard<std::mutex>(fRootMutex));
+    }
     
     if (!fRootFile || !fTree || fRootFile->IsZombie()) {
         G4cerr << "RunAction: Cannot write - invalid ROOT file or tree" << G4endl;
