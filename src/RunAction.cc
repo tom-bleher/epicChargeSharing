@@ -308,6 +308,20 @@ void RunAction::EndOfRunAction(const G4Run* run)
             // Use separate lock scope for merging
             std::lock_guard<std::mutex> lock(fRootMutex);
             
+            // Be conservative: disable ROOT implicit MT during merge to avoid crashes in IO
+            #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
+            bool wasIMT = false;
+            try {
+                wasIMT = ROOT::IsImplicitMTEnabled();
+                if (wasIMT) {
+                    ROOT::DisableImplicitMT();
+                    G4cout << "ROOT: implicit MT disabled for merge" << G4endl;
+                }
+            } catch (...) {
+                // ignore if not available
+            }
+            #endif
+            
             G4int nThreads = fTotalWorkers.load();
             std::vector<G4String> workerFileNames;
             std::vector<G4String> validFiles;
@@ -353,7 +367,8 @@ void RunAction::EndOfRunAction(const G4Run* run)
             
             // Use ROOT's TFileMerger for robust and thread-safe file merging
             TFileMerger merger(kFALSE); // kFALSE = don't print progress
-            merger.SetFastMethod(kTRUE);
+            // Disable fast method to avoid edge-case crashes on some ROOT builds
+            merger.SetFastMethod(kFALSE);
             merger.SetNotrees(kFALSE);
             
             // Set output file; compression can be enabled for final merged file
@@ -375,6 +390,14 @@ void RunAction::EndOfRunAction(const G4Run* run)
             Bool_t mergeResult = merger.Merge();
             if (!mergeResult) {
                 G4cerr << "Master thread: File merging failed!" << G4endl;
+                #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
+                try {
+                    if (wasIMT) {
+                        ROOT::EnableImplicitMT();
+                        G4cout << "ROOT: implicit MT re-enabled after failed merge" << G4endl;
+                    }
+                } catch (...) {}
+                #endif
                 return;
             }
             
@@ -436,6 +459,16 @@ void RunAction::EndOfRunAction(const G4Run* run)
 
             // After merging and metadata write, run post-processing macros on the final file
             RunPostProcessingMacros("epicChargeSharing.root");
+            
+            // Re-enable IMT if it was previously on
+            #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
+            try {
+                if (wasIMT) {
+                    ROOT::EnableImplicitMT();
+                    G4cout << "ROOT: implicit MT re-enabled after merge" << G4endl;
+                }
+            } catch (...) {}
+            #endif
             
         } catch (const std::exception& e) {
             G4cerr << "Master thread: Exception during robust file merging: " << e.what() << G4endl;
