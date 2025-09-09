@@ -165,10 +165,10 @@ bool plotBranchWithPitch(TFile *file,
 } // namespace
 
 // Usage from ROOT:
-//   root -l -b -q 'analysis/root/vis/plot_x_y_px.C("/abs/path/to/epicChargeSharingOutput.root", "histograms")'
+//   root -l -b -q 'analysis/root/vis/plot_x_y_px.C("/abs/path/to/epicChargeSharing.root", "histograms")'
 // Defaults are chosen for this repository's layout.
 void plot_x_y_px(const char *filename = 
-                   "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharingOutput.root",
+                   "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root",
                  const char *outdir = "histograms") {
   std::string filePath(filename ? filename : "");
   std::string outputDir(outdir ? outdir : "histograms");
