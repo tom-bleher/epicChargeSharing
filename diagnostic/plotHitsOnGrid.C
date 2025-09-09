@@ -55,11 +55,11 @@ namespace {
 // written into the ROOT file by the simulation (master or single-thread).
 //
 // Usage (from repo root):
-//   root -l 'diagnostic/plotPixelGrid.C("epicChargeSharingOutput.root")'
+//   root -l 'diagnostic/plotPixelGrid.C("epicChargeSharing.root")'
 // or simply:
 //   root -l diagnostic/plotPixelGrid.C
-// which defaults to "epicChargeSharingOutput.root" in the CWD and writes SVG.
-void plotPixelGrid(const char* rootFilePath = "epicChargeSharingOutput.root",
+// which defaults to "epicChargeSharing.root" in the CWD and writes SVG.
+void plotPixelGrid(const char* rootFilePath = "epicChargeSharing.root",
                    const char* outImagePath = "pixel_grid.svg",
                    bool saveImage = true)
 {
@@ -79,9 +79,9 @@ void plotPixelGrid(const char* rootFilePath = "epicChargeSharingOutput.root",
   };
 
   TFile* f = tryOpen(rootFilePath);
-  if (!f) f = tryOpen("build/epicChargeSharingOutput.root");
-  if (!f) f = tryOpen("../build/epicChargeSharingOutput.root");
-  if (!f) f = tryOpen("../epicChargeSharingOutput.root");
+  if (!f) f = tryOpen("build/epicChargeSharing.root");
+  if (!f) f = tryOpen("../build/epicChargeSharing.root");
+  if (!f) f = tryOpen("../epicChargeSharing.root");
   if (!f) {
     std::cerr << "ERROR: Cannot open any ROOT file (tried provided path and common fallbacks)." << std::endl;
     return;
@@ -218,12 +218,12 @@ void plotPixelGrid(const char* rootFilePath = "epicChargeSharingOutput.root",
       Bool_t is_pixel_hit = 0;
       // Speed up by disabling all branches then enabling needed ones
       hitsTree->SetBranchStatus("*", 0);
-      hitsTree->SetBranchStatus("x_hit", 1);
-      hitsTree->SetBranchStatus("y_hit", 1);
-      hitsTree->SetBranchStatus("is_pixel_hit", 1);
-      hitsTree->SetBranchAddress("x_hit", &x_hit);
-      hitsTree->SetBranchAddress("y_hit", &y_hit);
-      hitsTree->SetBranchAddress("is_pixel_hit", &is_pixel_hit);
+      hitsTree->SetBranchStatus("TrueX", 1);
+      hitsTree->SetBranchStatus("TrueY", 1);
+      hitsTree->SetBranchStatus("isPixelHit", 1);
+      hitsTree->SetBranchAddress("TrueX", &x_hit);
+      hitsTree->SetBranchAddress("TrueY", &y_hit);
+      hitsTree->SetBranchAddress("isPixelHit", &is_pixel_hit);
 
       const double dotRadiusMm = pixelSizeMm / 6.0;
       const int numSegments = 64; // smooth enough for vector outputs
@@ -293,4 +293,14 @@ void plotPixelGrid(const char* rootFilePath = "epicChargeSharingOutput.root",
   delete f;
 }
 
+// Convenience wrappers so running `root -l -b -q plotHitsOnGrid.C` auto-executes
+void plotHitsOnGrid() {
+  const char* thisFile = __FILE__;
+  std::string thisDir = gSystem->DirName(thisFile);
+  std::string defaultPath = thisDir + "/../build/epicChargeSharing.root";
+  plotPixelGrid(defaultPath.c_str());
+}
 
+void plotHitsOnGrid(const char* filename) {
+  plotPixelGrid(filename);
+}

@@ -157,15 +157,15 @@ void RunAction::BeginOfRunAction(const G4Run* run)
             // Worker thread: create unique file for this thread
             G4int threadId = G4Threading::G4GetThreadId();
             std::ostringstream oss;
-            oss << "epicChargeSharingOutput_t" << threadId << ".root";
+            oss << "epicChargeSharing_t" << threadId << ".root";
             fileName = oss.str();
         } else {
             // Master thread: this file will be created during merge
-            fileName = "epicChargeSharingOutput.root";
+            fileName = "epicChargeSharing.root";
         }
     } else {
         // Single-threaded mode
-        fileName = "epicChargeSharingOutput.root";
+        fileName = "epicChargeSharing.root";
     }
     
     // Only create ROOT file for worker threads or single-threaded mode
@@ -301,7 +301,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             // Generate expected worker file names
             for (G4int i = 0; i < nThreads; i++) {
                 std::ostringstream oss;
-                oss << "epicChargeSharingOutput_t" << i << ".root";
+                oss << "epicChargeSharing_t" << i << ".root";
                 workerFileNames.push_back(oss.str());
             }
             
@@ -343,7 +343,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             merger.SetNotrees(kFALSE);
             
             // Set output file
-            if (!merger.OutputFile("epicChargeSharingOutput.root", "RECREATE", 1)) {
+            if (!merger.OutputFile("epicChargeSharing.root", "RECREATE", 1)) {
                 G4cerr << "Master thread: Failed to set output file for merger!" << G4endl;
                 return;
             }
@@ -370,7 +370,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             // NOTE: This is the ONLY place metadata should be written to avoid duplicates
             // Worker threads write only their tree data, master adds metadata once to final file
             if (fGridPixelSize > 0) {
-                TFile* mergedFile = TFile::Open("epicChargeSharingOutput.root", "UPDATE");
+                TFile* mergedFile = TFile::Open("epicChargeSharing.root", "UPDATE");
                 if (mergedFile && !mergedFile->IsZombie()) {
                     mergedFile->cd();
                     
@@ -398,7 +398,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             }
             
             // Verify the merged file
-            TFile* verifyFile = TFile::Open("epicChargeSharingOutput.root", "READ");
+            TFile* verifyFile = TFile::Open("epicChargeSharing.root", "READ");
             if (verifyFile && !verifyFile->IsZombie()) {
                 TTree* verifyTree = (TTree*)verifyFile->Get("Hits");
                 if (verifyTree) {
@@ -421,7 +421,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
             }
 
             // After merging and metadata write, run post-processing macros on the final file
-            RunPostProcessingMacros("epicChargeSharingOutput.root");
+            RunPostProcessingMacros("epicChargeSharing.root");
             
         } catch (const std::exception& e) {
             G4cerr << "Master thread: Exception during robust file merging: " << e.what() << G4endl;
