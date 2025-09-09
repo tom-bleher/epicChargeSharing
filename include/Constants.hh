@@ -41,7 +41,7 @@ namespace Constants {
     // ========================
     
     // Step limiting
-    const G4double MAX_STEP_SIZE = 5.0*micrometer;      // Maximum step size for tracking
+    const G4double MAX_STEP_SIZE = 20.0*micrometer;      // Maximum step size for tracking
         
     // Primary generator constants
     const G4double PRIMARY_PARTICLE_Z_POSITION = 0.0*cm; // Z position for primary particle generation
