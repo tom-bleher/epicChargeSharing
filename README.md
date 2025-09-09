@@ -24,19 +24,16 @@ make -j$(nproc)
 
 ## Usage
 
-### Interactive Mode (GUI)
-```bash
-# Multi-threaded (default uses all CPU cores)
-./epicChargeSharing
-
-# Specify number of threads (single-threaded is -t 1)
-./epicChargeSharing -t 4
-```
-
 ### Batch Mode
 ```bash
 # Multi-threaded with macro file
 ./epicChargeSharing -m ../macros/run.mac
+```
+
+### GUI Mode
+```bash
+# Multi-threaded (default uses all CPU cores)
+./epicChargeSharing
 ```
 
 ## Repository Structure
