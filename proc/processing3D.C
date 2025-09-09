@@ -51,7 +51,7 @@ namespace {
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
 // of the event's maximum charge within the neighborhood. The same error is
 // applied to all data points used in the fit for that event.
-int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
+int processing3D(const char* filename = "../build/epicChargeSharing.root",
                  double errorPercentOfMax = 5.0) {
   // Favor faster least-squares: Minuit2 + Fumili2
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
@@ -70,7 +70,7 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
   // Get tree (check first for clearer diagnostics)
   TTree* tree = dynamic_cast<TTree*>(file->Get("Hits"));
   if (!tree) {
-    ::Error("processing3D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharingOutput.root?)", filename);
+    ::Error("processing3D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
     file->Close();
     delete file;
     return 3;
@@ -156,6 +156,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
   double y_rec_3d = INVALID_VALUE;
   double rec_hit_delta_x_3d = INVALID_VALUE;
   double rec_hit_delta_y_3d = INVALID_VALUE;
+  double rec_hit_delta_x_3d_signed = INVALID_VALUE;
+  double rec_hit_delta_y_3d_signed = INVALID_VALUE;
   
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
     TBranch* br = tree->GetBranch(name);
@@ -176,6 +178,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
   TBranch* br_y_rec = ensureAndResetBranch("ReconY_3D", &y_rec_3d);
   TBranch* br_dx    = ensureAndResetBranch("ReconTrueDeltaX_3D", &rec_hit_delta_x_3d);
   TBranch* br_dy    = ensureAndResetBranch("ReconTrueDeltaY_3D", &rec_hit_delta_y_3d);
+  TBranch* br_dx_signed = ensureAndResetBranch("ReconTrueDeltaX_3D_Signed", &rec_hit_delta_x_3d_signed);
+  TBranch* br_dy_signed = ensureAndResetBranch("ReconTrueDeltaY_3D_Signed", &rec_hit_delta_y_3d_signed);
   
   // 2D fit function kept for reference. We use Minuit2 on a compact window.
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
@@ -190,12 +194,15 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     // Defaults: set to finite invalid sentinel
     x_rec_3d = y_rec_3d = INVALID_VALUE;
     rec_hit_delta_x_3d = rec_hit_delta_y_3d = INVALID_VALUE;
+    rec_hit_delta_x_3d_signed = rec_hit_delta_y_3d_signed = INVALID_VALUE;
 
     if (is_pixel_hit || !Fi || Fi->empty()) {
       br_x_rec->Fill();
       br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
+      br_dx_signed->Fill();
+      br_dy_signed->Fill();
       
       continue;
     }
@@ -207,6 +214,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
       br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
+      br_dx_signed->Fill();
+      br_dy_signed->Fill();
       
       continue;
     }
@@ -264,12 +273,16 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
         y_rec_3d = yw / wsum;
         rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
         rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
+        rec_hit_delta_x_3d_signed = (x_hit - x_rec_3d);
+        rec_hit_delta_y_3d_signed = (y_hit - y_rec_3d);
         nFitted++;
       }
       br_x_rec->Fill();
       br_y_rec->Fill();
       br_dx->Fill();
       br_dy->Fill();
+      br_dx_signed->Fill();
+      br_dy_signed->Fill();
       continue;
     }
 
@@ -416,6 +429,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
       y_rec_3d = fitter.Result().Parameter(2);
       rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
       rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
+      rec_hit_delta_x_3d_signed = (x_hit - x_rec_3d);
+      rec_hit_delta_y_3d_signed = (y_hit - y_rec_3d);
       
       nFitted++;
     } else {
@@ -432,11 +447,14 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
         y_rec_3d = yw / wsum;
         rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
         rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
+        rec_hit_delta_x_3d_signed = (x_hit - x_rec_3d);
+        rec_hit_delta_y_3d_signed = (y_hit - y_rec_3d);
         
         nFitted++;
       } else {
         x_rec_3d = y_rec_3d = INVALID_VALUE;
         rec_hit_delta_x_3d = rec_hit_delta_y_3d = INVALID_VALUE;
+        rec_hit_delta_x_3d_signed = rec_hit_delta_y_3d_signed = INVALID_VALUE;
         
       }
     }
@@ -445,6 +463,8 @@ int processing3D(const char* filename = "../build/epicChargeSharingOutput.root",
     br_y_rec->Fill();
     br_dx->Fill();
     br_dy->Fill();
+    br_dx_signed->Fill();
+    br_dy_signed->Fill();
     
   }
 
