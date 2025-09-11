@@ -74,6 +74,18 @@ static void RunPostProcessingMacros(const G4String& rootFilePath)
 
     G4cout << "Starting fitting simulated data in " << rootFilePath << G4endl;
 
+    // Ensure ROOT implicit MT is enabled for parallel fitting inside macros
+    #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
+    try {
+        if (!ROOT::IsImplicitMTEnabled()) {
+            ROOT::EnableImplicitMT();
+            G4cout << "ROOT: implicit MT enabled for post-processing" << G4endl;
+        }
+    } catch (...) {
+        // ignore if not available
+    }
+    #endif
+
     // Build ACLiC outputs in a local cache under build/ to avoid writing into source tree
     if (gSystem) {
         gSystem->mkdir("proc_cache", true);

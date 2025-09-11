@@ -29,6 +29,9 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <numeric>
+#include <atomic>
+#include <ROOT/TThreadExecutor.hxx>
 
 namespace {
   // 2D Gaussian with constant offset:
@@ -185,69 +188,70 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
 
   const Long64_t nEntries = tree->GetEntries();
-  Long64_t nProcessed = 0, nFitted = 0;
+  Long64_t nProcessed = 0;
+  std::atomic<long long> nFitted{0};
 
+  // Preload inputs sequentially to avoid ROOT I/O races
+  std::vector<double> v_x_hit(nEntries), v_y_hit(nEntries);
+  std::vector<double> v_x_px(nEntries), v_y_px(nEntries);
+  std::vector<char> v_is_pixel(nEntries);
+  std::vector<std::vector<double>> v_Fi(nEntries);
   for (Long64_t i = 0; i < nEntries; ++i) {
     tree->GetEntry(i);
-    nProcessed++;
+    v_x_hit[i] = x_hit;
+    v_y_hit[i] = y_hit;
+    v_x_px[i]  = x_px;
+    v_y_px[i]  = y_px;
+    v_is_pixel[i] = is_pixel_hit ? 1 : 0;
+    if (Fi && !Fi->empty()) v_Fi[i] = *Fi; else v_Fi[i].clear();
+  }
 
-    // Defaults: set to finite invalid sentinel
-    x_rec_3d = y_rec_3d = INVALID_VALUE;
-    rec_hit_delta_x_3d = rec_hit_delta_y_3d = INVALID_VALUE;
-    rec_hit_delta_x_3d_signed = rec_hit_delta_y_3d_signed = INVALID_VALUE;
+  // Prepare output buffers
+  std::vector<double> out_x_rec(nEntries, INVALID_VALUE);
+  std::vector<double> out_y_rec(nEntries, INVALID_VALUE);
+  std::vector<double> out_dx(nEntries, INVALID_VALUE);
+  std::vector<double> out_dy(nEntries, INVALID_VALUE);
+  std::vector<double> out_dx_s(nEntries, INVALID_VALUE);
+  std::vector<double> out_dy_s(nEntries, INVALID_VALUE);
 
-    if (is_pixel_hit || !Fi || Fi->empty()) {
-      br_x_rec->Fill();
-      br_y_rec->Fill();
-      br_dx->Fill();
-      br_dy->Fill();
-      br_dx_signed->Fill();
-      br_dy_signed->Fill();
-      
-      continue;
+  // Parallel computation across entries
+  std::vector<int> indices(nEntries);
+  std::iota(indices.begin(), indices.end(), 0);
+  ROOT::TThreadExecutor exec;
+  exec.Foreach([&](int i){
+    const bool isPix = v_is_pixel[i] != 0;
+    const auto &FiLoc = v_Fi[i];
+    if (isPix || FiLoc.empty()) {
+      return;
     }
 
-    const size_t total = Fi->size();
+    const size_t total = FiLoc.size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
     if (N * N != static_cast<int>(total) || N < 3) {
-      br_x_rec->Fill();
-      br_y_rec->Fill();
-      br_dx->Fill();
-      br_dy->Fill();
-      br_dx_signed->Fill();
-      br_dy_signed->Fill();
-      
-      continue;
+      return;
     }
-
     const int R = (N - 1) / 2;
 
-    // Prepare TGraph2D points for valid pixels (Fi >= 0). Also track the max
     TGraph2D g2d;
     int p = 0;
     double zmaxNeighborhood = -1e300;
+    const double x_px_loc = v_x_px[i];
+    const double y_px_loc = v_y_px[i];
     for (int di = -R; di <= R; ++di) {
       for (int dj = -R; dj <= R; ++dj) {
         const int idx = (di + R) * N + (dj + R);
-        const double f = (*Fi)[idx];
-        if (!IsFinite3D(f) || f < 0) continue; // skip invalid or sentinel
-        // Mapping: di indexes X, dj indexes Y
-        const double x = x_px + di * pixelSpacing;
-        const double y = y_px + dj * pixelSpacing;
+        const double f = FiLoc[idx];
+        if (!IsFinite3D(f) || f < 0) continue;
+        const double x = x_px_loc + di * pixelSpacing;
+        const double y = y_px_loc + dj * pixelSpacing;
         g2d.SetPoint(p++, x, y, f);
         if (f > zmaxNeighborhood) zmaxNeighborhood = f;
       }
     }
-
     if (g2d.GetN() < 5) {
-      br_x_rec->Fill();
-      br_y_rec->Fill();
-      br_dx->Fill();
-      br_dy->Fill();
-      continue;
+      return;
     }
 
-    // Initial guesses from data moments (seed around the max point)
     double zmin = 1e300, zmax = -1e300; int idxMax = 0;
     for (int k = 0; k < g2d.GetN(); ++k) {
       const double z = g2d.GetZ()[k];
@@ -259,142 +263,68 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
     const double mux0 = g2d.GetX()[idxMax];
     const double muy0 = g2d.GetY()[idxMax];
 
-    // Low-contrast neighborhood: skip iterative fit, use weighted centroid
     if (A0 < 1e-6) {
       double wsum = 0.0, xw = 0.0, yw = 0.0;
       for (int k = 0; k < g2d.GetN(); ++k) {
         const double w = std::max(0.0, g2d.GetZ()[k] - B0);
-        wsum += w;
-        xw += w * g2d.GetX()[k];
-        yw += w * g2d.GetY()[k];
+        wsum += w; xw += w * g2d.GetX()[k]; yw += w * g2d.GetY()[k];
       }
       if (wsum > 0.0) {
-        x_rec_3d = xw / wsum;
-        y_rec_3d = yw / wsum;
-        rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
-        rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
-        rec_hit_delta_x_3d_signed = (x_hit - x_rec_3d);
-        rec_hit_delta_y_3d_signed = (y_hit - y_rec_3d);
-        nFitted++;
+        const double xr = xw / wsum;
+        const double yr = yw / wsum;
+        out_x_rec[i] = xr; out_y_rec[i] = yr;
+        out_dx[i] = std::abs(v_x_hit[i] - xr);
+        out_dy[i] = std::abs(v_y_hit[i] - yr);
+        out_dx_s[i] = (v_x_hit[i] - xr);
+        out_dy_s[i] = (v_y_hit[i] - yr);
+        nFitted.fetch_add(1, std::memory_order_relaxed);
       }
-      br_x_rec->Fill();
-      br_y_rec->Fill();
-      br_dx->Fill();
-      br_dy->Fill();
-      br_dx_signed->Fill();
-      br_dy_signed->Fill();
-      continue;
+      return;
     }
 
-    // Optional uniform vertical uncertainty from percent-of-max
     const double relErr = std::max(0.0, errorPercentOfMax) * 0.01;
-    const double uniformSigma = (zmaxNeighborhood > 0 && relErr > 0.0)
-                              ? relErr * zmaxNeighborhood
-                              : 0.0;
-
-    // Seed sigmas from baseline-subtracted second moments; loosen bounds
+    const double uniformSigma = (zmaxNeighborhood > 0 && relErr > 0.0) ? relErr * zmaxNeighborhood : 0.0;
     const double sigLoBound = std::max(1e-6, 0.02*pixelSpacing);
     const double sigHiBound = 3.0*pixelSpacing;
-
     auto sigmaSeed2D = [&](bool forX)->double {
-      double wsum = 0.0, m = 0.0;
-      const int n = g2d.GetN();
+      double wsum = 0.0, m = 0.0; const int n = g2d.GetN();
       if (n <= 0) return std::max(0.25*pixelSpacing, 1e-6);
-      // mean
-      for (int k=0;k<n;++k) {
-        const double w = std::max(0.0, g2d.GetZ()[k] - B0);
-        const double coord = forX ? g2d.GetX()[k] : g2d.GetY()[k];
-        wsum += w; m += w * coord;
-      }
+      for (int k=0;k<n;++k) { const double w = std::max(0.0, g2d.GetZ()[k] - B0); const double c = forX ? g2d.GetX()[k] : g2d.GetY()[k]; wsum += w; m += w*c; }
       if (wsum <= 0.0) return std::max(0.25*pixelSpacing, 1e-6);
-      m /= wsum;
-      double var = 0.0;
-      for (int k=0;k<n;++k) {
-        const double w = std::max(0.0, g2d.GetZ()[k] - B0);
-        const double coord = forX ? g2d.GetX()[k] : g2d.GetY()[k];
-        const double d = coord - m;
-        var += w * d * d;
-      }
+      m /= wsum; double var = 0.0;
+      for (int k=0;k<n;++k) { const double w = std::max(0.0, g2d.GetZ()[k] - B0); const double c = forX ? g2d.GetX()[k] : g2d.GetY()[k]; const double d = c - m; var += w*d*d; }
       var = (wsum > 0.0) ? (var / wsum) : 0.0;
       double s = std::sqrt(std::max(var, 1e-12));
-      if (s < sigLoBound) s = sigLoBound;
-      if (s > sigHiBound) s = sigHiBound;
-      return s;
+      if (s < sigLoBound) s = sigLoBound; if (s > sigHiBound) s = sigHiBound; return s;
     };
-
     const double sxInitMoment = sigmaSeed2D(true);
     const double syInitMoment = sigmaSeed2D(false);
 
-    // Seed params retained for reference TF2, but Minimizer constraints used below
-    f2D.SetParameters(A0, mux0, muy0, sxInitMoment, syInitMoment, B0);
+    // Build range
+    double xMinR =  1e300, xMaxR = -1e300; double yMinR =  1e300, yMaxR = -1e300;
+    for (int k = 0; k < g2d.GetN(); ++k) { xMinR = std::min(xMinR, g2d.GetX()[k]); xMaxR = std::max(xMaxR, g2d.GetX()[k]); yMinR = std::min(yMinR, g2d.GetY()[k]); yMaxR = std::max(yMaxR, g2d.GetY()[k]); }
+    xMinR -= 0.5 * pixelSpacing; xMaxR += 0.5 * pixelSpacing; yMinR -= 0.5 * pixelSpacing; yMaxR += 0.5 * pixelSpacing;
+    const double muXLo = v_x_px[i] - 0.5 * pixelSpacing;
+    const double muXHi = v_x_px[i] + 0.5 * pixelSpacing;
+    const double muYLo = v_y_px[i] - 0.5 * pixelSpacing;
+    const double muYHi = v_y_px[i] + 0.5 * pixelSpacing;
 
-    // Fit on FULL range covering all points present in the neighborhood
-    double xMinR =  1e300, xMaxR = -1e300;
-    double yMinR =  1e300, yMaxR = -1e300;
-    for (int k = 0; k < g2d.GetN(); ++k) {
-      xMinR = std::min(xMinR, g2d.GetX()[k]);
-      xMaxR = std::max(xMaxR, g2d.GetX()[k]);
-      yMinR = std::min(yMinR, g2d.GetY()[k]);
-      yMaxR = std::max(yMaxR, g2d.GetY()[k]);
-    }
-    // Add small padding
-    xMinR -= 0.5 * pixelSpacing; xMaxR += 0.5 * pixelSpacing;
-    yMinR -= 0.5 * pixelSpacing; yMaxR += 0.5 * pixelSpacing;
-    f2D.SetRange(xMinR, xMaxR, yMinR, yMaxR);
-    // Constrain means to ±1/2 pitch about nearest pixel center
-    const double muXLo = x_px - 0.5 * pixelSpacing;
-    const double muXHi = x_px + 0.5 * pixelSpacing;
-    const double muYLo = y_px - 0.5 * pixelSpacing;
-    const double muYHi = y_px + 0.5 * pixelSpacing;
-    f2D.SetParLimits(1, muXLo, muXHi);
-    f2D.SetParLimits(2, muYLo, muYHi);
-
-    // Minuit2 least-squares over the trimmed window
+    TF2 fModel("fModel", Gauss2DPlusB, xMinR, xMaxR, yMinR, yMaxR, 6);
+    ROOT::Math::WrappedMultiTF1 wModel(fModel, 2);
     const double* Xarr = g2d.GetX();
     const double* Yarr = g2d.GetY();
     const double* Zarr = g2d.GetZ();
     const int nPts = g2d.GetN();
-    auto chi2 = [&](const double* p) -> double {
-      const double A = p[0];
-      const double mx = p[1];
-      const double my = p[2];
-      const double sx = p[3];
-      const double sy = p[4];
-      const double B = p[5];
-      const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
-      double sum = 0.0;
-      for (int k = 0; k < nPts; ++k) {
-        const double xi = Xarr[k];
-        const double yi = Yarr[k];
-        const double dx = (xi - mx)/sx;
-        const double dy = (yi - my)/sy;
-        const double model = A * std::exp(-0.5*(dx*dx + dy*dy)) + B;
-        const double r = (Zarr[k] - model);
-        sum += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
-      }
-      return sum;
-    };
-
-    // Wrap model as TF1 for ROOT::Fit pipeline
-    TF2 fModel("fModel", Gauss2DPlusB, xMinR, xMaxR, yMinR, yMaxR, 6);
-    ROOT::Math::WrappedMultiTF1 wModel(fModel, 2);
-
-    // Build BinData (Fumili2 requires FitMethodFunction via Chi2Function)
     ROOT::Fit::BinData data2D(nPts, 2);
     for (int k = 0; k < nPts; ++k) {
-      const double ey = (uniformSigma > 0.0) ? uniformSigma : 1.0;
-      double xy[2] = {Xarr[k], Yarr[k]};
-      data2D.Add(xy, Zarr[k], ey);
+      const double ey = (uniformSigma > 0.0) ? uniformSigma : 1.0; double xy[2] = {Xarr[k], Yarr[k]}; data2D.Add(xy, Zarr[k], ey);
     }
     ROOT::Fit::Fitter fitter;
     fitter.Config().SetMinimizer("Minuit2", "Fumili2");
     fitter.Config().MinimizerOptions().SetStrategy(0);
     fitter.Config().MinimizerOptions().SetTolerance(1e-4);
     fitter.Config().MinimizerOptions().SetPrintLevel(0);
-    // Provide the model; Chi2 will be constructed from BinData internally
     fitter.SetFunction(wModel);
-
-    // Parameter settings and limits
     fitter.Config().ParSettings(0).SetName("A");
     fitter.Config().ParSettings(1).SetName("mux");
     fitter.Config().ParSettings(2).SetName("muy");
@@ -407,66 +337,63 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
     fitter.Config().ParSettings(3).SetLimits(sigLoBound, sigHiBound);
     fitter.Config().ParSettings(4).SetLimits(sigLoBound, sigHiBound);
     fitter.Config().ParSettings(5).SetLowerLimit(0.0);
-
     fitter.Config().ParSettings(0).SetStepSize(1e-3);
     fitter.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
     fitter.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
     fitter.Config().ParSettings(3).SetStepSize(1e-4*pixelSpacing);
     fitter.Config().ParSettings(4).SetStepSize(1e-4*pixelSpacing);
     fitter.Config().ParSettings(5).SetStepSize(1e-3);
-
-    // Initial parameters (via ParSettings)
     fitter.Config().ParSettings(0).SetValue(A0);
     fitter.Config().ParSettings(1).SetValue(mux0);
     fitter.Config().ParSettings(2).SetValue(muy0);
     fitter.Config().ParSettings(3).SetValue(sxInitMoment);
     fitter.Config().ParSettings(4).SetValue(syInitMoment);
     fitter.Config().ParSettings(5).SetValue(B0);
-
     bool ok = fitter.Fit(data2D);
     if (ok) {
-      x_rec_3d = fitter.Result().Parameter(1);
-      y_rec_3d = fitter.Result().Parameter(2);
-      rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
-      rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
-      rec_hit_delta_x_3d_signed = (x_hit - x_rec_3d);
-      rec_hit_delta_y_3d_signed = (y_hit - y_rec_3d);
-      
-      nFitted++;
+      const double xr = fitter.Result().Parameter(1);
+      const double yr = fitter.Result().Parameter(2);
+      out_x_rec[i] = xr; out_y_rec[i] = yr;
+      out_dx[i] = std::abs(v_x_hit[i] - xr);
+      out_dy[i] = std::abs(v_y_hit[i] - yr);
+      out_dx_s[i] = (v_x_hit[i] - xr);
+      out_dy_s[i] = (v_y_hit[i] - yr);
+      nFitted.fetch_add(1, std::memory_order_relaxed);
     } else {
-      // Fallback: weighted centroid over the neighborhood
       double wsum = 0.0, xw = 0.0, yw = 0.0;
-      for (int k = 0; k < g2d.GetN(); ++k) {
-        double w = std::max(0.0, g2d.GetZ()[k] - B0);
-        wsum += w;
-        xw += w * g2d.GetX()[k];
-        yw += w * g2d.GetY()[k];
-      }
+      for (int k = 0; k < g2d.GetN(); ++k) { double w = std::max(0.0, g2d.GetZ()[k] - B0); wsum += w; xw += w * g2d.GetX()[k]; yw += w * g2d.GetY()[k]; }
       if (wsum > 0) {
-        x_rec_3d = xw / wsum;
-        y_rec_3d = yw / wsum;
-        rec_hit_delta_x_3d = std::abs(x_hit - x_rec_3d);
-        rec_hit_delta_y_3d = std::abs(y_hit - y_rec_3d);
-        rec_hit_delta_x_3d_signed = (x_hit - x_rec_3d);
-        rec_hit_delta_y_3d_signed = (y_hit - y_rec_3d);
-        
-        nFitted++;
-      } else {
-        x_rec_3d = y_rec_3d = INVALID_VALUE;
-        rec_hit_delta_x_3d = rec_hit_delta_y_3d = INVALID_VALUE;
-        rec_hit_delta_x_3d_signed = rec_hit_delta_y_3d_signed = INVALID_VALUE;
-        
+        const double xr = xw / wsum; const double yr = yw / wsum;
+        out_x_rec[i] = xr; out_y_rec[i] = yr;
+        out_dx[i] = std::abs(v_x_hit[i] - xr);
+        out_dy[i] = std::abs(v_y_hit[i] - yr);
+        out_dx_s[i] = (v_x_hit[i] - xr);
+        out_dy_s[i] = (v_y_hit[i] - yr);
+        nFitted.fetch_add(1, std::memory_order_relaxed);
       }
     }
+  }, indices);
 
+  // Sequentially write outputs
+  for (Long64_t i = 0; i < nEntries; ++i) {
+    tree->GetEntry(i);
+    x_rec_3d = out_x_rec[i];
+    y_rec_3d = out_y_rec[i];
+    rec_hit_delta_x_3d = out_dx[i];
+    rec_hit_delta_y_3d = out_dy[i];
+    rec_hit_delta_x_3d_signed = out_dx_s[i];
+    rec_hit_delta_y_3d_signed = out_dy_s[i];
     br_x_rec->Fill();
     br_y_rec->Fill();
     br_dx->Fill();
     br_dy->Fill();
     br_dx_signed->Fill();
     br_dy_signed->Fill();
-    
+    nProcessed++;
   }
+
+  // Re-enable all branches to avoid persisting disabled-status to file
+  tree->SetBranchStatus("*", 1);
 
   // Overwrite tree in file
   file->cd();
@@ -475,7 +402,7 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
   file->Close();
   delete file;
 
-  ::Info("processing3D", "Processed %lld entries, fitted %lld.", nProcessed, nFitted);
+  ::Info("processing3D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
   return 0;
 }
 
