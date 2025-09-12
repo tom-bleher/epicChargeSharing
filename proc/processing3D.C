@@ -55,7 +55,8 @@ namespace {
 // of the event's maximum charge within the neighborhood. The same error is
 // applied to all data points used in the fit for that event.
 int processing3D(const char* filename = "../build/epicChargeSharing.root",
-                 double errorPercentOfMax = 5.0) {
+                 double errorPercentOfMax = 5.0,
+                 bool saveFitParameters = false) {
   // Favor faster least-squares: Minuit2 + Fumili2
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
@@ -161,6 +162,13 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
   double rec_hit_delta_y_3d = INVALID_VALUE;
   double rec_hit_delta_x_3d_signed = INVALID_VALUE;
   double rec_hit_delta_y_3d_signed = INVALID_VALUE;
+  // 2D Gaussian fit parameters
+  double gauss3d_A = INVALID_VALUE;
+  double gauss3d_mux = INVALID_VALUE;
+  double gauss3d_muy = INVALID_VALUE;
+  double gauss3d_sigx = INVALID_VALUE;
+  double gauss3d_sigy = INVALID_VALUE;
+  double gauss3d_B = INVALID_VALUE;
   
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
     TBranch* br = tree->GetBranch(name);
@@ -183,6 +191,21 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
   TBranch* br_dy    = ensureAndResetBranch("ReconTrueDeltaY_3D", &rec_hit_delta_y_3d);
   TBranch* br_dx_signed = ensureAndResetBranch("ReconTrueDeltaX_3D_Signed", &rec_hit_delta_x_3d_signed);
   TBranch* br_dy_signed = ensureAndResetBranch("ReconTrueDeltaY_3D_Signed", &rec_hit_delta_y_3d_signed);
+  // Parameter branches
+  TBranch* br_A = nullptr;
+  TBranch* br_mux = nullptr;
+  TBranch* br_muy = nullptr;
+  TBranch* br_sigx = nullptr;
+  TBranch* br_sigy = nullptr;
+  TBranch* br_B = nullptr;
+  if (saveFitParameters) {
+    br_A     = ensureAndResetBranch("Gauss3D_A", &gauss3d_A);
+    br_mux   = ensureAndResetBranch("Gauss3D_mux", &gauss3d_mux);
+    br_muy   = ensureAndResetBranch("Gauss3D_muy", &gauss3d_muy);
+    br_sigx  = ensureAndResetBranch("Gauss3D_sigx", &gauss3d_sigx);
+    br_sigy  = ensureAndResetBranch("Gauss3D_sigy", &gauss3d_sigy);
+    br_B     = ensureAndResetBranch("Gauss3D_B", &gauss3d_B);
+  }
   
   // 2D fit function kept for reference. We use Minuit2 on a compact window.
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
@@ -213,6 +236,13 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double> out_dy(nEntries, INVALID_VALUE);
   std::vector<double> out_dx_s(nEntries, INVALID_VALUE);
   std::vector<double> out_dy_s(nEntries, INVALID_VALUE);
+  // Output buffers for fit parameters
+  std::vector<double> out_A(nEntries, INVALID_VALUE);
+  std::vector<double> out_mux(nEntries, INVALID_VALUE);
+  std::vector<double> out_muy(nEntries, INVALID_VALUE);
+  std::vector<double> out_sigx(nEntries, INVALID_VALUE);
+  std::vector<double> out_sigy(nEntries, INVALID_VALUE);
+  std::vector<double> out_B(nEntries, INVALID_VALUE);
 
   // Parallel computation across entries
   std::vector<int> indices(nEntries);
@@ -349,10 +379,17 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
     fitter.Config().ParSettings(3).SetValue(sxInitMoment);
     fitter.Config().ParSettings(4).SetValue(syInitMoment);
     fitter.Config().ParSettings(5).SetValue(B0);
-    bool ok = fitter.Fit(data2D);
-    if (ok) {
-      const double xr = fitter.Result().Parameter(1);
-      const double yr = fitter.Result().Parameter(2);
+    bool okFit = fitter.Fit(data2D);
+    if (okFit) {
+      // Save parameters on successful fit
+      out_A[i]    = fitter.Result().Parameter(0);
+      out_mux[i]  = fitter.Result().Parameter(1);
+      out_muy[i]  = fitter.Result().Parameter(2);
+      out_sigx[i] = fitter.Result().Parameter(3);
+      out_sigy[i] = fitter.Result().Parameter(4);
+      out_B[i]    = fitter.Result().Parameter(5);
+      const double xr = out_mux[i];
+      const double yr = out_muy[i];
       out_x_rec[i] = xr; out_y_rec[i] = yr;
       out_dx[i] = std::abs(v_x_hit[i] - xr);
       out_dy[i] = std::abs(v_y_hit[i] - yr);
@@ -383,12 +420,28 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
     rec_hit_delta_y_3d = out_dy[i];
     rec_hit_delta_x_3d_signed = out_dx_s[i];
     rec_hit_delta_y_3d_signed = out_dy_s[i];
+    if (saveFitParameters) {
+      gauss3d_A = out_A[i];
+      gauss3d_mux = out_mux[i];
+      gauss3d_muy = out_muy[i];
+      gauss3d_sigx = out_sigx[i];
+      gauss3d_sigy = out_sigy[i];
+      gauss3d_B = out_B[i];
+    }
     br_x_rec->Fill();
     br_y_rec->Fill();
     br_dx->Fill();
     br_dy->Fill();
     br_dx_signed->Fill();
     br_dy_signed->Fill();
+    if (saveFitParameters) {
+      if (br_A) br_A->Fill();
+      if (br_mux) br_mux->Fill();
+      if (br_muy) br_muy->Fill();
+      if (br_sigx) br_sigx->Fill();
+      if (br_sigy) br_sigy->Fill();
+      if (br_B) br_B->Fill();
+    }
     nProcessed++;
   }
 

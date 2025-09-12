@@ -53,7 +53,8 @@ namespace {
 // of the event's maximum charge within the neighborhood. The same error is
 // applied to all data points used in the fits for that event.
 int processing2D(const char* filename = "../build/epicChargeSharing.root",
-                 double errorPercentOfMax = 5.0) {
+                 double errorPercentOfMax = 5.0,
+                 bool saveFitParameters = false) {
   // Favor faster least-squares: Minuit2 + Fumili2
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
@@ -158,6 +159,15 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   double rec_hit_delta_y_2d = INVALID_VALUE;
   double rec_hit_delta_x_2d_signed = INVALID_VALUE;
   double rec_hit_delta_y_2d_signed = INVALID_VALUE;
+  // 1D Gaussian fit parameters (row=x, col=y)
+  double gauss2d_row_a = INVALID_VALUE;
+  double gauss2d_row_mu = INVALID_VALUE;
+  double gauss2d_row_sigma = INVALID_VALUE;
+  double gauss2d_row_b = INVALID_VALUE;
+  double gauss2d_col_a = INVALID_VALUE;
+  double gauss2d_col_mu = INVALID_VALUE;
+  double gauss2d_col_sigma = INVALID_VALUE;
+  double gauss2d_col_b = INVALID_VALUE;
 
   // If branches already exist, we will overwrite their contents
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
@@ -181,6 +191,25 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   TBranch* br_dy    = ensureAndResetBranch("ReconTrueDeltaY", &rec_hit_delta_y_2d);
   TBranch* br_dx_signed = ensureAndResetBranch("ReconTrueDeltaX_Signed", &rec_hit_delta_x_2d_signed);
   TBranch* br_dy_signed = ensureAndResetBranch("ReconTrueDeltaY_Signed", &rec_hit_delta_y_2d_signed);
+  // Parameter branches
+  TBranch* br_row_A = nullptr;
+  TBranch* br_row_mu = nullptr;
+  TBranch* br_row_sigma = nullptr;
+  TBranch* br_row_B = nullptr;
+  TBranch* br_col_A = nullptr;
+  TBranch* br_col_mu = nullptr;
+  TBranch* br_col_sigma = nullptr;
+  TBranch* br_col_B = nullptr;
+  if (saveFitParameters) {
+    br_row_A     = ensureAndResetBranch("Gauss2D_Row_A", &gauss2d_row_a);
+    br_row_mu    = ensureAndResetBranch("Gauss2D_Row_mu", &gauss2d_row_mu);
+    br_row_sigma = ensureAndResetBranch("Gauss2D_Row_sigma", &gauss2d_row_sigma);
+    br_row_B     = ensureAndResetBranch("Gauss2D_Row_B", &gauss2d_row_b);
+    br_col_A     = ensureAndResetBranch("Gauss2D_Col_A", &gauss2d_col_a);
+    br_col_mu    = ensureAndResetBranch("Gauss2D_Col_mu", &gauss2d_col_mu);
+    br_col_sigma = ensureAndResetBranch("Gauss2D_Col_sigma", &gauss2d_col_sigma);
+    br_col_B     = ensureAndResetBranch("Gauss2D_Col_B", &gauss2d_col_b);
+  }
 
   // Fitting function for 1D gaussian + const
   TF1 fRow("fRow", GaussPlusB, -1e9, 1e9, 4);
@@ -212,6 +241,15 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double> out_dy(nEntries, INVALID_VALUE);
   std::vector<double> out_dx_s(nEntries, INVALID_VALUE);
   std::vector<double> out_dy_s(nEntries, INVALID_VALUE);
+  // Output buffers for fit parameters
+  std::vector<double> out_row_A(nEntries, INVALID_VALUE);
+  std::vector<double> out_row_mu(nEntries, INVALID_VALUE);
+  std::vector<double> out_row_sigma(nEntries, INVALID_VALUE);
+  std::vector<double> out_row_B(nEntries, INVALID_VALUE);
+  std::vector<double> out_col_A(nEntries, INVALID_VALUE);
+  std::vector<double> out_col_mu(nEntries, INVALID_VALUE);
+  std::vector<double> out_col_sigma(nEntries, INVALID_VALUE);
+  std::vector<double> out_col_B(nEntries, INVALID_VALUE);
 
   // Parallel computation over entries
   std::vector<int> indices(nEntries);
@@ -396,22 +434,37 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     fitCol.Config().ParSettings(2).SetValue(sigInitCol);
     fitCol.Config().ParSettings(3).SetValue(B0_col);
 
-    bool okRow = fitRow.Fit(dataRow);
-    bool okCol = fitCol.Fit(dataCol);
+    bool okRowFit = fitRow.Fit(dataRow);
+    bool okColFit = fitCol.Fit(dataCol);
+    // Save parameters only if the corresponding fit converged
+    if (okRowFit) {
+      out_row_A[i]     = fitRow.Result().Parameter(0);
+      out_row_mu[i]    = fitRow.Result().Parameter(1);
+      out_row_sigma[i] = fitRow.Result().Parameter(2);
+      out_row_B[i]     = fitRow.Result().Parameter(3);
+    }
+    if (okColFit) {
+      out_col_A[i]     = fitCol.Result().Parameter(0);
+      out_col_mu[i]    = fitCol.Result().Parameter(1);
+      out_col_sigma[i] = fitCol.Result().Parameter(2);
+      out_col_B[i]     = fitCol.Result().Parameter(3);
+    }
     double muX = NAN, muY = NAN;
-    if (okRow) muX = fitRow.Result().Parameter(1);
-    if (okCol) muY = fitCol.Result().Parameter(1);
-    if (!okRow) {
+    if (okRowFit) muX = fitRow.Result().Parameter(1);
+    if (okColFit) muY = fitCol.Result().Parameter(1);
+    if (!okRowFit) {
       double wsum = 0.0, xw = 0.0;
       for (size_t k=0;k<x_row_fit.size();++k) { double w = std::max(0.0, q_row_fit[k] - B0_row); wsum += w; xw += w * x_row_fit[k]; }
-      if (wsum > 0) { muX = xw / wsum; okRow = true; }
+      if (wsum > 0) { muX = xw / wsum; }
     }
-    if (!okCol) {
+    if (!okColFit) {
       double wsum = 0.0, yw = 0.0;
       for (size_t k=0;k<y_col_fit.size();++k) { double w = std::max(0.0, q_col_fit[k] - B0_col); wsum += w; yw += w * y_col_fit[k]; }
-      if (wsum > 0) { muY = yw / wsum; okCol = true; }
+      if (wsum > 0) { muY = yw / wsum; }
     }
-    if (okRow && okCol && IsFinite(muX) && IsFinite(muY)) {
+    const bool okRow = IsFinite(muX);
+    const bool okCol = IsFinite(muY);
+    if (okRow && okCol) {
       out_x_rec[i] = muX;
       out_y_rec[i] = muY;
       out_dx[i] = std::abs(v_x_hit[i] - muX);
@@ -431,12 +484,32 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     rec_hit_delta_y_2d = out_dy[i];
     rec_hit_delta_x_2d_signed = out_dx_s[i];
     rec_hit_delta_y_2d_signed = out_dy_s[i];
+    if (saveFitParameters) {
+      gauss2d_row_a = out_row_A[i];
+      gauss2d_row_mu = out_row_mu[i];
+      gauss2d_row_sigma = out_row_sigma[i];
+      gauss2d_row_b = out_row_B[i];
+      gauss2d_col_a = out_col_A[i];
+      gauss2d_col_mu = out_col_mu[i];
+      gauss2d_col_sigma = out_col_sigma[i];
+      gauss2d_col_b = out_col_B[i];
+    }
     br_x_rec->Fill();
     br_y_rec->Fill();
     br_dx->Fill();
     br_dy->Fill();
     br_dx_signed->Fill();
     br_dy_signed->Fill();
+    if (saveFitParameters) {
+      if (br_row_A) br_row_A->Fill();
+      if (br_row_mu) br_row_mu->Fill();
+      if (br_row_sigma) br_row_sigma->Fill();
+      if (br_row_B) br_row_B->Fill();
+      if (br_col_A) br_col_A->Fill();
+      if (br_col_mu) br_col_mu->Fill();
+      if (br_col_sigma) br_col_sigma->Fill();
+      if (br_col_B) br_col_B->Fill();
+    }
     nProcessed++;
   }
 
