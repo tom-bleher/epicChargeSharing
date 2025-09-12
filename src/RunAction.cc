@@ -17,6 +17,7 @@
 #include <thread>
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 
 #include "TFile.h"
 #include "TTree.h"
@@ -336,84 +337,128 @@ void RunAction::EndOfRunAction(const G4Run* run)
             
             G4int nThreads = fTotalWorkers.load();
             std::vector<G4String> workerFileNames;
-            std::vector<G4String> validFiles;
-            
-            // Generate expected worker file names
+            workerFileNames.reserve(nThreads);
             for (G4int i = 0; i < nThreads; i++) {
                 std::ostringstream oss;
                 oss << "epicChargeSharing_t" << i << ".root";
                 workerFileNames.push_back(oss.str());
             }
-            
-            // Validate all worker files with enhanced checking
-            for (const auto& workerFile : workerFileNames) {
-                if (ValidateRootFile(workerFile)) {
-                    validFiles.push_back(workerFile);
-                    G4cout << "Master thread: Validated worker file " << workerFile << G4endl;
-                } else {
-                    G4cerr << "Master thread: Invalid or missing worker file " << workerFile << G4endl;
-                }
-            }
-            
-            if (validFiles.empty()) {
-                G4cerr << "Master thread: No valid worker files found for merging!" << G4endl;
-                return;
-            }
-            
-            // Count total entries for verification
-            G4int totalEntries = 0;
-            for (const auto& validFile : validFiles) {
-                TFile* testFile = TFile::Open(validFile.c_str(), "READ");
-                if (testFile && !testFile->IsZombie()) {
-                    TTree* testTree = (TTree*)testFile->Get("Hits");
-                    if (testTree) {
-                        totalEntries += testTree->GetEntries();
+
+            // Quick filter: keep only existing, non-empty files (no ROOT open)
+            std::vector<G4String> existingFiles;
+            existingFiles.reserve(workerFileNames.size());
+            for (const auto& wf : workerFileNames) {
+                try {
+                    if (std::filesystem::exists(wf.c_str()) && std::filesystem::file_size(wf.c_str()) > 0) {
+                        existingFiles.push_back(wf);
                     }
-                    testFile->Close();
-                    delete testFile;
+                } catch (...) {
+                    // ignore and skip problematic paths
                 }
             }
-            
-            G4cout << "Master thread: Merging " << validFiles.size() 
-                   << " files with total " << totalEntries << " entries" << G4endl;
-            
-            // Use ROOT's TFileMerger for robust and thread-safe file merging
-            TFileMerger merger(kFALSE); // kFALSE = don't print progress
-            // Disable fast method to avoid edge-case crashes on some ROOT builds
-            merger.SetFastMethod(kFALSE);
-            merger.SetNotrees(kFALSE);
-            
-            // Set output file; compression can be enabled for final merged file
-            if (!merger.OutputFile("epicChargeSharing.root", "RECREATE", 1)) {
-                G4cerr << "Master thread: Failed to set output file for merger!" << G4endl;
-                return;
-            }
-            
-            // Add all valid worker files to merger
-            for (const auto& validFile : validFiles) {
-                if (!merger.AddFile(validFile.c_str())) {
-                    G4cerr << "Master thread: Failed to add " << validFile << " to merger" << G4endl;
-                } else {
-                    G4cout << "Master thread: Added " << validFile << " to merger" << G4endl;
-                }
-            }
-            
-            // Perform the merge
-            Bool_t mergeResult = merger.Merge();
-            if (!mergeResult) {
-                G4cerr << "Master thread: File merging failed!" << G4endl;
+
+            if (existingFiles.empty()) {
+                G4cerr << "Master thread: No worker files found for merging!" << G4endl;
+                // Re-enable IMT if it was previously on
                 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
                 try {
                     if (wasIMT) {
                         ROOT::EnableImplicitMT();
-                        G4cout << "ROOT: implicit MT re-enabled after failed merge" << G4endl;
+                        G4cout << "ROOT: implicit MT re-enabled after merge" << G4endl;
                     }
                 } catch (...) {}
                 #endif
                 return;
             }
-            
+
+            // Helper: merge files with fast path and fallback
+            auto mergeFiles = [&](const std::vector<G4String>& inputs, const G4String& output) -> bool {
+                auto doMerge = [&](Bool_t fast) -> Bool_t {
+                    TFileMerger merger(kFALSE);
+                    merger.SetFastMethod(fast);
+                    merger.SetNotrees(kFALSE);
+                    if (!merger.OutputFile(output.c_str(), "RECREATE", 1)) {
+                        G4cerr << "Master thread: Failed to set output file for merger!" << G4endl;
+                        return kFALSE;
+                    }
+                    Int_t added = 0;
+                    for (const auto& in : inputs) {
+                        // Add only files that still exist at this moment
+                        if (std::filesystem::exists(in.c_str())) {
+                            if (merger.AddFile(in.c_str())) {
+                                added++;
+                            } else {
+                                G4cerr << "Master thread: Skipped unreadable file " << in << G4endl;
+                            }
+                        }
+                    }
+                    if (added == 0) {
+                        G4cerr << "Master thread: No readable input files for merge to " << output << G4endl;
+                        return kFALSE;
+                    }
+                    return merger.Merge();
+                };
+
+                Bool_t ok = kFALSE;
+                try { ok = doMerge(kTRUE); } catch (...) { ok = kFALSE; }
+                if (!ok) {
+                    G4cout << "Master thread: Fast merge failed; retrying with safe merge..." << G4endl;
+                    try { ok = doMerge(kFALSE); } catch (...) { ok = kFALSE; }
+                }
+                return ok;
+            };
+
+            // Chunked merge to limit simultaneously opened files
+            const std::size_t kBatchSize = 16; // limit open files and memory usage
+            std::vector<G4String> chunkOutputs;
+
+            if (existingFiles.size() > kBatchSize) {
+                for (std::size_t offset = 0, chunkIdx = 0; offset < existingFiles.size(); offset += kBatchSize, ++chunkIdx) {
+                    const std::size_t end = std::min(offset + kBatchSize, existingFiles.size());
+                    std::vector<G4String> chunk(existingFiles.begin() + offset, existingFiles.begin() + end);
+                    G4String chunkName = Form("epicChargeSharing_chunk_%zu.root", chunkIdx);
+                    if (!mergeFiles(chunk, chunkName)) {
+                        G4cerr << "Master thread: Chunk merge failed" << G4endl;
+                        // Attempt to clean partial chunk
+                        try { std::filesystem::remove(chunkName.c_str()); } catch (...) {}
+                        #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
+                        try {
+                            if (wasIMT) {
+                                ROOT::EnableImplicitMT();
+                                G4cout << "ROOT: implicit MT re-enabled after merge" << G4endl;
+                            }
+                        } catch (...) {}
+                        #endif
+                        return;
+                    }
+                    chunkOutputs.push_back(chunkName);
+                }
+            }
+
+            const bool usedChunks = !chunkOutputs.empty();
+            const std::vector<G4String>& finalInputs = usedChunks ? chunkOutputs : existingFiles;
+
+            G4cout << "Master thread: Merging " << finalInputs.size() << " file(s) into final output" << G4endl;
+
+            if (!mergeFiles(finalInputs, "epicChargeSharing.root")) {
+                G4cerr << "Master thread: File merging failed!" << G4endl;
+                // cleanup chunks if any
+                for (const auto& f : chunkOutputs) { try { std::filesystem::remove(f.c_str()); } catch (...) {} }
+                #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
+                try {
+                    if (wasIMT) {
+                        ROOT::EnableImplicitMT();
+                        G4cout << "ROOT: implicit MT re-enabled after merge" << G4endl;
+                    }
+                } catch (...) {}
+                #endif
+                return;
+            }
+
             G4cout << "Master thread: File merging completed successfully" << G4endl;
+
+            // Remove temporary chunk files
+            for (const auto& f : chunkOutputs) { try { std::filesystem::remove(f.c_str()); } catch (...) {} }
             
             // Add metadata to the merged file
             // NOTE: This is the ONLY place metadata should be written to avoid duplicates
@@ -461,18 +506,19 @@ void RunAction::EndOfRunAction(const G4Run* run)
             }
             
             // Clean up worker files after success merge
-            for (const auto& file : validFiles) {
-                if (std::remove(file.c_str()) == 0) {
-                    G4cout << "Master thread: Cleaned up " << file << G4endl;
-                } else {
-                    G4cerr << "Master thread: Failed to clean up " << file << G4endl;
-                }
+            for (const auto& file : existingFiles) {
+                try {
+                    if (std::filesystem::exists(file.c_str())) {
+                        if (std::filesystem::remove(file.c_str())) {
+                            G4cout << "Master thread: Cleaned up " << file << G4endl;
+                        } else {
+                            G4cerr << "Master thread: Failed to clean up " << file << G4endl;
+                        }
+                    }
+                } catch (...) {}
             }
 
-            // After merging and metadata write, run post-processing macros on the final file
-            RunPostProcessingMacros("epicChargeSharing.root");
-            
-            // Re-enable IMT if it was previously on
+            // Re-enable IMT before running post-processing macros (they can use IMT)
             #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
             try {
                 if (wasIMT) {
@@ -481,6 +527,9 @@ void RunAction::EndOfRunAction(const G4Run* run)
                 }
             } catch (...) {}
             #endif
+
+            // After merging and metadata write, run post-processing macros on the final file
+            RunPostProcessingMacros("epicChargeSharing.root");
             
         } catch (const std::exception& e) {
             G4cerr << "Master thread: Exception during robust file merging: " << e.what() << G4endl;
