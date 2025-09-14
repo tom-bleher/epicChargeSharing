@@ -78,10 +78,21 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     return 3;
   }
 
-  // Fetch metadata (pixel spacing) with fallback to inference from x_px/y_px
+  // Fetch metadata (pixel spacing, pixel size, neighborhood radius) with fallbacks
   double pixelSpacing = NAN;
   if (auto* spacingObj = dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
     try { pixelSpacing = std::stod(spacingObj->GetTitle()); } catch (...) {}
+  }
+  double pixelSize = NAN;
+  if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
+    try { pixelSize = std::stod(sizeObj->GetTitle()); } catch (...) {}
+  }
+  int neighborhoodRadiusMeta = -1;
+  if (auto* rObj = dynamic_cast<TNamed*>(file->Get("NeighborhoodRadius"))) {
+    try { neighborhoodRadiusMeta = std::stoi(rObj->GetTitle()); }
+    catch (...) {
+      try { neighborhoodRadiusMeta = static_cast<int>(std::lround(std::stod(rObj->GetTitle()))); } catch (...) {}
+    }
   }
 
   auto inferSpacingFromTree = [&](TTree* t) -> double {
@@ -118,6 +129,23 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     return NAN;
   };
 
+  auto inferRadiusFromTree = [&](TTree* t) -> int {
+    std::vector<double>* Fi_tmp = nullptr;
+    t->SetBranchAddress("F_i", &Fi_tmp);
+    Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
+    for (Long64_t i=0;i<nToScan;++i) {
+      t->GetEntry(i);
+      if (Fi_tmp && !Fi_tmp->empty()) {
+        const size_t total = Fi_tmp->size();
+        const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
+        if (N >= 3 && N*N == static_cast<int>(total)) {
+          return (N - 1) / 2;
+        }
+      }
+    }
+    return -1;
+  };
+
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
     pixelSpacing = inferSpacingFromTree(tree);
   }
@@ -126,6 +154,13 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     file->Close();
     delete file;
     return 2;
+  }
+  if (!IsFinite(pixelSize) || pixelSize <= 0) {
+    // Fallback: if pixel size metadata is missing, use half of pitch as a conservative lower bound
+    pixelSize = 0.5 * pixelSpacing;
+  }
+  if (neighborhoodRadiusMeta <= 0) {
+    neighborhoodRadiusMeta = inferRadiusFromTree(tree);
   }
 
   // Existing branches (inputs)
@@ -341,12 +376,18 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     const std::vector<double>& y_col_fit = y_col;
     const std::vector<double>& q_col_fit = q_col;
 
-    const double sigLoBound = std::max(1e-6, 0.02*pixelSpacing);
-    const double sigHiBound = 3.0*pixelSpacing;
+    // Constrain sigma to be within [1 * pitch, R * pitch]
+    const double sigLoBound = pixelSize;
+    const double sigHiBound = std::max(sigLoBound, static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
     auto sigmaSeed1D = [&](const std::vector<double>& xs, const std::vector<double>& qs, double B0)->double {
       double wsum = 0.0, xw = 0.0;
       for (size_t k=0;k<xs.size();++k) { double w = std::max(0.0, qs[k] - B0); wsum += w; xw += w * xs[k]; }
-      if (wsum <= 0.0) return std::max(0.25*pixelSpacing, 1e-6);
+      if (wsum <= 0.0) {
+        double s = std::max(0.25*pixelSpacing, 1e-6);
+        if (s < sigLoBound) s = sigLoBound;
+        if (s > sigHiBound) s = sigHiBound;
+        return s;
+      }
       const double mean = xw / wsum;
       double var = 0.0;
       for (size_t k=0;k<xs.size();++k) { double w = std::max(0.0, qs[k] - B0); const double dx = xs[k] - mean; var += w * dx * dx; }
@@ -378,12 +419,13 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     const double muYHi = y_px_loc + 0.5 * pixelSpacing;
     fRowLoc.SetParLimits(1, muXLo, muXHi);
     fColLoc.SetParLimits(1, muYLo, muYHi);
-    fRowLoc.SetParLimits(0, 0.0, 1.0);
+    // Enforce requested bounds: A in (0,2], B in [0,0.5]
+    fRowLoc.SetParLimits(0, 1e-12, 2.0);
     fRowLoc.SetParLimits(2, sigLoBound, sigHiBound);
-    fRowLoc.SetParLimits(3, 0.0, std::max(0.0, *minmaxRow.first));
-    fColLoc.SetParLimits(0, 0.0, 1.0);
+    fRowLoc.SetParLimits(3, 0.0, 0.5);
+    fColLoc.SetParLimits(0, 1e-12, 2.0);
     fColLoc.SetParLimits(2, sigLoBound, sigHiBound);
-    fColLoc.SetParLimits(3, 0.0, std::max(0.0, *minmaxCol.first));
+    fColLoc.SetParLimits(3, 0.0, 0.5);
 
     ROOT::Math::WrappedMultiTF1 wRow(fRowLoc, 1);
     ROOT::Math::WrappedMultiTF1 wCol(fColLoc, 1);
@@ -409,14 +451,18 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     fitCol.Config().MinimizerOptions().SetPrintLevel(0);
     fitRow.SetFunction(wRow);
     fitCol.SetFunction(wCol);
-    fitRow.Config().ParSettings(0).SetLowerLimit(0.0);
+    // A in (0,2]
+    fitRow.Config().ParSettings(0).SetLimits(1e-12, 2.0);
     fitRow.Config().ParSettings(1).SetLimits(muXLo, muXHi);
     fitRow.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
-    fitRow.Config().ParSettings(3).SetLowerLimit(0.0);
-    fitCol.Config().ParSettings(0).SetLowerLimit(0.0);
+    // B in [0,0.5]
+    fitRow.Config().ParSettings(3).SetLimits(0.0, 0.5);
+    // A in (0,2]
+    fitCol.Config().ParSettings(0).SetLimits(1e-12, 2.0);
     fitCol.Config().ParSettings(1).SetLimits(muYLo, muYHi);
     fitCol.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
-    fitCol.Config().ParSettings(3).SetLowerLimit(0.0);
+    // B in [0,0.5]
+    fitCol.Config().ParSettings(3).SetLimits(0.0, 0.5);
     fitRow.Config().ParSettings(0).SetStepSize(1e-3);
     fitRow.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
     fitRow.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
