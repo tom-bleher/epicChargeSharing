@@ -332,6 +332,17 @@ class PyColorGUI(QtWidgets.QMainWindow):
         file_layout.addWidget(open_btn)
         vbox.addLayout(file_layout)
 
+        # Second file controls
+        file_layout2 = QtWidgets.QHBoxLayout()
+        file_layout2.addWidget(QtWidgets.QLabel("ROOT file B:"))
+        self.file_edit_b = QtWidgets.QLineEdit()
+        file_layout2.addWidget(self.file_edit_b, 1)
+        browse_btn_b = QtWidgets.QPushButton("Browse…")
+        open_btn_b = QtWidgets.QPushButton("Open")
+        file_layout2.addWidget(browse_btn_b)
+        file_layout2.addWidget(open_btn_b)
+        vbox.addLayout(file_layout2)
+
         # Controls row
         controls = QtWidgets.QHBoxLayout()
         controls.addWidget(QtWidgets.QLabel("Mode:"))
@@ -349,11 +360,14 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.save_btn = QtWidgets.QPushButton("Save…")
         self.show_fit_btn = QtWidgets.QPushButton("Show fit")
         self.show_fit_btn.setCheckable(True)
+        self.compare_btn = QtWidgets.QPushButton("Compare…")
+        self.compare_btn.setEnabled(False)
         self.aggregate_cb = QtWidgets.QCheckBox("Aggregate all 3x3s")
         controls.addWidget(self.preview_btn)
         controls.addWidget(self.rand_btn)
         controls.addWidget(self.save_btn)
         controls.addWidget(self.show_fit_btn)
+        controls.addWidget(self.compare_btn)
         controls.addWidget(self.aggregate_cb)
         vbox.addLayout(controls)
 
@@ -388,7 +402,10 @@ class PyColorGUI(QtWidgets.QMainWindow):
         # State
         self.file: Optional[uproot.ReadOnlyFile] = None
         self.file_path: str = ""
+        self.file_b: Optional[uproot.ReadOnlyFile] = None
+        self.file_path_b: str = ""
         self.geom = Geometry()
+        self.geom_b = Geometry()
         self.mode: int = Mode.TwoD_Abs
         self.metric_index: int = 0
         self.i0: int = -1
@@ -398,6 +415,12 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.hasRecon3D = False
         self.hasRecon3DSigned = False
         self.hasPixelDeltas = False
+        # Availability for file B
+        self.hasRecon2D_b = False
+        self.hasRecon2DSigned_b = False
+        self.hasRecon3D_b = False
+        self.hasRecon3DSigned_b = False
+        self.hasPixelDeltas_b = False
         self.aggregate_all: bool = False
         # Options state
         self.scale_mode: str = "auto"
@@ -423,6 +446,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
         # Signals
         browse_btn.clicked.connect(self.on_browse)
         open_btn.clicked.connect(self.on_open)
+        browse_btn_b.clicked.connect(self.on_browse_b)
+        open_btn_b.clicked.connect(self.on_open_b)
         self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
         self.metric_combo.currentIndexChanged.connect(self.on_metric_changed)
         self.preview_btn.clicked.connect(self.on_preview)
@@ -430,6 +455,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.save_btn.clicked.connect(self.on_save)
         self.aggregate_cb.stateChanged.connect(self.on_aggregate_changed)
         self.show_fit_btn.toggled.connect(self.on_show_fit_toggled)
+        self.compare_btn.clicked.connect(self.on_compare)
         # Option signals
         self.scale_combo.currentIndexChanged.connect(self.on_options_changed)
         self.cmap_combo.currentIndexChanged.connect(self.on_options_changed)
@@ -477,6 +503,44 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.update_mode_availability()
         self.rebuild_metric_combo()
         self.draw_current()
+        # Enable compare if second file present
+        try:
+            self.compare_btn.setEnabled(self.file is not None and self.file_b is not None)
+        except Exception:
+            pass
+
+    def on_browse_b(self):
+        fn, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open ROOT file B", self.file_edit_b.text() or os.getcwd(),
+            "ROOT files (*.root);;All files (*)"
+        )
+        if fn:
+            self.file_edit_b.setText(fn)
+
+    def on_open_b(self):
+        path = self.file_edit_b.text().strip()
+        if not path:
+            return
+        if not os.path.exists(path):
+            QtWidgets.QMessageBox.critical(self, "Open ROOT (B)", f"File not found: {path}")
+            return
+        try:
+            self.file_b = uproot.open(path)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Open ROOT (B)", f"Failed to open {path}: {e}")
+            return
+        self.file_path_b = path
+        # Detect availability and geometry for file B
+        self.detect_branch_availability_b()
+        try:
+            self.load_geometry_b()
+        except Exception:
+            pass
+        # Enable compare if primary present
+        try:
+            self.compare_btn.setEnabled(self.file is not None and self.file_b is not None)
+        except Exception:
+            pass
     def on_options_changed(self, *args, **kwargs):
         try:
             self.scale_mode = str(self.scale_combo.currentData())
@@ -492,6 +556,10 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.mode = self.mode_combo.currentData()
         self.rebuild_metric_combo()
         self.draw_current()
+        try:
+            self.compare_btn.setEnabled(self.file is not None and self.file_b is not None)
+        except Exception:
+            pass
 
     def on_metric_changed(self, idx: int):
         self.metric_index = self.metric_combo.currentData()
@@ -681,6 +749,23 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.hasRecon3DSigned = ("ReconTrueDeltaX_3D_Signed" in branches) and ("ReconTrueDeltaY_3D_Signed" in branches)
         self.hasPixelDeltas = ("PixelTrueDeltaX" in branches) and ("PixelTrueDeltaY" in branches)
 
+    def detect_branch_availability_b(self):
+        self.hasRecon2D_b = self.hasRecon2DSigned_b = False
+        self.hasRecon3D_b = self.hasRecon3DSigned_b = False
+        self.hasPixelDeltas_b = False
+        try:
+            hits = self.file_b["Hits"] if self.file_b is not None else None
+        except Exception:
+            hits = None
+        if hits is None:
+            return
+        branches = set(hits.keys())
+        self.hasRecon2D_b = ("ReconTrueDeltaX" in branches) and ("ReconTrueDeltaY" in branches)
+        self.hasRecon2DSigned_b = ("ReconTrueDeltaX_Signed" in branches) and ("ReconTrueDeltaY_Signed" in branches)
+        self.hasRecon3D_b = ("ReconTrueDeltaX_3D" in branches) and ("ReconTrueDeltaY_3D" in branches)
+        self.hasRecon3DSigned_b = ("ReconTrueDeltaX_3D_Signed" in branches) and ("ReconTrueDeltaY_3D_Signed" in branches)
+        self.hasPixelDeltas_b = ("PixelTrueDeltaX" in branches) and ("PixelTrueDeltaY" in branches)
+
     def update_mode_availability(self):
         # Rebuild mode combo to show only valid modes
         valid_modes: List[int] = []
@@ -799,6 +884,79 @@ class PyColorGUI(QtWidgets.QMainWindow):
         except Exception:
             # Default to 1 if metadata missing
             self.geom.neighborhood_radius = 1
+
+    def load_geometry_b(self):
+        if self.file_b is None:
+            return
+        self.geom_b.pixel_size_mm = read_named_double(self.file_b, "GridPixelSize_mm")
+        self.geom_b.pixel_spacing_mm = read_named_double(self.file_b, "GridPixelSpacing_mm")
+        self.geom_b.pixel_corner_offset_mm = read_named_double(self.file_b, "GridPixelCornerOffset_mm")
+        self.geom_b.det_size_mm = read_named_double(self.file_b, "GridDetectorSize_mm")
+        self.geom_b.num_per_side = read_named_int(self.file_b, "GridNumBlocksPerSide")
+        try:
+            self.geom_b.neighborhood_radius = read_named_int(self.file_b, "NeighborhoodRadius")
+        except Exception:
+            self.geom_b.neighborhood_radius = 1
+
+    def _geometries_compatible(self) -> bool:
+        try:
+            a = self.geom
+            b = self.geom_b
+            if a.num_per_side != b.num_per_side:
+                return False
+            def feq(x, y, tol=1e-9):
+                return (abs(float(x) - float(y)) <= tol)
+            return (
+                feq(a.pixel_size_mm, b.pixel_size_mm) and
+                feq(a.pixel_spacing_mm, b.pixel_spacing_mm) and
+                feq(a.pixel_corner_offset_mm, b.pixel_corner_offset_mm) and
+                feq(a.det_size_mm, b.det_size_mm) and
+                int(a.neighborhood_radius) == int(b.neighborhood_radius)
+            )
+        except Exception:
+            return False
+
+    def _branches_available_for_mode_in_both(self, mode: int) -> bool:
+        if mode == Mode.TwoD_Abs:
+            return self.hasRecon2D and self.hasRecon2D_b
+        if mode == Mode.TwoD_Signed:
+            return self.hasRecon2DSigned and self.hasRecon2DSigned_b
+        if mode == Mode.ThreeD_Abs:
+            return self.hasRecon3D and self.hasRecon3D_b
+        if mode == Mode.ThreeD_Signed:
+            return self.hasRecon3DSigned and self.hasRecon3DSigned_b
+        if mode == Mode.TwoD_vs_Pixel:
+            return (self.hasRecon2D and self.hasPixelDeltas) and (self.hasRecon2D_b and self.hasPixelDeltas_b)
+        if mode == Mode.ThreeD_vs_Pixel:
+            return (self.hasRecon3D and self.hasPixelDeltas) and (self.hasRecon3D_b and self.hasPixelDeltas_b)
+        if mode == Mode.TwoD_vs_ThreeD:
+            return (self.hasRecon2D and self.hasRecon3D) and (self.hasRecon2D_b and self.hasRecon3D_b)
+        if mode == Mode.TwoD3D_Combined:
+            return (self.hasRecon2D and self.hasRecon3D) and (self.hasRecon2D_b and self.hasRecon3D_b)
+        return False
+
+    def on_compare(self):
+        if self.file is None or self.file_b is None:
+            QtWidgets.QMessageBox.warning(self, "Compare", "Load both ROOT files first.")
+            return
+        try:
+            self.load_geometry()
+            self.load_geometry_b()
+        except Exception:
+            pass
+        if not self._geometries_compatible():
+            QtWidgets.QMessageBox.critical(self, "Compare", "Files have incompatible geometries; cannot compare.")
+            return
+        if not self._branches_available_for_mode_in_both(self.mode):
+            QtWidgets.QMessageBox.critical(self, "Compare", "Current mode requires branches not present in both files.")
+            return
+        try:
+            dlg = CompareDialog(self)
+            # Keep a ref
+            self._compare_dialog = dlg
+            dlg.show()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Compare", f"Failed to open compare dialog: {e}")
 
     def _get_colorbar_label(self, sel: Optional[int] = None) -> str:
         try:
@@ -1972,6 +2130,366 @@ class PyColorGUI(QtWidgets.QMainWindow):
             pass
         dlg.show()
 
+
+class CompareDialog(QtWidgets.QDialog):
+    def __init__(self, parent: PyColorGUI):
+        super().__init__(parent)
+        self.gui = parent
+        self.setWindowTitle(self._make_title())
+        self.resize(1400, 900)
+
+        lay = QtWidgets.QVBoxLayout(self)
+        self.info_label = QtWidgets.QLabel(self._make_info_text())
+        lay.addWidget(self.info_label)
+
+        # Figure with 3 panels: A, B, Diff
+        self.fig = Figure(figsize=(12, 6), dpi=100)
+        self.canvas = FigureCanvas(self.fig)
+        lay.addWidget(self.canvas, 1)
+        self.axA = self.fig.add_subplot(1, 3, 1)
+        self.axB = self.fig.add_subplot(1, 3, 2)
+        self.axD = self.fig.add_subplot(1, 3, 3)
+        for ax in (self.axA, self.axB, self.axD):
+            ax.set_aspect("equal", adjustable="box")
+        self.fig.subplots_adjust(left=0.06, right=0.98, top=0.92, bottom=0.10, wspace=0.28)
+        self.cbarA = None
+        self.cbarB = None
+        self.cbarD = None
+
+        # Buttons
+        btns = QtWidgets.QHBoxLayout()
+        self.recompute_btn = QtWidgets.QPushButton("Recompute")
+        self.close_btn = QtWidgets.QPushButton("Close")
+        btns.addStretch(1)
+        btns.addWidget(self.recompute_btn)
+        btns.addWidget(self.close_btn)
+        lay.addLayout(btns)
+
+        self.recompute_btn.clicked.connect(self._start)
+        self.close_btn.clicked.connect(self.close)
+
+        # Async state
+        self._threads = []
+        self._workers = []
+        self._x_edges = None
+        self._y_edges = None
+        self._zA = None
+        self._zB = None
+
+        # kick off
+        self._start()
+
+    def _make_title(self) -> str:
+        try:
+            a = os.path.basename(self.gui.file_path or "A")
+            b = os.path.basename(self.gui.file_path_b or "B")
+            return f"Compare A={a} vs B={b}"
+        except Exception:
+            return "Compare"
+
+    def _make_info_text(self) -> str:
+        try:
+            mode_name = MODE_LABELS.get(self.gui.mode, str(self.gui.mode))
+            metric_txt = self.gui.metric_combo.currentText()
+            return f"Mode: {mode_name} — Metric: {metric_txt}"
+        except Exception:
+            return ""
+
+    def _clear_cbars(self):
+        for c in (self.cbarA, self.cbarB, self.cbarD):
+            try:
+                if c is not None:
+                    c.remove()
+            except Exception:
+                pass
+        self.cbarA = self.cbarB = self.cbarD = None
+
+    def _build_branches(self, mode: int) -> list:
+        need2D = (mode in (Mode.TwoD_Abs, Mode.TwoD_Signed, Mode.TwoD_vs_Pixel, Mode.TwoD3D_Combined, Mode.TwoD_vs_ThreeD))
+        need2DS = (mode == Mode.TwoD_Signed)
+        need3D = (mode in (Mode.ThreeD_Abs, Mode.ThreeD_Signed, Mode.ThreeD_vs_Pixel, Mode.TwoD3D_Combined, Mode.TwoD_vs_ThreeD))
+        need3DS = (mode == Mode.ThreeD_Signed)
+        needPix = (mode in (Mode.TwoD_vs_Pixel, Mode.ThreeD_vs_Pixel))
+        br = ["TrueX", "TrueY", "isPixelHit"]
+        if need2D:
+            br += ["ReconTrueDeltaX", "ReconTrueDeltaY"]
+        if need2DS:
+            br += ["ReconTrueDeltaX_Signed", "ReconTrueDeltaY_Signed"]
+        if need3D:
+            br += ["ReconTrueDeltaX_3D", "ReconTrueDeltaY_3D"]
+        if need3DS:
+            br += ["ReconTrueDeltaX_3D_Signed", "ReconTrueDeltaY_3D_Signed"]
+        if needPix:
+            br += ["PixelTrueDeltaX", "PixelTrueDeltaY"]
+        return br
+
+    def _compute_base_z(self, arrs: dict, mode: int, sel: int, x_hit: np.ndarray) -> np.ndarray:
+        def arr_or_zero(name: str):
+            v = arrs.get(name)
+            if v is None:
+                return np.zeros_like(x_hit, dtype=float)
+            return v
+        if mode == Mode.TwoD_Abs:
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY"))
+            if sel == 0: return dtx2
+            if sel == 1: return dty2
+            if sel == 2: return 0.5 * (dtx2 + dty2)
+            if sel == 3: return np.sqrt(dtx2 * dtx2 + dty2 * dty2)
+            return np.maximum(dtx2, dty2)
+        if mode == Mode.TwoD_Signed:
+            dtx2s = arr_or_zero("ReconTrueDeltaX_Signed"); dty2s = arr_or_zero("ReconTrueDeltaY_Signed")
+            return dtx2s if sel == 0 else (dty2s if sel == 1 else 0.5 * (dtx2s + dty2s))
+        if mode == Mode.ThreeD_Abs:
+            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+            if sel == 0: return dtx3
+            if sel == 1: return dty3
+            if sel == 2: return 0.5 * (dtx3 + dty3)
+            if sel == 3: return np.sqrt(dtx3 * dtx3 + dty3 * dty3)
+            return np.maximum(dtx3, dty3)
+        if mode == Mode.ThreeD_Signed:
+            dtx3s = arr_or_zero("ReconTrueDeltaX_3D_Signed"); dty3s = arr_or_zero("ReconTrueDeltaY_3D_Signed")
+            return dtx3s if sel == 0 else (dty3s if sel == 1 else 0.5 * (dtx3s + dty3s))
+        if mode == Mode.TwoD_vs_Pixel:
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY"))
+            dpx = np.abs(arr_or_zero("PixelTrueDeltaX")); dpy = np.abs(arr_or_zero("PixelTrueDeltaY"))
+            m2 = 0.5 * (dtx2 + dty2); mp = 0.5 * (dpx + dpy)
+            if sel == 0: return np.abs(m2 - mp)
+            if sel == 1: return (m2 - mp)
+            if sel == 2: return np.abs(dtx2 - dpx)
+            if sel == 3: return (dtx2 - dpx)
+            if sel == 4: return np.abs(dty2 - dpy)
+            if sel == 5: return (dty2 - dpy)
+            r2 = np.sqrt(dtx2 * dtx2 + dty2 * dty2); rp = np.sqrt(dpx * dpx + dpy * dpy)
+            return np.abs(r2 - rp) if sel == 6 else (r2 - rp)
+        if mode == Mode.ThreeD_vs_Pixel:
+            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+            dpx = np.abs(arr_or_zero("PixelTrueDeltaX")); dpy = np.abs(arr_or_zero("PixelTrueDeltaY"))
+            m3 = 0.5 * (dtx3 + dty3); mp = 0.5 * (dpx + dpy)
+            if sel == 0: return np.abs(m3 - mp)
+            if sel == 1: return (m3 - mp)
+            if sel == 2: return np.abs(dtx3 - dpx)
+            if sel == 3: return (dtx3 - dpx)
+            if sel == 4: return np.abs(dty3 - dpy)
+            if sel == 5: return (dty3 - dpy)
+            r3 = np.sqrt(dtx3 * dtx3 + dty3 * dty3); rp = np.sqrt(dpx * dpx + dpy * dpy)
+            return np.abs(r3 - rp) if sel == 6 else (r3 - rp)
+        if mode == Mode.TwoD3D_Combined:
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY"))
+            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+            if sel == 0: return 0.25 * (dtx2 + dty2 + dtx3 + dty3)
+            if sel == 1: return 0.5 * (dtx2 + dtx3)
+            if sel == 2: return 0.5 * (dty2 + dty3)
+            r2 = np.sqrt(dtx2 * dtx2 + dty2 * dty2); r3 = np.sqrt(dtx3 * dtx3 + dty3 * dty3)
+            return 0.5 * (r2 + r3)
+        if mode == Mode.TwoD_vs_ThreeD:
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY"))
+            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+            m2 = 0.5 * (dtx2 + dty2); m3 = 0.5 * (dtx3 + dty3)
+            if sel == 0: return np.abs(m3 - m2)
+            if sel == 1: return (m3 - m2)
+            if sel == 2: return np.abs(dtx3 - dtx2)
+            if sel == 3: return (dtx3 - dtx2)
+            if sel == 4: return np.abs(dty3 - dty2)
+            if sel == 5: return (dty3 - dty2)
+            r2 = np.sqrt(dtx2 * dtx2 + dty2 * dty2); r3 = np.sqrt(dtx3 * dtx3 + dty3 * dty3)
+            return np.abs(r3 - r2) if sel == 6 else (r3 - r2)
+        return np.zeros_like(x_hit, dtype=float)
+
+    def _start(self):
+        # cancel previous
+        try:
+            for w in self._workers:
+                try:
+                    w.cancel()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self._threads = []
+        self._workers = []
+        self._x_edges = None
+        self._y_edges = None
+        self._zA = None
+        self._zB = None
+
+        # status
+        try:
+            self.info_label.setText(self._make_info_text() + " — computing…")
+        except Exception:
+            pass
+
+        # Geometry (already checked compatible by caller)
+        g = self.gui.geom
+        first_center = -g.det_size_mm/2.0 + g.pixel_corner_offset_mm + g.pixel_size_mm/2.0
+        pitch = float(g.pixel_spacing_mm)
+        n = int(g.num_per_side)
+        r = max(1, int(g.neighborhood_radius))
+        i0 = self.gui.i0 if (0 <= self.gui.i0 <= n - 3) else max(0, (n - 3)//2)
+        j0 = self.gui.j0 if (0 <= self.gui.j0 <= n - 3) else max(0, (n - 3)//2)
+        xC1 = first_center + (i0 + 1) * pitch
+        yC1 = first_center + (j0 + 1) * pitch
+
+        # Build branches
+        mode = self.gui.mode
+        sel = self.gui.metric_combo.currentIndex()
+        branches = self._build_branches(mode)
+
+        # Read arrays for A and B
+        try:
+            hitsA = self.gui.file["Hits"]
+            arrsA = hitsA.arrays(branches, library="np")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Compare", f"Failed reading arrays from A: {e}")
+            return
+        try:
+            hitsB = self.gui.file_b["Hits"]
+            arrsB = hitsB.arrays(branches, library="np")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Compare", f"Failed reading arrays from B: {e}")
+            return
+
+        xA = arrsA.get("TrueX"); yA = arrsA.get("TrueY"); pxA = arrsA.get("isPixelHit")
+        xB = arrsB.get("TrueX"); yB = arrsB.get("TrueY"); pxB = arrsB.get("isPixelHit")
+        pxA = np.zeros_like(xA, dtype=bool) if pxA is None else pxA.astype(bool)
+        pxB = np.zeros_like(xB, dtype=bool) if pxB is None else pxB.astype(bool)
+
+        baseA = self._compute_base_z(arrsA, mode, sel, xA)
+        baseB = self._compute_base_z(arrsB, mode, sel, xB)
+
+        # kx0, ky0
+        xiA = (xA - first_center) / max(pitch, 1e-12); yiA = (yA - first_center) / max(pitch, 1e-12)
+        kxA = np.rint(xiA).astype(np.int32); kyA = np.rint(yiA).astype(np.int32)
+        xiB = (xB - first_center) / max(pitch, 1e-12); yiB = (yB - first_center) / max(pitch, 1e-12)
+        kxB = np.rint(xiB).astype(np.int32); kyB = np.rint(yiB).astype(np.int32)
+
+        # start workers
+        self._start_worker("A", xA, yA, pxA, baseA, kxA, kyA, first_center, pitch, n, r, xC1, yC1)
+        self._start_worker("B", xB, yB, pxB, baseB, kxB, kyB, first_center, pitch, n, r, xC1, yC1)
+
+    def _start_worker(self, tag: str, x_hit, y_hit, is_px, base_z, kx0, ky0,
+                      first_center, pitch, n, r, xC1, yC1):
+        worker = _AggregateWorker(
+            x_hit=x_hit,
+            y_hit=y_hit,
+            is_pixel_hit=is_px,
+            base_z=base_z,
+            kx0=kx0,
+            ky0=ky0,
+            first_center=float(first_center),
+            pitch=float(pitch),
+            n=int(n),
+            r=int(r),
+            xC1=float(xC1),
+            yC1=float(yC1),
+            sel=int(self.gui.metric_combo.currentIndex()),
+            seq=1 if tag == "A" else 2
+        )
+        thread = QtCore.QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        if tag == "A":
+            worker.finished.connect(self._on_finished_a)
+            worker.error.connect(self._on_error_a)
+        else:
+            worker.finished.connect(self._on_finished_b)
+            worker.error.connect(self._on_error_b)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        self._threads.append(thread)
+        self._workers.append(worker)
+        thread.start()
+
+    @QtCore.pyqtSlot(int, object, object, object)
+    def _on_finished_a(self, seq: int, xs_obj, ys_obj, zvals_obj):
+        try:
+            self._x_edges = np.asarray(xs_obj)
+            self._y_edges = np.asarray(ys_obj)
+            self._zA = np.asarray(zvals_obj)
+        except Exception:
+            return
+        self._try_render()
+
+    @QtCore.pyqtSlot(int, object, object, object)
+    def _on_finished_b(self, seq: int, xs_obj, ys_obj, zvals_obj):
+        try:
+            self._zB = np.asarray(zvals_obj)
+        except Exception:
+            return
+        self._try_render()
+
+    @QtCore.pyqtSlot(int, str)
+    def _on_error_a(self, seq: int, msg: str):
+        QtWidgets.QMessageBox.critical(self, "Compare", f"Aggregation failed for A: {msg}")
+
+    @QtCore.pyqtSlot(int, str)
+    def _on_error_b(self, seq: int, msg: str):
+        QtWidgets.QMessageBox.critical(self, "Compare", f"Aggregation failed for B: {msg}")
+
+    def _try_render(self):
+        if self._zA is None or self._zB is None or self._x_edges is None or self._y_edges is None:
+            return
+        # Update label
+        try:
+            self.info_label.setText(self._make_info_text())
+        except Exception:
+            pass
+
+        self.axA.clear(); self.axB.clear(); self.axD.clear()
+        for ax in (self.axA, self.axB, self.axD):
+            ax.set_aspect("equal", adjustable="box")
+            ax.set_xlabel("x [mm]"); ax.set_ylabel("y [mm]")
+        self._clear_cbars()
+
+        # Norms and cmaps
+        signed = self.gui._is_signed_metric(self.gui.metric_combo.currentIndex())
+        finiteA = self._zA[np.isfinite(self._zA)]
+        finiteB = self._zB[np.isfinite(self._zB)]
+        normA, _, _ = self.gui._build_norm(finiteA, signed, 0.5 * self.gui.geom.pixel_spacing_mm)
+        normB, _, _ = self.gui._build_norm(finiteB, signed, 0.5 * self.gui.geom.pixel_spacing_mm)
+        cmap = self.gui._select_cmap(signed)
+
+        mA = self.axA.pcolormesh(self._x_edges, self._y_edges, self._zA, cmap=cmap, norm=normA, shading='auto')
+        mB = self.axB.pcolormesh(self._x_edges, self._y_edges, self._zB, cmap=cmap, norm=normB, shading='auto')
+        self.cbarA = self.fig.colorbar(mA, ax=self.axA, fraction=0.046, pad=0.04)
+        self.cbarB = self.fig.colorbar(mB, ax=self.axB, fraction=0.046, pad=0.04)
+        try:
+            self.cbarA.set_label(self.gui._get_colorbar_label())
+            self.cbarB.set_label(self.gui._get_colorbar_label())
+        except Exception:
+            pass
+
+        # Difference
+        try:
+            zd = self._zB - self._zA
+        except Exception:
+            zd = np.array([])
+        finiteD = zd[np.isfinite(zd)] if isinstance(zd, np.ndarray) else np.array([])
+        if finiteD.size > 0:
+            amax = float(np.max(np.abs(finiteD)))
+            vmin, vmax = -amax, amax
+        else:
+            vmin, vmax = -1.0, 1.0
+        try:
+            normD = mcolors.TwoSlopeNorm(vcenter=0.0, vmin=vmin, vmax=vmax)
+        except Exception:
+            normD = mcolors.Normalize(vmin=vmin, vmax=vmax, clip=True)
+        cmapD = self.gui._select_cmap(True)
+        mD = self.axD.pcolormesh(self._x_edges, self._y_edges, zd, cmap=cmapD, norm=normD, shading='auto')
+        self.cbarD = self.fig.colorbar(mD, ax=self.axD, fraction=0.046, pad=0.04)
+        self.cbarD.set_label("Difference (B - A) [mm]")
+
+        # Titles
+        try:
+            self.axA.set_title(f"A: {os.path.basename(self.gui.file_path)}")
+            self.axB.set_title(f"B: {os.path.basename(self.gui.file_path_b)}")
+            self.axD.set_title("B - A")
+        except Exception:
+            pass
+
+        self.canvas.draw()
+
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     gui = PyColorGUI()
@@ -1982,9 +2500,10 @@ def main():
         gui.file_edit.setText(sys.argv[1].strip())
         gui.on_open()
     else:
-        # Default ROOT path (if present)
-        default_root = "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root"
+        # Default ROOT path (absolute, relative to this script directory)
         try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            default_root = os.path.normpath(os.path.join(script_dir, "..", "build", "epicChargeSharing.root"))
             if os.path.exists(default_root):
                 gui.file_edit.setText(default_root)
                 gui.on_open()
