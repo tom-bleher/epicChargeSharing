@@ -83,12 +83,14 @@ void EventAction::EndOfEventAction(const G4Event* event)
     // Always compute neighborhood pixel geometry and IDs (independent of charge sharing)
     CalcNeighborhoodPixelGeometryAndIDs(hitPos);
     
-    fRunAction->SetEventData(finalEdep, hitPos.x(), hitPos.y(), hitPos.z());
     fRunAction->SetNearestPixelPos(nearestPixel.x(), nearestPixel.y());
     fRunAction->SetFirstContactIsPixel(firstContactIsPixel);
     fRunAction->SetGeometricIsPixel(geometricIsPixel);
     fRunAction->SetIsPixelHitCombined(isPixelHitCombined);
     fRunAction->SetPixelClassification(isPixelHitCombined, fPixelTrueDeltaX, fPixelTrueDeltaY);
+    // Record Edep for non-pixel-pad hits only (pixel hits get 0.0)
+    const G4double recordedEdep = isPixelHitCombined ? 0.0 : finalEdep;
+    fRunAction->SetEventData(recordedEdep, hitPos.x(), hitPos.y(), hitPos.z());
     
     fRunAction->SetNeighborhoodChargeData(fNeighborhoodChargeFractions, fNeighborhoodCharge);
     fRunAction->SetNeighborhoodPixelData(fNeighborhoodPixelX, fNeighborhoodPixelY, fNeighborhoodPixelID);
