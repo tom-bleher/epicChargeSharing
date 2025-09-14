@@ -113,6 +113,9 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         # Aggregate option
         self.aggregate_check = QtWidgets.QCheckBox("All indices")
         ctr.addWidget(self.aggregate_check)
+        # Aggregate across all 3x3 windows (canonical mapping)
+        self.aggregate_all_cb = QtWidgets.QCheckBox("Aggregate all 3x3s")
+        ctr.addWidget(self.aggregate_all_cb)
 
         ctr.addWidget(QtWidgets.QLabel("Band size [mm]:"))
         self.band_spin = QtWidgets.QDoubleSpinBox()
@@ -146,6 +149,7 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         self.hasRecon3DSigned = False
         self.i0: int = 0
         self.j0: int = 0
+        self.aggregate_all: bool = False
 
         # Signals
         self.browse_btn.clicked.connect(self.on_browse)
@@ -156,6 +160,7 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         self.snap_slider.valueChanged.connect(self.on_snap_index_changed)
         self.band_spin.valueChanged.connect(self.on_band_changed)
         self.aggregate_check.toggled.connect(self.on_aggregate_toggled)
+        self.aggregate_all_cb.toggled.connect(self.on_aggregate_all_toggled)
         self.rand_btn.clicked.connect(self.on_random)
         self.plot_btn.clicked.connect(self.on_plot)
         self.preview_btn.clicked.connect(self.on_preview)
@@ -248,8 +253,19 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         self.snap_slider.setEnabled(not checked)
         self.draw_current()
 
+    def on_aggregate_all_toggled(self, checked: bool):
+        # Disable Random 3x3 when aggregating across all windows
+        try:
+            self.aggregate_all = bool(checked)
+            self.rand_btn.setEnabled(not self.aggregate_all)
+        except Exception:
+            self.aggregate_all = bool(checked)
+        self.draw_current()
+
     def on_random(self):
         if self.geom.num_per_side < 3:
+            return
+        if getattr(self, 'aggregate_all', False):
             return
         max_i = max(0, self.geom.num_per_side - 3)
         max_j = max(0, self.geom.num_per_side - 3)
@@ -333,6 +349,77 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         y_min = max(-half_det, yC0 - half_pitch)
         y_max = min( half_det, yC2 + half_pitch)
         return xC0, xC1, xC2, yC0, yC1, yC2, x_min, x_max, y_min, y_max, half_pitch, half_det, first_center, self.geom.pixel_spacing_mm
+
+    def _map_hits_to_canonical_multi(self, x_hit: np.ndarray, y_hit: np.ndarray, ring: int = 1) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        # Map each hit into the canonical 3x3 window around (xC1,yC1),
+        # replicating across central pads within a square of side (2*ring+1).
+        # Returns flattened x_map, y_map, and a boolean valid mask of same length.
+        try:
+            nside = int(self.geom.num_per_side)
+            pitch = float(self.geom.pixel_spacing_mm)
+            half_det = float(self.geom.det_size_mm) / 2.0
+            first_center = -half_det + float(self.geom.pixel_corner_offset_mm) + float(self.geom.pixel_size_mm) / 2.0
+        except Exception:
+            return np.array([], dtype=float), np.array([], dtype=float), np.array([], dtype=bool)
+        if x_hit is None or y_hit is None:
+            return np.array([], dtype=float), np.array([], dtype=float), np.array([], dtype=bool)
+        if nside < 3 or pitch <= 0:
+            return np.array([], dtype=float), np.array([], dtype=float), np.array([], dtype=bool)
+
+        # Canonical centers
+        _, xC1, _, _, yC1, _, _, _, _, _, *_ = self._centers_3x3()
+
+        N = int(x_hit.shape[0])
+        if N == 0:
+            return np.array([], dtype=float), np.array([], dtype=float), np.array([], dtype=bool)
+
+        xi = (x_hit - first_center) / max(pitch, 1e-12)
+        yi = (y_hit - first_center) / max(pitch, 1e-12)
+        kx0 = np.rint(xi).astype(np.int32)
+        ky0 = np.rint(yi).astype(np.int32)
+
+        ring = int(max(0, ring))
+        offsets = np.arange(-ring, ring + 1, dtype=np.int32)
+        OX, OY = np.meshgrid(offsets, offsets, indexing='xy')
+        OX = OX.ravel()
+        OY = OY.ravel()
+        K = int(OX.size)
+        if K == 0:
+            return np.array([], dtype=float), np.array([], dtype=float), np.array([], dtype=bool)
+
+        kx_c = (kx0[:, None] + OX[None, :]).astype(np.int32)
+        ky_c = (ky0[:, None] + OY[None, :]).astype(np.int32)
+        valid = (kx_c >= 1) & (kx_c <= (nside - 2)) & (ky_c >= 1) & (ky_c <= (nside - 2))
+
+        x_center = first_center + kx_c.astype(np.float64) * pitch
+        y_center = first_center + ky_c.astype(np.float64) * pitch
+        x_map = (x_hit[:, None] - x_center) + xC1
+        y_map = (y_hit[:, None] - y_center) + yC1
+
+        return x_map.ravel().astype(float), y_map.ravel().astype(float), valid.ravel().astype(bool)
+
+    def _pixel_hit_mask_from_coords(self, x_vals: np.ndarray, y_vals: np.ndarray) -> np.ndarray:
+        # Determine whether coordinates fall inside any pixel pad (based on geometry)
+        try:
+            ps = float(self.geom.pixel_size_mm)
+            pitch = float(self.geom.pixel_spacing_mm)
+            half_det = float(self.geom.det_size_mm) / 2.0
+            first_center = -half_det + float(self.geom.pixel_corner_offset_mm) + ps / 2.0
+        except Exception:
+            # If geometry is missing, conservatively return all False
+            return np.zeros(0 if x_vals is None else x_vals.shape, dtype=bool)
+        if x_vals is None or y_vals is None:
+            return np.zeros(0, dtype=bool)
+        # Nearest pad centers along x and y
+        safe_pitch = max(pitch, 1e-12)
+        kx = np.rint((x_vals - first_center) / safe_pitch)
+        ky = np.rint((y_vals - first_center) / safe_pitch)
+        xc = first_center + kx * safe_pitch
+        yc = first_center + ky * safe_pitch
+        half_ps = ps / 2.0
+        inside_x = np.abs(x_vals - xc) <= half_ps
+        inside_y = np.abs(y_vals - yc) <= half_ps
+        return inside_x & inside_y
 
     def _current_strip_center(self) -> Tuple[float, bool]:
         # Returns (center, is_row) where center is y for row, x for column
@@ -666,9 +753,33 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         else:
             is_pixel_hit = is_pixel_hit.astype(bool)
 
-        # Filter base region
-        mask = np.isfinite(x_hit) & np.isfinite(y_hit)
-        mask &= (x_hit >= x_min) & (x_hit <= x_max) & (y_hit >= y_min) & (y_hit <= y_max)
+        # Optionally remap and REPLICATE all events into a canonical 3x3 window (aggregate across all 3x3s)
+        aggregate_all = bool(getattr(self, 'aggregate_all', False))
+        x_coord = x_hit
+        y_coord = y_hit
+        valid_multi = None
+        if aggregate_all:
+            # Use multi-mapping to replicate each hit across the 3x3 around its nearest center
+            x_map, y_map, valid = self._map_hits_to_canonical_multi(x_hit, y_hit, ring=1)
+            if x_map.size == 0:
+                QtWidgets.QMessageBox.information(self, "Plot", "No mappable hits for aggregation.")
+                return
+            x_coord = x_map
+            y_coord = y_map
+            valid_multi = valid.astype(bool)
+            # IMPORTANT: recompute pixel-hit mask using mapped coordinates, not the original mask
+            is_pixel_hit = self._pixel_hit_mask_from_coords(x_coord, y_coord)
+        else:
+            valid_multi = np.ones_like(x_hit, dtype=bool)
+
+        # Filter base region (use replicated mapped coordinates if aggregating)
+        if aggregate_all:
+            mask = np.isfinite(x_coord) & np.isfinite(y_coord)
+            mask &= valid_multi
+            mask &= (x_coord >= x_min) & (x_coord <= x_max) & (y_coord >= y_min) & (y_coord <= y_max)
+        else:
+            mask = np.isfinite(x_hit) & np.isfinite(y_hit)
+            mask &= (x_hit >= x_min) & (x_hit <= x_max) & (y_hit >= y_min) & (y_hit <= y_max)
         # For resolution studies we always use non-pixel hits (charge sharing region)
         mask &= (~is_pixel_hit)
         snap_mode = int(self.snap_combo.currentData())
@@ -683,8 +794,9 @@ class ResolutionGUI(QtWidgets.QMainWindow):
                 selected = gaps if self.aggregate_check.isChecked() else [gaps[max(0, min(int(self.snap_slider.value()), 1))]]
                 wall_mask = np.zeros_like(mask)
                 for (low_edge, up_edge) in selected:
-                    wall_mask |= ((y_hit >= low_edge) & (y_hit <= low_edge + band))
-                    wall_mask |= ((y_hit >= up_edge - band) & (y_hit <= up_edge))
+                    wall_axis = (y_coord if aggregate_all else y_hit)
+                    wall_mask |= ((wall_axis >= low_edge) & (wall_axis <= low_edge + band))
+                    wall_mask |= ((wall_axis >= up_edge - band) & (wall_axis <= up_edge))
                 mask &= wall_mask
             else:
                 gaps = [
@@ -694,8 +806,9 @@ class ResolutionGUI(QtWidgets.QMainWindow):
                 selected = gaps if self.aggregate_check.isChecked() else [gaps[max(0, min(int(self.snap_slider.value()), 1))]]
                 wall_mask = np.zeros_like(mask)
                 for (left_edge, right_edge) in selected:
-                    wall_mask |= ((x_hit >= left_edge) & (x_hit <= left_edge + band))
-                    wall_mask |= ((x_hit >= right_edge - band) & (x_hit <= right_edge))
+                    wall_axis = (x_coord if aggregate_all else x_hit)
+                    wall_mask |= ((wall_axis >= left_edge) & (wall_axis <= left_edge + band))
+                    wall_mask |= ((wall_axis >= right_edge - band) & (wall_axis <= right_edge))
                 mask &= wall_mask
         else:
             # Apply strip selection: either current index or aggregate across all indices
@@ -706,47 +819,65 @@ class ResolutionGUI(QtWidgets.QMainWindow):
                         centers = [0.5 * (yC0 + yC1), 0.5 * (yC1 + yC2)]
                     else:
                         centers = [yC0, yC1, yC2]
-                    strip_mask = np.zeros_like(mask)
                     half_band = band / 2.0
-                    for c in centers:
-                        strip_mask |= (np.abs(y_hit - c) <= half_band)
+                    y_axis = (y_coord if aggregate_all else y_hit)
+                    if len(centers) == 0:
+                        strip_mask = np.zeros_like(mask, dtype=bool)
+                    else:
+                        c_arr = np.asarray(centers, dtype=float)
+                        strip_mask = np.any(np.abs(y_axis[:, None] - c_arr[None, :]) <= half_band, axis=1)
                 else:
                     if snap_is_gaps:
                         centers = [0.5 * (xC0 + xC1), 0.5 * (xC1 + xC2)]
                     else:
                         centers = [xC0, xC1, xC2]
-                    strip_mask = np.zeros_like(mask)
                     half_band = band / 2.0
-                    for c in centers:
-                        strip_mask |= (np.abs(x_hit - c) <= half_band)
+                    x_axis = (x_coord if aggregate_all else x_hit)
+                    if len(centers) == 0:
+                        strip_mask = np.zeros_like(mask, dtype=bool)
+                    else:
+                        c_arr = np.asarray(centers, dtype=float)
+                        strip_mask = np.any(np.abs(x_axis[:, None] - c_arr[None, :]) <= half_band, axis=1)
                 mask &= strip_mask
             else:
                 if is_row:
-                    mask &= (np.abs(y_hit - center) <= (band/2.0))
+                    y_axis = (y_coord if aggregate_all else y_hit)
+                    mask &= (np.abs(y_axis - center) <= (band/2.0))
                 else:
-                    mask &= (np.abs(x_hit - center) <= (band/2.0))
+                    x_axis = (x_coord if aggregate_all else x_hit)
+                    mask &= (np.abs(x_axis - center) <= (band/2.0))
 
         if not np.any(mask):
             QtWidgets.QMessageBox.information(self, "Plot", "No hits in selected strip.")
             return
 
-        xs = x_hit[mask]
-        ys = y_hit[mask]
+        xs = (x_coord if aggregate_all else x_hit)[mask]
+        ys = (y_coord if aggregate_all else y_hit)[mask]
         # Precompute full dx/dy arrays (unmasked) for flexible selections below
         if is2Dabs:
-            dx_all = np.abs(arrs.get("ReconTrueDeltaX"))
-            dy_all = np.abs(arrs.get("ReconTrueDeltaY"))
+            dx_base = np.abs(arrs.get("ReconTrueDeltaX"))
+            dy_base = np.abs(arrs.get("ReconTrueDeltaY"))
         elif is3Dabs:
-            dx_all = np.abs(arrs.get("ReconTrueDeltaX_3D"))
-            dy_all = np.abs(arrs.get("ReconTrueDeltaY_3D"))
+            dx_base = np.abs(arrs.get("ReconTrueDeltaX_3D"))
+            dy_base = np.abs(arrs.get("ReconTrueDeltaY_3D"))
         elif is2Dsgn:
-            dx_all = arrs.get("ReconTrueDeltaX_Signed")
-            dy_all = arrs.get("ReconTrueDeltaY_Signed")
+            dx_base = arrs.get("ReconTrueDeltaX_Signed")
+            dy_base = arrs.get("ReconTrueDeltaY_Signed")
         else:  # is3Dsgn
-            dx_all = arrs.get("ReconTrueDeltaX_3D_Signed")
-            dy_all = arrs.get("ReconTrueDeltaY_3D_Signed")
+            dx_base = arrs.get("ReconTrueDeltaX_3D_Signed")
+            dy_base = arrs.get("ReconTrueDeltaY_3D_Signed")
 
-        axis_vals = (x_hit[mask] if is_row else y_hit[mask])
+        if aggregate_all:
+            # Replicate dx/dy to align with replicated coordinates
+            N = int(x_hit.shape[0]) if x_hit is not None else 0
+            K = int(x_coord.size // max(1, N)) if N > 0 else 1
+            dx_all = np.repeat(dx_base, K)
+            dy_all = np.repeat(dy_base, K)
+        else:
+            dx_all = dx_base
+            dy_all = dy_base
+
+        axis_vals = (((x_coord if aggregate_all else x_hit)[mask]) if is_row else ((y_coord if aggregate_all else y_hit)[mask]))
         res_vals = (dx_all[mask] if is_row else dy_all[mask])
         axis_label = "x [mm]" if is_row else "y [mm]"
         if is2Dabs:
@@ -763,7 +894,7 @@ class ResolutionGUI(QtWidgets.QMainWindow):
             # Prepare data and masks
             shade_color = (1.0, 0.78, 0.86, 0.35)  # light pink
             ps_local = float(self.geom.pixel_size_mm)
-            axis_full = x_hit if is_row else y_hit
+            axis_full = (x_coord if aggregate_all else x_hit) if is_row else (y_coord if aggregate_all else y_hit)
             res_full = dx_all if is_row else dy_all
             if is_row:
                 pad_centers = (xC0, xC1, xC2)
@@ -773,7 +904,7 @@ class ResolutionGUI(QtWidgets.QMainWindow):
                     (yC1 + ps_local/2.0, yC2 - ps_local/2.0),
                 ]
                 # For rows, wall selection is along y, not x
-                wall_axis = y_hit
+                wall_axis = (y_coord if aggregate_all else y_hit)
                 mask_bottom_local = ((wall_axis >= gaps[0][0]) & (wall_axis <= gaps[0][0] + band)) | \
                                     ((wall_axis >= gaps[1][0]) & (wall_axis <= gaps[1][0] + band))
                 mask_top_local = ((wall_axis >= gaps[0][1] - band) & (wall_axis <= gaps[0][1])) | \
@@ -788,7 +919,7 @@ class ResolutionGUI(QtWidgets.QMainWindow):
                     (xC1 + ps_local/2.0, xC2 - ps_local/2.0),
                 ]
                 # For columns, wall selection is along x
-                wall_axis = x_hit
+                wall_axis = (x_coord if aggregate_all else x_hit)
                 mask_bottom_local = ((wall_axis >= gaps[0][0]) & (wall_axis <= gaps[0][0] + band)) | \
                                     ((wall_axis >= gaps[1][0]) & (wall_axis <= gaps[1][0] + band))
                 mask_top_local = ((wall_axis >= gaps[0][1] - band) & (wall_axis <= gaps[0][1])) | \
