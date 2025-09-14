@@ -168,7 +168,7 @@ bool plotBranchWithPitch(TFile *file,
 //   root -l -b -q 'analysis/root/vis/plot_x_y_px.C("/abs/path/to/epicChargeSharing.root", "histograms")'
 // Defaults are chosen for this repository's layout.
 void plot_x_y_px(const char *filename = 
-                   "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root",
+                   "../../build/epicChargeSharing.root",
                  const char *outdir = "histograms") {
   std::string filePath(filename ? filename : "");
   std::string outputDir(outdir ? outdir : "histograms");
@@ -180,7 +180,15 @@ void plot_x_y_px(const char *filename =
 
   TFile *file = TFile::Open(filePath.c_str(), "READ");
   if (!file || file->IsZombie()) {
-    std::cerr << "Error: Could not open file '" << filePath << "'" << std::endl;
+    if (file) { file->Close(); file = nullptr; }
+    // Fallback: resolve build path relative to this macro's directory
+    const char* thisFile = __FILE__;
+    std::string thisDir = gSystem->DirName(thisFile);
+    std::string fallback = thisDir + "/../../build/epicChargeSharing.root";
+    file = TFile::Open(fallback.c_str(), "READ");
+  }
+  if (!file || file->IsZombie()) {
+    std::cerr << "Error: Could not open file ('" << filePath << "' or relative build path)." << std::endl;
     if (file) file->Close();
     return;
   }
@@ -192,13 +200,13 @@ void plot_x_y_px(const char *filename =
     return;
   }
 
-  // Read pixel pitch from metadata (fallback to 0.1 mm)
-  double pixelPitchMm = 0.1;
-  if (TNamed *pixelSizeObj = dynamic_cast<TNamed *>(file->Get("GridPixelSize_mm"))) {
+  // Read pixel pitch (center-to-center spacing) from metadata; fallback to 0.5 mm
+  double pixelPitchMm = 0.5;
+  if (TNamed *pitchObj = dynamic_cast<TNamed *>(file->Get("GridPixelSpacing_mm"))) {
     try {
-      pixelPitchMm = std::stod(std::string(pixelSizeObj->GetTitle()));
+      pixelPitchMm = std::stod(std::string(pitchObj->GetTitle()));
     } catch (...) {
-      std::cerr << "Warning: Could not parse GridPixelSize_mm; using default 0.1 mm" << std::endl;
+      std::cerr << "Warning: Could not parse GridPixelSpacing_mm; using default 0.5 mm" << std::endl;
     }
   }
 

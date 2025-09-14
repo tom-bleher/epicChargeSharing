@@ -63,10 +63,7 @@ namespace {
     };
 
     TFile* f = tryOpen(rootFilePath);
-    if (!f) f = tryOpen("epicChargeSharingOutput.root");
-    if (!f) f = tryOpen("build/epicChargeSharing.root");
-    if (!f) f = tryOpen("../build/epicChargeSharing.root");
-    if (!f) f = tryOpen("../epicChargeSharing.root");
+    if (!f) f = tryOpen("../../build/epicChargeSharing.root");
     return f;
   }
 

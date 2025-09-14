@@ -79,9 +79,12 @@ void plotPixelGrid(const char* rootFilePath = "epicChargeSharing.root",
   };
 
   TFile* f = tryOpen(rootFilePath);
-  if (!f) f = tryOpen("build/epicChargeSharing.root");
-  if (!f) f = tryOpen("../build/epicChargeSharing.root");
-  if (!f) f = tryOpen("../epicChargeSharing.root");
+  if (!f) {
+    const char* thisFile = __FILE__;
+    std::string thisDir = gSystem->DirName(thisFile);
+    std::string defaultPath = thisDir + "/../../build/epicChargeSharing.root";
+    f = tryOpen(defaultPath.c_str());
+  }
   if (!f) {
     std::cerr << "ERROR: Cannot open any ROOT file (tried provided path and common fallbacks)." << std::endl;
     return;
@@ -297,7 +300,7 @@ void plotPixelGrid(const char* rootFilePath = "epicChargeSharing.root",
 void plotHitsOnGrid() {
   const char* thisFile = __FILE__;
   std::string thisDir = gSystem->DirName(thisFile);
-  std::string defaultPath = thisDir + "/../build/epicChargeSharing.root";
+  std::string defaultPath = thisDir + "/../../build/epicChargeSharing.root";
   plotPixelGrid(defaultPath.c_str());
 }
 

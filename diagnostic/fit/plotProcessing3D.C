@@ -61,11 +61,18 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
   ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
-  // Open file for read
+  // Open file for read (try provided path, then fallback relative to this macro)
   TFile* file = TFile::Open(filename, "READ");
   if (!file || file->IsZombie()) {
-    ::Error("processing3D_plots", "Cannot open file: %s", filename);
-    return 1;
+    if (file) { file->Close(); delete file; file = nullptr; }
+    TString macroDir = gSystem->DirName(__FILE__);
+    TString fallback = macroDir + "/../../build/epicChargeSharing.root";
+    file = TFile::Open(fallback, "READ");
+    if (!file || file->IsZombie()) {
+      ::Error("processing3D_plots", "Cannot open file: %s or fallback: %s", filename, fallback.Data());
+      if (file) { file->Close(); delete file; }
+      return 1;
+    }
   }
 
   // Get tree
@@ -627,10 +634,9 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
 //   root -l -b -q plotProcessing3D.C
 // They forward to processing3D_plots and try a few common default paths.
 int plotProcessing3D() {
-  int rc = processing3D_plots("../build/epicChargeSharing.root", 5.0);
-  if (rc != 0) rc = processing3D_plots("../../build/epicChargeSharing.root", 5.0);
-  if (rc != 0) rc = processing3D_plots("build/epicChargeSharing.root", 5.0);
-  return rc;
+  TString macroDir = gSystem->DirName(__FILE__);
+  TString def = macroDir + "/../../build/epicChargeSharing.root";
+  return processing3D_plots(def.Data(), 5.0);
 }
 
 int plotProcessing3D(const char* filename) {

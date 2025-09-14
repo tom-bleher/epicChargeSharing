@@ -59,7 +59,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
   ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
-  // Open file for read (try provided path, then fallback relative to macro dir)
+  // Open file for read (try provided path, then fallback to ../.. /build relative to this file)
   TFile* file = TFile::Open(filename, "READ");
   if (!file || file->IsZombie()) {
     if (file) { file->Close(); delete file; file = nullptr; }
