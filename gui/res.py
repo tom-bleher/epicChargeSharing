@@ -965,18 +965,28 @@ class ResolutionGUI(QtWidgets.QMainWindow):
                     ax.axvspan(c - ps_local/2.0, c + ps_local/2.0, facecolor=shade_color, edgecolor=None, linewidth=0, zorder=0)
                 # Data points
                 ax.scatter(axis_full[series_mask], res_full[series_mask], s=10.0, c=color, alpha=0.8, edgecolors='none')
-                # Reference line segments at pixel-size/sqrt(12)
+                # Reference lines at pixel-size/sqrt(12) and 500um/sqrt(12)
                 try:
                     y_ref_local = float(self.geom.pixel_size_mm) / np.sqrt(12.0)
                 except Exception:
                     y_ref_local = None
+                y_ref_500 = 0.5 / np.sqrt(12.0)
+                ymin_cur, ymax_cur = ax.get_ylim()
+                target_top = ymax_cur
                 if y_ref_local is not None and np.isfinite(y_ref_local):
-                    ymin_cur, ymax_cur = ax.get_ylim()
-                    if ymax_cur < y_ref_local * 1.02:
-                        ax.set_ylim(ymin_cur, y_ref_local * 1.02)
+                    target_top = max(target_top, y_ref_local * 1.02)
+                if np.isfinite(y_ref_500):
+                    target_top = max(target_top, y_ref_500 * 1.02)
+                if target_top > ymax_cur:
+                    ax.set_ylim(ymin_cur, target_top)
+                # Draw pad-span line segments for geometry-based reference
+                if y_ref_local is not None and np.isfinite(y_ref_local):
                     for c in pad_centers:
                         ax.hlines(y=y_ref_local, xmin=c - ps_local/2.0, xmax=c + ps_local/2.0,
                                   colors='k', linewidth=2.0, zorder=3)
+                # Draw full-width horizontal line for 500um/sqrt(12)
+                ax.hlines(y=y_ref_500, xmin=xmin_plot, xmax=xmax_plot,
+                          colors='r', linewidth=1.5, linestyles='--', zorder=3)
                 if is2Dabs or is3Dabs:
                     ax.set_ylim(bottom=0.0)
                 ax.grid(False)
@@ -1037,17 +1047,27 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         for c in pad_centers:
             ax.axvspan(c - ps_local/2.0, c + ps_local/2.0, facecolor=shade_color, edgecolor=None, linewidth=0, zorder=0)
         ax.scatter(axis_vals, res_vals, s=10.0, c='C0', alpha=0.8, edgecolors='none')
+        # Reference lines at pixel-size/sqrt(12) and 500um/sqrt(12)
         try:
             y_ref = float(self.geom.pixel_size_mm) / np.sqrt(12.0)
         except Exception:
             y_ref = None
+        y_ref_500 = 0.5 / np.sqrt(12.0)
+        ymin_cur, ymax_cur = ax.get_ylim()
+        target_top = ymax_cur
         if y_ref is not None and np.isfinite(y_ref):
-            ymin_cur, ymax_cur = ax.get_ylim()
-            if ymax_cur < y_ref * 1.02:
-                ax.set_ylim(ymin_cur, y_ref * 1.02)
+            target_top = max(target_top, y_ref * 1.02)
+        if np.isfinite(y_ref_500):
+            target_top = max(target_top, y_ref_500 * 1.02)
+        if target_top > ymax_cur:
+            ax.set_ylim(ymin_cur, target_top)
+        if y_ref is not None and np.isfinite(y_ref):
             for c in pad_centers:
                 ax.hlines(y=y_ref, xmin=c - ps_local/2.0, xmax=c + ps_local/2.0,
                           colors='k', linewidth=2.0, zorder=3)
+        # Full-width horizontal line for 500um/sqrt(12)
+        ax.hlines(y=y_ref_500, xmin=xmin_plot, xmax=xmax_plot,
+                  colors='r', linewidth=1.5, linestyles='--', zorder=3)
         if is2Dabs or is3Dabs:
             ax.set_ylim(bottom=0.0)
         ax.grid(False)
