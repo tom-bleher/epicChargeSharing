@@ -125,6 +125,34 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         self.band_spin.setValue(0.20)
         ctr.addWidget(self.band_spin)
 
+        # Compare mode: overlay interior, gap, wall with separate widths
+        self.compare_check = QtWidgets.QCheckBox("Compare")
+        ctr.addWidget(self.compare_check)
+        ctr.addWidget(QtWidgets.QLabel("Int [mm]:"))
+        self.band_int_spin = QtWidgets.QDoubleSpinBox()
+        self.band_int_spin.setDecimals(3)
+        self.band_int_spin.setRange(0.01, 5.0)
+        self.band_int_spin.setSingleStep(0.01)
+        self.band_int_spin.setValue(0.20)
+        self.band_int_spin.setEnabled(False)
+        ctr.addWidget(self.band_int_spin)
+        ctr.addWidget(QtWidgets.QLabel("Gap [mm]:"))
+        self.band_gap_spin = QtWidgets.QDoubleSpinBox()
+        self.band_gap_spin.setDecimals(3)
+        self.band_gap_spin.setRange(0.01, 5.0)
+        self.band_gap_spin.setSingleStep(0.01)
+        self.band_gap_spin.setValue(0.20)
+        self.band_gap_spin.setEnabled(False)
+        ctr.addWidget(self.band_gap_spin)
+        ctr.addWidget(QtWidgets.QLabel("Wall [mm]:"))
+        self.band_wall_spin = QtWidgets.QDoubleSpinBox()
+        self.band_wall_spin.setDecimals(3)
+        self.band_wall_spin.setRange(0.01, 5.0)
+        self.band_wall_spin.setSingleStep(0.01)
+        self.band_wall_spin.setValue(0.20)
+        self.band_wall_spin.setEnabled(False)
+        ctr.addWidget(self.band_wall_spin)
+
         # i0/j0 removed from GUI; selection can be randomized with the button
 
         self.rand_btn = QtWidgets.QPushButton("Random 3x3")
@@ -164,6 +192,7 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         self.rand_btn.clicked.connect(self.on_random)
         self.plot_btn.clicked.connect(self.on_plot)
         self.preview_btn.clicked.connect(self.on_preview)
+        self.compare_check.toggled.connect(self.on_compare_toggled)
 
         # Start blank until a file is selected by the user
         self._clamp_i0j0()
@@ -302,10 +331,28 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         # Interiors -> 3 positions; Gaps -> 2 positions; Walls -> 2 positions
         mode = int(self.snap_combo.currentData())
         self.snap_slider.blockSignals(True)
-        self.snap_slider.setMaximum(1 if mode in (1, 2) else 2)
+        if hasattr(self, 'compare_check') and self.compare_check.isChecked():
+            self.snap_slider.setMaximum(2)
+        else:
+            self.snap_slider.setMaximum(1 if mode in (1, 2) else 2)
         if self.snap_slider.value() > self.snap_slider.maximum():
             self.snap_slider.setValue(self.snap_slider.maximum())
         self.snap_slider.blockSignals(False)
+
+    def on_compare_toggled(self, checked: bool):
+        # Enable/disable per-type width controls and the single band spin
+        try:
+            self.band_spin.setEnabled(not checked)
+        except Exception:
+            pass
+        for w in (self.band_int_spin, self.band_gap_spin, self.band_wall_spin):
+            try:
+                w.setEnabled(bool(checked))
+            except Exception:
+                pass
+        # Allow selecting index 0..2 in compare mode for interior series
+        self._update_snap_slider()
+        self.draw_current()
 
     def _update_mode_availability(self):
         # Rebuild mode options to show only valid ones for the opened file
@@ -782,6 +829,191 @@ class ResolutionGUI(QtWidgets.QMainWindow):
             mask &= (x_hit >= x_min) & (x_hit <= x_max) & (y_hit >= y_min) & (y_hit <= y_max)
         # For resolution studies we always use non-pixel hits (charge sharing region)
         mask &= (~is_pixel_hit)
+
+        # Build base dx/dy arrays and replicate if aggregating
+        if is2Dabs:
+            dx_base = np.abs(arrs.get("ReconTrueDeltaX"))
+            dy_base = np.abs(arrs.get("ReconTrueDeltaY"))
+        elif is3Dabs:
+            dx_base = np.abs(arrs.get("ReconTrueDeltaX_3D"))
+            dy_base = np.abs(arrs.get("ReconTrueDeltaY_3D"))
+        elif is2Dsgn:
+            dx_base = arrs.get("ReconTrueDeltaX_Signed")
+            dy_base = arrs.get("ReconTrueDeltaY_Signed")
+        else:  # is3Dsgn
+            dx_base = arrs.get("ReconTrueDeltaX_3D_Signed")
+            dy_base = arrs.get("ReconTrueDeltaY_3D_Signed")
+
+        if aggregate_all:
+            N = int(x_hit.shape[0]) if x_hit is not None else 0
+            K = int(x_coord.size // max(1, N)) if N > 0 else 1
+            dx_all = np.repeat(dx_base, K)
+            dy_all = np.repeat(dy_base, K)
+        else:
+            dx_all = dx_base
+            dy_all = dy_base
+
+        # Compare Mode: overlay interior, gap, and walls in one plot
+        if hasattr(self, 'compare_check') and self.compare_check.isChecked():
+            band_int = max(0.01, float(self.band_int_spin.value()))
+            band_gap = max(0.01, float(self.band_gap_spin.value()))
+            band_wall = max(0.01, float(self.band_wall_spin.value()))
+
+            # Axes for plotting and for selection
+            axis_full = (x_coord if aggregate_all else x_hit) if is_row else (y_coord if aggregate_all else y_hit)
+            orth_full = (y_coord if aggregate_all else y_hit) if is_row else (x_coord if aggregate_all else x_hit)
+
+            # Helper to clamp index by number of centers for non-aggregated case
+            idx = int(self.snap_slider.value())
+
+            series = []  # list of tuples: (mask_series, color, label)
+
+            # Interior series
+            if self.aggregate_check.isChecked():
+                centers_int = [yC0, yC1, yC2] if is_row else [xC0, xC1, xC2]
+                c_arr = np.asarray(centers_int, dtype=float)
+                half_b = band_int / 2.0
+                sel_int = np.any(np.abs(orth_full[:, None] - c_arr[None, :]) <= half_b, axis=1)
+            else:
+                centers_int = [yC0, yC1, yC2] if is_row else [xC0, xC1, xC2]
+                ii = max(0, min(idx, len(centers_int) - 1))
+                sel_int = np.abs(orth_full - centers_int[ii]) <= (band_int / 2.0)
+            mask_int = mask & sel_int
+            series.append((mask_int, 'C0', 'interior'))
+
+            # Gap series (between pixels)
+            if self.aggregate_check.isChecked():
+                centers_gap = ([0.5 * (yC0 + yC1), 0.5 * (yC1 + yC2)] if is_row
+                               else [0.5 * (xC0 + xC1), 0.5 * (xC1 + xC2)])
+                c_arr = np.asarray(centers_gap, dtype=float)
+                half_b = band_gap / 2.0
+                sel_gap = np.any(np.abs(orth_full[:, None] - c_arr[None, :]) <= half_b, axis=1)
+            else:
+                centers_gap = ([0.5 * (yC0 + yC1), 0.5 * (yC1 + yC2)] if is_row
+                               else [0.5 * (xC0 + xC1), 0.5 * (xC1 + xC2)])
+                ii = max(0, min(idx, len(centers_gap) - 1))
+                sel_gap = np.abs(orth_full - centers_gap[ii]) <= (band_gap / 2.0)
+            mask_gap = mask & sel_gap
+            series.append((mask_gap, 'C1', 'gap'))
+
+            # Walls series (near pad edges): union of lower/upper (or left/right) walls within gaps
+            ps_local = float(self.geom.pixel_size_mm)
+            if is_row:
+                gaps = [
+                    (yC0 + ps_local / 2.0, yC1 - ps_local / 2.0),
+                    (yC1 + ps_local / 2.0, yC2 - ps_local / 2.0),
+                ]
+            else:
+                gaps = [
+                    (xC0 + ps_local / 2.0, xC1 - ps_local / 2.0),
+                    (xC1 + ps_local / 2.0, xC2 - ps_local / 2.0),
+                ]
+            if self.aggregate_check.isChecked():
+                selected_pairs = gaps
+            else:
+                ii = max(0, min(idx, 1))
+                selected_pairs = [gaps[ii]]
+            wall_mask_local = np.zeros_like(mask, dtype=bool)
+            for low_edge, up_edge in selected_pairs:
+                wall_mask_local |= ((orth_full >= low_edge) & (orth_full <= low_edge + band_wall))
+                wall_mask_local |= ((orth_full >= up_edge - band_wall) & (orth_full <= up_edge))
+            mask_wall = mask & wall_mask_local
+            series.append((mask_wall, 'C3', 'walls'))
+
+            # If no data at all, inform user
+            any_points = any(np.any(msk) for msk, _, _ in series)
+            if not any_points:
+                QtWidgets.QMessageBox.information(self, "Plot", "No hits in any selected bands.")
+                return
+
+            # Create a single overlay plot
+            dlg = QtWidgets.QDialog(self)
+            dlg.setWindowTitle("Strip resolution (compare)")
+            dlg.resize(900, 700)
+            lay = QtWidgets.QVBoxLayout(dlg)
+            fig = Figure(figsize=(7, 5), dpi=100)
+            canvas = FigureCanvas(fig)
+            lay.addWidget(canvas, 1)
+            ax = fig.add_subplot(111)
+            axis_label = "x [mm]" if is_row else "y [mm]"
+            ax.set_xlabel(axis_label)
+            ax.set_ylabel("resolution [mm]")
+            # Shade pixel pads along plot axis
+            shade_color = (1.0, 0.78, 0.86, 0.35)
+            ps_local = float(self.geom.pixel_size_mm)
+            if is_row:
+                pad_centers = (xC0, xC1, xC2)
+                xmin_plot, xmax_plot = x_min, x_max
+            else:
+                pad_centers = (yC0, yC1, yC2)
+                xmin_plot, xmax_plot = y_min, y_max
+            ax.set_xlim([xmin_plot, xmax_plot])
+            for c in pad_centers:
+                ax.axvspan(c - ps_local / 2.0, c + ps_local / 2.0, facecolor=shade_color, edgecolor=None, linewidth=0, zorder=0)
+
+            # Plot each series
+            res_full = dx_all if is_row else dy_all
+            for msk, color, label in series:
+                if np.any(msk):
+                    ax.scatter(axis_full[msk], res_full[msk], s=10.0, c=color, alpha=0.8, edgecolors='none', label=label)
+
+            # Reference lines
+            try:
+                y_ref = float(self.geom.pixel_size_mm) / np.sqrt(12.0)
+            except Exception:
+                y_ref = None
+            y_ref_500 = 0.5 / np.sqrt(12.0)
+            ymin_cur, ymax_cur = ax.get_ylim()
+            target_top = ymax_cur
+            if y_ref is not None and np.isfinite(y_ref):
+                target_top = max(target_top, y_ref * 1.02)
+            if np.isfinite(y_ref_500):
+                target_top = max(target_top, y_ref_500 * 1.02)
+            if target_top > ymax_cur:
+                ax.set_ylim(ymin_cur, target_top)
+            if y_ref is not None and np.isfinite(y_ref):
+                for c in pad_centers:
+                    ax.hlines(y=y_ref, xmin=c - ps_local / 2.0, xmax=c + ps_local / 2.0,
+                              colors='k', linewidth=2.0, zorder=3)
+            ax.hlines(y=y_ref_500, xmin=xmin_plot, xmax=xmax_plot,
+                      colors='r', linewidth=1.5, linestyles='--', zorder=3)
+            if is2Dabs or is3Dabs:
+                ax.set_ylim(bottom=0.0)
+            ax.grid(False)
+            title_suffix = " (all indices)" if self.aggregate_check.isChecked() else ""
+            if is2Dabs:
+                res_label = " (2D)"
+            elif is3Dabs:
+                res_label = " (3D)"
+            elif is2Dsgn:
+                res_label = " (2D)"
+            else:
+                res_label = " (3D)"
+            ax.set_title("interior / gap / walls" + res_label + title_suffix)
+            ax.legend(loc='best')
+            ax.tick_params(direction='in')
+            canvas.draw()
+            # Save controls
+            btn_row = QtWidgets.QHBoxLayout()
+            save_btn = QtWidgets.QPushButton("Save…")
+            close_btn = QtWidgets.QPushButton("Close")
+            btn_row.addStretch(1)
+            btn_row.addWidget(save_btn)
+            btn_row.addWidget(close_btn)
+            lay.addLayout(btn_row)
+            def on_save_clicked():
+                fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+                    dlg, "Save figure", os.getcwd(), "SVG (*.svg);;PNG (*.png);;PDF (*.pdf)"
+                )
+                if fn:
+                    try:
+                        fig.savefig(fn, bbox_inches="tight")
+                    except Exception as e:
+                        QtWidgets.QMessageBox.critical(dlg, "Save", f"Failed to save: {e}")
+            save_btn.clicked.connect(on_save_clicked)
+            close_btn.clicked.connect(dlg.accept)
+            dlg.exec_()
+            return
         snap_mode = int(self.snap_combo.currentData())
         if snap_mode == 2:
             # Gap walls: select paired rectangles hugging pad edges into the gap(s)
@@ -854,28 +1086,7 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         xs = (x_coord if aggregate_all else x_hit)[mask]
         ys = (y_coord if aggregate_all else y_hit)[mask]
         # Precompute full dx/dy arrays (unmasked) for flexible selections below
-        if is2Dabs:
-            dx_base = np.abs(arrs.get("ReconTrueDeltaX"))
-            dy_base = np.abs(arrs.get("ReconTrueDeltaY"))
-        elif is3Dabs:
-            dx_base = np.abs(arrs.get("ReconTrueDeltaX_3D"))
-            dy_base = np.abs(arrs.get("ReconTrueDeltaY_3D"))
-        elif is2Dsgn:
-            dx_base = arrs.get("ReconTrueDeltaX_Signed")
-            dy_base = arrs.get("ReconTrueDeltaY_Signed")
-        else:  # is3Dsgn
-            dx_base = arrs.get("ReconTrueDeltaX_3D_Signed")
-            dy_base = arrs.get("ReconTrueDeltaY_3D_Signed")
-
-        if aggregate_all:
-            # Replicate dx/dy to align with replicated coordinates
-            N = int(x_hit.shape[0]) if x_hit is not None else 0
-            K = int(x_coord.size // max(1, N)) if N > 0 else 1
-            dx_all = np.repeat(dx_base, K)
-            dy_all = np.repeat(dy_base, K)
-        else:
-            dx_all = dx_base
-            dy_all = dy_base
+        # (already built above in compare-mode branch too)
 
         axis_vals = (((x_coord if aggregate_all else x_hit)[mask]) if is_row else ((y_coord if aggregate_all else y_hit)[mask]))
         res_vals = (dx_all[mask] if is_row else dy_all[mask])
