@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
+#include <random>
 
 namespace {
   // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
@@ -51,7 +52,8 @@ namespace {
 // column (left) and row (right) on a single 1800x700 canvas per page.
 // Output: row_column.pdf (multi-page)
 int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
-                           double errorPercentOfMax = 5.0) {
+                           double errorPercentOfMax = 5.0,
+                           Long64_t nRandomEvents = 100) {
   // Match processing2D configuration exactly
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
@@ -175,11 +177,17 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
   TF1 fCol("fCol", GaussPlusB, -1e9, 1e9, 4);
 
   const Long64_t nEntries = tree->GetEntries();
-  const Long64_t nEntriesToPlot = std::min<Long64_t>(nEntries, 100);
+  std::vector<Long64_t> indices; indices.reserve(nEntries);
+  for (Long64_t ii = 0; ii < nEntries; ++ii) indices.push_back(ii);
+  std::random_device rd;
+  std::mt19937_64 rng(rd());
+  std::shuffle(indices.begin(), indices.end(), rng);
   Long64_t nPages = 0, nConsidered = 0;
+  const Long64_t targetPages = (nRandomEvents < 0) ? 0 : nRandomEvents;
 
-  for (Long64_t i = 0; i < nEntriesToPlot; ++i) {
-    tree->GetEntry(i);
+  for (Long64_t sampleIdx = 0; sampleIdx < nEntries && nPages < targetPages; ++sampleIdx) {
+    const Long64_t eventIndex = indices[sampleIdx];
+    tree->GetEntry(eventIndex);
 
     // Only non-pixel-pad trues with valid neighborhood (fractions 0..1)
     if (is_pixel_true || !Fi || Fi->empty()) continue;
@@ -197,7 +205,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     if (!(maxAbs > halfPixel)) {
       ::Warning("processing2D_plots",
                 "Event %lld marked non-pixel but max(|dx|,|dy|)=%.3f \u00b5m <= halfPixel=%.3f \u00b5m (dx=%.3f \u00b5m, dy=%.3f \u00b5m).",
-                i, 1000.0*maxAbs, 1000.0*halfPixel, 1000.0*dxAbs, 1000.0*dyAbs);
+                eventIndex, 1000.0*maxAbs, 1000.0*halfPixel, 1000.0*dxAbs, 1000.0*dyAbs);
     }
 
     std::vector<double> x_row, q_row;
@@ -272,12 +280,12 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     }
 
     // Set titles and styles
-    baseRowPtr->SetTitle(Form("Event %lld: Central row fit; x [mm]; Charge fraction F_i [unitless]", i));
+    baseRowPtr->SetTitle(Form("Event %lld: Central row fit; x [mm]; Charge fraction F_i [unitless]", eventIndex));
     baseRowPtr->SetMarkerStyle(20);
     baseRowPtr->SetMarkerSize(0.9);
     baseRowPtr->SetLineColor(kBlue+1);
 
-    baseColPtr->SetTitle(Form("Event %lld: Central column fit; y [mm]; Charge fraction F_i [unitless]", i));
+    baseColPtr->SetTitle(Form("Event %lld: Central column fit; y [mm]; Charge fraction F_i [unitless]", eventIndex));
     baseColPtr->SetMarkerStyle(21);
     baseColPtr->SetMarkerSize(0.9);
     baseColPtr->SetLineColor(kBlue+2);
@@ -614,4 +622,12 @@ int plotProcessing2D() {
 
 int plotProcessing2D(const char* filename, double errorPercentOfMax) {
   return processing2D_plots(filename, errorPercentOfMax);
+}
+
+int plotProcessing2D(Long64_t nRandomEvents) {
+  return processing2D_plots("../build/epicChargeSharing.root", 5.0, nRandomEvents);
+}
+
+int plotProcessing2D(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents) {
+  return processing2D_plots(filename, errorPercentOfMax, nRandomEvents);
 }
