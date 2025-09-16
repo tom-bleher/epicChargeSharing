@@ -97,6 +97,19 @@ namespace {
     const int idx = std::clamp(static_cast<int>(std::round(t * (n - 1))), 0, n - 1);
     return TColor::GetColorPalette(idx);
   }
+  
+  // Map human-friendly quantity selectors to internal dataKind strings
+  // Accepts: "F_i", "Fi", "fraction" -> "fraction" and
+  //          "Q_i", "Qi", "charge", "coulomb" -> "coulomb"
+  const char* QuantityToDataKind(const char* quantity)
+  {
+    if (!quantity) return "fraction";
+    std::string q = quantity;
+    std::transform(q.begin(), q.end(), q.begin(), [](unsigned char c){ return std::tolower(c); });
+    if (q == "f" || q == "fi" || q == "f_i" || q == "fraction" || q == "fractions") return "fraction";
+    if (q == "q" || q == "qi" || q == "q_i" || q == "charge" || q == "coulomb") return "coulomb";
+    return "fraction";
+  }
 }
 
 // Draw a 5x5 charge neighborhood centered on the event's pixel center using real mm coordinates.
@@ -151,13 +164,14 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   Bool_t isPixelHit = 0;
 
   std::vector<double>* Fi = nullptr;          // Charge fractions per neighborhood cell (size = N*N)
+  std::vector<double>* Qi = nullptr;          // Induced charge per cell [C] (size = N*N)
 
   // Speed up I/O: deactivate everything, then enable the needed branches if present
   tree->SetBranchStatus("*", 0);
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
   enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY");
   enableIf("Edep"); enableIf("isPixelHit");
-  enableIf("F_i");
+  enableIf("Q_i"); enableIf("F_i");
 
   if (tree->GetBranch("TrueX")) tree->SetBranchAddress("TrueX", &trueX);
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
@@ -165,17 +179,16 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
   if (tree->GetBranch("Edep")) tree->SetBranchAddress("Edep", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
-
-  if (tree->GetBranch("F_i"))
-    tree->SetBranchAddress("F_i", &Fi);
+  if (tree->GetBranch("Q_i")) tree->SetBranchAddress("Q_i", &Qi);
+  if (tree->GetBranch("F_i")) tree->SetBranchAddress("F_i", &Fi);
 
   // Select which neighborhood data we will use
   std::string kind = dataKind ? dataKind : "fraction";
   std::transform(kind.begin(), kind.end(), kind.begin(), [](unsigned char c){ return std::tolower(c); });
   std::string label = (kind == "coulomb") ? "Charge" : (kind == "distance" ? "Distance" : "Charge Fraction");
   std::string unit  = (kind == "coulomb") ? " C" : (kind == "distance" ? " mm" : "");
-  if (!Fi) {
-    std::cerr << "ERROR: Required neighborhood fraction branch 'F_i' not found in tree." << std::endl;
+  if (!tree->GetBranch("Q_i") && !tree->GetBranch("F_i")) {
+    std::cerr << "ERROR: Required neighborhood data branch 'Q_i' or 'F_i' not found in tree." << std::endl;
     f->Close(); delete f; return;
   }
 
@@ -188,10 +201,10 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
     evt = -1;
     for (Long64_t i = 0; i < nEntries; ++i) {
       tree->GetEntry(i);
-      if (!Fi) continue;
-      const auto& vec = *Fi;
-      if (vec.empty()) continue;
-      const bool hasValid = std::any_of(vec.begin(), vec.end(), [](double v){ return std::isfinite(v) && v != -999.0; });
+      const std::vector<double>* vptr = (kind == "coulomb") ? (Qi ? Qi : Fi) : (Fi ? Fi : Qi);
+      if (!vptr) continue;
+      if (vptr->empty()) continue;
+      const bool hasValid = std::any_of(vptr->begin(), vptr->end(), [](double v){ return std::isfinite(v) && v != -999.0; });
       if (hasValid) { evt = i; break; }
     }
     if (evt < 0) evt = 0; // fallback
@@ -199,7 +212,8 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
 
   // Load the selected event
   tree->GetEntry(evt);
-  const auto* vecPtr = Fi;
+  const std::vector<double>* vecPtr = (kind == "coulomb") ? (Qi ? Qi : Fi) : (Fi ? Fi : Qi);
+  const bool usingQi = (vecPtr == Qi && Qi != nullptr);
   if (!vecPtr || vecPtr->empty()) { std::cerr << "ERROR: Neighborhood vector is empty for event " << evt << std::endl; f->Close(); delete f; return; }
 
   // Determine grid dimension (expect 5x5 or larger).
@@ -250,17 +264,26 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
     vmax = 0.0;
     bool any = false;
     for (int i = i0; i <= i1; ++i) for (int j = j0; j <= j1; ++j) {
-      const double fval = grid[i][j];
-      if (std::isfinite(fval) && fval >= 0.0) { vmax = std::max(vmax, fval); any = true; }
+      const double raw = grid[i][j];
+      if (!(std::isfinite(raw) && raw >= 0.0)) continue;
+      double frac = 0.0;
+      if (std::isfinite(edep) && edep <= 0) {
+        frac = 0.0;
+      } else if (usingQi) {
+        if (qTotalC > 0) frac = raw / qTotalC; else continue;
+      } else {
+        frac = raw;
+      }
+      vmax = std::max(vmax, frac); any = true;
     }
     if (!any) vmax = 1.0;
   } else if (kind == "coulomb") {
     vmin = +std::numeric_limits<double>::infinity();
     vmax = -std::numeric_limits<double>::infinity();
     for (int i = i0; i <= i1; ++i) for (int j = j0; j <= j1; ++j) {
-      const double fval = grid[i][j];
-      if (!(std::isfinite(fval) && fval >= 0.0)) continue;
-      const double q = fval * qTotalC;
+      const double raw = grid[i][j];
+      if (!(std::isfinite(raw) && raw >= 0.0)) continue;
+      const double q = usingQi ? raw : (raw * qTotalC);
       vmin = std::min(vmin, q);
       vmax = std::max(vmax, q);
     }
@@ -358,9 +381,12 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
       const double y2 = cy + pixelSpacingMm/2.0;
 
       double shownVal = 0.0;
-      if (kind == "fraction") shownVal = fval;
-      else if (kind == "coulomb") shownVal = fval * qTotalC;
-      else { // distance
+      if (kind == "fraction") {
+        if (std::isfinite(edep) && edep <= 0) shownVal = 0.0;
+        else shownVal = usingQi ? (qTotalC > 0 ? fval / qTotalC : 0.0) : fval;
+      } else if (kind == "coulomb") {
+        shownVal = usingQi ? fval : (fval * qTotalC);
+      } else { // distance
         shownVal = std::hypot(cx - trueX, cy - trueY);
       }
 
@@ -505,6 +531,22 @@ void plotChargeNeighborhood(const char* rootFilePath, Long64_t nPages) {
   plotChargeNeighborhood5x5_pages(rootFilePath, nPages, "coulomb", "charge_neighborhoods.pdf");
 }
 
+// New overloads: choose between F_i (default) and Q_i via a friendly selector
+void plotChargeNeighborhood(const char* quantity) {
+  const char* kind = QuantityToDataKind(quantity); // "F_i"/"Q_i" -> "fraction"/"coulomb"
+  plotChargeNeighborhood5x5_pages("epicChargeSharing.root", 100, kind, "charge_neighborhoods.pdf");
+}
+
+void plotChargeNeighborhood(Long64_t nPages, const char* quantity) {
+  const char* kind = QuantityToDataKind(quantity);
+  plotChargeNeighborhood5x5_pages("epicChargeSharing.root", nPages, kind, "charge_neighborhoods.pdf");
+}
+
+void plotChargeNeighborhood(const char* rootFilePath, Long64_t nPages, const char* quantity) {
+  const char* kind = QuantityToDataKind(quantity);
+  plotChargeNeighborhood5x5_pages(rootFilePath, nPages, kind, "charge_neighborhoods.pdf");
+}
+
 // Compute and draw mean neighborhood (5x5 ROI) across all non-inside-pixel events with energy deposition
 // dataKind: "fraction", "coulomb", or "distance"
 void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing.root",
@@ -535,19 +577,21 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
   double trueX = 0.0, trueY = 0.0, pixelX = 0.0, pixelY = 0.0, edep = 0.0;
   Bool_t isPixelHit = 0;
   std::vector<double>* Fi = nullptr;
+  std::vector<double>* Qi = nullptr;
 
   tree->SetBranchStatus("*", 0);
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
-  enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY"); enableIf("Edep"); enableIf("isPixelHit"); enableIf("F_i");
+  enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY"); enableIf("Edep"); enableIf("isPixelHit"); enableIf("Q_i"); enableIf("F_i");
   if (tree->GetBranch("TrueX")) tree->SetBranchAddress("TrueX", &trueX);
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
   if (tree->GetBranch("PixelX")) tree->SetBranchAddress("PixelX", &pixelX);
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
   if (tree->GetBranch("Edep"))  tree->SetBranchAddress("Edep", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
+  if (tree->GetBranch("Q_i")) tree->SetBranchAddress("Q_i", &Qi);
   if (tree->GetBranch("F_i")) tree->SetBranchAddress("F_i", &Fi);
 
-  if (!Fi) { std::cerr << "ERROR: Missing 'F_i' branch" << std::endl; f->Close(); delete f; return; }
+  if (!Qi && !Fi) { std::cerr << "ERROR: Missing 'Q_i' or 'F_i' branch" << std::endl; f->Close(); delete f; return; }
 
   const Long64_t nEntries = tree->GetEntries();
   if (nEntries <= 0) { std::cerr << "ERROR: Empty 'Hits' tree" << std::endl; f->Close(); delete f; return; }
@@ -556,9 +600,10 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
   int dim = -1; Long64_t firstValidEvt = -1;
   for (Long64_t i = 0; i < nEntries; ++i) {
     tree->GetEntry(i);
-    if (!Fi || Fi->empty()) continue;
-    const int d = static_cast<int>(std::lround(std::sqrt(static_cast<double>(Fi->size()))));
-    if (d*d != static_cast<int>(Fi->size())) continue;
+    const std::vector<double>* vec = Qi ? Qi : Fi;
+    if (!vec || vec->empty()) continue;
+    const int d = static_cast<int>(std::lround(std::sqrt(static_cast<double>(vec->size()))));
+    if (d*d != static_cast<int>(vec->size())) continue;
     dim = d; firstValidEvt = i; break;
   }
   if (dim <= 0) { std::cerr << "ERROR: Unable to determine neighborhood dimension" << std::endl; f->Close(); delete f; return; }
@@ -579,7 +624,6 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
   // Select only non-inside-pixel events with Edep>0
   for (Long64_t i = 0; i < nEntries; ++i) {
     tree->GetEntry(i);
-    if (!Fi || Fi->empty()) continue;
     if (!std::isfinite(edep) || edep <= 0) continue;
     if (isPixelHit) continue;
 
@@ -591,15 +635,22 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
         const int ii = di - i0; // 0..4
         const int jj = dj - j0; // 0..4
         const int idxGrid = ii * roiSize + jj;
-        const double fval = (*Fi)[idxFlat];
-        if (!(std::isfinite(fval)) || fval < 0.0) continue; // ignore -999 sentinel and invalid
 
-        double val = 0.0;
         std::string kind = dataKind ? dataKind : "fraction";
         std::transform(kind.begin(), kind.end(), kind.begin(), [](unsigned char c){ return std::tolower(c); });
-        if (kind == "fraction") val = fval;
-        else if (kind == "coulomb") val = fval * qTotalC;
-        else {
+        const std::vector<double>* vec = (kind == "coulomb") ? (Qi ? Qi : Fi) : (Fi ? Fi : Qi);
+        const bool usingQi = (vec == Qi && Qi != nullptr);
+        if (!vec || vec->empty()) continue;
+
+        const double raw = (*vec)[idxFlat];
+        if (!(std::isfinite(raw)) || raw < 0.0) continue; // ignore -999 sentinel and invalid
+
+        double val = 0.0;
+        if (kind == "fraction") {
+          val = usingQi ? (qTotalC > 0 ? raw / qTotalC : 0.0) : raw;
+        } else if (kind == "coulomb") {
+          val = usingQi ? raw : (raw * qTotalC);
+        } else {
           const double cx = pixelX + (dj - c) * pixelSpacingMm;
           const double cy = pixelY + (di - c) * pixelSpacingMm;
           val = std::hypot(cx - trueX, cy - trueY);
@@ -811,20 +862,22 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
   double edep   = std::numeric_limits<double>::quiet_NaN();
   Bool_t isPixelHit = 0;
   std::vector<double>* Fi = nullptr;
+  std::vector<double>* Qi = nullptr;
 
   // Speed up I/O
   tree->SetBranchStatus("*", 0);
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
   enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY");
-  enableIf("Edep"); enableIf("isPixelHit"); enableIf("F_i");
+  enableIf("Edep"); enableIf("isPixelHit"); enableIf("Q_i"); enableIf("F_i");
   if (tree->GetBranch("TrueX")) tree->SetBranchAddress("TrueX", &trueX);
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
   if (tree->GetBranch("PixelX")) tree->SetBranchAddress("PixelX", &pixelX);
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
   if (tree->GetBranch("Edep")) tree->SetBranchAddress("Edep", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
+  if (tree->GetBranch("Q_i")) tree->SetBranchAddress("Q_i", &Qi);
   if (tree->GetBranch("F_i")) tree->SetBranchAddress("F_i", &Fi);
-  if (!Fi) { std::cerr << "ERROR: Required neighborhood fraction branch 'F_i' not found in tree." << std::endl; f->Close(); delete f; return 4; }
+  if (!Qi && !Fi) { std::cerr << "ERROR: Required neighborhood data branch 'Q_i' or 'F_i' not found in tree." << std::endl; f->Close(); delete f; return 4; }
 
   const Long64_t nEntries = tree->GetEntries();
   if (nEntries <= 0) { std::cerr << "ERROR: Hits tree is empty." << std::endl; f->Close(); delete f; return 5; }
@@ -858,18 +911,20 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
   Long64_t pages = 0;
   for (Long64_t i = 0; i < nEntries && pages < nPages; ++i) {
     tree->GetEntry(i);
-    if (!Fi || Fi->empty()) continue;
+    const std::vector<double>* vec = (kind == "coulomb") ? (Qi ? Qi : Fi) : (Fi ? Fi : Qi);
+    const bool usingQi = (vec == Qi && Qi != nullptr);
+    if (!vec || vec->empty()) continue;
 
-    const size_t nVals = Fi->size();
+    const size_t nVals = vec->size();
     const int dim = static_cast<int>(std::lround(std::sqrt(static_cast<double>(nVals))));
     if (dim * dim != static_cast<int>(nVals) || dim < 5) continue;
 
-    // Build transposed grid[y][x]
+    // Build transposed grid[y][x] from chosen source (Qi or Fi)
     std::vector<std::vector<double>> grid(dim, std::vector<double>(dim, std::numeric_limits<double>::quiet_NaN()));
     for (int di = 0; di < dim; ++di) {
       for (int dj = 0; dj < dim; ++dj) {
         const int idx = di * dim + dj;
-        grid[dj][di] = (*Fi)[idx];
+        grid[dj][di] = (*vec)[idx];
       }
     }
 
@@ -889,11 +944,22 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
     double vmin = 0.0, vmax = 1.0;
     if (kind == "fraction") {
       vmin = 0.0; vmax = 0.0; bool any=false;
-      for (int ii=i0; ii<=i1; ++ii) for (int jj=j0; jj<=j1; ++jj) { double fval = grid[ii][jj]; if (std::isfinite(fval) && fval >= 0.0) { vmax = std::max(vmax, fval); any=true; } }
+      for (int ii=i0; ii<=i1; ++ii) for (int jj=j0; jj<=j1; ++jj) {
+        double raw = grid[ii][jj]; if (!(std::isfinite(raw) && raw >= 0.0)) continue;
+        double frac = 0.0;
+        if (std::isfinite(edep) && edep <= 0) frac = 0.0;
+        else if (usingQi) { if (qTotalC > 0) frac = raw / qTotalC; else continue; }
+        else frac = raw;
+        vmax = std::max(vmax, frac); any = true;
+      }
       if (!any) vmax = 1.0;
     } else if (kind == "coulomb") {
       vmin = +std::numeric_limits<double>::infinity(); vmax = -std::numeric_limits<double>::infinity();
-      for (int ii=i0; ii<=i1; ++ii) for (int jj=j0; jj<=j1; ++jj) { double fval = grid[ii][jj]; if (!(std::isfinite(fval) && fval >= 0.0)) continue; double q = fval * qTotalC; vmin = std::min(vmin, q); vmax = std::max(vmax, q); }
+      for (int ii=i0; ii<=i1; ++ii) for (int jj=j0; jj<=j1; ++jj) {
+        double raw = grid[ii][jj]; if (!(std::isfinite(raw) && raw >= 0.0)) continue;
+        double q = usingQi ? raw : (raw * qTotalC);
+        vmin = std::min(vmin, q); vmax = std::max(vmax, q);
+      }
       if (!(vmax > vmin)) { vmin = 0.0; vmax = 1.0; }
     } else { // distance
       vmin = +std::numeric_limits<double>::infinity(); vmax = -std::numeric_limits<double>::infinity();
@@ -972,9 +1038,12 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
         const double y2 = cy + pixelSpacingMm/2.0;
 
         double shownVal = 0.0;
-        if (kind == "fraction") shownVal = grid[gi][gj];
-        else if (kind == "coulomb") shownVal = grid[gi][gj] * qTotalC;
-        else shownVal = std::hypot(cx - trueX, cy - trueY);
+        if (kind == "fraction") {
+          if (std::isfinite(edep) && edep <= 0) shownVal = 0.0;
+          else shownVal = usingQi ? (qTotalC > 0 ? grid[gi][gj] / qTotalC : 0.0) : grid[gi][gj];
+        } else if (kind == "coulomb") {
+          shownVal = usingQi ? grid[gi][gj] : (grid[gi][gj] * qTotalC);
+        } else shownVal = std::hypot(cx - trueX, cy - trueY);
 
         const int color = ValueToPaletteColor(shownVal, vmin, vmax, invertPalette);
         TBox* blk = new TBox(x1, y1, x2, y2);
