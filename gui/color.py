@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
 import matplotlib as mpl
+from matplotlib.widgets import RectangleSelector
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
@@ -360,6 +361,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.save_btn = QtWidgets.QPushButton("Save…")
         self.show_fit_btn = QtWidgets.QPushButton("Show fit")
         self.show_fit_btn.setCheckable(True)
+        self.roi_hist_btn = QtWidgets.QPushButton("ROI hist")
+        self.roi_hist_btn.setCheckable(True)
         self.compare_btn = QtWidgets.QPushButton("Compare…")
         self.compare_btn.setEnabled(False)
         self.aggregate_cb = QtWidgets.QCheckBox("Aggregate all 3x3s")
@@ -367,6 +370,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         controls.addWidget(self.rand_btn)
         controls.addWidget(self.save_btn)
         controls.addWidget(self.show_fit_btn)
+        controls.addWidget(self.roi_hist_btn)
         controls.addWidget(self.compare_btn)
         controls.addWidget(self.aggregate_cb)
         vbox.addLayout(controls)
@@ -442,6 +446,16 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self._last_zvals = None
         self._last_norm = None
         self._last_cmap = None
+        # Aggregated grid cache for ROI
+        self._last_grid_xedges = None
+        self._last_grid_yedges = None
+        self._last_grid_zgrid = None
+        # ROI selection state
+        self.roi_active: bool = False
+        self._roi_selector = None
+        self._roi_last_extent = None  # (x0, y0, x1, y1)
+        # ROI snapping grid (in mm). 10 µm = 0.01 mm
+        self.roi_grid_step_mm: float = 0.01
 
         # Signals
         browse_btn.clicked.connect(self.on_browse)
@@ -455,6 +469,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.save_btn.clicked.connect(self.on_save)
         self.aggregate_cb.stateChanged.connect(self.on_aggregate_changed)
         self.show_fit_btn.toggled.connect(self.on_show_fit_toggled)
+        self.roi_hist_btn.toggled.connect(self.on_roi_hist_toggled)
         self.compare_btn.clicked.connect(self.on_compare)
         # Option signals
         self.scale_combo.currentIndexChanged.connect(self.on_options_changed)
@@ -602,6 +617,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
             self.show_fit_btn.setEnabled(not self.aggregate_all)
             if self.aggregate_all and self.show_fit_btn.isChecked():
                 self.show_fit_btn.setChecked(False)
+            # Allow ROI in aggregation; keep button enabled
+            self.roi_hist_btn.setEnabled(True)
         except Exception:
             pass
         # Cancel any ongoing aggregation and bump epoch
@@ -616,6 +633,12 @@ class PyColorGUI(QtWidgets.QMainWindow):
     def on_show_fit_toggled(self, checked: bool):
         self.show_fit_active = bool(checked)
         try:
+            # Mutual exclusivity with ROI
+            if self.show_fit_active and getattr(self, 'roi_hist_btn', None) is not None and self.roi_hist_btn.isChecked():
+                try:
+                    self.roi_hist_btn.setChecked(False)
+                except Exception:
+                    pass
             if self.show_fit_active and not getattr(self, 'aggregate_all', False):
                 if self._mpl_cid_click is None:
                     self._mpl_cid_click = self.canvas.mpl_connect('button_press_event', self._on_canvas_click)
@@ -628,6 +651,275 @@ class PyColorGUI(QtWidgets.QMainWindow):
                     self._mpl_cid_click = None
         except Exception:
             pass
+    def on_roi_hist_toggled(self, checked: bool):
+        # Turn off Show fit if enabling
+        try:
+            if checked and self.show_fit_btn.isChecked():
+                self.show_fit_btn.setChecked(False)
+        except Exception:
+            pass
+        self.roi_active = bool(checked)
+        if self.roi_active:
+            # Ensure we have something to select (points or aggregated grid)
+            pts = getattr(self, '_last_points', None)
+            zgrid = getattr(self, '_last_grid_zgrid', None)
+            if (pts is None or not isinstance(pts, np.ndarray) or pts.shape[0] == 0) and (zgrid is None):
+                try:
+                    QtWidgets.QMessageBox.information(self, "ROI hist", "Nothing to select in the current view.")
+                except Exception:
+                    pass
+                try:
+                    self.roi_hist_btn.setChecked(False)
+                except Exception:
+                    pass
+                self.roi_active = False
+                return
+            self._start_roi_selector()
+            # Guide the user
+            try:
+                self.statusBar().showMessage("Drag on the plot to select a rectangle for ROI histogram.", 3000)
+            except Exception:
+                pass
+        else:
+            self._stop_roi_selector()
+
+    def _start_roi_selector(self):
+        try:
+            # Clean previous selector
+            self._stop_roi_selector()
+            ax = self.canvas.ax
+            # Snap helper to the configured grid step (mm)
+            def _snap_val(v: float) -> float:
+                try:
+                    step = float(getattr(self, 'roi_grid_step_mm', 0.01))
+                except Exception:
+                    step = 0.01
+                if step <= 0:
+                    return float(v)
+                try:
+                    return float(round(v / step) * step)
+                except Exception:
+                    return float(v)
+            def _on_select(eclick, erelease):
+                try:
+                    x0, y0 = float(eclick.xdata), float(eclick.ydata)
+                    x1, y1 = float(erelease.xdata), float(erelease.ydata)
+                except Exception:
+                    return
+                if not np.isfinite([x0, y0, x1, y1]).all():
+                    return
+                # Snap to grid and order extents
+                sx0, sx1 = _snap_val(x0), _snap_val(x1)
+                sy0, sy1 = _snap_val(y0), _snap_val(y1)
+                xmin, xmax = (sx0, sx1) if sx0 <= sx1 else (sx1, sx0)
+                ymin, ymax = (sy0, sy1) if sy0 <= sy1 else (sy1, sy0)
+                try:
+                    # Reflect snapped extents in the visible rectangle
+                    if hasattr(self, '_roi_selector') and self._roi_selector is not None:
+                        self._roi_selector.extents = (float(xmin), float(xmax), float(ymin), float(ymax))
+                except Exception:
+                    pass
+                self._roi_last_extent = (xmin, ymin, xmax, ymax)
+                self._show_roi_histogram(xmin, xmax, ymin, ymax)
+            rs = RectangleSelector(
+                ax,
+                _on_select,
+                useblit=False,
+                interactive=True,
+                spancoords='data',
+                minspanx=0.0,
+                minspany=0.0,
+                props={
+                    'edgecolor': '#ff7f0e',
+                    'facecolor': (1.0, 0.5, 0.0, 0.15),
+                    'linewidth': 2.0,
+                    'linestyle': '--',
+                    'zorder': 1000,
+                }
+            )
+            # During interactive dragging, continuously snap the rectangle to the grid
+            def _on_motion(event):
+                if event is None or event.inaxes is not ax:
+                    return
+                try:
+                    xmin, xmax, ymin, ymax = rs.extents
+                except Exception:
+                    return
+                try:
+                    sxmin, sxmax = _snap_val(xmin), _snap_val(xmax)
+                    symin, symax = _snap_val(ymin), _snap_val(ymax)
+                except Exception:
+                    return
+                # Ensure ordering after snapping
+                if sxmin > sxmax:
+                    sxmin, sxmax = sxmax, sxmin
+                if symin > symax:
+                    symin, symax = symax, symin
+                # Only update if changed to avoid redundant draws
+                if (sxmin, sxmax, symin, symax) != (xmin, xmax, ymin, ymax):
+                    try:
+                        rs.extents = (float(sxmin), float(sxmax), float(symin), float(symax))
+                    except Exception:
+                        pass
+            try:
+                rs.connect_event('motion_notify_event', _on_motion)
+            except Exception:
+                pass
+            # Restore previous selection rectangle if available
+            try:
+                if isinstance(self._roi_last_extent, tuple) and len(self._roi_last_extent) == 4:
+                    xmin, ymin, xmax, ymax = self._roi_last_extent
+                    rs.extents = (float(xmin), float(xmax), float(ymin), float(ymax))
+                    # Show histogram immediately for current coloring
+                    try:
+                        self._show_roi_histogram(float(xmin), float(xmax), float(ymin), float(ymax))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            try:
+                rs.set_active(True)
+            except Exception:
+                pass
+            self._roi_selector = rs
+            try:
+                self.canvas.draw_idle()
+            except Exception:
+                pass
+        except Exception:
+            self._roi_selector = None
+
+    def _stop_roi_selector(self):
+        try:
+            if self._roi_selector is not None:
+                try:
+                    self._roi_selector.set_active(False)
+                except Exception:
+                    pass
+                try:
+                    self._roi_selector.disconnect_events()
+                except Exception:
+                    pass
+                # Aggressively remove any artists the selector added to the axes
+                # Support multiple Matplotlib versions: attributes may be
+                # 'to_draw', 'patch', 'artists', 'selection_artist', or internals
+                try:
+                    artist = getattr(self._roi_selector, 'to_draw', None)
+                    if artist is not None:
+                        try:
+                            artist.remove()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                try:
+                    patch = getattr(self._roi_selector, 'patch', None)
+                    if patch is not None:
+                        try:
+                            patch.remove()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                try:
+                    artists = getattr(self._roi_selector, 'artists', None)
+                    if artists is not None:
+                        for a in list(artists):
+                            try:
+                                a.remove()
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+                try:
+                    sel_artist = getattr(self._roi_selector, 'selection_artist', None)
+                    if sel_artist is not None:
+                        try:
+                            sel_artist.remove()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                try:
+                    sel_artist_priv = getattr(self._roi_selector, '_selection_artist', None)
+                    if sel_artist_priv is not None:
+                        try:
+                            sel_artist_priv.remove()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                # Also try to remove any handle markers if present
+                for handle_attr in ("corner_handles", "edge_handles", "_handles"):
+                    try:
+                        handles = getattr(self._roi_selector, handle_attr, None)
+                        if handles is not None:
+                            for h in list(handles):
+                                try:
+                                    h.remove()
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+                try:
+                    if hasattr(self._roi_selector, 'canvas'):
+                        self._roi_selector.canvas.draw_idle()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self._roi_selector = None
+
+    def _show_roi_histogram(self, xmin: float, xmax: float, ymin: float, ymax: float):
+        try:
+            # Prefer scatter points when available
+            z = None
+            pts = getattr(self, '_last_points', None)
+            zvals = getattr(self, '_last_zvals', None)
+            if pts is not None and isinstance(pts, np.ndarray) and pts.shape[0] > 0 and zvals is not None:
+                xs = pts[:, 0]
+                ys = pts[:, 1]
+                m = (xs >= xmin) & (xs <= xmax) & (ys >= ymin) & (ys <= ymax)
+                if np.any(m):
+                    z = np.asarray(zvals)[m]
+                    z = z[np.isfinite(z)]
+            if z is None or z.size == 0:
+                # Sample aggregated grid if present
+                x_edges = getattr(self, '_last_grid_xedges', None)
+                y_edges = getattr(self, '_last_grid_yedges', None)
+                zgrid = getattr(self, '_last_grid_zgrid', None)
+                if isinstance(x_edges, np.ndarray) and isinstance(y_edges, np.ndarray) and isinstance(zgrid, np.ndarray) and zgrid.size > 0:
+                    x_cent = 0.5 * (x_edges[:-1] + x_edges[1:])
+                    y_cent = 0.5 * (y_edges[:-1] + y_edges[1:])
+                    ix = (x_cent >= xmin) & (x_cent <= xmax)
+                    iy = (y_cent >= ymin) & (y_cent <= ymax)
+                    if np.any(ix) and np.any(iy):
+                        sub = zgrid[np.ix_(iy, ix)]
+                        z = sub[np.isfinite(sub)].ravel()
+            if z is None or z.size == 0:
+                try:
+                    QtWidgets.QMessageBox.information(self, "ROI hist", "No values in selected region.")
+                except Exception:
+                    pass
+                return
+            try:
+                label = self._get_colorbar_label(self.metric_combo.currentIndex())
+            except Exception:
+                label = "metric [mm]"
+            dlg = ROIHistDialog(self, z, label)
+            try:
+                if hasattr(self, '_roi_dialogs'):
+                    self._roi_dialogs.append(dlg)
+                else:
+                    self._roi_dialogs = [dlg]
+            except Exception:
+                pass
+            dlg.show()
+        except Exception:
+            try:
+                QtWidgets.QMessageBox.critical(self, "ROI hist", "Failed to build histogram.")
+            except Exception:
+                pass
     def on_preview(self):
         # Show the entire detector grid with the current 3x3 highlighted
         try:
@@ -1220,6 +1512,11 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 self.canvas.draw()
             except Exception:
                 pass
+            # disable ROI on no file
+            try:
+                self.roi_hist_btn.setEnabled(False)
+            except Exception:
+                pass
             return
 
         # Geometry
@@ -1257,6 +1554,11 @@ class PyColorGUI(QtWidgets.QMainWindow):
 
         # Clear canvas and draw base
         self.canvas.clear()
+        # Stop ROI selector on redraw to avoid stale overlays
+        try:
+            self._stop_roi_selector()
+        except Exception:
+            pass
         self.draw_base_scene(x_min, y_min, x_max, y_max, xC0, xC1, xC2, yC0, yC1, yC2)
 
         # Prepare data
@@ -1266,6 +1568,10 @@ class PyColorGUI(QtWidgets.QMainWindow):
             hits = None
         if hits is None:
             self.canvas.draw()
+            try:
+                self.roi_hist_btn.setEnabled(False)
+            except Exception:
+                pass
             return
 
         need2D = (self.mode in (Mode.TwoD_Abs, Mode.TwoD_Signed, Mode.TwoD_vs_Pixel, Mode.TwoD3D_Combined, Mode.TwoD_vs_ThreeD))
@@ -1738,6 +2044,17 @@ class PyColorGUI(QtWidgets.QMainWindow):
             self.show_fit_btn.setEnabled(bool(can_show))
         except Exception:
             pass
+        # Enable ROI button when we have points and not aggregating
+        try:
+            can_roi = (not getattr(self, 'aggregate_all', False)) and (self._last_points is not None) and (self._last_points.shape[0] > 0)
+            self.roi_hist_btn.setEnabled(bool(can_roi))
+            if not can_roi and self.roi_hist_btn.isChecked():
+                self.roi_hist_btn.setChecked(False)
+            # Restart selector if ROI mode is active and possible
+            if can_roi and self.roi_hist_btn.isChecked():
+                self._start_roi_selector()
+        except Exception:
+            pass
 
 
     @QtCore.pyqtSlot(int, object, object, object)
@@ -1783,6 +2100,17 @@ class PyColorGUI(QtWidgets.QMainWindow):
         cbar.set_label(self._get_colorbar_label(sel))
         self.canvas.ax.tick_params(direction='in')
         self.canvas.draw()
+
+        # Cache grid for ROI sampling and enable ROI
+        try:
+            self._last_grid_xedges = np.asarray(x_edges)
+            self._last_grid_yedges = np.asarray(y_edges)
+            self._last_grid_zgrid = np.asarray(zgrid)
+            self.roi_hist_btn.setEnabled(True)
+            if self.roi_hist_btn.isChecked():
+                self._start_roi_selector()
+        except Exception:
+            pass
 
     @QtCore.pyqtSlot(int, str)
     def _on_aggregate_error(self, seq: int, msg: str):
@@ -2489,6 +2817,62 @@ class CompareDialog(QtWidgets.QDialog):
 
         self.canvas.draw()
 
+
+class ROIHistDialog(QtWidgets.QDialog):
+    def __init__(self, parent: PyColorGUI, values: np.ndarray, label: str):
+        super().__init__(parent)
+        self.setWindowTitle("ROI Histogram")
+        self.resize(700, 500)
+        lay = QtWidgets.QVBoxLayout(self)
+        # Stats label
+        try:
+            mu = float(np.mean(values)) if values.size else float('nan')
+            sd = float(np.std(values)) if values.size else float('nan')
+            md = float(np.median(values)) if values.size else float('nan')
+            n = int(values.size)
+            stats = f"N={n}   mean={mu:.5g}   std={sd:.5g}   median={md:.5g}"
+        except Exception:
+            stats = ""
+        self.stats_label = QtWidgets.QLabel(stats)
+        lay.addWidget(self.stats_label)
+
+        # Figure
+        self.fig = Figure(figsize=(6, 4), dpi=100)
+        self.canvas = FigureCanvas(self.fig)
+        lay.addWidget(self.canvas, 1)
+        ax = self.fig.add_subplot(111)
+        ax.set_xlabel(label)
+        ax.set_ylabel("Counts")
+        # Choose nice bins via Freedman–Diaconis, fallback to sqrt
+        try:
+            vals = np.asarray(values, dtype=float)
+            vals = vals[np.isfinite(vals)]
+            if vals.size > 1:
+                q75, q25 = np.percentile(vals, [75, 25])
+                iqr = max(1e-12, float(q75 - q25))
+                bin_width = 2.0 * iqr / max(vals.size ** (1.0/3.0), 1.0)
+                if not np.isfinite(bin_width) or bin_width <= 0:
+                    num_bins = int(np.ceil(np.sqrt(vals.size)))
+                else:
+                    vmin, vmax = float(vals.min()), float(vals.max())
+                    if vmax <= vmin:
+                        num_bins = int(np.ceil(np.sqrt(vals.size)))
+                    else:
+                        num_bins = int(np.clip(np.ceil((vmax - vmin) / bin_width), 10, 200))
+            else:
+                num_bins = max(1, int(np.ceil(np.sqrt(max(vals.size, 1)))))
+        except Exception:
+            num_bins = 50
+        try:
+            ax.hist(vals, bins=num_bins, color='tab:blue', alpha=0.8, edgecolor='white', linewidth=0.5)
+        except Exception:
+            pass
+        try:
+            ax.grid(True, alpha=0.2)
+        except Exception:
+            pass
+        self.fig.tight_layout()
+        self.canvas.draw()
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
