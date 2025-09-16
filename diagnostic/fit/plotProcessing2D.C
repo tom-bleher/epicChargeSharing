@@ -84,14 +84,21 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     return 2;
   }
 
-  // Pixel spacing/size: prefer metadata; fallback to inference/defaults as in processing2D
+  // Pixel spacing/size/radius: prefer metadata; fallback to inference/defaults as in processing2D
   double pixelSpacing = NAN;
   double pixelSize    = NAN;
+  int neighborhoodRadiusMeta = -1;
   if (auto* spacingObj = dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
     try { pixelSpacing = std::stod(spacingObj->GetTitle()); } catch (...) {}
   }
   if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
     try { pixelSize = std::stod(sizeObj->GetTitle()); } catch (...) {}
+  }
+  if (auto* rObj = dynamic_cast<TNamed*>(file->Get("NeighborhoodRadius"))) {
+    try { neighborhoodRadiusMeta = std::stoi(rObj->GetTitle()); }
+    catch (...) {
+      try { neighborhoodRadiusMeta = static_cast<int>(std::lround(std::stod(rObj->GetTitle()))); } catch (...) {}
+    }
   }
 
   auto inferSpacingFromTree = [&](TTree* t) -> double {
@@ -128,6 +135,23 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     return NAN;
   };
 
+  auto inferRadiusFromTree = [&](TTree* t) -> int {
+    std::vector<double>* Qi_tmp = nullptr;
+    t->SetBranchAddress("Q_i", &Qi_tmp);
+    Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
+    for (Long64_t i=0;i<nToScan;++i) {
+      t->GetEntry(i);
+      if (Qi_tmp && !Qi_tmp->empty()) {
+        const size_t total = Qi_tmp->size();
+        const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
+        if (N >= 3 && N*N == static_cast<int>(total)) {
+          return (N - 1) / 2;
+        }
+      }
+    }
+    return -1;
+  };
+
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
     pixelSpacing = inferSpacingFromTree(tree);
   }
@@ -137,24 +161,26 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     delete file;
     return 3;
   }
-  // Pixel size: if not available in metadata, fall back to nominal 0.1 mm
+  // Pixel size: if not available in metadata, fall back to 0.5 * pitch (match processing2D)
   if (!IsFinite(pixelSize) || pixelSize <= 0) {
-    pixelSize = 0.1; // mm
-    ::Info("processing2D_plots", "Pixel size metadata missing. Falling back to nominal %.3f mm.", pixelSize);
+    pixelSize = 0.5 * pixelSpacing; // mm
+  }
+  if (neighborhoodRadiusMeta <= 0) {
+    neighborhoodRadiusMeta = inferRadiusFromTree(tree);
   }
 
   // Set up branches
   double x_true = 0.0, y_true = 0.0;
   double x_px  = 0.0, y_px  = 0.0;
   Bool_t is_pixel_true = kFALSE;
-  std::vector<double>* Fi = nullptr; // use fractions for fitting
+  std::vector<double>* Qi = nullptr; // use induced charge for fitting
 
   tree->SetBranchAddress("TrueX", &x_true);
   tree->SetBranchAddress("TrueY", &y_true);
   tree->SetBranchAddress("PixelX",  &x_px);
   tree->SetBranchAddress("PixelY",  &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
-  tree->SetBranchAddress("F_i", &Fi);
+  tree->SetBranchAddress("Q_i", &Qi);
 
   // Prepare plotting objects
   gROOT->SetBatch(true);
@@ -189,10 +215,10 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     const Long64_t eventIndex = indices[sampleIdx];
     tree->GetEntry(eventIndex);
 
-    // Only non-pixel-pad trues with valid neighborhood (fractions 0..1)
-    if (is_pixel_true || !Fi || Fi->empty()) continue;
+    // Only non-pixel-pad trues with valid neighborhood (Q_i present)
+    if (is_pixel_true || !Qi || Qi->empty()) continue;
 
-    const size_t total = Fi->size();
+    const size_t total = Qi->size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
     if (N * N != static_cast<int>(total) || N < 3) continue;
     const int R = (N - 1) / 2;
@@ -221,19 +247,19 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
         const int irow = di + R;
         const int jcol = dj + R;
         const int idx  = irow * N + jcol;
-        const double f = (*Fi)[idx];
-        if (!IsFinite(f) || f < 0) continue;
-        if (f > qmaxNeighborhood) qmaxNeighborhood = f;
+        const double q = (*Qi)[idx];
+        if (!IsFinite(q) || q < 0) continue;
+        if (q > qmaxNeighborhood) qmaxNeighborhood = q;
         // Correct mapping: di moves along X, dj moves along Y
         if (dj == 0) { // central row (vary X at fixed Y)
           const double x = x_px + di * pixelSpacing;
           x_row.push_back(x);
-          q_row.push_back(f);
+          q_row.push_back(q);
         }
         if (di == 0) { // central column (vary Y at fixed X)
           const double y = y_px + dj * pixelSpacing;
           y_col.push_back(y);
-          q_col.push_back(f);
+          q_col.push_back(q);
         }
       }
     }
@@ -280,12 +306,12 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     }
 
     // Set titles and styles
-    baseRowPtr->SetTitle(Form("Event %lld: Central row fit; x [mm]; Charge fraction F_i [unitless]", eventIndex));
+    baseRowPtr->SetTitle(Form("Event %lld: Central row fit; x [mm]; Induced charge Q_{i} [C]", eventIndex));
     baseRowPtr->SetMarkerStyle(20);
     baseRowPtr->SetMarkerSize(0.9);
     baseRowPtr->SetLineColor(kBlue+1);
 
-    baseColPtr->SetTitle(Form("Event %lld: Central column fit; y [mm]; Charge fraction F_i [unitless]", eventIndex));
+    baseColPtr->SetTitle(Form("Event %lld: Central column fit; y [mm]; Induced charge Q_{i} [C]", eventIndex));
     baseColPtr->SetMarkerStyle(21);
     baseColPtr->SetMarkerSize(0.9);
     baseColPtr->SetLineColor(kBlue+2);
@@ -305,7 +331,8 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     double A_col = A0_col, B_col = B0_col, S_col = std::max(0.25*pixelSpacing, 1e-6);
 
     // Very low contrast: fallback to fast weighted centroids (skip fit), baseline-subtracted
-    if (A0_row < 1e-6 && A0_col < 1e-6) {
+    const double contrastEps = (qmaxNeighborhood > 0.0) ? (1e-3 * qmaxNeighborhood) : 0.0;
+    if (qmaxNeighborhood > 0.0 && A0_row < contrastEps && A0_col < contrastEps) {
       double wsumx = 0.0, xw = 0.0;
       for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k] - B0_row); wsumx += w; xw += w * x_row[k]; }
       double wsumy = 0.0, yw = 0.0;
@@ -334,15 +361,15 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
       const double xMax = *minmaxX.second + 0.5 * pixelSpacing;
       const double yMin = *minmaxY.first - 0.5 * pixelSpacing;
       const double yMax = *minmaxY.second + 0.5 * pixelSpacing;
-      // Tighten mu bounds to  b11/2 pitch about nearest pixel center (match processing2D)
+      // Tighten mu bounds to  b11/2 pitch about nearest pixel center (match processing2D)
       const double muXLo = x_px - 0.5 * pixelSpacing;
       const double muXHi = x_px + 0.5 * pixelSpacing;
       const double muYLo = y_px - 0.5 * pixelSpacing;
       const double muYHi = y_px + 0.5 * pixelSpacing;
 
       // Sigma seeding and bounds identical to processing2D.C
-      const double sigLoBound = std::max(1e-6, 0.02*pixelSpacing);
-      const double sigHiBound = 3.0*pixelSpacing;
+      const double sigLoBound = pixelSize;
+      const double sigHiBound = std::max(sigLoBound, static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
       auto sigmaSeed1D = [&](const std::vector<double>& xs, const std::vector<double>& qs, double B0)->double {
         double wsum = 0.0, xw = 0.0;
         for (size_t k=0;k<xs.size();++k) { double w = std::max(0.0, qs[k] - B0); wsum += w; xw += w * xs[k]; }
@@ -399,23 +426,30 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
       fitCol.Config().ParSettings(2).SetName("sigma");
       fitCol.Config().ParSettings(3).SetName("B");
 
-      fitRow.Config().ParSettings(0).SetLowerLimit(0.0);
+      // Bounds for Q_i fits: A in (0, ~2*qmax], B in [0, ~qmax]
+      const double AHi = std::max(1e-18, 2.0 * std::max(qmaxNeighborhood, 0.0));
+      const double BHi = std::max(1e-18, 1.0 * std::max(qmaxNeighborhood, 0.0));
+      fitRow.Config().ParSettings(0).SetLimits(1e-18, AHi);
       fitRow.Config().ParSettings(1).SetLimits(muXLo, muXHi);
       fitRow.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
-      fitRow.Config().ParSettings(3).SetLowerLimit(0.0);
-      fitCol.Config().ParSettings(0).SetLowerLimit(0.0);
+      fitRow.Config().ParSettings(3).SetLimits(0.0, BHi);
+      fitCol.Config().ParSettings(0).SetLimits(1e-18, AHi);
       fitCol.Config().ParSettings(1).SetLimits(muYLo, muYHi);
       fitCol.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
-      fitCol.Config().ParSettings(3).SetLowerLimit(0.0);
+      fitCol.Config().ParSettings(3).SetLimits(0.0, BHi);
 
-      fitRow.Config().ParSettings(0).SetStepSize(1e-3);
+      const double stepA_row = std::max(1e-18, 0.01 * A0_row);
+      const double stepA_col = std::max(1e-18, 0.01 * A0_col);
+      const double stepB_row = std::max(1e-18, 0.01 * std::max(B0_row, A0_row));
+      const double stepB_col = std::max(1e-18, 0.01 * std::max(B0_col, A0_col));
+      fitRow.Config().ParSettings(0).SetStepSize(stepA_row);
       fitRow.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
       fitRow.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
-      fitRow.Config().ParSettings(3).SetStepSize(1e-3);
-      fitCol.Config().ParSettings(0).SetStepSize(1e-3);
+      fitRow.Config().ParSettings(3).SetStepSize(stepB_row);
+      fitCol.Config().ParSettings(0).SetStepSize(stepA_col);
       fitCol.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
       fitCol.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
-      fitCol.Config().ParSettings(3).SetStepSize(1e-3);
+      fitCol.Config().ParSettings(3).SetStepSize(stepB_col);
 
       // Seed values
       fitRow.Config().ParSettings(0).SetValue(A0_row);
@@ -518,25 +552,36 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     double fy1c = gPad->GetBottomMargin();
     double fx2c = 1.0 - gPad->GetRightMargin();
     double fy2c = 1.0 - gPad->GetTopMargin();
-    // Slightly increase legend height to accommodate extra entry (|y_true - y_px|)
-    double legWc = 0.22, legHc = 0.18, insetc = 0.008;
-    double lx1c = fx1c + insetc, lx2c = lx1c + legWc;
+    // Increase legend size to accommodate extra entries
+    double legWc = 0.28, legHc = 0.30, insetc = 0.008;
     double ly2c = fy2c - insetc, ly1c = ly2c - legHc;
-    TLegend legC(lx1c, ly1c, lx2c, ly2c, "", "NDC");
-    legC.SetBorderSize(0);
-    legC.SetFillStyle(0);
-    legC.SetTextSize(0.03);
-    legC.AddEntry(&lineYtrue, "y_{true}", "l");
+    // Left legend (top-left): line indicators
+    double lx1c = fx1c + insetc, lx2c = lx1c + legWc;
+    TLegend legCLeft(lx1c, ly1c, lx2c, ly2c, "", "NDC");
+    legCLeft.SetBorderSize(0);
+    legCLeft.SetFillStyle(0);
+    legCLeft.SetTextSize(0.03);
+    legCLeft.AddEntry(&lineYtrue, "y_{true}", "l");
     TLine lineYrec(muCol, yPadMinC, muCol, yPadMaxC);
     lineYrec.SetLineStyle(2);
     lineYrec.SetLineWidth(2);
     lineYrec.SetLineColor(kRed+1);
     lineYrec.Draw("SAME");
-    legC.AddEntry(&lineYrec, "y_{rec}", "l");
+    legCLeft.AddEntry(&lineYrec, "y_{rec}", "l");
+    legCLeft.Draw();
+    // Right legend (top-right): numeric values
+    double rx2c = fx2c - insetc, rx1c = rx2c - legWc;
+    TLegend legCRight(rx1c, ly1c, rx2c, ly2c, "", "NDC");
+    legCRight.SetBorderSize(0);
+    legCRight.SetFillStyle(0);
+    legCRight.SetTextSize(0.03);
+    legCRight.AddEntry((TObject*)nullptr, Form("y_{true} = %.4f mm", y_true), "");
+    legCRight.AddEntry((TObject*)nullptr, Form("y_{rec} = %.4f mm", muCol), "");
+    legCRight.AddEntry((TObject*)nullptr, Form("#sigma_{fit} = %.3f mm", S_col), "");
     // Show pixel-centered delta (|y_true - y_px|) and reconstruction delta
-    legC.AddEntry((TObject*)nullptr, Form("|y_{true}-y_{px}| = %.1f #mum", 1000.0*std::abs(y_true - y_px)), "");
-    legC.AddEntry((TObject*)nullptr, Form("|y_{true}-y_{rec,2d}| = %.1f #mum", 1000.0*std::abs(y_true - muCol)), "");
-    legC.Draw();
+    legCRight.AddEntry((TObject*)nullptr, Form("y_{true}-y_{px} = %.1f #mum", 1000.0*(y_true - y_px)), "");
+    legCRight.AddEntry((TObject*)nullptr, Form("y_{true}-y_{rec} = %.1f #mum", 1000.0*(y_true - muCol)), "");
+    legCRight.Draw();
 
     // Right pad: ROW plot
     pR.cd();
@@ -577,25 +622,36 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     double fy1 = gPad->GetBottomMargin();
     double fx2 = 1.0 - gPad->GetRightMargin();
     double fy2 = 1.0 - gPad->GetTopMargin();
-    // Slightly increase legend height to accommodate extra entry (|x_true - x_px|)
-    double legW = 0.22, legH = 0.18, inset = 0.008;
-    double lx1 = fx1 + inset, lx2 = lx1 + legW;
+    // Increase legend size to accommodate extra entries
+    double legW = 0.28, legH = 0.30, inset = 0.008;
     double ly2 = fy2 - inset, ly1 = ly2 - legH;
-    TLegend leg(lx1, ly1, lx2, ly2, "", "NDC");
-    leg.SetBorderSize(0);
-    leg.SetFillStyle(0);
-    leg.SetTextSize(0.03);
-    leg.AddEntry(&lineXtrue, "x_{true}", "l");
+    // Left legend (top-left): line indicators
+    double lx1 = fx1 + inset, lx2 = lx1 + legW;
+    TLegend legLeft(lx1, ly1, lx2, ly2, "", "NDC");
+    legLeft.SetBorderSize(0);
+    legLeft.SetFillStyle(0);
+    legLeft.SetTextSize(0.03);
+    legLeft.AddEntry(&lineXtrue, "x_{true}", "l");
     TLine lineXrec(muRow, yPadMin, muRow, yPadMax);
     lineXrec.SetLineStyle(2);
     lineXrec.SetLineWidth(2);
     lineXrec.SetLineColor(kRed+1);
     lineXrec.Draw("SAME");
-    leg.AddEntry(&lineXrec, "x_{rec}", "l");
+    legLeft.AddEntry(&lineXrec, "x_{rec}", "l");
+    legLeft.Draw();
+    // Right legend (top-right): numeric values
+    double rx2 = fx2 - inset, rx1 = rx2 - legW;
+    TLegend legRight(rx1, ly1, rx2, ly2, "", "NDC");
+    legRight.SetBorderSize(0);
+    legRight.SetFillStyle(0);
+    legRight.SetTextSize(0.03);
+    legRight.AddEntry((TObject*)nullptr, Form("x_{true} = %.4f mm", x_true), "");
+    legRight.AddEntry((TObject*)nullptr, Form("x_{rec} = %.4f mm", muRow), "");
+    legRight.AddEntry((TObject*)nullptr, Form("#sigma_{fit} = %.3f mm", S_row), "");
     // Show pixel-centered delta (|x_true - x_px|) and reconstruction delta
-    leg.AddEntry((TObject*)nullptr, Form("|x_{true}-x_{px}| = %.1f #mum", 1000.0*std::abs(x_true - x_px)), "");
-    leg.AddEntry((TObject*)nullptr, Form("|x_{true}-x_{rec,2d}| = %.1f #mum", 1000.0*std::abs(x_true - muRow)), "");
-    leg.Draw();
+    legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{px} = %.1f #mum", 1000.0*(x_true - x_px)), "");
+    legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{rec} = %.1f #mum", 1000.0*(x_true - muRow)), "");
+    legRight.Draw();
 
     // Print page
     c.cd();
