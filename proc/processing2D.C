@@ -241,20 +241,20 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   TBranch* br_col_sigma = nullptr;
   TBranch* br_col_B = nullptr;
   if (saveParamA) {
-    br_row_A     = ensureAndResetBranch("Gauss2D_Row_A", &gauss2d_row_a);
-    br_col_A     = ensureAndResetBranch("Gauss2D_Col_A", &gauss2d_col_a);
+    br_row_A     = ensureAndResetBranch("GaussRowA", &gauss2d_row_a);
+    br_col_A     = ensureAndResetBranch("GaussColA", &gauss2d_col_a);
   }
   if (saveParamMu) {
-    br_row_mu    = ensureAndResetBranch("Gauss2D_Row_mu", &gauss2d_row_mu);
-    br_col_mu    = ensureAndResetBranch("Gauss2D_Col_mu", &gauss2d_col_mu);
+    br_row_mu    = ensureAndResetBranch("GaussRowMu", &gauss2d_row_mu);
+    br_col_mu    = ensureAndResetBranch("GaussColMu", &gauss2d_col_mu);
   }
   if (saveParamSigma) {
-    br_row_sigma = ensureAndResetBranch("Gauss2D_Row_sigma", &gauss2d_row_sigma);
-    br_col_sigma = ensureAndResetBranch("Gauss2D_Col_sigma", &gauss2d_col_sigma);
+    br_row_sigma = ensureAndResetBranch("GaussRowSigma", &gauss2d_row_sigma);
+    br_col_sigma = ensureAndResetBranch("GaussColSigma", &gauss2d_col_sigma);
   }
   if (saveParamB) {
-    br_row_B     = ensureAndResetBranch("Gauss2D_Row_B", &gauss2d_row_b);
-    br_col_B     = ensureAndResetBranch("Gauss2D_Col_B", &gauss2d_col_b);
+    br_row_B     = ensureAndResetBranch("GaussRowB", &gauss2d_row_b);
+    br_col_B     = ensureAndResetBranch("GaussColB", &gauss2d_col_b);
   }
 
   // Fitting function for 1D gaussian + const
