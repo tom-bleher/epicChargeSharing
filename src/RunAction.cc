@@ -241,18 +241,18 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
         fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]"); 
-        fTree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
-        //fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
+        //Tree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
+        fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
         
         // Full-grid pixel geometry and IDs (constant per run/thread)
-        fTree->Branch("GridPixelX", &fGridPixelX)->SetTitle("Full-grid pixel centers X [mm] (row-major, size N^2)");
-        fTree->Branch("GridPixelY", &fGridPixelY)->SetTitle("Full-grid pixel centers Y [mm] (row-major, size N^2)");
-        fTree->Branch("GridPixelID", &fGridPixelID)->SetTitle("Full-grid pixel IDs (row-major i*N + j, size N^2)");
+        //fTree->Branch("GridPixelX", &fGridPixelX)->SetTitle("Full-grid pixel centers X [mm] (row-major, size N^2)");
+        //fTree->Branch("GridPixelY", &fGridPixelY)->SetTitle("Full-grid pixel centers Y [mm] (row-major, size N^2)");
+        //fTree->Branch("GridPixelID", &fGridPixelID)->SetTitle("Full-grid pixel IDs (row-major i*N + j, size N^2)");
 
         // Neighborhood pixel geometry and IDs
-        fTree->Branch("NeighborhoodPixelX", &fNeighborhoodPixelX)->SetTitle("Neighborhood pixel centers X [mm] (row-major, size (2r+1)^2)");
-        fTree->Branch("NeighborhoodPixelY", &fNeighborhoodPixelY)->SetTitle("Neighborhood pixel centers Y [mm] (row-major, size (2r+1)^2)");
-        fTree->Branch("NeighborhoodPixelID", &fNeighborhoodPixelID)->SetTitle("Neighborhood pixel IDs (global grid IDs; -1 for OOB)");
+        //fTree->Branch("NeighborhoodPixelX", &fNeighborhoodPixelX)->SetTitle("Neighborhood pixel centers X [mm] (row-major, size (2r+1)^2)");
+        //fTree->Branch("NeighborhoodPixelY", &fNeighborhoodPixelY)->SetTitle("Neighborhood pixel centers Y [mm] (row-major, size (2r+1)^2)");
+        //fTree->Branch("NeighborhoodPixelID", &fNeighborhoodPixelID)->SetTitle("Neighborhood pixel IDs (global grid IDs; -1 for OOB)");
         
         G4cout << "ROOT tree 'Hits': " << fTree->GetNbranches() << " branches" << G4endl;
     
