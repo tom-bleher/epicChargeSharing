@@ -93,22 +93,48 @@ static void RunPostProcessingMacros(const G4String& rootFilePath)
         gSystem->SetBuildDir("proc_cache");
     }
 
-    auto runMacro = [&](const char* macroPath, const char* funcName) {
-        if (!macroPath || !funcName) return;
-        // Force recompile each run ("++") to ensure fresh .so and corresponding .pcm are produced
+    auto runMacro2D = [&](const char* macroPath) {
+        if (!macroPath) return;
         const G4String loadCmdRebuild = Form(".L %s++", macroPath);
         gROOT->ProcessLine(loadCmdRebuild.c_str());
-        const G4String callCmd = Form("%s(\"%s\", %.9g);", funcName, rootFilePath.c_str(), Constants::PROCESSING_ERROR_PERCENT);
+        const char* chargeBranch = "Q_f";
+        const G4String callCmd = Form(
+            "processing2D(\"%s\", %.9g, %s, %s, %s, %s, \"%s\", %s, %.9g, %d);",
+            rootFilePath.c_str(),
+            Constants::PROCESSING_ERROR_PERCENT,
+            "false", "false", "false", "false",
+            chargeBranch,
+            Constants::PROCESSING_2D_REMOVE_OUTLIERS ? "true" : "false",
+            Constants::PROCESSING_2D_OUTLIER_SIGMA,
+            (int)Constants::PROCESSING_2D_MIN_POINTS_AFTER_CLIP
+        );
+        gROOT->ProcessLine(callCmd.c_str());
+    };
+
+    auto runMacro3D = [&](const char* macroPath) {
+        if (!macroPath) return;
+        const G4String loadCmdRebuild = Form(".L %s++", macroPath);
+        gROOT->ProcessLine(loadCmdRebuild.c_str());
+        const char* chargeBranch = "Q_f";
+        const G4String callCmd = Form(
+            "processing3D(\"%s\", %.9g, %s, %s, %s, %s, %s, %s, \"%s\");",
+            rootFilePath.c_str(),
+            Constants::PROCESSING_ERROR_PERCENT,
+            // save parameters A,mux,muy,sigx,sigy,B
+            "false", "false", "false", "false", "false", "false",
+            chargeBranch
+        );
+        // The 3D function also has defaulted outlier controls appended; use defaults set in the macro
         gROOT->ProcessLine(callCmd.c_str());
     };
 
     if (Constants::RUN_PROCESSING_2D) {
         const G4String macroPath2D = G4String(PROJECT_SOURCE_DIR) + "/proc/processing2D.C";
-        runMacro(macroPath2D.c_str(), "processing2D");
+        runMacro2D(macroPath2D.c_str());
     }
     if (Constants::RUN_PROCESSING_3D) {
         const G4String macroPath3D = G4String(PROJECT_SOURCE_DIR) + "/proc/processing3D.C";
-        runMacro(macroPath3D.c_str(), "processing3D");
+        runMacro3D(macroPath3D.c_str());
     }
 }
 
@@ -241,8 +267,14 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         }
         fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
         fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]"); 
-        //Tree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
+        
+        
+        fTree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
         fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
+        fTree->Branch("Q_n", &fNeighborhoodChargeNew)->SetTitle("Intermediate charge per pixel Q_new = Qi * Gauss(1,sigma_gain) [C]");
+        fTree->Branch("Q_f", &fNeighborhoodChargeFinal)->SetTitle("Noisy charge per pixel Q_i_final [C]");
+        fTree->Branch("d_i", &fNeighborhoodDistance)->SetTitle("Distance from hit to neighborhood pixel center [mm]");
+        fTree->Branch("alpha_i", &fNeighborhoodAlpha)->SetTitle("Subtended angle alpha used in weighting [rad]");
         
         // Full-grid pixel geometry and IDs (constant per run/thread)
         //fTree->Branch("GridPixelX", &fGridPixelX)->SetTitle("Full-grid pixel centers X [mm] (row-major, size N^2)");
@@ -563,6 +595,23 @@ void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFra
     // Store the neighborhood (9x9) grid charge sharing data for non-pixel hits
     fNeighborhoodChargeFractions = chargeFractions;
     fNeighborhoodCharge = chargeCoulombs;
+}
+
+void RunAction::SetNeighborhoodChargeFinalData(const std::vector<G4double>& chargeCoulombsFinal)
+{
+    fNeighborhoodChargeFinal = chargeCoulombsFinal;
+}
+
+void RunAction::SetNeighborhoodChargeNewData(const std::vector<G4double>& chargeCoulombsNew)
+{
+    fNeighborhoodChargeNew = chargeCoulombsNew;
+}
+
+void RunAction::SetNeighborhoodDistanceAlphaData(const std::vector<G4double>& distances,
+                                          const std::vector<G4double>& alphas)
+{
+    fNeighborhoodDistance = distances;
+    fNeighborhoodAlpha = alphas;
 }
 
 void RunAction::FillTree()

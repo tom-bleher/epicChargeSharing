@@ -72,6 +72,8 @@ private:
     
     std::vector<G4double> fNeighborhoodChargeFractions;
     std::vector<G4double> fNeighborhoodCharge;
+    std::vector<G4double> fNeighborhoodDistance; // mm
+    std::vector<G4double> fNeighborhoodAlpha;    // rad
     
     // Neighborhood geometry (aligned to fractions vector sizing and ordering)
     std::vector<G4double> fNeighborhoodPixelX; // mm

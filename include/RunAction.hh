@@ -51,6 +51,10 @@ public:
     
     void SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
                           const std::vector<G4double>& chargeCoulombs);
+    void SetNeighborhoodChargeNewData(const std::vector<G4double>& chargeCoulombsNew);
+    void SetNeighborhoodChargeFinalData(const std::vector<G4double>& chargeCoulombsFinal);
+    void SetNeighborhoodDistanceAlphaData(const std::vector<G4double>& distances,
+                                          const std::vector<G4double>& alphas);
     
     void SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, 
                                    G4double pixelCornerOffset, G4double detSize, 
@@ -90,6 +94,11 @@ private:
     
     std::vector<G4double> fNeighborhoodChargeFractions;
     std::vector<G4double> fNeighborhoodCharge;
+    std::vector<G4double> fNeighborhoodChargeNew;
+    std::vector<G4double> fNeighborhoodChargeFinal;
+    // Derived per-neighborhood metrics used in charge sharing
+    std::vector<G4double> fNeighborhoodDistance; // mm, distance from hit to each neighborhood pixel center
+    std::vector<G4double> fNeighborhoodAlpha;    // rad, subtended angle used in weighting
     
     // Per–event neighborhood pixel geometry
     std::vector<G4double> fNeighborhoodPixelX;

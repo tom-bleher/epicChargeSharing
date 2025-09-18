@@ -9,6 +9,7 @@
 #include "G4VUserDetectorConstruction.hh"
 #include "G4VPhysicalVolume.hh"
 #include "G4ThreeVector.hh"
+#include <vector>
 
 class EventAction;
 class G4LogicalVolume;
@@ -42,6 +43,9 @@ public:
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
     G4ThreeVector GetDetectorPos() const;
+    // Noise sigma accessors (row-major global pixel id = i*N + j)
+    G4double GetPixelGainSigma(G4int globalPixelId) const { return (globalPixelId >= 0 && globalPixelId < (G4int)fPixelGainSigmas.size()) ? fPixelGainSigmas[globalPixelId] : 0.0; }
+    const std::vector<G4double>& GetPixelGainSigmas() const { return fPixelGainSigmas; }
     
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
     
@@ -60,6 +64,9 @@ private:
     G4int fNeighborhoodRadius;
 
     G4LogicalVolume* fLogicSilicon;
+
+    // Per-pixel multiplicative noise sigma table (initialized once during construction)
+    std::vector<G4double> fPixelGainSigmas;
 };
 
 #endif // DETECTORCONSTRUCTION_HH
