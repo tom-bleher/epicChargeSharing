@@ -290,6 +290,14 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         if ("Q_n" in available) and ("Q_f" in available):
             self.branch_combo.addItem("|Q_n - Q_f|", "delta_nf")
 
+        # Outlier mask options (discrete binary coloring)
+        if "Gauss3DMaskRemoved" in available:
+            self.branch_combo.addItem("Outlier mask (3D)", "mask_3d")
+        if "GaussRowMaskRemoved" in available:
+            self.branch_combo.addItem("Outlier mask (row)", "mask_row")
+        if "GaussColMaskRemoved" in available:
+            self.branch_combo.addItem("Outlier mask (col)", "mask_col")
+
         # Default to Q_f if present, else first entry
         try:
             idx_qf = next((i for i in range(self.branch_combo.count()) if self.branch_combo.itemData(i) == "Q_f"), 0)
@@ -341,6 +349,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
           ("direct", key) for a direct branch key
           ("delta_abs", ("Q_i", "Q_f"))
           ("delta_signed", ("Q_i", "Q_f"))
+          ("mask", "mask_3d" | "mask_row" | "mask_col")
         If selection missing, fallback to first available direct key.
         """
         sel = None
@@ -356,6 +365,9 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
             return ("delta_abs", ("Q_i", "Q_f"))
         if sel == "delta_nf":
             return ("delta_abs", ("Q_n", "Q_f"))
+        # Mask selections
+        if sel in ("mask_3d", "mask_row", "mask_col"):
+            return ("mask", sel)
         # Fallback: pick first available
         try:
             if self._tree is not None:
@@ -397,15 +409,36 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
 
         # Read one event worth of data
         branches = ["TrueX", "TrueY", "PixelX", "PixelY", "Edep", "isPixelHit"]
+        mask_mode = (kind == "mask")
+        mask_sel = spec if mask_mode else None
+        shape_key = None
         if kind == "direct" and key is not None:
             branches.append(key)
-        else:
+        elif kind == "delta_abs":
             # delta requires both components
             try:
                 a, b = spec
             except Exception:
                 a, b = "Q_i", "Q_f"
             branches += [a, b]
+        elif mask_mode:
+            # Determine necessary branches for masks
+            if mask_sel == "mask_3d":
+                branches.append("Gauss3DMaskRemoved")
+            elif mask_sel == "mask_row":
+                branches.append("GaussRowMaskRemoved")
+            elif mask_sel == "mask_col":
+                branches.append("GaussColMaskRemoved")
+            # We also need a shape source to obtain NxN and valid positions for mapping
+            try:
+                available = set(self._tree.keys()) if self._tree is not None else set()
+            except Exception:
+                available = set()
+            for kshape in ["Q_f", "F_i", "Q_i", "Q_n"]:
+                if kshape in available:
+                    shape_key = kshape
+                    branches.append(kshape)
+                    break
         # Include additional quantity branches if needed
         if quantity in ("d_i", "alpha_i"):
             branches.append(quantity)
@@ -437,7 +470,56 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         # Build the values array according to selection
         signed_values = False
         try:
-            if kind == "direct" and key is not None:
+            if mask_mode:
+                # Build NxN array from mask branches using a shape source
+                if shape_key is None:
+                    values = np.array([], dtype=float)
+                else:
+                    shape_vec = np.asarray(arrs[shape_key][0], dtype=float)
+                    if shape_vec.size == 0:
+                        values = np.array([], dtype=float)
+                    else:
+                        dim_guess = int(round(math.sqrt(float(shape_vec.size))))
+                        if dim_guess * dim_guess != int(shape_vec.size) or dim_guess < 3:
+                            values = np.array([], dtype=float)
+                        else:
+                            N = dim_guess
+                            R = N // 2
+                            values = np.full(N * N, np.nan, dtype=float)
+                            if mask_sel == "mask_3d":
+                                mvec = np.asarray(arrs["Gauss3DMaskRemoved"][0], dtype=float)
+                                k = 0
+                                for di in range(-R, R + 1):
+                                    for dj in range(-R, R + 1):
+                                        idx_shape = (di + R) * N + (dj + R)
+                                        q = shape_vec[idx_shape]
+                                        if math.isfinite(q) and q >= 0.0:
+                                            if k < mvec.size:
+                                                values[idx_shape] = mvec[k]
+                                                k += 1
+                            elif mask_sel == "mask_row":
+                                mvec = np.asarray(arrs["GaussRowMaskRemoved"][0], dtype=float)
+                                k = 0
+                                dj = 0
+                                for di in range(-R, R + 1):
+                                    idx_shape = (di + R) * N + (dj + R)
+                                    q = shape_vec[idx_shape]
+                                    if math.isfinite(q) and q >= 0.0:
+                                        if k < mvec.size:
+                                            values[idx_shape] = mvec[k]
+                                            k += 1
+                            elif mask_sel == "mask_col":
+                                mvec = np.asarray(arrs["GaussColMaskRemoved"][0], dtype=float)
+                                k = 0
+                                di = 0
+                                for dj in range(-R, R + 1):
+                                    idx_shape = (di + R) * N + (dj + R)
+                                    q = shape_vec[idx_shape]
+                                    if math.isfinite(q) and q >= 0.0:
+                                        if k < mvec.size:
+                                            values[idx_shape] = mvec[k]
+                                            k += 1
+            elif kind == "direct" and key is not None:
                 vec = arrs[key][0]
                 values = np.asarray(vec, dtype=float)
             else:
@@ -501,14 +583,16 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 aux_grid = None
 
         # vmin/vmax on ROI
-        usingQ = True if kind != "direct" else (key in ("Q_f", "Q_n", "Q_i"))
+        usingQ = False if mask_mode else (True if kind != "direct" else (key in ("Q_f", "Q_n", "Q_i")))
         roi_vals_for_range: List[float] = []
         for ii in range(i0, i1 + 1):
             for jj in range(j0, j1 + 1):
                 base_raw = grid[ii, jj]
                 if not (math.isfinite(base_raw) and (signed_values or base_raw >= 0.0)):
                     continue
-                if quantity == "fraction":
+                if mask_mode:
+                    roi_vals_for_range.append(base_raw)
+                elif quantity == "fraction":
                     if math.isfinite(edep) and edep <= 0:
                         frac = 0.0
                     elif usingQ:
@@ -529,7 +613,9 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                     if math.isfinite(aux_raw):
                         roi_vals_for_range.append(aux_raw)
 
-        if quantity == "fraction":
+        if mask_mode:
+            vmin, vmax = -0.5, 1.5
+        elif quantity == "fraction":
             if signed_values and roi_vals_for_range:
                 vmin, vmax = float(min(roi_vals_for_range)), float(max(roi_vals_for_range))
             else:
@@ -551,8 +637,12 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         ax.set_ylabel("y [mm]")
 
         # Colormap and norm
-        cmap = mpl.cm.get_cmap(cmap_name)
-        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+        if mask_mode:
+            cmap = mpl.colors.ListedColormap(["#bdbdbd", "#d32f2f"])  # 0=kept (gray), 1=removed (red)
+            norm = mpl.colors.BoundaryNorm([-0.5, 0.5, 1.5], ncolors=cmap.N)
+        else:
+            cmap = mpl.cm.get_cmap(cmap_name)
+            norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
         sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
 
         # Valid mask and drawing
@@ -570,7 +660,9 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 x1, x2 = cx - pixel_spacing / 2.0, cx + pixel_spacing / 2.0
                 y1, y2 = cy - pixel_spacing / 2.0, cy + pixel_spacing / 2.0
 
-                if quantity == "fraction":
+                if mask_mode:
+                    shown = fval
+                elif quantity == "fraction":
                     if math.isfinite(edep) and edep <= 0:
                         shown = 0.0
                     else:
@@ -588,7 +680,9 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 ax.add_patch(Rectangle((x1, y1), pixel_spacing, pixel_spacing, linewidth=1.0, edgecolor="black", facecolor=color, alpha=alpha))
 
                 # Value label
-                if quantity == "coulomb":
+                if mask_mode:
+                    label = f"{int(round(shown))}"
+                elif quantity == "coulomb":
                     label = f"{shown:.2e}"
                 else:
                     label = f"{shown:.3f}"
@@ -633,7 +727,10 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         ax.add_patch(circ)
 
         # Title and colorbar
-        label = {"coulomb": "Charge [C]", "fraction": "Charge Fraction", "d_i": "Distance [mm]", "alpha_i": "Alpha [rad]"}[quantity]
+        if mask_mode:
+            label = "Outlier removed (1=yes, 0=no)"
+        else:
+            label = {"coulomb": "Charge [C]", "fraction": "Charge Fraction", "d_i": "Distance [mm]", "alpha_i": "Alpha [rad]"}[quantity]
         ax.set_title(f"Event {evt} Charge Neighborhood\nHit: ({trueX:.3f}, {trueY:.3f}) mm,  Pixel: ({pixelX:.3f}, {pixelY:.3f}) mm   isPixelHit={int(is_pixel_hit)}")
         sm.set_array([])
         self.canvas.set_colorbar(sm, label)
@@ -669,14 +766,34 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 if evt >= self._n_entries:
                     break
                 branches = ["TrueX", "TrueY", "PixelX", "PixelY", "Edep"]
+                mask_mode = (kind == "mask")
+                mask_sel = spec if mask_mode else None
+                shape_key = None
                 if kind == "direct" and spec is not None:
                     branches.append(spec)
-                else:
+                elif kind == "delta_abs":
                     try:
                         a, b = spec
                     except Exception:
                         a, b = "Q_i", "Q_f"
                     branches += [a, b]
+                elif mask_mode:
+                    if mask_sel == "mask_3d":
+                        branches.append("Gauss3DMaskRemoved")
+                    elif mask_sel == "mask_row":
+                        branches.append("GaussRowMaskRemoved")
+                    elif mask_sel == "mask_col":
+                        branches.append("GaussColMaskRemoved")
+                    # Shape source for 2D/3D masks
+                    try:
+                        available = set(self._tree.keys()) if self._tree is not None else set()
+                    except Exception:
+                        available = set()
+                    for kshape in ["Q_f", "F_i", "Q_i", "Q_n"]:
+                        if kshape in available:
+                            shape_key = kshape
+                            branches.append(kshape)
+                            break
                 if quantity in ("d_i", "alpha_i"):
                     branches.append(quantity)
                 arrs = self._tree.arrays(branches, entry_start=evt, entry_stop=evt + 1)
@@ -693,7 +810,55 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 pixelY = scalar("PixelY")
                 edep = scalar("Edep")
                 signed_values = False
-                if kind == "direct" and spec is not None:
+                if mask_mode:
+                    if shape_key is None:
+                        values = np.array([], dtype=float)
+                    else:
+                        shape_vec = np.asarray(arrs[shape_key][0], dtype=float)
+                        if shape_vec.size == 0:
+                            values = np.array([], dtype=float)
+                        else:
+                            dim_guess = int(round(math.sqrt(float(shape_vec.size))))
+                            if dim_guess * dim_guess != int(shape_vec.size) or dim_guess < 3:
+                                values = np.array([], dtype=float)
+                            else:
+                                N = dim_guess
+                                R = N // 2
+                                values = np.full(N * N, np.nan, dtype=float)
+                                if mask_sel == "mask_3d":
+                                    mvec = np.asarray(arrs["Gauss3DMaskRemoved"][0], dtype=float)
+                                    k = 0
+                                    for di in range(-R, R + 1):
+                                        for dj in range(-R, R + 1):
+                                            idx_shape = (di + R) * N + (dj + R)
+                                            q = shape_vec[idx_shape]
+                                            if math.isfinite(q) and q >= 0.0:
+                                                if k < mvec.size:
+                                                    values[idx_shape] = mvec[k]
+                                                    k += 1
+                                elif mask_sel == "mask_row":
+                                    mvec = np.asarray(arrs["GaussRowMaskRemoved"][0], dtype=float)
+                                    k = 0
+                                    dj = 0
+                                    for di in range(-R, R + 1):
+                                        idx_shape = (di + R) * N + (dj + R)
+                                        q = shape_vec[idx_shape]
+                                        if math.isfinite(q) and q >= 0.0:
+                                            if k < mvec.size:
+                                                values[idx_shape] = mvec[k]
+                                                k += 1
+                                elif mask_sel == "mask_col":
+                                    mvec = np.asarray(arrs["GaussColMaskRemoved"][0], dtype=float)
+                                    k = 0
+                                    di = 0
+                                    for dj in range(-R, R + 1):
+                                        idx_shape = (di + R) * N + (dj + R)
+                                        q = shape_vec[idx_shape]
+                                        if math.isfinite(q) and q >= 0.0:
+                                            if k < mvec.size:
+                                                values[idx_shape] = mvec[k]
+                                                k += 1
+                elif kind == "direct" and spec is not None:
                     values = np.asarray(arrs[spec][0], dtype=float)
                 else:
                     a_key, b_key = spec
@@ -720,7 +885,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 e_charge = 1.602176634e-19
                 pair_e_ev = 3.60
                 q_total = edep * 1.0e6 / pair_e_ev * e_charge if (edep > 0) else 0.0
-                usingQ = True if kind != "direct" else (spec in ("Q_f", "Q_n", "Q_i"))
+                usingQ = False if mask_mode else (True if kind != "direct" else (spec in ("Q_f", "Q_n", "Q_i")))
 
                 # Optional aux grid for d_i / alpha_i
                 aux_grid = None
@@ -760,7 +925,9 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                             if math.isfinite(aux_raw):
                                 roi_vals.append(aux_raw)
 
-                if quantity == "fraction":
+                if mask_mode:
+                    vmin, vmax = -0.5, 1.5
+                elif quantity == "fraction":
                     if signed_values and roi_vals:
                         vmin, vmax = float(min(roi_vals)), float(max(roi_vals))
                     else:
@@ -781,8 +948,12 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 ax.set_ylabel("y [mm]")
                 fig.subplots_adjust(left=0.12, right=0.86, top=0.90, bottom=0.12)
 
-                cmap = mpl.cm.get_cmap(cmap_name)
-                norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+                if mask_mode:
+                    cmap = mpl.colors.ListedColormap(["#bdbdbd", "#d32f2f"])  # 0=kept, 1=removed
+                    norm = mpl.colors.BoundaryNorm([-0.5, 0.5, 1.5], ncolors=cmap.N)
+                else:
+                    cmap = mpl.cm.get_cmap(cmap_name)
+                    norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
                 sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
 
                 valid = np.zeros((dim, dim), dtype=bool)
@@ -795,7 +966,9 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                         cx = pixelX + (jj - c) * pixel_spacing
                         cy = pixelY + (ii - c) * pixel_spacing
                         x1, y1 = cx - pixel_spacing / 2.0, cy - pixel_spacing / 2.0
-                        if quantity == "fraction":
+                        if mask_mode:
+                            shown = fval
+                        elif quantity == "fraction":
                             if edep <= 0:
                                 shown = 0.0
                             else:
@@ -825,7 +998,10 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 hit_r = pixel_size / 6.0 if pixel_size > 0 else pixel_spacing / 6.0
                 ax.add_patch(plt.Circle((trueX, trueY), hit_r, color="red", fill=True))
 
-                label = {"coulomb": "Charge [C]", "fraction": "Charge Fraction", "d_i": "Distance [mm]", "alpha_i": "Alpha [rad]"}[quantity]
+                if mask_mode:
+                    label = "Outlier removed (1=yes, 0=no)"
+                else:
+                    label = {"coulomb": "Charge [C]", "fraction": "Charge Fraction", "d_i": "Distance [mm]", "alpha_i": "Alpha [rad]"}[quantity]
                 ax.set_title(f"Event {evt} Charge Neighborhood")
                 sm.set_array([])
                 cbar = fig.colorbar(sm, ax=ax)
