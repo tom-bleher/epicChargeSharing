@@ -70,6 +70,15 @@ namespace Constants {
     const G4double ELEMENTARY_CHARGE = 1.602176634e-19;  // Elementary charge in Coulombs
 
     // ========================
+    // NOISE MODEL CONSTANTS
+    // ========================
+    // Per-pixel multiplicative gain noise sigma range (dimensionless)
+    const G4double PIXEL_GAIN_SIGMA_MIN = 0.010;          // lower bound for sigma in Gauss(1, sigma) - 1%
+    const G4double PIXEL_GAIN_SIGMA_MAX = 0.050;          // upper bound for sigma in Gauss(1, sigma) - 5%
+    // Additive electronic noise modeled as Gaussian with sigma1 = N_e * q_e [C]
+    const G4double NOISE_ELECTRON_COUNT = 500.0;         // baseline number of noise electrons
+
+    // ========================
     // POST-RUN PROCESSING (Gaussian fits over the charge neighborhood)
     // ========================
     // Control whether to run ROOT post-processing macros automatically after the run finishes
@@ -77,6 +86,16 @@ namespace Constants {
     const G4bool RUN_PROCESSING_3D = true;  // Calls proc/processing3D.C
     // Vertical uncertainty for the fits, as percent of the neighborhood max
     const G4double PROCESSING_ERROR_PERCENT = 5.0;
+
+    // Outlier removal controls (sigma-clipping) used inside processing2D/processing3D
+    // 2D (row/column fits)
+    const G4bool   PROCESSING_2D_REMOVE_OUTLIERS = true;
+    const G4double PROCESSING_2D_OUTLIER_SIGMA = 4.0;      // threshold to be outlier
+    const G4int    PROCESSING_2D_MIN_POINTS_AFTER_CLIP = 3; // minimum points required for fit
+    // 3D (full 2D fit)
+    const G4bool   PROCESSING_3D_REMOVE_OUTLIERS = true;
+    const G4double PROCESSING_3D_OUTLIER_SIGMA = 4.0;
+    const G4int    PROCESSING_3D_MIN_POINTS_AFTER_CLIP = 5;
 
 } // namespace Constants
 

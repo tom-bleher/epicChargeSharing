@@ -19,6 +19,7 @@
 #include <ctime>
 #include <string>
 #include <filesystem>
+#include "Randomize.hh"
 
 #include "G4UserLimits.hh"
 #include "G4SDManager.hh"
@@ -131,6 +132,22 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     
     const G4double pixelZ = detectorPos.z() + fDetWidth/2 + fPixelWidth/2;
     
+    // Initialize per-pixel gain noise sigmas once (uniform in [min,max])
+    {
+        const G4int n = fNumBlocksPerSide;
+        const G4int total = n * n;
+        fPixelGainSigmas.clear();
+        fPixelGainSigmas.reserve(total);
+        const G4double a = Constants::PIXEL_GAIN_SIGMA_MIN;
+        const G4double b = Constants::PIXEL_GAIN_SIGMA_MAX;
+        for (G4int gi = 0; gi < total; ++gi) {
+            const G4double u = G4UniformRand();
+            const G4double sigma = a + (b - a) * u;
+            fPixelGainSigmas.push_back(sigma);
+        }
+        G4cout << "Initialized per-pixel gain sigmas in [" << a << ", " << b << "] with " << total << " entries" << G4endl;
+    }
+
     for (G4int i = 0; i < fNumBlocksPerSide; i++) {
         for (G4int j = 0; j < fNumBlocksPerSide; j++) {
             G4double pixelX = firstPixelPos + i * fPixelSpacing;
