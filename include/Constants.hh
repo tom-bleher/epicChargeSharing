@@ -89,11 +89,11 @@ namespace Constants {
 
     // Outlier removal controls (sigma-clipping) used inside processing2D/processing3D
     // 2D (row/column fits)
-    const G4bool   PROCESSING_2D_REMOVE_OUTLIERS = true;
+    const G4bool   PROCESSING_2D_REMOVE_OUTLIERS = false;
     const G4double PROCESSING_2D_OUTLIER_SIGMA = 4.0;      // threshold to be outlier
     const G4int    PROCESSING_2D_MIN_POINTS_AFTER_CLIP = 3; // minimum points required for fit
     // 3D (full 2D fit)
-    const G4bool   PROCESSING_3D_REMOVE_OUTLIERS = true;
+    const G4bool   PROCESSING_3D_REMOVE_OUTLIERS = false;
     const G4double PROCESSING_3D_OUTLIER_SIGMA = 4.0;
     const G4int    PROCESSING_3D_MIN_POINTS_AFTER_CLIP = 5;
 
