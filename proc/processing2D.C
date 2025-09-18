@@ -1,7 +1,7 @@
 // ROOT macro: processing2D.C
 // Performs 1D Gaussian fits on central row and column of the charge neighborhood
-// using Q_i (induced charge per pixel) to reconstruct (x_rec_2d, y_rec_2d) and
-// deltas, and appends them as new branches.
+// using Q_f (noisy charge per pixel) to reconstruct (x_rec_2d, y_rec_2d) and
+// deltas, and appends them as new branches. Falls back to Q_i if Q_f is absent.
 
 #include <TFile.h>
 #include <TTree.h>
@@ -57,8 +57,13 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
                  double errorPercentOfMax = 5.0,
                  bool saveParamA = false,
                  bool saveParamMu = false,
-                 bool saveParamSigma = true,
-                 bool saveParamB = false) {
+                 bool saveParamSigma = false,
+                 bool saveParamB = false,
+                 const char* chargeBranch = "Q_f",
+                 bool removeOutliers = true,
+                 double outlierSigma = 4.0,
+                 int minPointsAfterClip = 3,
+                 bool saveOutlierMask = false) {
   // Favor faster least-squares: Minuit2 + Fumili2
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
@@ -133,14 +138,20 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     return NAN;
   };
 
-  auto inferRadiusFromTree = [&](TTree* t) -> int {
-    std::vector<double>* Qi_tmp = nullptr;
-    t->SetBranchAddress("Q_i", &Qi_tmp);
+  auto inferRadiusFromTree = [&](TTree* t, const std::string& preferred) -> int {
+    // Prefer requested branch; fall back to Q_f, F_i, Q_i
+    std::vector<double>* Q_tmp = nullptr;
+    auto bind = [&](const char* b)->bool { if (t->GetBranch(b)) { t->SetBranchStatus(b, 1); t->SetBranchAddress(b, &Q_tmp); return true; } return false; };
+    if (!preferred.empty() && bind(preferred.c_str())) {}
+    else if (bind("Q_f")) {}
+    else if (bind("F_i")) {}
+    else if (bind("Q_i")) {}
+    else return -1;
     Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
     for (Long64_t i=0;i<nToScan;++i) {
       t->GetEntry(i);
-      if (Qi_tmp && !Qi_tmp->empty()) {
-        const size_t total = Qi_tmp->size();
+      if (Q_tmp && !Q_tmp->empty()) {
+        const size_t total = Q_tmp->size();
         const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
         if (N >= 3 && N*N == static_cast<int>(total)) {
           return (N - 1) / 2;
@@ -163,15 +174,31 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     // Fallback: if pixel size metadata is missing, use half of pitch as a conservative lower bound
     pixelSize = 0.5 * pixelSpacing;
   }
+  
+  // Decide which charge branch to use
+  std::string chosenCharge = (chargeBranch && chargeBranch[0] != '\0') ? std::string(chargeBranch) : std::string("Q_f");
+  auto hasBranch = [&](const char* b){ return tree->GetBranch(b) != nullptr; };
+  if (!hasBranch(chosenCharge.c_str())) {
+    if (hasBranch("Q_f")) chosenCharge = "Q_f";
+    else if (hasBranch("F_i")) chosenCharge = "F_i";
+    else if (hasBranch("Q_i")) chosenCharge = "Q_i";
+    else {
+      ::Error("processing2D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
+      file->Close();
+      delete file;
+      return 4;
+    }
+  }
   if (neighborhoodRadiusMeta <= 0) {
-    neighborhoodRadiusMeta = inferRadiusFromTree(tree);
+    neighborhoodRadiusMeta = inferRadiusFromTree(tree, chosenCharge);
   }
 
   // Existing branches (inputs)
   double x_hit = 0.0, y_hit = 0.0;
   double x_px  = 0.0, y_px  = 0.0;
   Bool_t is_pixel_hit = kFALSE;
-  std::vector<double>* Qi = nullptr; // used for fits (charges in Coulombs)
+  // Use Q_f (noisy) for fits; fall back to Q_i if Q_f absent
+  std::vector<double>* Q = nullptr; // used for fits (charges in Coulombs)
 
   // Speed up I/O: deactivate all branches, then enable only what we read
   tree->SetBranchStatus("*", 0);
@@ -180,14 +207,15 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchStatus("PixelX", 1);
   tree->SetBranchStatus("PixelY", 1);
   tree->SetBranchStatus("isPixelHit", 1);
-  tree->SetBranchStatus("Q_i", 1);
+  // Enable only the chosen charge branch
+  tree->SetBranchStatus(chosenCharge.c_str(), 1);
 
   tree->SetBranchAddress("TrueX", &x_hit);
   tree->SetBranchAddress("TrueY", &y_hit);
   tree->SetBranchAddress("PixelX", &x_px);
   tree->SetBranchAddress("PixelY", &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
-  tree->SetBranchAddress("Q_i", &Qi);
+  tree->SetBranchAddress(chosenCharge.c_str(), &Q);
 
   // New branches (outputs).
   // Use NaN sentinel so invalid/unfitted entries are ignored in ROOT histograms.
@@ -257,9 +285,31 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     br_col_B     = ensureAndResetBranch("GaussColB", &gauss2d_col_b);
   }
 
-  // Fitting function for 1D gaussian + const
-  TF1 fRow("fRow", GaussPlusB, -1e9, 1e9, 4);
-  TF1 fCol("fCol", GaussPlusB, -1e9, 1e9, 4);
+  // Optional branches for sigma-clipping removal masks (0 = kept, 1 = removed)
+  TBranch* br_row_mask = nullptr;
+  TBranch* br_col_mask = nullptr;
+  std::vector<int> row_mask;
+  std::vector<int> col_mask;
+  auto ensureAndResetVectorIntBranch = [&](const char* name, std::vector<int>* addr) -> TBranch* {
+    TBranch* br = tree->GetBranch(name);
+    if (!br) {
+      br = tree->Branch(name, addr);
+    } else {
+      tree->SetBranchAddress(name, addr);
+      br = tree->GetBranch(name);
+      if (br) {
+        br->Reset();
+        br->DropBaskets();
+      }
+    }
+    return br;
+  };
+  if (saveOutlierMask) {
+    br_row_mask = ensureAndResetVectorIntBranch("GaussRowMaskRemoved", &row_mask);
+    br_col_mask = ensureAndResetVectorIntBranch("GaussColMaskRemoved", &col_mask);
+  }
+
+  // Fitting function for 1D gaussian + const (locals created per-fit below)
 
   const Long64_t nEntries = tree->GetEntries();
   Long64_t nProcessed = 0;
@@ -269,7 +319,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double> v_x_hit(nEntries), v_y_hit(nEntries);
   std::vector<double> v_x_px(nEntries), v_y_px(nEntries);
   std::vector<char> v_is_pixel(nEntries);
-  std::vector<std::vector<double>> v_Qi(nEntries);
+  std::vector<std::vector<double>> v_Q(nEntries);
   for (Long64_t i = 0; i < nEntries; ++i) {
     tree->GetEntry(i);
     v_x_hit[i] = x_hit;
@@ -277,7 +327,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     v_x_px[i]  = x_px;
     v_y_px[i]  = y_px;
     v_is_pixel[i] = is_pixel_hit ? 1 : 0;
-    if (Qi && !Qi->empty()) v_Qi[i] = *Qi; else v_Qi[i].clear();
+    if (Q && !Q->empty()) v_Q[i] = *Q; else v_Q[i].clear();
   }
 
   // Prepare output buffers
@@ -296,21 +346,35 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double> out_col_mu(nEntries, INVALID_VALUE);
   std::vector<double> out_col_sigma(nEntries, INVALID_VALUE);
   std::vector<double> out_col_B(nEntries, INVALID_VALUE);
+  // Output buffers for removal masks
+  std::vector<std::vector<int>> out_row_mask(nEntries);
+  std::vector<std::vector<int>> out_col_mask(nEntries);
 
   // Parallel computation over entries
   std::vector<int> indices(nEntries);
   std::iota(indices.begin(), indices.end(), 0);
   ROOT::TThreadExecutor exec; // uses ROOT IMT pool size by default
+  // Suppress expected Minuit2 error spam during Fumili2 attempts; we'll fallback to MIGRAD if needed
+  const int prevErrorLevel_processing2D = gErrorIgnoreLevel;
+  gErrorIgnoreLevel = kFatal;
   exec.Foreach([&](int i){
     const bool isPix = v_is_pixel[i] != 0;
-    const auto &QiLoc = v_Qi[i];
-    if (isPix || QiLoc.empty()) {
+    const auto &QLoc = v_Q[i];
+    if (isPix || QLoc.empty()) {
+      if (saveOutlierMask) {
+        out_row_mask[i].clear();
+        out_col_mask[i].clear();
+      }
       return;
     }
 
-    const size_t total = QiLoc.size();
+    const size_t total = QLoc.size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
     if (N * N != static_cast<int>(total) || N < 3) {
+      if (saveOutlierMask) {
+        out_row_mask[i].clear();
+        out_col_mask[i].clear();
+      }
       return;
     }
     const int R = (N - 1) / 2;
@@ -325,7 +389,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     for (int di = -R; di <= R; ++di) {
       for (int dj = -R; dj <= R; ++dj) {
         const int idx  = (di + R) * N + (dj + R);
-        const double q = QiLoc[idx];
+        const double q = QLoc[idx];
         if (!IsFinite(q) || q < 0) continue;
         if (q > qmaxNeighborhood) qmaxNeighborhood = q;
         if (dj == 0) {
@@ -341,6 +405,10 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
       }
     }
     if (x_row.size() < 3 || y_col.size() < 3) {
+      if (saveOutlierMask) {
+        out_row_mask[i] = std::vector<int>(x_row.size(), 0);
+        out_col_mask[i] = std::vector<int>(y_col.size(), 0);
+      }
       return;
     }
 
@@ -351,10 +419,10 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
 
     auto minmaxRow = std::minmax_element(q_row.begin(), q_row.end());
     auto minmaxCol = std::minmax_element(q_col.begin(), q_col.end());
-    const double A0_row = std::max(1e-18, *minmaxRow.second - *minmaxRow.first);
-    const double B0_row = std::max(0.0, *minmaxRow.first);
-    const double A0_col = std::max(1e-18, *minmaxCol.second - *minmaxCol.first);
-    const double B0_col = std::max(0.0, *minmaxCol.first);
+    double A0_row = std::max(1e-18, *minmaxRow.second - *minmaxRow.first);
+    double B0_row = std::max(0.0, *minmaxRow.first);
+    double A0_col = std::max(1e-18, *minmaxCol.second - *minmaxCol.first);
+    double B0_col = std::max(0.0, *minmaxCol.first);
 
     // Low-contrast: fast centroid (relative to neighborhood max charge)
     const double contrastEps = (qmaxNeighborhood > 0.0) ? (1e-3 * qmaxNeighborhood) : 0.0;
@@ -373,6 +441,10 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
         out_dx_s[i] = (v_x_hit[i] - xr);
         out_dy_s[i] = (v_y_hit[i] - yr);
         nFitted.fetch_add(1, std::memory_order_relaxed);
+        if (saveOutlierMask) {
+          out_row_mask[i] = std::vector<int>(x_row.size(), 0);
+          out_col_mask[i] = std::vector<int>(y_col.size(), 0);
+        }
       }
       return;
     }
@@ -383,12 +455,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     double mu0_row = x_row[idxMaxRow];
     double mu0_col = y_col[idxMaxCol];
 
-    const std::vector<double>& x_row_fit = x_row;
-    const std::vector<double>& q_row_fit = q_row;
-    const std::vector<double>& y_col_fit = y_col;
-    const std::vector<double>& q_col_fit = q_col;
-
-    // Constrain sigma to be within [1 * pitch, R * pitch]
+    // Constrain sigma to be within [pixel size, radius * pitch]
     const double sigLoBound = pixelSize;
     const double sigHiBound = std::max(sigLoBound, static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
     auto sigmaSeed1D = [&](const std::vector<double>& xs, const std::vector<double>& qs, double B0)->double {
@@ -409,8 +476,91 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
       if (s > sigHiBound) s = sigHiBound;
       return s;
     };
-    const double sigInitRow = sigmaSeed1D(x_row, q_row, B0_row);
-    const double sigInitCol = sigmaSeed1D(y_col, q_col, B0_col);
+    double sigInitRow = sigmaSeed1D(x_row, q_row, B0_row);
+    double sigInitCol = sigmaSeed1D(y_col, q_col, B0_col);
+
+    std::vector<double> x_row_fit = x_row;
+    std::vector<double> q_row_fit = q_row;
+    std::vector<double> y_col_fit = y_col;
+    std::vector<double> q_col_fit = q_col;
+    std::vector<int> maskRow, maskCol;
+
+    // Optional sigma-clipping outlier removal using seeded model
+    auto medianVal = [&](std::vector<double> v)->double {
+      if (v.empty()) return 0.0;
+      size_t m = v.size()/2;
+      std::nth_element(v.begin(), v.begin()+m, v.end());
+      double med = v[m];
+      if ((v.size() & 1U) == 0) {
+        auto max_it = std::max_element(v.begin(), v.begin()+m);
+        med = 0.5 * (med + *max_it);
+      }
+      return med;
+    };
+    auto madSigma = [&](const std::vector<double>& r)->double {
+      if (r.empty()) return 0.0;
+      std::vector<double> rcopy = r;
+      double med = medianVal(rcopy);
+      std::vector<double> dev; dev.reserve(r.size());
+      for (double v : r) dev.push_back(std::abs(v - med));
+      double mad = medianVal(dev);
+      return 1.4826 * mad;
+    };
+    auto clip1D = [&](std::vector<double>& xs, std::vector<double>& qs,
+                      double A0, double mu0, double sig0, double B0,
+                      std::vector<int>* removedMask) {
+      if (removedMask) removedMask->assign(xs.size(), 0);
+      if (!removeOutliers || xs.size() < 3 || qs.size() != xs.size()) return;
+      if (!(outlierSigma > 0.0) || minPointsAfterClip <= 0) return;
+      std::vector<double> resid; resid.reserve(qs.size());
+      for (size_t k=0;k<xs.size();++k) {
+        const double dx = (xs[k] - mu0) / sig0;
+        const double model = A0 * std::exp(-0.5 * dx * dx) + B0;
+        resid.push_back(qs[k] - model);
+      }
+      const double sigR = madSigma(resid);
+      if (!(sigR > 0.0)) return;
+      const double thr = outlierSigma * sigR;
+      std::vector<double> xs_new; xs_new.reserve(xs.size());
+      std::vector<double> qs_new; qs_new.reserve(qs.size());
+      const double rmed = medianVal(resid);
+      for (size_t k=0;k<xs.size();++k) {
+        const double r = resid[k] - rmed;
+        if (std::abs(r) <= thr) { xs_new.push_back(xs[k]); qs_new.push_back(qs[k]); }
+        else if (removedMask) { (*removedMask)[k] = 1; }
+      }
+      if (static_cast<int>(xs_new.size()) >= std::max(minPointsAfterClip, 3)) {
+        xs.swap(xs_new);
+        qs.swap(qs_new);
+      } else {
+        // Not enough points after clipping; revert mask to all-kept
+        if (removedMask) removedMask->assign(removedMask->size(), 0);
+      }
+    };
+
+    // Clip row and column independently using seeded parameters
+    clip1D(x_row_fit, q_row_fit, A0_row, mu0_row, sigInitRow, B0_row, saveOutlierMask ? &maskRow : nullptr);
+    clip1D(y_col_fit, q_col_fit, A0_col, mu0_col, sigInitCol, B0_col, saveOutlierMask ? &maskCol : nullptr);
+    // Recompute seeds after clipping
+    if (x_row_fit.size() >= 3) {
+      auto minmaxRow2 = std::minmax_element(q_row_fit.begin(), q_row_fit.end());
+      A0_row = std::max(1e-18, *minmaxRow2.second - *minmaxRow2.first);
+      B0_row = std::max(0.0, *minmaxRow2.first);
+      int idxMaxRow2 = std::distance(q_row_fit.begin(), std::max_element(q_row_fit.begin(), q_row_fit.end()));
+      mu0_row = x_row_fit[idxMaxRow2];
+      sigInitRow = sigmaSeed1D(x_row_fit, q_row_fit, B0_row);
+    }
+    if (y_col_fit.size() >= 3) {
+      auto minmaxCol2 = std::minmax_element(q_col_fit.begin(), q_col_fit.end());
+      A0_col = std::max(1e-18, *minmaxCol2.second - *minmaxCol2.first);
+      B0_col = std::max(0.0, *minmaxCol2.first);
+      int idxMaxCol2 = std::distance(q_col_fit.begin(), std::max_element(q_col_fit.begin(), q_col_fit.end()));
+      mu0_col = y_col_fit[idxMaxCol2];
+      sigInitCol = sigmaSeed1D(y_col_fit, q_col_fit, B0_col);
+    }
+
+    // sigInitRow/sigInitCol were computed above on unfiltered data. They are possibly
+    // updated after clipping in the block above.
 
     TF1 fRowLoc("fRowLoc", GaussPlusB, -1e9, 1e9, 4);
     TF1 fColLoc("fColLoc", GaussPlusB, -1e9, 1e9, 4);
@@ -500,6 +650,21 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
 
     bool okRowFit = fitRow.Fit(dataRow);
     bool okColFit = fitCol.Fit(dataCol);
+    // If Fumili2 fails, retry once with MIGRAD which is more robust
+    if (!okRowFit) {
+      fitRow.Config().SetMinimizer("Minuit2", "Migrad");
+      fitRow.Config().MinimizerOptions().SetStrategy(1);
+      fitRow.Config().MinimizerOptions().SetTolerance(1e-3);
+      fitRow.Config().MinimizerOptions().SetPrintLevel(0);
+      okRowFit = fitRow.Fit(dataRow);
+    }
+    if (!okColFit) {
+      fitCol.Config().SetMinimizer("Minuit2", "Migrad");
+      fitCol.Config().MinimizerOptions().SetStrategy(1);
+      fitCol.Config().MinimizerOptions().SetTolerance(1e-3);
+      fitCol.Config().MinimizerOptions().SetPrintLevel(0);
+      okColFit = fitCol.Fit(dataCol);
+    }
     // Save parameters only if the corresponding fit converged
     if (okRowFit) {
       out_row_A[i]     = fitRow.Result().Parameter(0);
@@ -537,7 +702,16 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
       out_dy_s[i] = (v_y_hit[i] - muY);
       nFitted.fetch_add(1, std::memory_order_relaxed);
     }
+    if (saveOutlierMask) {
+      // If masks were never initialized (e.g. no clipping), default to all-kept
+      if (maskRow.empty()) maskRow = std::vector<int>(x_row.size(), 0);
+      if (maskCol.empty()) maskCol = std::vector<int>(y_col.size(), 0);
+      out_row_mask[i] = std::move(maskRow);
+      out_col_mask[i] = std::move(maskCol);
+    }
   }, indices);
+  // Restore previous error level
+  gErrorIgnoreLevel = prevErrorLevel_processing2D;
 
   // Sequentially write outputs to the tree (thread-safe)
   for (Long64_t i = 0; i < nEntries; ++i) {
@@ -558,9 +732,6 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     gauss2d_col_b = out_col_B[i];
     br_x_rec->Fill();
     br_y_rec->Fill();
-    // Commented out per request: do not save absolute-value delta branches
-    // br_dx->Fill();
-    // br_dy->Fill();
     br_dx_signed->Fill();
     br_dy_signed->Fill();
     if (br_row_A) br_row_A->Fill();
@@ -571,6 +742,12 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     if (br_col_mu) br_col_mu->Fill();
     if (br_col_sigma) br_col_sigma->Fill();
     if (br_col_B) br_col_B->Fill();
+    if (saveOutlierMask) {
+      row_mask = out_row_mask[i];
+      col_mask = out_col_mask[i];
+      if (br_row_mask) br_row_mask->Fill();
+      if (br_col_mask) br_col_mask->Fill();
+    }
     nProcessed++;
   }
 
