@@ -140,8 +140,8 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         self.event_spin.setMinimum(0)
         self.event_spin.setMaximum(0)
         self.event_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
-        self.prev_btn = QtWidgets.QPushButton("◀ Prev")
-        self.next_btn = QtWidgets.QPushButton("Next ▶")
+        self.prev_btn = QtWidgets.QPushButton("◀")
+        self.next_btn = QtWidgets.QPushButton("▶")
         ctrl.addWidget(self.event_spin)
         ctrl.addWidget(self.prev_btn)
         ctrl.addWidget(self.next_btn)
@@ -239,6 +239,12 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(self, "Metadata", f"Failed to read grid metadata:\n{e}")
             self._meta = {}
             return
+
+        # Optional metadata: neighborhood radius (fallback to 2 if absent)
+        try:
+            self._meta["neighborhood_radius"] = read_named_int(self._root, "NeighborhoodRadius")
+        except Exception:
+            self._meta["neighborhood_radius"] = 2
 
         try:
             self._tree = self._root["Hits"]
@@ -552,12 +558,17 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 grid[dj, di] = values[idx]
 
         c = dim // 2
-        i0, i1 = c - 2, c + 2
-        j0, j1 = c - 2, c + 2
+        try:
+            r_meta = int(self._meta.get("neighborhood_radius", 2))
+        except Exception:
+            r_meta = 2
+        roi_r = max(1, min(c, r_meta))
+        i0, i1 = c - roi_r, c + roi_r
+        j0, j1 = c - roi_r, c + roi_r
 
         pixel_spacing = float(self._meta.get("pixel_spacing", 0.0))
         pixel_size = float(self._meta.get("pixel_size", 0.0))
-        half_extent = 2.5 * pixel_spacing
+        half_extent = (roi_r + 0.5) * pixel_spacing
 
         # q_total from edep
         e_charge = 1.602176634e-19
@@ -758,7 +769,12 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         cmap_name = self.cmap_combo.currentData()
         pixel_spacing = float(self._meta.get("pixel_spacing", 0.0))
         pixel_size = float(self._meta.get("pixel_size", 0.0))
-        half_pad = 2.5 * pixel_spacing
+        try:
+            r_meta = int(self._meta.get("neighborhood_radius", 2))
+        except Exception:
+            r_meta = 2
+        roi_r = max(1, r_meta)
+        half_pad = (roi_r + 0.5) * pixel_spacing
 
         with PdfPages(out_path) as pdf:
             for page in range(n_pages):
@@ -878,8 +894,13 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                         idx = di * dim + dj
                         grid[dj, di] = values[idx]
                 c = dim // 2
-                i0, i1 = c - 2, c + 2
-                j0, j1 = c - 2, c + 2
+                try:
+                    r_meta = int(self._meta.get("neighborhood_radius", 2))
+                except Exception:
+                    r_meta = 2
+                roi_r = max(1, min(c, r_meta))
+                i0, i1 = c - roi_r, c + roi_r
+                j0, j1 = c - roi_r, c + roi_r
 
                 # q_total
                 e_charge = 1.602176634e-19
