@@ -83,7 +83,17 @@ namespace Constants {
     // ========================
     // Control whether to run ROOT post-processing macros automatically after the run finishes
     const G4bool RUN_PROCESSING_2D = true;   // Calls proc/processing2D.C
-    const G4bool RUN_PROCESSING_3D = true;  // Calls proc/processing3D.C
+    const G4bool RUN_PROCESSING_3D = false;  // Calls proc/processing3D.C
+
+    // Enable fitting along diagonals in 2D post-processing (main and secondary)
+    const G4bool PROCESSING_2D_FIT_DIAGONALS = true;
+
+    // Control saving of diagonal Gaussian parameters (A, mu, sigma, B)
+    const G4bool PROCESSING_2D_SAVE_DIAG_A = true;
+    const G4bool PROCESSING_2D_SAVE_DIAG_MU = true;
+    const G4bool PROCESSING_2D_SAVE_DIAG_SIGMA = true;
+    const G4bool PROCESSING_2D_SAVE_DIAG_B = true;
+
     // Vertical uncertainty for the fits, as percent of the neighborhood max
     const G4double PROCESSING_ERROR_PERCENT = 5.0;
 
