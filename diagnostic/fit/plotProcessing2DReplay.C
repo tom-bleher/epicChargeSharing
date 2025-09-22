@@ -31,6 +31,7 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <utility>
 
 namespace {
   // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
@@ -52,9 +53,10 @@ namespace {
 // GaussRow/Col{A,Mu,Sigma,B} parameters and GaussRow/ColMaskRemoved masks.
 // This mirrors the layout and styling of plotProcessing2D.C, but does no fitting.
 // It draws the saved model curves and highlights removed points.
-int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root",
+int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChargeSharing/clean/475um.root",
                         double errorPercentOfMax = 5.0,
-                        Long64_t nRandomEvents = 100) {
+                        Long64_t nRandomEvents = 100,
+                        bool plotQiOverlay = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
@@ -165,6 +167,7 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
   double x_px  = 0.0, y_px  = 0.0;
   Bool_t is_pixel_true = kFALSE;
   std::vector<double>* Q = nullptr;
+  std::vector<double>* QiVec = nullptr; // Optional overlay source
   // Saved fit parameters
   double rowA = NAN, rowMu = NAN, rowSig = NAN, rowB = NAN;
   double colA = NAN, colMu = NAN, colSig = NAN, colB = NAN;
@@ -178,6 +181,10 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
   tree->SetBranchAddress("PixelY",  &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
+  const bool haveQiBranch = (tree->GetBranch("Q_i") != nullptr);
+  if (haveQiBranch) {
+    tree->SetBranchAddress("Q_i", &QiVec);
+  }
 
   bool haveRowA = tree->GetBranch("GaussRowA") != nullptr;
   bool haveRowMu = tree->GetBranch("GaussRowMu") != nullptr;
@@ -243,8 +250,10 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     // Build full row/column samples from raw charges
     std::vector<double> x_row, q_row;
     std::vector<double> y_col, q_col;
+    std::vector<int> rowIdx, colIdx; // indices into flattened NxN neighborhood
     x_row.reserve(N); q_row.reserve(N);
     y_col.reserve(N); q_col.reserve(N);
+    rowIdx.reserve(N); colIdx.reserve(N);
     double qmaxNeighborhood = -1e300;
     for (int di = -R; di <= R; ++di) {
       for (int dj = -R; dj <= R; ++dj) {
@@ -256,11 +265,13 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
           const double x = x_px + di * pixelSpacing;
           x_row.push_back(x);
           q_row.push_back(q);
+          rowIdx.push_back(idx);
         }
         if (di == 0) {
           const double y = y_px + dj * pixelSpacing;
           y_col.push_back(y);
           q_col.push_back(q);
+          colIdx.push_back(idx);
         }
       }
     }
@@ -282,13 +293,14 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
 
     // Reconstruct the filtered sets used for fitting (kept points only)
     std::vector<double> x_row_fit, q_row_fit, y_col_fit, q_col_fit;
+    std::vector<int> rowIdx_fit, colIdx_fit;
     x_row_fit.reserve(x_row.size()); q_row_fit.reserve(q_row.size());
     y_col_fit.reserve(y_col.size()); q_col_fit.reserve(q_col.size());
-    for (size_t k=0;k<x_row.size();++k) if (rowKeptMask[k]) { x_row_fit.push_back(x_row[k]); q_row_fit.push_back(q_row[k]); }
-    for (size_t k=0;k<y_col.size();++k) if (colKeptMask[k]) { y_col_fit.push_back(y_col[k]); q_col_fit.push_back(q_col[k]); }
+    for (size_t k=0;k<x_row.size();++k) if (rowKeptMask[k]) { x_row_fit.push_back(x_row[k]); q_row_fit.push_back(q_row[k]); rowIdx_fit.push_back(rowIdx[k]); }
+    for (size_t k=0;k<y_col.size();++k) if (colKeptMask[k]) { y_col_fit.push_back(y_col[k]); q_col_fit.push_back(q_col[k]); colIdx_fit.push_back(colIdx[k]); }
     // Hard minimum for replay as well
-    if ((int)x_row_fit.size() < 3) { x_row_fit = x_row; q_row_fit = q_row; }
-    if ((int)y_col_fit.size() < 3) { y_col_fit = y_col; q_col_fit = q_col; }
+    if ((int)x_row_fit.size() < 3) { x_row_fit = x_row; q_row_fit = q_row; rowIdx_fit = rowIdx; }
+    if ((int)y_col_fit.size() < 3) { y_col_fit = y_col; q_col_fit = q_col; colIdx_fit = colIdx; }
 
     // Must have mus to draw recon lines. Prefer saved parameters when present.
     bool haveMuRow = haveRowMu && IsFinite(rowMu);
@@ -429,6 +441,42 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
         }
       }
     }
+    // Optional overlay of Q_i points (kept subset)
+    bool drewColQi = false;
+    TGraph gColQi;
+    const bool canOverlayQi = plotQiOverlay && haveQiBranch && (chosenCharge != "Q_i");
+    if (canOverlayQi && QiVec) {
+      std::vector<double> y_col_qi; y_col_qi.reserve(y_col_fit.size());
+      for (size_t k = 0; k < colIdx_fit.size(); ++k) {
+        const int idxQi = colIdx_fit[k];
+        if (idxQi >= 0 && idxQi < static_cast<int>(QiVec->size())) {
+          const double qqi = (*QiVec)[idxQi];
+          if (IsFinite(qqi) && qqi >= 0.0) {
+            y_col_qi.push_back(qqi);
+          } else {
+            y_col_qi.push_back(NAN);
+          }
+        } else {
+          y_col_qi.push_back(NAN);
+        }
+      }
+      // Build graph skipping NaNs
+      std::vector<std::pair<double,double>> colPoints;
+      colPoints.reserve(y_col_qi.size());
+      for (size_t k = 0; k < y_col_qi.size(); ++k) {
+        if (IsFinite(y_col_qi[k])) colPoints.emplace_back(y_col_fit[k], y_col_qi[k]);
+      }
+      if (!colPoints.empty()) {
+        gColQi = TGraph(static_cast<int>(colPoints.size()));
+        for (int k = 0; k < gColQi.GetN(); ++k) gColQi.SetPoint(k, colPoints[k].first, colPoints[k].second);
+        gColQi.SetMarkerStyle(24);
+        gColQi.SetMarkerSize(1.1);
+        gColQi.SetMarkerColor(kGreen+2);
+        gColQi.SetLineColor(kGreen+2);
+        gColQi.Draw("P SAME");
+        drewColQi = true;
+      }
+    }
     TLine lineYtrue(y_true, yPadMinC, y_true, yPadMaxC);
     lineYtrue.SetLineStyle(2);
     lineYtrue.SetLineWidth(2);
@@ -453,6 +501,7 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     legCLeft.SetTextSize(0.03);
     legCLeft.AddEntry(&lineYtrue, "y_{true}", "l");
     legCLeft.AddEntry(&lineYrec,  "y_{rec}",  "l");
+    if (drewColQi) legCLeft.AddEntry(&gColQi, "Q_{i} points", "p");
     legCLeft.Draw();
     double rx2c = fx2c - insetc, rx1c = rx2c - legWc;
     TLegend legCRight(rx1c, ly1c, rx2c, ly2c, "", "NDC");
@@ -522,6 +571,40 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
         }
       }
     }
+    // Optional overlay of Q_i points (kept subset)
+    bool drewRowQi = false;
+    TGraph gRowQi;
+    if (canOverlayQi && QiVec) {
+      std::vector<double> x_row_qi; x_row_qi.reserve(x_row_fit.size());
+      for (size_t k = 0; k < rowIdx_fit.size(); ++k) {
+        const int idxQi = rowIdx_fit[k];
+        if (idxQi >= 0 && idxQi < static_cast<int>(QiVec->size())) {
+          const double qqi = (*QiVec)[idxQi];
+          if (IsFinite(qqi) && qqi >= 0.0) {
+            x_row_qi.push_back(qqi);
+          } else {
+            x_row_qi.push_back(NAN);
+          }
+        } else {
+          x_row_qi.push_back(NAN);
+        }
+      }
+      std::vector<std::pair<double,double>> rowPoints;
+      rowPoints.reserve(x_row_qi.size());
+      for (size_t k = 0; k < x_row_qi.size(); ++k) {
+        if (IsFinite(x_row_qi[k])) rowPoints.emplace_back(x_row_fit[k], x_row_qi[k]);
+      }
+      if (!rowPoints.empty()) {
+        gRowQi = TGraph(static_cast<int>(rowPoints.size()));
+        for (int k = 0; k < gRowQi.GetN(); ++k) gRowQi.SetPoint(k, rowPoints[k].first, rowPoints[k].second);
+        gRowQi.SetMarkerStyle(24);
+        gRowQi.SetMarkerSize(1.1);
+        gRowQi.SetMarkerColor(kGreen+2);
+        gRowQi.SetLineColor(kGreen+2);
+        gRowQi.Draw("P SAME");
+        drewRowQi = true;
+      }
+    }
     TLine lineXtrue(x_true, yPadMin, x_true, yPadMax);
     lineXtrue.SetLineStyle(2);
     lineXtrue.SetLineWidth(2);
@@ -546,6 +629,7 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     legLeft.SetTextSize(0.03);
     legLeft.AddEntry(&lineXtrue, "x_{true}", "l");
     legLeft.AddEntry(&lineXrec,  "x_{rec}",  "l");
+    if (drewRowQi) legLeft.AddEntry(&gRowQi, "Q_{i} points", "p");
     legLeft.Draw();
     double rx2 = fx2 - inset, rx1 = rx2 - legW;
     TLegend legRight(rx1, ly1, rx2, ly2, "", "NDC");
@@ -590,6 +674,10 @@ int plotProcessing2DReplay(Long64_t nRandomEvents) {
 
 int plotProcessing2DReplay(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents) {
   return processing2D_replay(filename, errorPercentOfMax, nRandomEvents);
+}
+
+int plotProcessing2DReplay(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool plotQiOverlay) {
+  return processing2D_replay(filename, errorPercentOfMax, nRandomEvents, plotQiOverlay);
 }
 
 
