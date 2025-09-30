@@ -3,7 +3,6 @@ import os
 import re
 import sys
 import time
-import csv
 import shutil
 import subprocess
 from pathlib import Path
@@ -14,25 +13,19 @@ SRC_FILE = REPO_ROOT / "src" / "PrimaryGenerator.cc"
 BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"
 RUN_MAC = (BUILD_DIR / "run.mac") if (BUILD_DIR / "run.mac").exists() else (REPO_ROOT / "macros" / "run.mac")
-CSV_OUT = REPO_ROOT / "sweep_results.csv"
 
 # Positions to sweep (micrometers)
 # First group: [+-25, +-50, ..., +-175]
 GROUP1 = [25, 50, 75, 100, 125, 150, 175]
 # Second group: [+-325, +-350, ..., +-475]
-GROUP2 = [325, 350, 375, 400, 425, 450, 475]
+GROUP2 = []#[325, 350, 375, 400, 425, 450, 475]
 POSITIONS = []
 for p in GROUP1:
     POSITIONS.extend([p, -p])
 for p in GROUP2:
     POSITIONS.extend([p, -p])
 
-# Branches to read means from
-BRANCHES = [
-    "ReconTrueDeltaX",
-    "MDiagReconTrueDeltaX",
-    "SDiagReconTrueDeltaX",
-]
+ 
 
 # Regex pattern to locate the x position line in PrimaryGenerator.cc
 # We expect a line like:     const G4double x = -25.0*um;
@@ -140,38 +133,6 @@ def rename_output_to(target_name: Path):
     shutil.move(str(source), str(target_name))
 
 
-def compute_means_with_uproot(root_path: Path):
-    import numpy as np
-    import uproot
-
-    means = {}
-    with uproot.open(root_path) as f:
-        if "Hits" not in f:
-            raise RuntimeError(f"Tree 'Hits' not found in {root_path}")
-        tree = f["Hits"]
-        arrays = tree.arrays(BRANCHES, library="np", how=dict)
-        for br in BRANCHES:
-            if br not in arrays:
-                raise RuntimeError(f"Branch '{br}' not found in {root_path}")
-            data = arrays[br]
-            try:
-                import numpy as np  # ensure present in this scope
-                arr = np.asarray(data)
-            except Exception:
-                arr = data
-            means[br] = float(arr.mean()) if arr.size else float("nan")
-    return means
-
-
-def append_csv_row(csv_path: Path, x_um: float, means: dict):
-    file_exists = csv_path.exists()
-    with open(csv_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(["x_um"] + BRANCHES)
-        writer.writerow([x_um] + [means.get(br, "") for br in BRANCHES])
-
-
 def main():
     os.chdir(str(REPO_ROOT))
 
@@ -197,10 +158,6 @@ def main():
 
             # Rename/move output (merged file)
             rename_output_to(out_name)
-
-            # Read means and write CSV
-            means = compute_means_with_uproot(out_name)
-            append_csv_row(CSV_OUT, x_um, means)
 
     finally:
         # Restore original source
