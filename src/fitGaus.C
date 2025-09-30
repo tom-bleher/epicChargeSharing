@@ -60,16 +60,12 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveParamSigma = true,
                  bool saveParamB = true,
                  const char* chargeBranch = "Q_f",
-                 bool removeOutliers = false,
-                 double outlierSigma = 4.0,
-                 int minPointsAfterClip = 3,
-                 bool saveOutlierMask = false,
                  bool fitDiagonals = true,
                  bool saveDiagParamA = true,
                  bool saveDiagParamMu = true,
                  bool saveDiagParamSigma = true,
-                 bool saveDiagParamB = true) {
-  // Favor faster least-squares: Minuit2 + Fumili2
+                 bool saveDiagParamB = true,
+                 bool saveLineMeans = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
@@ -225,34 +221,38 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   // New branches (outputs).
   // Use NaN sentinel so invalid/unfitted entries are ignored in ROOT histograms.
   const double INVALID_VALUE = std::numeric_limits<double>::quiet_NaN();
-  double x_rec_2d = INVALID_VALUE;
-  double y_rec_2d = INVALID_VALUE;
-  double rec_hit_delta_x_2d = INVALID_VALUE;
-  double rec_hit_delta_y_2d = INVALID_VALUE;
-  double rec_hit_delta_x_2d_signed = INVALID_VALUE;
-  double rec_hit_delta_y_2d_signed = INVALID_VALUE;
+  double ReconTrueRowX = INVALID_VALUE;
+  double ReconTrueColY = INVALID_VALUE;
+  double ReconTrueDeltaRowX = INVALID_VALUE;
+  double ReconTrueDeltaColY = INVALID_VALUE;
+
   // 1D Gaussian fit parameters (row=x, col=y)
-  double gauss2d_row_a = INVALID_VALUE;
-  double gauss2d_row_mu = INVALID_VALUE;
-  double gauss2d_row_sigma = INVALID_VALUE;
-  double gauss2d_row_b = INVALID_VALUE;
-  double gauss2d_col_a = INVALID_VALUE;
-  double gauss2d_col_mu = INVALID_VALUE;
-  double gauss2d_col_sigma = INVALID_VALUE;
-  double gauss2d_col_b = INVALID_VALUE;
+  double GaussRowA = INVALID_VALUE;
+  double GaussRowMu = INVALID_VALUE;
+  double GaussRowSigma = INVALID_VALUE;
+  double GaussRowB = INVALID_VALUE;
+  double GaussColA = INVALID_VALUE;
+  double GaussColMu = INVALID_VALUE;
+  double GaussColSigma = INVALID_VALUE;
+  double GaussColB = INVALID_VALUE;
 
   // Optional diagonal reconstructions and parameters
-  double x_rec_diag_main = INVALID_VALUE;   // main diagonal (dj = di)
-  double y_rec_diag_main = INVALID_VALUE;
-  double x_rec_diag_sec  = INVALID_VALUE;   // secondary diagonal (dj = -di)
-  double y_rec_diag_sec  = INVALID_VALUE;
-  double gaussD1_a = INVALID_VALUE, gaussD1_mu = INVALID_VALUE, gaussD1_sigma = INVALID_VALUE, gaussD1_b = INVALID_VALUE;
-  double gaussD2_a = INVALID_VALUE, gaussD2_mu = INVALID_VALUE, gaussD2_sigma = INVALID_VALUE, gaussD2_b = INVALID_VALUE;
+  double ReconMDiagX = INVALID_VALUE;   // main diagonal (dj = di)
+  double ReconMDiagY = INVALID_VALUE;
+  double ReconSDiagX  = INVALID_VALUE;   // secondary diagonal (dj = -di)
+  double ReconSDiagY  = INVALID_VALUE;
+  double GaussMDiagA = INVALID_VALUE, GaussMDiagMu = INVALID_VALUE, GaussMDiagSigma = INVALID_VALUE, GaussMDiagB = INVALID_VALUE;
+  double GaussSDiagA = INVALID_VALUE, GaussSDiagMu = INVALID_VALUE, GaussSDiagSigma = INVALID_VALUE, GaussSDiagB = INVALID_VALUE;
   // Signed deltas for diagonals
-  double mdiag_dx_signed = INVALID_VALUE;
-  double mdiag_dy_signed = INVALID_VALUE;
-  double sdiag_dx_signed = INVALID_VALUE;
-  double sdiag_dy_signed = INVALID_VALUE;
+  double ReconTrueDeltaMDiagX = INVALID_VALUE;
+  double ReconTrueDeltaMDiagY = INVALID_VALUE;
+  double ReconTrueDeltaSDiagX = INVALID_VALUE;
+  double ReconTrueDeltaSDiagY = INVALID_VALUE;
+  // Mean-of-lines recon (optional)
+  double ReconMeanX = INVALID_VALUE;
+  double ReconMeanY = INVALID_VALUE;
+  double ReconTrueDeltaMeanX = INVALID_VALUE;
+  double ReconTrueDeltaMeanY = INVALID_VALUE;
 
   // If branches already exist, we will overwrite their contents
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
@@ -270,13 +270,13 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     return br;
   };
 
-  TBranch* br_x_rec = ensureAndResetBranch("ReconX", &x_rec_2d);
-  TBranch* br_y_rec = ensureAndResetBranch("ReconY", &y_rec_2d);
+  TBranch* br_x_rec = ensureAndResetBranch("ReconTrueRowX", &ReconTrueRowX);
+  TBranch* br_y_rec = ensureAndResetBranch("ReconTrueColY", &ReconTrueColY);
   // Commented out per request: do not save absolute-value delta branches
   // TBranch* br_dx    = ensureAndResetBranch("ReconTrueDeltaX", &rec_hit_delta_x_2d);
   // TBranch* br_dy    = ensureAndResetBranch("ReconTrueDeltaY", &rec_hit_delta_y_2d);
-  TBranch* br_dx_signed = ensureAndResetBranch("ReconTrueDeltaX", &rec_hit_delta_x_2d_signed);
-  TBranch* br_dy_signed = ensureAndResetBranch("ReconTrueDeltaY", &rec_hit_delta_y_2d_signed);
+  TBranch* br_dx_signed = ensureAndResetBranch("ReconTrueDeltaRowX", &ReconTrueDeltaRowX);
+  TBranch* br_dy_signed = ensureAndResetBranch("ReconTrueDeltaColY", &ReconTrueDeltaColY);
   // Parameter branches
   TBranch* br_row_A = nullptr;
   TBranch* br_row_mu = nullptr;
@@ -304,72 +304,59 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   TBranch* br_mdiag_dy_signed = nullptr;
   TBranch* br_sdiag_dx_signed = nullptr;
   TBranch* br_sdiag_dy_signed = nullptr;
+  // Mean-of-lines branches
+  TBranch* br_x_mean_lines = nullptr;
+  TBranch* br_y_mean_lines = nullptr;
+  TBranch* br_dx_mean_signed = nullptr;
+  TBranch* br_dy_mean_signed = nullptr;
   if (saveParamA) {
-    br_row_A     = ensureAndResetBranch("GaussRowA", &gauss2d_row_a);
-    br_col_A     = ensureAndResetBranch("GaussColA", &gauss2d_col_a);
+    br_row_A     = ensureAndResetBranch("GaussRowA", &GaussRowA);
+    br_col_A     = ensureAndResetBranch("GaussColA", &GaussColA);
   }
   if (saveParamMu) {
-    br_row_mu    = ensureAndResetBranch("GaussRowMu", &gauss2d_row_mu);
-    br_col_mu    = ensureAndResetBranch("GaussColMu", &gauss2d_col_mu);
+    br_row_mu    = ensureAndResetBranch("GaussRowMu", &GaussRowMu);
+    br_col_mu    = ensureAndResetBranch("GaussColMu", &GaussColMu);
   }
   if (saveParamSigma) {
-    br_row_sigma = ensureAndResetBranch("GaussRowSigma", &gauss2d_row_sigma);
-    br_col_sigma = ensureAndResetBranch("GaussColSigma", &gauss2d_col_sigma);
+    br_row_sigma = ensureAndResetBranch("GaussRowSigma", &GaussRowSigma);
+    br_col_sigma = ensureAndResetBranch("GaussColSigma", &GaussColSigma);
   }
   if (saveParamB) {
-    br_row_B     = ensureAndResetBranch("GaussRowB", &gauss2d_row_b);
-    br_col_B     = ensureAndResetBranch("GaussColB", &gauss2d_col_b);
-  }
-
-  // Optional branches for sigma-clipping removal masks (0 = kept, 1 = removed)
-  TBranch* br_row_mask = nullptr;
-  TBranch* br_col_mask = nullptr;
-  std::vector<int> row_mask;
-  std::vector<int> col_mask;
-  auto ensureAndResetVectorIntBranch = [&](const char* name, std::vector<int>* addr) -> TBranch* {
-    TBranch* br = tree->GetBranch(name);
-    if (!br) {
-      br = tree->Branch(name, addr);
-    } else {
-      tree->SetBranchAddress(name, addr);
-      br = tree->GetBranch(name);
-      if (br) {
-        br->Reset();
-        br->DropBaskets();
-      }
-    }
-    return br;
-  };
-  if (saveOutlierMask) {
-    br_row_mask = ensureAndResetVectorIntBranch("GaussRowMaskRemoved", &row_mask);
-    br_col_mask = ensureAndResetVectorIntBranch("GaussColMaskRemoved", &col_mask);
+    br_row_B     = ensureAndResetBranch("GaussRowB", &GaussRowB);
+    br_col_B     = ensureAndResetBranch("GaussColB", &GaussColB);
   }
 
   // Create diagonal branches if requested
   if (fitDiagonals) {
-    br_x_rec_diag_main = ensureAndResetBranch("ReconX_DiagMain", &x_rec_diag_main);
-    br_y_rec_diag_main = ensureAndResetBranch("ReconY_DiagMain", &y_rec_diag_main);
-    br_x_rec_diag_sec  = ensureAndResetBranch("ReconX_DiagSecond", &x_rec_diag_sec);
-    br_y_rec_diag_sec  = ensureAndResetBranch("ReconY_DiagSecond", &y_rec_diag_sec);
-    br_mdiag_dx_signed = ensureAndResetBranch("MDiagReconTrueDeltaX", &mdiag_dx_signed);
-    br_mdiag_dy_signed = ensureAndResetBranch("MDiagReconTrueDeltaY", &mdiag_dy_signed);
-    br_sdiag_dx_signed = ensureAndResetBranch("SDiagReconTrueDeltaX", &sdiag_dx_signed);
-    br_sdiag_dy_signed = ensureAndResetBranch("SDiagReconTrueDeltaY", &sdiag_dy_signed);
+    br_x_rec_diag_main = ensureAndResetBranch("ReconMDiagX", &ReconMDiagX);
+    br_y_rec_diag_main = ensureAndResetBranch("ReconMDiagY", &ReconMDiagY);
+    br_x_rec_diag_sec  = ensureAndResetBranch("ReconSDiagX", &ReconSDiagX);
+    br_y_rec_diag_sec  = ensureAndResetBranch("ReconSDiagY", &ReconSDiagY);
+    br_mdiag_dx_signed = ensureAndResetBranch("ReconTrueDeltaMDiagX", &ReconTrueDeltaMDiagX);
+    br_mdiag_dy_signed = ensureAndResetBranch("ReconTrueDeltaMDiagY", &ReconTrueDeltaMDiagY);
+    br_sdiag_dx_signed = ensureAndResetBranch("ReconTrueDeltaSDiagX", &ReconTrueDeltaSDiagX);
+    br_sdiag_dy_signed = ensureAndResetBranch("ReconTrueDeltaSDiagY", &ReconTrueDeltaSDiagY);
+    if (saveLineMeans) {
+      br_x_mean_lines = ensureAndResetBranch("ReconMeanX", &ReconMeanX);
+      br_y_mean_lines = ensureAndResetBranch("ReconMeanY", &ReconMeanY);
+      br_dx_mean_signed = ensureAndResetBranch("ReconTrueDeltaMeanX", &ReconTrueDeltaMeanX);
+      br_dy_mean_signed = ensureAndResetBranch("ReconTrueDeltaMeanY", &ReconTrueDeltaMeanY);
+    }
     if (saveDiagParamA) {
-      br_d1_A = ensureAndResetBranch("GaussDiagMainA", &gaussD1_a);
-      br_d2_A = ensureAndResetBranch("GaussDiagSecondA", &gaussD2_a);
+      br_d1_A = ensureAndResetBranch("GaussMDiagA", &GaussMDiagA);
+      br_d2_A = ensureAndResetBranch("GaussSDiagA", &GaussSDiagA);
     }
     if (saveDiagParamMu) {
-      br_d1_mu = ensureAndResetBranch("GaussDiagMainMu", &gaussD1_mu);
-      br_d2_mu = ensureAndResetBranch("GaussDiagSecondMu", &gaussD2_mu);
+      br_d1_mu = ensureAndResetBranch("GaussMDiagMu", &GaussMDiagMu);
+      br_d2_mu = ensureAndResetBranch("GaussSDiagMu", &GaussSDiagMu);
     }
     if (saveDiagParamSigma) {
-      br_d1_sigma = ensureAndResetBranch("GaussDiagMainSigma", &gaussD1_sigma);
-      br_d2_sigma = ensureAndResetBranch("GaussDiagSecondSigma", &gaussD2_sigma);
+      br_d1_sigma = ensureAndResetBranch("GaussMDiagSigma", &GaussMDiagSigma);
+      br_d2_sigma = ensureAndResetBranch("GaussSDiagSigma", &GaussSDiagSigma);
     }
     if (saveDiagParamB) {
-      br_d1_B = ensureAndResetBranch("GaussDiagMainB", &gaussD1_b);
-      br_d2_B = ensureAndResetBranch("GaussDiagSecondB", &gaussD2_b);
+      br_d1_B = ensureAndResetBranch("GaussMDiagB", &GaussMDiagB);
+      br_d2_B = ensureAndResetBranch("GaussSDiagB", &GaussSDiagB);
     }
   }
 
@@ -397,8 +384,6 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   // Prepare output buffers
   std::vector<double> out_x_rec(nEntries, INVALID_VALUE);
   std::vector<double> out_y_rec(nEntries, INVALID_VALUE);
-  std::vector<double> out_dx(nEntries, INVALID_VALUE);
-  std::vector<double> out_dy(nEntries, INVALID_VALUE);
   std::vector<double> out_dx_s(nEntries, INVALID_VALUE);
   std::vector<double> out_dy_s(nEntries, INVALID_VALUE);
   // Output buffers for fit parameters
@@ -410,16 +395,14 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double> out_col_mu(nEntries, INVALID_VALUE);
   std::vector<double> out_col_sigma(nEntries, INVALID_VALUE);
   std::vector<double> out_col_B(nEntries, INVALID_VALUE);
-  // Output buffers for removal masks
-  std::vector<std::vector<int>> out_row_mask(nEntries);
-  std::vector<std::vector<int>> out_col_mask(nEntries);
 
   // Diagonal buffers
   std::vector<double> out_x_rec_diag_main, out_y_rec_diag_main, out_x_rec_diag_sec, out_y_rec_diag_sec;
   std::vector<double> out_d1_A, out_d1_mu, out_d1_sigma, out_d1_B;
   std::vector<double> out_d2_A, out_d2_mu, out_d2_sigma, out_d2_B;
-  std::vector<std::vector<int>> out_d1_mask, out_d2_mask;
   std::vector<double> out_mdiag_dx_s, out_mdiag_dy_s, out_sdiag_dx_s, out_sdiag_dy_s;
+  // Mean-of-lines buffers
+  std::vector<double> out_x_mean_lines, out_y_mean_lines, out_dx_mean_s, out_dy_mean_s;
   if (fitDiagonals) {
     out_x_rec_diag_main.assign(nEntries, INVALID_VALUE);
     out_y_rec_diag_main.assign(nEntries, INVALID_VALUE);
@@ -437,9 +420,11 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     out_mdiag_dy_s.assign(nEntries, INVALID_VALUE);
     out_sdiag_dx_s.assign(nEntries, INVALID_VALUE);
     out_sdiag_dy_s.assign(nEntries, INVALID_VALUE);
-    if (saveOutlierMask) {
-      out_d1_mask.resize(nEntries);
-      out_d2_mask.resize(nEntries);
+    if (saveLineMeans) {
+      out_x_mean_lines.assign(nEntries, INVALID_VALUE);
+      out_y_mean_lines.assign(nEntries, INVALID_VALUE);
+      out_dx_mean_s.assign(nEntries, INVALID_VALUE);
+      out_dy_mean_s.assign(nEntries, INVALID_VALUE);
     }
   }
 
@@ -454,20 +439,12 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     const bool isPix = v_is_pixel[i] != 0;
     const auto &QLoc = v_Q[i];
     if (isPix || QLoc.empty()) {
-      if (saveOutlierMask) {
-        out_row_mask[i].clear();
-        out_col_mask[i].clear();
-      }
       return;
     }
 
     const size_t total = QLoc.size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
     if (N * N != static_cast<int>(total) || N < 3) {
-      if (saveOutlierMask) {
-        out_row_mask[i].clear();
-        out_col_mask[i].clear();
-      }
       return;
     }
     const int R = (N - 1) / 2;
@@ -498,10 +475,6 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
       }
     }
     if (x_row.size() < 3 || y_col.size() < 3) {
-      if (saveOutlierMask) {
-        out_row_mask[i] = std::vector<int>(x_row.size(), 0);
-        out_col_mask[i] = std::vector<int>(y_col.size(), 0);
-      }
       return;
     }
 
@@ -513,9 +486,10 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     auto minmaxRow = std::minmax_element(q_row.begin(), q_row.end());
     auto minmaxCol = std::minmax_element(q_col.begin(), q_col.end());
     double A0_row = std::max(1e-18, *minmaxRow.second - *minmaxRow.first);
-    double B0_row = std::max(0.0, *minmaxRow.first);
+    // Allow negative baseline seed if the data suggest it
+    double B0_row = *minmaxRow.first;
     double A0_col = std::max(1e-18, *minmaxCol.second - *minmaxCol.first);
-    double B0_col = std::max(0.0, *minmaxCol.first);
+    double B0_col = *minmaxCol.first;
 
     // Low-contrast: fast centroid (relative to neighborhood max charge)
     const double contrastEps = (qmaxNeighborhood > 0.0) ? (1e-3 * qmaxNeighborhood) : 0.0;
@@ -529,15 +503,9 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
         const double yr = yw / wsumy;
         out_x_rec[i] = xr;
         out_y_rec[i] = yr;
-        out_dx[i] = std::abs(v_x_hit[i] - xr);
-        out_dy[i] = std::abs(v_y_hit[i] - yr);
         out_dx_s[i] = (v_x_hit[i] - xr);
         out_dy_s[i] = (v_y_hit[i] - yr);
         nFitted.fetch_add(1, std::memory_order_relaxed);
-        if (saveOutlierMask) {
-          out_row_mask[i] = std::vector<int>(x_row.size(), 0);
-          out_col_mask[i] = std::vector<int>(y_col.size(), 0);
-        }
       }
       return;
     }
@@ -576,82 +544,6 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     std::vector<double> q_row_fit = q_row;
     std::vector<double> y_col_fit = y_col;
     std::vector<double> q_col_fit = q_col;
-    std::vector<int> maskRow, maskCol;
-    std::vector<int> maskD1, maskD2;
-
-    // Optional sigma-clipping outlier removal using seeded model
-    auto medianVal = [&](std::vector<double> v)->double {
-      if (v.empty()) return 0.0;
-      size_t m = v.size()/2;
-      std::nth_element(v.begin(), v.begin()+m, v.end());
-      double med = v[m];
-      if ((v.size() & 1U) == 0) {
-        auto max_it = std::max_element(v.begin(), v.begin()+m);
-        med = 0.5 * (med + *max_it);
-      }
-      return med;
-    };
-    auto madSigma = [&](const std::vector<double>& r)->double {
-      if (r.empty()) return 0.0;
-      std::vector<double> rcopy = r;
-      double med = medianVal(rcopy);
-      std::vector<double> dev; dev.reserve(r.size());
-      for (double v : r) dev.push_back(std::abs(v - med));
-      double mad = medianVal(dev);
-      return 1.4826 * mad;
-    };
-    auto clip1D = [&](std::vector<double>& xs, std::vector<double>& qs,
-                      double A0, double mu0, double sig0, double B0,
-                      std::vector<int>* removedMask) {
-      if (removedMask) removedMask->assign(xs.size(), 0);
-      if (!removeOutliers || xs.size() < 3 || qs.size() != xs.size()) return;
-      if (!(outlierSigma > 0.0) || minPointsAfterClip <= 0) return;
-      std::vector<double> resid; resid.reserve(qs.size());
-      for (size_t k=0;k<xs.size();++k) {
-        const double dx = (xs[k] - mu0) / sig0;
-        const double model = A0 * std::exp(-0.5 * dx * dx) + B0;
-        resid.push_back(qs[k] - model);
-      }
-      const double sigR = madSigma(resid);
-      if (!(sigR > 0.0)) return;
-      const double thr = outlierSigma * sigR;
-      std::vector<double> xs_new; xs_new.reserve(xs.size());
-      std::vector<double> qs_new; qs_new.reserve(qs.size());
-      const double rmed = medianVal(resid);
-      for (size_t k=0;k<xs.size();++k) {
-        const double r = resid[k] - rmed;
-        if (std::abs(r) <= thr) { xs_new.push_back(xs[k]); qs_new.push_back(qs[k]); }
-        else if (removedMask) { (*removedMask)[k] = 1; }
-      }
-      if (static_cast<int>(xs_new.size()) >= std::max(minPointsAfterClip, 3)) {
-        xs.swap(xs_new);
-        qs.swap(qs_new);
-      } else {
-        // Not enough points after clipping; revert mask to all-kept
-        if (removedMask) removedMask->assign(removedMask->size(), 0);
-      }
-    };
-
-    // Clip row and column independently using seeded parameters
-    clip1D(x_row_fit, q_row_fit, A0_row, mu0_row, sigInitRow, B0_row, saveOutlierMask ? &maskRow : nullptr);
-    clip1D(y_col_fit, q_col_fit, A0_col, mu0_col, sigInitCol, B0_col, saveOutlierMask ? &maskCol : nullptr);
-    // Recompute seeds after clipping
-    if (x_row_fit.size() >= 3) {
-      auto minmaxRow2 = std::minmax_element(q_row_fit.begin(), q_row_fit.end());
-      A0_row = std::max(1e-18, *minmaxRow2.second - *minmaxRow2.first);
-      B0_row = std::max(0.0, *minmaxRow2.first);
-      int idxMaxRow2 = std::distance(q_row_fit.begin(), std::max_element(q_row_fit.begin(), q_row_fit.end()));
-      mu0_row = x_row_fit[idxMaxRow2];
-      sigInitRow = sigmaSeed1D(x_row_fit, q_row_fit, B0_row);
-    }
-    if (y_col_fit.size() >= 3) {
-      auto minmaxCol2 = std::minmax_element(q_col_fit.begin(), q_col_fit.end());
-      A0_col = std::max(1e-18, *minmaxCol2.second - *minmaxCol2.first);
-      B0_col = std::max(0.0, *minmaxCol2.first);
-      int idxMaxCol2 = std::distance(q_col_fit.begin(), std::max_element(q_col_fit.begin(), q_col_fit.end()));
-      mu0_col = y_col_fit[idxMaxCol2];
-      sigInitCol = sigmaSeed1D(y_col_fit, q_col_fit, B0_col);
-    }
 
     // sigInitRow/sigInitCol were computed above on unfiltered data. They are possibly
     // updated after clipping in the block above.
@@ -669,21 +561,22 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     const double yMax = *minmaxY.second + 0.5 * pixelSpacing;
     fRowLoc.SetRange(xMin, xMax);
     fColLoc.SetRange(yMin, yMax);
-    const double muXLo = x_px_loc - 0.5 * pixelSpacing;
-    const double muXHi = x_px_loc + 0.5 * pixelSpacing;
-    const double muYLo = y_px_loc - 0.5 * pixelSpacing;
-    const double muYHi = y_px_loc + 0.5 * pixelSpacing;
+    // Allow mean to cross pixel boundaries to avoid one-sided residuals
+    const double muXLo = x_px_loc - 1.0 * pixelSpacing;
+    const double muXHi = x_px_loc + 1.0 * pixelSpacing;
+    const double muYLo = y_px_loc - 1.0 * pixelSpacing;
+    const double muYHi = y_px_loc + 1.0 * pixelSpacing;
     fRowLoc.SetParLimits(1, muXLo, muXHi);
     fColLoc.SetParLimits(1, muYLo, muYHi);
-    // Bounds for Q_i fits: A in (0, ~2*qmax], B in [0, ~qmax]
+    // Bounds for Q_i fits: A in (0, ~2*qmax], B in [-~qmax, ~qmax]
     const double AHi = std::max(1e-18, 2.0 * std::max(qmaxNeighborhood, 0.0));
     const double BHi = std::max(1e-18, 1.0 * std::max(qmaxNeighborhood, 0.0));
     fRowLoc.SetParLimits(0, 1e-18, AHi);
     fRowLoc.SetParLimits(2, sigLoBound, sigHiBound);
-    fRowLoc.SetParLimits(3, 0.0, BHi);
+    fRowLoc.SetParLimits(3, -BHi, BHi);
     fColLoc.SetParLimits(0, 1e-18, AHi);
     fColLoc.SetParLimits(2, sigLoBound, sigHiBound);
-    fColLoc.SetParLimits(3, 0.0, BHi);
+    fColLoc.SetParLimits(3, -BHi, BHi);
 
     ROOT::Math::WrappedMultiTF1 wRow(fRowLoc, 1);
     ROOT::Math::WrappedMultiTF1 wCol(fColLoc, 1);
@@ -713,18 +606,18 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     fitRow.Config().ParSettings(0).SetLimits(1e-18, AHi);
     fitRow.Config().ParSettings(1).SetLimits(muXLo, muXHi);
     fitRow.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
-    // B in [0, ~qmax]
-    fitRow.Config().ParSettings(3).SetLimits(0.0, BHi);
+    // B in [-~qmax, ~qmax]
+    fitRow.Config().ParSettings(3).SetLimits(-BHi, BHi);
     // A in (0, ~2*qmax]
     fitCol.Config().ParSettings(0).SetLimits(1e-18, AHi);
     fitCol.Config().ParSettings(1).SetLimits(muYLo, muYHi);
     fitCol.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
-    // B in [0, ~qmax]
-    fitCol.Config().ParSettings(3).SetLimits(0.0, BHi);
+    // B in [-~qmax, ~qmax]
+    fitCol.Config().ParSettings(3).SetLimits(-BHi, BHi);
     const double stepA_row = std::max(1e-18, 0.01 * A0_row);
     const double stepA_col = std::max(1e-18, 0.01 * A0_col);
-    const double stepB_row = std::max(1e-18, 0.01 * std::max(B0_row, A0_row));
-    const double stepB_col = std::max(1e-18, 0.01 * std::max(B0_col, A0_col));
+    const double stepB_row = std::max(1e-18, 0.01 * std::max(std::abs(B0_row), A0_row));
+    const double stepB_col = std::max(1e-18, 0.01 * std::max(std::abs(B0_col), A0_col));
     fitRow.Config().ParSettings(0).SetStepSize(stepA_row);
     fitRow.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
     fitRow.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
@@ -790,20 +683,10 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     if (okRow && okCol) {
       out_x_rec[i] = muX;
       out_y_rec[i] = muY;
-      out_dx[i] = std::abs(v_x_hit[i] - muX);
-      out_dy[i] = std::abs(v_y_hit[i] - muY);
       out_dx_s[i] = (v_x_hit[i] - muX);
       out_dy_s[i] = (v_y_hit[i] - muY);
       nFitted.fetch_add(1, std::memory_order_relaxed);
     }
-    if (saveOutlierMask) {
-      // If masks were never initialized (e.g. no clipping), default to all-kept
-      if (maskRow.empty()) maskRow = std::vector<int>(x_row.size(), 0);
-      if (maskCol.empty()) maskCol = std::vector<int>(y_col.size(), 0);
-      out_row_mask[i] = std::move(maskRow);
-      out_col_mask[i] = std::move(maskCol);
-    }
-
     // =========================
     // Diagonal fits (optional)
     // =========================
@@ -835,22 +718,15 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
           }
         }
       }
-
-      if (saveOutlierMask) {
-        maskD1.assign(s_d1.size(), 0);
-        maskD2.assign(s_d2.size(), 0);
-      }
-
       auto fitDiag = [&](const std::vector<double>& s_vals_in,
                          const std::vector<double>& q_vals_in,
-                         std::vector<int>* maskOut,
                          double muLo, double muHi,
                          double& outA, double& outMu, double& outSig, double& outB) -> bool {
         if (s_vals_in.size() < 3) return false;
         // Seeds from min/max
         auto mm = std::minmax_element(q_vals_in.begin(), q_vals_in.end());
         double A0 = std::max(1e-18, *mm.second - *mm.first);
-        double B0 = std::max(0.0, *mm.first);
+        double B0 = *mm.first; // allow negative baseline seed
         int idxMax = std::distance(q_vals_in.begin(), std::max_element(q_vals_in.begin(), q_vals_in.end()));
         double mu0 = s_vals_in[idxMax];
         // Copy for optional clipping
@@ -878,22 +754,6 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
           return s;
         };
         double sigInit = sigmaSeed1D_local(s_vals, q_vals, B0);
-        // Optional clipping using seeded params
-        if (removeOutliers && maskOut) {
-          // reuse clip1D from above scope
-          clip1D(s_vals, q_vals, A0, mu0, sigInit, B0, maskOut);
-          // recompute seeds after clipping
-          if (s_vals.size() >= 3) {
-            auto mm2 = std::minmax_element(q_vals.begin(), q_vals.end());
-            A0 = std::max(1e-18, *mm2.second - *mm2.first);
-            B0 = std::max(0.0, *mm2.first);
-            int idxMax2 = std::distance(q_vals.begin(), std::max_element(q_vals.begin(), q_vals.end()));
-            mu0 = s_vals[idxMax2];
-            sigInit = sigmaSeed1D_local(s_vals, q_vals, B0);
-          }
-        } else if (maskOut) {
-          maskOut->assign(s_vals.size(), 0);
-        }
         // Prepare wrapped TF1
         TF1 fLoc("fDiagLoc", GaussPlusB, -1e9, 1e9, 4);
         fLoc.SetParameters(A0, mu0, sigInit, B0);
@@ -914,11 +774,11 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
         fitter.Config().ParSettings(0).SetLimits(1e-18, AHiL);
         fitter.Config().ParSettings(1).SetLimits(muLo, muHi);
         fitter.Config().ParSettings(2).SetLimits(sigLoBound, sigHiBound);
-        fitter.Config().ParSettings(3).SetLimits(0.0, BHiL);
+        fitter.Config().ParSettings(3).SetLimits(-BHiL, BHiL);
         fitter.Config().ParSettings(0).SetStepSize(std::max(1e-18, 0.01 * A0));
         fitter.Config().ParSettings(1).SetStepSize(1e-4*pixelSpacing);
         fitter.Config().ParSettings(2).SetStepSize(1e-4*pixelSpacing);
-        fitter.Config().ParSettings(3).SetStepSize(std::max(1e-18, 0.01 * std::max(B0, A0)));
+        fitter.Config().ParSettings(3).SetStepSize(std::max(1e-18, 0.01 * std::max(std::abs(B0), A0)));
         fitter.Config().ParSettings(0).SetValue(A0);
         fitter.Config().ParSettings(1).SetValue(mu0);
         fitter.Config().ParSettings(2).SetValue(sigInit);
@@ -948,12 +808,12 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
         return false;
       };
 
-      const double muLo = x_px_loc - 0.5 * pixelSpacing;
-      const double muHi = x_px_loc + 0.5 * pixelSpacing;
+      const double muLo = x_px_loc - 1.0 * pixelSpacing;
+      const double muHi = x_px_loc + 1.0 * pixelSpacing;
       double A1=INVALID_VALUE, mu1=INVALID_VALUE, S1=INVALID_VALUE, B1=INVALID_VALUE;
       double A2=INVALID_VALUE, mu2=INVALID_VALUE, S2=INVALID_VALUE, B2=INVALID_VALUE;
-      bool ok1 = fitDiag(s_d1, q_d1, saveOutlierMask ? &maskD1 : nullptr, muLo, muHi, A1, mu1, S1, B1);
-      bool ok2 = fitDiag(s_d2, q_d2, saveOutlierMask ? &maskD2 : nullptr, muLo, muHi, A2, mu2, S2, B2);
+      bool ok1 = fitDiag(s_d1, q_d1, muLo, muHi, A1, mu1, S1, B1);
+      bool ok2 = fitDiag(s_d2, q_d2, muLo, muHi, A2, mu2, S2, B2);
       if (ok1) {
         // Transform diagonal coordinate mu -> (x,y)
         const double dx = mu1 - x_px_loc;
@@ -962,7 +822,6 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
         out_mdiag_dx_s[i] = (v_x_hit[i] - out_x_rec_diag_main[i]);
         out_mdiag_dy_s[i] = (v_y_hit[i] - out_y_rec_diag_main[i]);
         if (saveDiagParamA) out_d1_A[i] = A1; if (saveDiagParamMu) out_d1_mu[i] = mu1; if (saveDiagParamSigma) out_d1_sigma[i] = S1; if (saveDiagParamB) out_d1_B[i] = B1;
-        if (saveOutlierMask) out_d1_mask[i] = std::move(maskD1);
       }
       if (ok2) {
         const double dx = mu2 - x_px_loc;
@@ -971,7 +830,28 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
         out_sdiag_dx_s[i] = (v_x_hit[i] - out_x_rec_diag_sec[i]);
         out_sdiag_dy_s[i] = (v_y_hit[i] - out_y_rec_diag_sec[i]);
         if (saveDiagParamA) out_d2_A[i] = A2; if (saveDiagParamMu) out_d2_mu[i] = mu2; if (saveDiagParamSigma) out_d2_sigma[i] = S2; if (saveDiagParamB) out_d2_B[i] = B2;
-        if (saveOutlierMask) out_d2_mask[i] = std::move(maskD2);
+      }
+      // Compute mean-of-lines recon (row/diagonals for X, col/diagonals for Y)
+      if (saveLineMeans) {
+        int cntX = 0;
+        double accX = 0.0;
+        if (IsFinite(muX)) { accX += muX; cntX++; }
+        if (ok1) { accX += mu1; cntX++; }
+        if (ok2) { accX += mu2; cntX++; }
+        if (cntX > 0) {
+          out_x_mean_lines[i] = accX / cntX;
+          out_dx_mean_s[i] = v_x_hit[i] - out_x_mean_lines[i];
+        }
+
+        int cntY = 0;
+        double accY = 0.0;
+        if (IsFinite(muY)) { accY += muY; cntY++; }
+        if (ok1) { double dy1 = (mu1 - x_px_loc); accY += (y_px_loc + dy1); cntY++; }
+        if (ok2) { double dy2 = (mu2 - x_px_loc); accY += (y_px_loc - dy2); cntY++; }
+        if (cntY > 0) {
+          out_y_mean_lines[i] = accY / cntY;
+          out_dy_mean_s[i] = v_y_hit[i] - out_y_mean_lines[i];
+        }
       }
     }
   }, indices);
@@ -981,20 +861,18 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   // Sequentially write outputs to the tree (thread-safe)
   for (Long64_t i = 0; i < nEntries; ++i) {
     tree->GetEntry(i); // ensure correct entry numbering for branch fill
-    x_rec_2d = out_x_rec[i];
-    y_rec_2d = out_y_rec[i];
-    rec_hit_delta_x_2d = out_dx[i];
-    rec_hit_delta_y_2d = out_dy[i];
-    rec_hit_delta_x_2d_signed = out_dx_s[i];
-    rec_hit_delta_y_2d_signed = out_dy_s[i];
-    gauss2d_row_a = out_row_A[i];
-    gauss2d_row_mu = out_row_mu[i];
-    gauss2d_row_sigma = out_row_sigma[i];
-    gauss2d_row_b = out_row_B[i];
-    gauss2d_col_a = out_col_A[i];
-    gauss2d_col_mu = out_col_mu[i];
-    gauss2d_col_sigma = out_col_sigma[i];
-    gauss2d_col_b = out_col_B[i];
+    ReconTrueRowX = out_x_rec[i];
+    ReconTrueColY = out_y_rec[i];
+    ReconTrueDeltaRowX = out_dx_s[i];
+    ReconTrueDeltaColY = out_dy_s[i];
+    GaussRowA = out_row_A[i];
+    GaussRowMu = out_row_mu[i];
+    GaussRowSigma = out_row_sigma[i];
+    GaussRowB = out_row_B[i];
+    GaussColA = out_col_A[i];
+    GaussColMu = out_col_mu[i];
+    GaussColSigma = out_col_sigma[i];
+    GaussColB = out_col_B[i];
     br_x_rec->Fill();
     br_y_rec->Fill();
     br_dx_signed->Fill();
@@ -1007,37 +885,41 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     if (br_col_mu) br_col_mu->Fill();
     if (br_col_sigma) br_col_sigma->Fill();
     if (br_col_B) br_col_B->Fill();
-    if (saveOutlierMask) {
-      row_mask = out_row_mask[i];
-      col_mask = out_col_mask[i];
-      if (br_row_mask) br_row_mask->Fill();
-      if (br_col_mask) br_col_mask->Fill();
-    }
     if (fitDiagonals) {
-      x_rec_diag_main = out_x_rec_diag_main.empty() ? INVALID_VALUE : out_x_rec_diag_main[i];
-      y_rec_diag_main = out_y_rec_diag_main.empty() ? INVALID_VALUE : out_y_rec_diag_main[i];
-      x_rec_diag_sec  = out_x_rec_diag_sec.empty()  ? INVALID_VALUE : out_x_rec_diag_sec[i];
-      y_rec_diag_sec  = out_y_rec_diag_sec.empty()  ? INVALID_VALUE : out_y_rec_diag_sec[i];
+      ReconMDiagX = out_x_rec_diag_main.empty() ? INVALID_VALUE : out_x_rec_diag_main[i];
+      ReconMDiagY = out_y_rec_diag_main.empty() ? INVALID_VALUE : out_y_rec_diag_main[i];
+      ReconSDiagX  = out_x_rec_diag_sec.empty()  ? INVALID_VALUE : out_x_rec_diag_sec[i];
+      ReconSDiagY  = out_y_rec_diag_sec.empty()  ? INVALID_VALUE : out_y_rec_diag_sec[i];
       if (br_x_rec_diag_main) br_x_rec_diag_main->Fill();
       if (br_y_rec_diag_main) br_y_rec_diag_main->Fill();
       if (br_x_rec_diag_sec)  br_x_rec_diag_sec->Fill();
       if (br_y_rec_diag_sec)  br_y_rec_diag_sec->Fill();
-      mdiag_dx_signed = out_mdiag_dx_s.empty()? INVALID_VALUE : out_mdiag_dx_s[i];
-      mdiag_dy_signed = out_mdiag_dy_s.empty()? INVALID_VALUE : out_mdiag_dy_s[i];
-      sdiag_dx_signed = out_sdiag_dx_s.empty()? INVALID_VALUE : out_sdiag_dx_s[i];
-      sdiag_dy_signed = out_sdiag_dy_s.empty()? INVALID_VALUE : out_sdiag_dy_s[i];
+      ReconTrueDeltaMDiagX = out_mdiag_dx_s.empty()? INVALID_VALUE : out_mdiag_dx_s[i];
+      ReconTrueDeltaMDiagY = out_mdiag_dy_s.empty()? INVALID_VALUE : out_mdiag_dy_s[i];
+      ReconTrueDeltaSDiagX = out_sdiag_dx_s.empty()? INVALID_VALUE : out_sdiag_dx_s[i];
+      ReconTrueDeltaSDiagY = out_sdiag_dy_s.empty()? INVALID_VALUE : out_sdiag_dy_s[i];
       if (br_mdiag_dx_signed) br_mdiag_dx_signed->Fill();
       if (br_mdiag_dy_signed) br_mdiag_dy_signed->Fill();
       if (br_sdiag_dx_signed) br_sdiag_dx_signed->Fill();
       if (br_sdiag_dy_signed) br_sdiag_dy_signed->Fill();
-      gaussD1_a = out_d1_A.empty()? INVALID_VALUE : out_d1_A[i];
-      gaussD1_mu = out_d1_mu.empty()? INVALID_VALUE : out_d1_mu[i];
-      gaussD1_sigma = out_d1_sigma.empty()? INVALID_VALUE : out_d1_sigma[i];
-      gaussD1_b = out_d1_B.empty()? INVALID_VALUE : out_d1_B[i];
-      gaussD2_a = out_d2_A.empty()? INVALID_VALUE : out_d2_A[i];
-      gaussD2_mu = out_d2_mu.empty()? INVALID_VALUE : out_d2_mu[i];
-      gaussD2_sigma = out_d2_sigma.empty()? INVALID_VALUE : out_d2_sigma[i];
-      gaussD2_b = out_d2_B.empty()? INVALID_VALUE : out_d2_B[i];
+      if (saveLineMeans) {
+        ReconMeanX = out_x_mean_lines.empty()? INVALID_VALUE : out_x_mean_lines[i];
+        ReconMeanY = out_y_mean_lines.empty()? INVALID_VALUE : out_y_mean_lines[i];
+        ReconTrueDeltaMeanX = out_dx_mean_s.empty()? INVALID_VALUE : out_dx_mean_s[i];
+        ReconTrueDeltaMeanY = out_dy_mean_s.empty()? INVALID_VALUE : out_dy_mean_s[i];
+        if (br_x_mean_lines) br_x_mean_lines->Fill();
+        if (br_y_mean_lines) br_y_mean_lines->Fill();
+        if (br_dx_mean_signed) br_dx_mean_signed->Fill();
+        if (br_dy_mean_signed) br_dy_mean_signed->Fill();
+      }
+      GaussMDiagA = out_d1_A.empty()? INVALID_VALUE : out_d1_A[i];
+      GaussMDiagMu = out_d1_mu.empty()? INVALID_VALUE : out_d1_mu[i];
+      GaussMDiagSigma = out_d1_sigma.empty()? INVALID_VALUE : out_d1_sigma[i];
+      GaussMDiagB = out_d1_B.empty()? INVALID_VALUE : out_d1_B[i];
+      GaussSDiagA = out_d2_A.empty()? INVALID_VALUE : out_d2_A[i];
+      GaussSDiagMu = out_d2_mu.empty()? INVALID_VALUE : out_d2_mu[i];
+      GaussSDiagSigma = out_d2_sigma.empty()? INVALID_VALUE : out_d2_sigma[i];
+      GaussSDiagB = out_d2_B.empty()? INVALID_VALUE : out_d2_B[i];
       if (br_d1_A && saveDiagParamA) br_d1_A->Fill();
       if (br_d1_mu && saveDiagParamMu) br_d1_mu->Fill();
       if (br_d1_sigma && saveDiagParamSigma) br_d1_sigma->Fill();
@@ -1046,10 +928,6 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
       if (br_d2_mu && saveDiagParamMu) br_d2_mu->Fill();
       if (br_d2_sigma && saveDiagParamSigma) br_d2_sigma->Fill();
       if (br_d2_B && saveDiagParamB) br_d2_B->Fill();
-      if (saveOutlierMask) {
-        // Persist diagonal masks if we created branches; reuse ensure/reset above for row/col (not created here)
-        // To keep file size in check, we do not create separate branches unless needed later.
-      }
     }
     nProcessed++;
   }
