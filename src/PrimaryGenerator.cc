@@ -70,7 +70,8 @@ void PrimaryGenerator::GeneratePrimaries(G4Event *anEvent)
 
 
 void PrimaryGenerator::GenerateRandomPos()
-{
+{   
+    /*
     const G4double detSize = fDetector->GetDetSize();
     const G4int radius      = fDetector->GetNeighborhoodRadius();
     const G4double margin   = fDetector->GetPixelCornerOffset() +
@@ -79,8 +80,14 @@ void PrimaryGenerator::GenerateRandomPos()
 
     G4double x = (G4UniformRand() * (detSize - 2.0*margin)) - (detSize/2 - margin);
     G4double y = (G4UniformRand() * (detSize - 2.0*margin)) - (detSize/2 - margin);
- 
+
     G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
- 
+    */
+    const G4double spacing = fDetector->GetPixelSpacing();
+
+    const G4double x = 0.0*um;
+    const G4double y = 0.5 * spacing;
+    const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
+
     fParticleGun->SetParticlePosition(G4ThreeVector(x, y, z));
 } 
