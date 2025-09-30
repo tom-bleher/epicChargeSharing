@@ -221,8 +221,8 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   // New branches (outputs).
   // Use NaN sentinel so invalid/unfitted entries are ignored in ROOT histograms.
   const double INVALID_VALUE = std::numeric_limits<double>::quiet_NaN();
-  double ReconTrueRowX = INVALID_VALUE;
-  double ReconTrueColY = INVALID_VALUE;
+  double ReconRowX = INVALID_VALUE;
+  double ReconColY = INVALID_VALUE;
   double ReconTrueDeltaRowX = INVALID_VALUE;
   double ReconTrueDeltaColY = INVALID_VALUE;
 
@@ -270,8 +270,8 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     return br;
   };
 
-  TBranch* br_x_rec = ensureAndResetBranch("ReconTrueRowX", &ReconTrueRowX);
-  TBranch* br_y_rec = ensureAndResetBranch("ReconTrueColY", &ReconTrueColY);
+  TBranch* br_x_rec = ensureAndResetBranch("ReconRowX", &ReconRowX);
+  TBranch* br_y_rec = ensureAndResetBranch("ReconColY", &ReconColY);
   // Commented out per request: do not save absolute-value delta branches
   // TBranch* br_dx    = ensureAndResetBranch("ReconTrueDeltaX", &rec_hit_delta_x_2d);
   // TBranch* br_dy    = ensureAndResetBranch("ReconTrueDeltaY", &rec_hit_delta_y_2d);
@@ -861,8 +861,8 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   // Sequentially write outputs to the tree (thread-safe)
   for (Long64_t i = 0; i < nEntries; ++i) {
     tree->GetEntry(i); // ensure correct entry numbering for branch fill
-    ReconTrueRowX = out_x_rec[i];
-    ReconTrueColY = out_y_rec[i];
+    ReconRowX = out_x_rec[i];
+    ReconColY = out_y_rec[i];
     ReconTrueDeltaRowX = out_dx_s[i];
     ReconTrueDeltaColY = out_dy_s[i];
     GaussRowA = out_row_A[i];
