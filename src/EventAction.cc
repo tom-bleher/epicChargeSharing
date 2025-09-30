@@ -213,14 +213,7 @@ G4double EventAction::CalcPixelAlphaSubtended(G4double hitX, G4double hitY,
   
   const G4double numerator = (l/2.0) * std::sqrt(2.0);
   const G4double denominator = numerator + d;
-  
-  G4double alpha;
-  if (denominator < Constants::MIN_DENOMINATOR_VALUE) {
-    alpha = CLHEP::pi/2.0;  // Maximum possible angle (90 degrees)
-  } else {
-    alpha = std::atan(numerator / denominator);
-  }
-  
+  const G4double alpha = std::atan(numerator / denominator);
   return alpha; // Return in radians
 }
 
@@ -282,12 +275,8 @@ void EventAction::CalcNeighborhoodChargeSharing(const G4ThreeVector& hitPos)
       const G4double alpha = CalcPixelAlphaSubtended(hitX, hitY, pixelCenterX, pixelCenterY, pixelSize, pixelSize);
       
       G4double weight = 0.0;
-      const G4double minLogArg = std::exp(Constants::MIN_LOG_VALUE);
-      G4double logArg = (distance > 0.0 && d0 > 0.0) ? (distance / d0) : minLogArg;
-      logArg = std::max(logArg, minLogArg);
-      G4double logValue = std::log(logArg);
-      logValue = std::max(logValue, Constants::MIN_LOG_VALUE);
-      weight = alpha * (1.0 / logValue);
+      const G4double logValue = std::log(distance / d0);
+      weight = alpha / logValue;
       
       inBoundsGrid[idx] = true;
       weightGrid[idx] = weight;

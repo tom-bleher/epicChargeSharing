@@ -46,16 +46,6 @@ namespace Constants {
     // Primary generator constants
     const G4double PRIMARY_PARTICLE_Z_POSITION = 0.0*cm; // Z position for primary particle generation
         
-    // ========================
-    // NUMERICAL TOLERANCE CONSTANTS
-    // ========================
-    
-    // Numerical stability and solver tolerances
-    const G4double MIN_UNCERTAINTY_VALUE = 1e-20;        // Minimum allowed uncertainty to prevent division by zero
-    const G4double MIN_SAFE_PARAMETER = 1e-12;           // Minimum safe value for denominators and parameters
-    const G4double MIN_LOG_VALUE = 1e-6;                 // Minimum allowed log value for numerical stability
-    const G4double MIN_DENOMINATOR_VALUE = 1e-10;        // Minimum allowed denominator value
-
     // Neighborhood grid special markers
     const G4double OUT_OF_BOUNDS_FRACTION_SENTINEL = -999.0; // Marks F_i as invalid (out-of-bounds)
     
@@ -83,29 +73,7 @@ namespace Constants {
     // ========================
     // Control whether to run ROOT post-processing macros automatically after the run finishes
     const G4bool RUN_PROCESSING_2D = true;   // Calls proc/processing2D.C
-    const G4bool RUN_PROCESSING_3D = false;  // Calls proc/processing3D.C
-
-    // Enable fitting along diagonals in 2D post-processing (main and secondary)
-    const G4bool PROCESSING_2D_FIT_DIAGONALS = true;
-
-    // Control saving of diagonal Gaussian parameters (A, mu, sigma, B)
-    const G4bool PROCESSING_2D_SAVE_DIAG_A = true;
-    const G4bool PROCESSING_2D_SAVE_DIAG_MU = true;
-    const G4bool PROCESSING_2D_SAVE_DIAG_SIGMA = true;
-    const G4bool PROCESSING_2D_SAVE_DIAG_B = true;
-
-    // Vertical uncertainty for the fits, as percent of the neighborhood max
-    const G4double PROCESSING_ERROR_PERCENT = 5.0;
-
-    // Outlier removal controls (sigma-clipping) used inside processing2D/processing3D
-    // 2D (row/column fits)
-    const G4bool   PROCESSING_2D_REMOVE_OUTLIERS = false;
-    const G4double PROCESSING_2D_OUTLIER_SIGMA = 4.0;      // threshold to be outlier
-    const G4int    PROCESSING_2D_MIN_POINTS_AFTER_CLIP = 3; // minimum points required for fit
-    // 3D (full 2D fit)
-    const G4bool   PROCESSING_3D_REMOVE_OUTLIERS = false;
-    const G4double PROCESSING_3D_OUTLIER_SIGMA = 4.0;
-    const G4int    PROCESSING_3D_MIN_POINTS_AFTER_CLIP = 5;
+    const G4bool RUN_PROCESSING_3D = true;  // Calls proc/processing3D.C
 
 } // namespace Constants
 

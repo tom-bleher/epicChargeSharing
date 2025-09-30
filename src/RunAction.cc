@@ -4,7 +4,6 @@
  */
 #include "RunAction.hh"
 #include "Constants.hh"
-#include "Control.hh"
 #include "DetectorConstruction.hh"
 
 #include "G4RunManager.hh"
@@ -93,57 +92,30 @@ static void RunPostProcessingMacros(const G4String& rootFilePath)
         gSystem->SetBuildDir("proc_cache");
     }
 
+    // Run processing2D using only the filename so all settings come from fitGaus.C defaults
     auto runMacro2D = [&](const char* macroPath) {
         if (!macroPath) return;
         const G4String loadCmdRebuild = Form(".L %s++", macroPath);
         gROOT->ProcessLine(loadCmdRebuild.c_str());
-        const char* chargeBranch = "Q_f";
-        const G4String callCmd = Form(
-            "processing2D(\"%s\", %.9g, %s, %s, %s, %s, \"%s\", %s, %.9g, %d, %s, %s, %s, %s, %s, %s);",
-            rootFilePath.c_str(),
-            Constants::PROCESSING_ERROR_PERCENT,
-            // saveParamA, saveParamMu, saveParamSigma, saveParamB -> all true
-            "true", "true", "true", "true",
-            chargeBranch,
-            // Force outlier removal off
-            "false",
-            Constants::PROCESSING_2D_OUTLIER_SIGMA,
-            (int)Constants::PROCESSING_2D_MIN_POINTS_AFTER_CLIP,
-            // saveOutlierMask=false, fitDiagonals per Constants
-            "false",
-            Constants::PROCESSING_2D_FIT_DIAGONALS ? "true" : "false",
-            // diagonal parameter save toggles
-            Constants::PROCESSING_2D_SAVE_DIAG_A ? "true" : "false",
-            Constants::PROCESSING_2D_SAVE_DIAG_MU ? "true" : "false",
-            Constants::PROCESSING_2D_SAVE_DIAG_SIGMA ? "true" : "false",
-            Constants::PROCESSING_2D_SAVE_DIAG_B ? "true" : "false"
-        );
+        const G4String callCmd = Form("processing2D(\"%s\");", rootFilePath.c_str());
         gROOT->ProcessLine(callCmd.c_str());
     };
 
+    // Run processing3D using only the filename so all settings come from fitGaus3D.C defaults
     auto runMacro3D = [&](const char* macroPath) {
         if (!macroPath) return;
         const G4String loadCmdRebuild = Form(".L %s++", macroPath);
         gROOT->ProcessLine(loadCmdRebuild.c_str());
-        const char* chargeBranch = "Q_f";
-        const G4String callCmd = Form(
-            "processing3D(\"%s\", %.9g, %s, %s, %s, %s, %s, %s, \"%s\");",
-            rootFilePath.c_str(),
-            Constants::PROCESSING_ERROR_PERCENT,
-            // save parameters A,mux,muy,sigx,sigy,B
-            "true", "true", "true", "true", "true", "true",
-            chargeBranch
-        );
-        // The 3D function also has defaulted outlier controls appended; use defaults set in the macro
+        const G4String callCmd = Form("processing3D(\"%s\");", rootFilePath.c_str());
         gROOT->ProcessLine(callCmd.c_str());
     };
 
     if (Constants::RUN_PROCESSING_2D) {
-        const G4String macroPath2D = G4String(PROJECT_SOURCE_DIR) + "/proc/processing2D.C";
+        const G4String macroPath2D = G4String(PROJECT_SOURCE_DIR) + "/src/fitGaus.C";
         runMacro2D(macroPath2D.c_str());
     }
     if (Constants::RUN_PROCESSING_3D) {
-        const G4String macroPath3D = G4String(PROJECT_SOURCE_DIR) + "/proc/processing3D.C";
+        const G4String macroPath3D = G4String(PROJECT_SOURCE_DIR) + "/src/fitGaus3D.C";
         runMacro3D(macroPath3D.c_str());
     }
 }
@@ -273,7 +245,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         
         fTree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
         fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
-        fTree->Branch("Q_n", &fNeighborhoodChargeNew)->SetTitle("Intermediate charge per pixel Q_new = Qi * Gauss(1,sigma_gain) [C]");
+        //fTree->Branch("Q_n", &fNeighborhoodChargeNew)->SetTitle("Intermediate charge per pixel Q_new = Qi * Gauss(1,sigma_gain) [C]");
         fTree->Branch("Q_f", &fNeighborhoodChargeFinal)->SetTitle("Noisy charge per pixel Q_i_final [C]");
         //fTree->Branch("d_i", &fNeighborhoodDistance)->SetTitle("Distance from hit to neighborhood pixel center [mm]");
         //fTree->Branch("alpha_i", &fNeighborhoodAlpha)->SetTitle("Subtended angle alpha used in weighting [rad]");
