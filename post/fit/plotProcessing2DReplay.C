@@ -171,6 +171,8 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
   // Saved fit parameters
   double rowA = NAN, rowMu = NAN, rowSig = NAN, rowB = NAN;
   double colA = NAN, colMu = NAN, colSig = NAN, colB = NAN;
+  // Optional mean-of-lines recon
+  double xMean = NAN, yMean = NAN;
   // Saved removal masks (0 = kept, 1 = removed)
   std::vector<int>* rowMask = nullptr;
   std::vector<int>* colMask = nullptr;
@@ -203,6 +205,10 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
   if (haveColMu) tree->SetBranchAddress("GaussColMu", &colMu);
   if (haveColSig) tree->SetBranchAddress("GaussColSigma", &colSig);
   if (haveColB) tree->SetBranchAddress("GaussColB", &colB);
+  const bool haveXMean = tree->GetBranch("ReconMeanX") != nullptr;
+  const bool haveYMean = tree->GetBranch("ReconMeanY") != nullptr;
+  if (haveXMean) tree->SetBranchAddress("ReconMeanX", &xMean);
+  if (haveYMean) tree->SetBranchAddress("ReconMeanY", &yMean);
 
   bool haveRowMask = tree->GetBranch("GaussRowMaskRemoved") != nullptr;
   bool haveColMask = tree->GetBranch("GaussColMaskRemoved") != nullptr;
@@ -487,6 +493,17 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     lineYrec.SetLineWidth(2);
     lineYrec.SetLineColor(kRed+1);
     lineYrec.Draw("SAME");
+    // Mean-of-lines Y (optional)
+    bool drewYMean = haveYMean && IsFinite(yMean);
+    TLine lineYmean;
+    if (drewYMean) {
+      lineYmean.SetX1(yMean); lineYmean.SetY1(yPadMinC);
+      lineYmean.SetX2(yMean); lineYmean.SetY2(yPadMaxC);
+      lineYmean.SetLineStyle(7);
+      lineYmean.SetLineWidth(2);
+      lineYmean.SetLineColor(kMagenta+2);
+      lineYmean.Draw("SAME");
+    }
 
     double fx1c = gPad->GetLeftMargin();
     double fy1c = gPad->GetBottomMargin();
@@ -501,6 +518,7 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     legCLeft.SetTextSize(0.03);
     legCLeft.AddEntry(&lineYtrue, "y_{true}", "l");
     legCLeft.AddEntry(&lineYrec,  "y_{rec}",  "l");
+    if (drewYMean) legCLeft.AddEntry(&lineYmean, "y_{mean}", "l");
     if (drewColQi) legCLeft.AddEntry(&gColQi, "Q_{i} points", "p");
     legCLeft.Draw();
     double rx2c = fx2c - insetc, rx1c = rx2c - legWc;
@@ -510,6 +528,7 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     legCRight.SetTextSize(0.03);
     legCRight.AddEntry((TObject*)nullptr, Form("y_{true} = %.4f mm", y_true), "");
     legCRight.AddEntry((TObject*)nullptr, Form("y_{rec} = %.4f mm", colMu), "");
+    if (drewYMean) legCRight.AddEntry((TObject*)nullptr, Form("y_{mean} = %.4f mm", yMean), "");
     if (didColFit) legCRight.AddEntry((TObject*)nullptr, Form("#sigma_{fit} = %.3f mm", colSig), "");
     legCRight.AddEntry((TObject*)nullptr, Form("y_{true}-y_{px} = %.1f #mum", 1000.0*(y_true - y_px)), "");
     legCRight.AddEntry((TObject*)nullptr, Form("y_{true}-y_{rec} = %.1f #mum", 1000.0*(y_true - colMu)), "");
@@ -615,6 +634,17 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     lineXrec.SetLineWidth(2);
     lineXrec.SetLineColor(kRed+1);
     lineXrec.Draw("SAME");
+    // Mean-of-lines X (optional)
+    bool drewXMean = haveXMean && IsFinite(xMean);
+    TLine lineXmean;
+    if (drewXMean) {
+      lineXmean.SetX1(xMean); lineXmean.SetY1(yPadMin);
+      lineXmean.SetX2(xMean); lineXmean.SetY2(yPadMax);
+      lineXmean.SetLineStyle(7);
+      lineXmean.SetLineWidth(2);
+      lineXmean.SetLineColor(kMagenta+2);
+      lineXmean.Draw("SAME");
+    }
 
     double fx1 = gPad->GetLeftMargin();
     double fy1 = gPad->GetBottomMargin();
@@ -629,6 +659,7 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     legLeft.SetTextSize(0.03);
     legLeft.AddEntry(&lineXtrue, "x_{true}", "l");
     legLeft.AddEntry(&lineXrec,  "x_{rec}",  "l");
+    if (drewXMean) legLeft.AddEntry(&lineXmean, "x_{mean}", "l");
     if (drewRowQi) legLeft.AddEntry(&gRowQi, "Q_{i} points", "p");
     legLeft.Draw();
     double rx2 = fx2 - inset, rx1 = rx2 - legW;
@@ -638,6 +669,7 @@ int processing2D_replay(const char* filename = "/home/tom/Desktop/Putza/epicChar
     legRight.SetTextSize(0.03);
     legRight.AddEntry((TObject*)nullptr, Form("x_{true} = %.4f mm", x_true), "");
     legRight.AddEntry((TObject*)nullptr, Form("x_{rec} = %.4f mm", rowMu), "");
+    if (drewXMean) legRight.AddEntry((TObject*)nullptr, Form("x_{mean} = %.4f mm", xMean), "");
     if (didRowFit) legRight.AddEntry((TObject*)nullptr, Form("#sigma_{fit} = %.3f mm", rowSig), "");
     legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{px} = %.1f #mum", 1000.0*(x_true - x_px)), "");
     legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{rec} = %.1f #mum", 1000.0*(x_true - rowMu)), "");
