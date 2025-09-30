@@ -254,7 +254,6 @@ list(APPEND sources
 list(APPEND headers 
     ${PROJECT_SOURCE_DIR}/include/ActionInitialization.hh
     ${PROJECT_SOURCE_DIR}/include/Constants.hh
-    ${PROJECT_SOURCE_DIR}/include/Control.hh
     ${PROJECT_SOURCE_DIR}/include/DetectorConstruction.hh
     ${PROJECT_SOURCE_DIR}/include/EventAction.hh
     ${PROJECT_SOURCE_DIR}/include/PhysicsList.hh
