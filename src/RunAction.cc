@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
+#include <cstdlib>
 
 #include "TFile.h"
 #include "TTree.h"
@@ -66,8 +67,20 @@ static void InitializeROOTThreading() {
     }
 }
 
+static bool IsInteractiveUI()
+{
+    const char* v = std::getenv("EPIC_INTERACTIVE_UI");
+    return (v && v[0] == '1');
+}
+
 static void RunPostProcessingMacros(const G4String& rootFilePath)
 {
+    // If we're in interactive UI mode, skip fitting entirely to avoid GUI freezes
+    if (IsInteractiveUI()) {
+        G4cout << "Interactive UI detected: skipping post-run fitting (processing2D/3D)." << G4endl;
+        return;
+    }
+
     if (!(Constants::RUN_PROCESSING_2D || Constants::RUN_PROCESSING_3D)) {
         return;
     }
@@ -92,22 +105,48 @@ static void RunPostProcessingMacros(const G4String& rootFilePath)
         gSystem->SetBuildDir("proc_cache");
     }
 
-    // Run processing2D using only the filename so all settings come from fitGaus.C defaults
+    // Helper to run macros either in-process (batch) or via an external ROOT process (interactive UI)
     auto runMacro2D = [&](const char* macroPath) {
         if (!macroPath) return;
-        const G4String loadCmdRebuild = Form(".L %s++", macroPath);
-        gROOT->ProcessLine(loadCmdRebuild.c_str());
-        const G4String callCmd = Form("processing2D(\"%s\");", rootFilePath.c_str());
-        gROOT->ProcessLine(callCmd.c_str());
+        if (IsInteractiveUI()) {
+            // External ROOT to avoid conflicts with the Geant4 UI/Qt when fitting
+            std::string absFile = std::filesystem::absolute(rootFilePath.c_str()).string();
+            std::string cmd = std::string("root -l -b -q ")
+                + "-e \"gSystem->mkdir(\\\"proc_cache\\\", true)\" "
+                + "-e \"gSystem->SetBuildDir(\\\"proc_cache\\\")\" "
+                + "-e \".L " + macroPath + "++\" "
+                + "-e \"processing2D(\\\"" + absFile + "\\\")\"";
+            int rc = std::system(cmd.c_str());
+            if (rc != 0) {
+                G4cerr << "External ROOT processing2D failed with code " << rc << G4endl;
+            }
+        } else {
+            const G4String loadCmdRebuild = Form(".L %s++", macroPath);
+            gROOT->ProcessLine(loadCmdRebuild.c_str());
+            const G4String callCmd = Form("processing2D(\"%s\");", rootFilePath.c_str());
+            gROOT->ProcessLine(callCmd.c_str());
+        }
     };
 
-    // Run processing3D using only the filename so all settings come from fitGaus3D.C defaults
     auto runMacro3D = [&](const char* macroPath) {
         if (!macroPath) return;
-        const G4String loadCmdRebuild = Form(".L %s++", macroPath);
-        gROOT->ProcessLine(loadCmdRebuild.c_str());
-        const G4String callCmd = Form("processing3D(\"%s\");", rootFilePath.c_str());
-        gROOT->ProcessLine(callCmd.c_str());
+        if (IsInteractiveUI()) {
+            std::string absFile = std::filesystem::absolute(rootFilePath.c_str()).string();
+            std::string cmd = std::string("root -l -b -q ")
+                + "-e \"gSystem->mkdir(\\\"proc_cache\\\", true)\" "
+                + "-e \"gSystem->SetBuildDir(\\\"proc_cache\\\")\" "
+                + "-e \".L " + macroPath + "++\" "
+                + "-e \"processing3D(\\\"" + absFile + "\\\")\"";
+            int rc = std::system(cmd.c_str());
+            if (rc != 0) {
+                G4cerr << "External ROOT processing3D failed with code " << rc << G4endl;
+            }
+        } else {
+            const G4String loadCmdRebuild = Form(".L %s++", macroPath);
+            gROOT->ProcessLine(loadCmdRebuild.c_str());
+            const G4String callCmd = Form("processing3D(\"%s\");", rootFilePath.c_str());
+            gROOT->ProcessLine(callCmd.c_str());
+        }
     };
 
     if (Constants::RUN_PROCESSING_2D) {

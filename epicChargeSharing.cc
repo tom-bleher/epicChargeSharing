@@ -13,6 +13,8 @@
 #include "DetectorConstruction.hh"
 #include "ActionInitialization.hh"
 
+#include <filesystem>
+
 int main(int argc, char** argv)
 {
     G4bool isBatch = false;
@@ -36,7 +38,6 @@ int main(int argc, char** argv)
                 return 1;
             }
         }
-        // Disable header/interactive-only modes: only macro-driven runs allowed
         else if (arg == "-t") {
             if (i + 1 < argc) {
                 requestedThreads = std::atoi(argv[++i]);
@@ -59,9 +60,10 @@ int main(int argc, char** argv)
     if (isBatch) {
         G4cout << "Setting batch mode environment variables..." << G4endl;
         setenv("QT_QPA_PLATFORM", "offscreen", 1);
+        setenv("EPIC_INTERACTIVE_UI", "0", 1);
     }
     
-    // No interactive UI; macro-driven only
+    // Interactive UI (default when no -m is provided)
     G4UIExecutive *ui = nullptr;
 
     // Create the appropriate run manager with enhanced multithreading support
@@ -134,26 +136,56 @@ int main(int argc, char** argv)
     // Get pointer to UI manager
     G4UImanager *uiManager = G4UImanager::GetUIpointer();
     
-    // Batch mode execution only
     if (macroFile.empty()) {
-        G4cerr << "Error: No macro file specified. Use -m <path-to-macro>." << G4endl;
+        // Interactive session: bring back GUI by default
+        ui = new G4UIExecutive(argc, argv);
+        setenv("EPIC_INTERACTIVE_UI", "1", 1);
+        
+        // Visualization
+        G4VisManager* visManager = new G4VisExecutive;
+        visManager->Initialize();
+        
+        // Execute visualization macro if present in build dir or source macros dir
+        try {
+            if (std::filesystem::exists("vis.mac")) {
+                uiManager->ApplyCommand("/control/execute vis.mac");
+            } else if (std::filesystem::exists("macros/vis.mac")) {
+                uiManager->ApplyCommand("/control/execute macros/vis.mac");
+            }
+        } catch (...) {
+            // ignore missing vis macro
+        }
+        
+        ui->SessionStart();
+        delete ui;
+        ui = nullptr;
+        
+        // Clean up
+        delete visManager;
         delete runManager;
-        return 1;
-    }
-    
-    G4cout << "Executing macro file: " << macroFile << G4endl;
-    G4String command = "/control/execute ";
-    command += macroFile;
-    G4int status = uiManager->ApplyCommand(command);
-    
-    if (status != 0) {
-        G4cerr << "Error executing macro file: " << macroFile << G4endl;
+    } else {
+        // Batch mode: execute provided macro file
+        G4cout << "Executing macro file: " << macroFile << G4endl;
+        G4String command = "/control/execute ";
+        command += macroFile;
+        G4int status = uiManager->ApplyCommand(command);
+        
+        // Clean up
         delete runManager;
-        return 1;
+        
+        if (status != 0) {
+            G4cerr << "Error executing macro file: " << macroFile << G4endl;
+            // Restore original environment variable if it was changed
+            if (isBatch) {
+                if (!oldQtPlatformValue.empty()) {
+                    setenv("QT_QPA_PLATFORM", oldQtPlatformValue.c_str(), 1);
+                } else {
+                    unsetenv("QT_QPA_PLATFORM");
+                }
+            }
+            return 1;
+        }
     }
-    
-    // Clean up
-    delete runManager;
     
     // Restore original environment variable if it was changed
     if (isBatch) {
