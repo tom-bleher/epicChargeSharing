@@ -169,6 +169,8 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
   // Saved diagonal fit parameters
   double d1A = NAN, d1Mu = NAN, d1Sig = NAN, d1B = NAN;
   double d2A = NAN, d2Mu = NAN, d2Sig = NAN, d2B = NAN;
+  // Optional mean-of-lines recon (x only relevant for diagonal plots)
+  double xMean = NAN;
 
   tree->SetBranchAddress("TrueX", &x_true);
   tree->SetBranchAddress("TrueY", &y_true);
@@ -181,23 +183,25 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
     tree->SetBranchAddress("Q_i", &QiVec);
   }
 
-  bool haveD1A = tree->GetBranch("GaussDiagMainA") != nullptr;
-  bool haveD1Mu = tree->GetBranch("GaussDiagMainMu") != nullptr;
-  bool haveD1Sig = tree->GetBranch("GaussDiagMainSigma") != nullptr;
-  bool haveD1B = tree->GetBranch("GaussDiagMainB") != nullptr;
-  bool haveD2A = tree->GetBranch("GaussDiagSecondA") != nullptr;
-  bool haveD2Mu = tree->GetBranch("GaussDiagSecondMu") != nullptr;
-  bool haveD2Sig = tree->GetBranch("GaussDiagSecondSigma") != nullptr;
-  bool haveD2B = tree->GetBranch("GaussDiagSecondB") != nullptr;
+  bool haveD1A = tree->GetBranch("GaussMDiagA") != nullptr;
+  bool haveD1Mu = tree->GetBranch("GaussMDiagMu") != nullptr;
+  bool haveD1Sig = tree->GetBranch("GaussMDiagSigma") != nullptr;
+  bool haveD1B = tree->GetBranch("GaussMDiagB") != nullptr;
+  bool haveD2A = tree->GetBranch("GaussSDiagA") != nullptr;
+  bool haveD2Mu = tree->GetBranch("GaussSDiagMu") != nullptr;
+  bool haveD2Sig = tree->GetBranch("GaussSDiagSigma") != nullptr;
+  bool haveD2B = tree->GetBranch("GaussSDiagB") != nullptr;
 
-  if (haveD1A) tree->SetBranchAddress("GaussDiagMainA", &d1A);
-  if (haveD1Mu) tree->SetBranchAddress("GaussDiagMainMu", &d1Mu);
-  if (haveD1Sig) tree->SetBranchAddress("GaussDiagMainSigma", &d1Sig);
-  if (haveD1B) tree->SetBranchAddress("GaussDiagMainB", &d1B);
-  if (haveD2A) tree->SetBranchAddress("GaussDiagSecondA", &d2A);
-  if (haveD2Mu) tree->SetBranchAddress("GaussDiagSecondMu", &d2Mu);
-  if (haveD2Sig) tree->SetBranchAddress("GaussDiagSecondSigma", &d2Sig);
-  if (haveD2B) tree->SetBranchAddress("GaussDiagSecondB", &d2B);
+  if (haveD1A) tree->SetBranchAddress("GaussMDiagA", &d1A);
+  if (haveD1Mu) tree->SetBranchAddress("GaussMDiagMu", &d1Mu);
+  if (haveD1Sig) tree->SetBranchAddress("GaussMDiagSigma", &d1Sig);
+  if (haveD1B) tree->SetBranchAddress("GaussMDiagB", &d1B);
+  if (haveD2A) tree->SetBranchAddress("GaussSDiagA", &d2A);
+  if (haveD2Mu) tree->SetBranchAddress("GaussSDiagMu", &d2Mu);
+  if (haveD2Sig) tree->SetBranchAddress("GaussSDiagSigma", &d2Sig);
+  if (haveD2B) tree->SetBranchAddress("GaussSDiagB", &d2B);
+  const bool haveXMean = tree->GetBranch("ReconMeanX") != nullptr;
+  if (haveXMean) tree->SetBranchAddress("ReconMeanX", &xMean);
 
   // Prepare plotting objects
   gROOT->SetBatch(true);
@@ -434,6 +438,17 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
     lineSrec1.SetLineWidth(2);
     lineSrec1.SetLineColor(kRed+1);
     lineSrec1.Draw("SAME");
+    // Mean-of-lines X (optional)
+    bool drewXMean1 = haveXMean && IsFinite(xMean);
+    TLine lineSmean1;
+    if (drewXMean1) {
+      lineSmean1.SetX1(xMean); lineSmean1.SetY1(yPadMin1);
+      lineSmean1.SetX2(xMean); lineSmean1.SetY2(yPadMax1);
+      lineSmean1.SetLineStyle(7);
+      lineSmean1.SetLineWidth(2);
+      lineSmean1.SetLineColor(kMagenta+2);
+      lineSmean1.Draw("SAME");
+    }
 
     {
       double fx1 = gPad->GetLeftMargin();
@@ -449,6 +464,7 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
       legLeft.SetTextSize(0.03);
       legLeft.AddEntry(&lineStrue1, "x_{true}", "l");
       legLeft.AddEntry(&lineSrec1,  "x_{rec}",  "l");
+      if (drewXMean1) legLeft.AddEntry(&lineSmean1, "x_{mean}", "l");
       if (drewD1Qi) legLeft.AddEntry(&gD1Qi, "Q_{i} points", "p");
       legLeft.Draw();
       double rx2 = fx2 - inset, rx1 = rx2 - legW;
@@ -458,6 +474,7 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
       legRight.SetTextSize(0.03);
       legRight.AddEntry((TObject*)nullptr, Form("x_{true} = %.4f mm", x_true), "");
       legRight.AddEntry((TObject*)nullptr, Form("x_{rec} = %.4f mm", d1Mu), "");
+      if (drewXMean1) legRight.AddEntry((TObject*)nullptr, Form("x_{mean} = %.4f mm", xMean), "");
       if (didD1Fit) legRight.AddEntry((TObject*)nullptr, Form("#sigma_{fit} = %.3f mm", d1Sig), "");
       legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{px} = %.1f #mum", 1000.0*(x_true - x_px)), "");
       legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{rec} = %.1f #mum", 1000.0*(x_true - d1Mu)), "");
@@ -538,6 +555,16 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
     lineSrec2.SetLineWidth(2);
     lineSrec2.SetLineColor(kRed+1);
     lineSrec2.Draw("SAME");
+    bool drewXMean2 = haveXMean && IsFinite(xMean);
+    TLine lineSmean2;
+    if (drewXMean2) {
+      lineSmean2.SetX1(xMean); lineSmean2.SetY1(yPadMin2);
+      lineSmean2.SetX2(xMean); lineSmean2.SetY2(yPadMax2);
+      lineSmean2.SetLineStyle(7);
+      lineSmean2.SetLineWidth(2);
+      lineSmean2.SetLineColor(kMagenta+2);
+      lineSmean2.Draw("SAME");
+    }
 
     {
       double fx1 = gPad->GetLeftMargin();
@@ -553,6 +580,7 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
       legLeft.SetTextSize(0.03);
       legLeft.AddEntry(&lineStrue2, "x_{true}", "l");
       legLeft.AddEntry(&lineSrec2,  "x_{rec}",  "l");
+      if (drewXMean2) legLeft.AddEntry(&lineSmean2, "x_{mean}", "l");
       if (drewD2Qi) legLeft.AddEntry(&gD2Qi, "Q_{i} points", "p");
       legLeft.Draw();
       double rx2 = fx2 - inset, rx1 = rx2 - legW;
@@ -562,6 +590,7 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
       legRight.SetTextSize(0.03);
       legRight.AddEntry((TObject*)nullptr, Form("x_{true} = %.4f mm", x_true), "");
       legRight.AddEntry((TObject*)nullptr, Form("x_{rec} = %.4f mm", d2Mu), "");
+      if (drewXMean2) legRight.AddEntry((TObject*)nullptr, Form("x_{mean} = %.4f mm", xMean), "");
       if (didD2Fit) legRight.AddEntry((TObject*)nullptr, Form("#sigma_{fit} = %.3f mm", d2Sig), "");
       legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{px} = %.1f #mum", 1000.0*(x_true - x_px)), "");
       legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{rec} = %.1f #mum", 1000.0*(x_true - d2Mu)), "");

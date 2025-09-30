@@ -242,9 +242,10 @@ class ResolutionGUI(QtWidgets.QMainWindow):
         if hits is None:
             return
         branches = set(hits.keys())
-        self.hasRecon2D = ("ReconTrueDeltaX" in branches) and ("ReconTrueDeltaY" in branches)
+        self.hasRecon2D = ("ReconTrueDeltaRowX" in branches) and ("ReconTrueDeltaColY" in branches)
         self.hasRecon3D = ("ReconTrueDeltaX_3D" in branches) and ("ReconTrueDeltaY_3D" in branches)
-        self.hasRecon2DSigned = ("ReconTrueDeltaX_Signed" in branches) and ("ReconTrueDeltaY_Signed" in branches)
+        # 2D signed uses the same base branches; abs mode takes |.| when plotting
+        self.hasRecon2DSigned = self.hasRecon2D
         self.hasRecon3DSigned = ("ReconTrueDeltaX_3D_Signed" in branches) and ("ReconTrueDeltaY_3D_Signed" in branches)
         self._update_mode_availability()
 
@@ -780,11 +781,11 @@ class ResolutionGUI(QtWidgets.QMainWindow):
 
         req_branches = ["TrueX", "TrueY", "isPixelHit"]
         if is2Dabs:
-            req_branches += ["ReconTrueDeltaX", "ReconTrueDeltaY"]
+            req_branches += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
         if is3Dabs:
             req_branches += ["ReconTrueDeltaX_3D", "ReconTrueDeltaY_3D"]
         if is2Dsgn:
-            req_branches += ["ReconTrueDeltaX_Signed", "ReconTrueDeltaY_Signed"]
+            req_branches += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
         if is3Dsgn:
             req_branches += ["ReconTrueDeltaX_3D_Signed", "ReconTrueDeltaY_3D_Signed"]
         arrs = self._read_arrays(req_branches)
@@ -832,14 +833,14 @@ class ResolutionGUI(QtWidgets.QMainWindow):
 
         # Build base dx/dy arrays and replicate if aggregating
         if is2Dabs:
-            dx_base = np.abs(arrs.get("ReconTrueDeltaX"))
-            dy_base = np.abs(arrs.get("ReconTrueDeltaY"))
+            dx_base = np.abs(arrs.get("ReconTrueDeltaRowX"))
+            dy_base = np.abs(arrs.get("ReconTrueDeltaColY"))
         elif is3Dabs:
             dx_base = np.abs(arrs.get("ReconTrueDeltaX_3D"))
             dy_base = np.abs(arrs.get("ReconTrueDeltaY_3D"))
         elif is2Dsgn:
-            dx_base = arrs.get("ReconTrueDeltaX_Signed")
-            dy_base = arrs.get("ReconTrueDeltaY_Signed")
+            dx_base = arrs.get("ReconTrueDeltaRowX")
+            dy_base = arrs.get("ReconTrueDeltaColY")
         else:  # is3Dsgn
             dx_base = arrs.get("ReconTrueDeltaX_3D_Signed")
             dy_base = arrs.get("ReconTrueDeltaY_3D_Signed")
