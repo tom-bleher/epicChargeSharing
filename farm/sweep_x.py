@@ -24,8 +24,7 @@ for p in GROUP1:
     POSITIONS.extend([p, -p])
 for p in GROUP2:
     POSITIONS.extend([p, -p])
-
- 
+POSITIONS.extend([0])
 
 # Regex pattern to locate the x position line in PrimaryGenerator.cc
 # We expect a line like:     const G4double x = -25.0*um;
@@ -131,7 +130,6 @@ def rename_output_to(target_name: Path):
     if target_name.exists():
         target_name.unlink()
     shutil.move(str(source), str(target_name))
-
 
 def main():
     os.chdir(str(REPO_ROOT))
