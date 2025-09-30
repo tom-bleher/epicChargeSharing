@@ -5,7 +5,6 @@
 #include "PrimaryGenerator.hh"
 #include "DetectorConstruction.hh"
 #include "Constants.hh"
-#include "Control.hh"
 #include "Randomize.hh"
 #include "G4Event.hh"
 #include "G4ParticleTable.hh"
@@ -22,21 +21,21 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     const G4ThreeVector momentumDirection(0.0, 0.0, -1.0);
 
     G4ParticleTable *particleTable = G4ParticleTable::GetParticleTable();
-    G4ParticleDefinition *particle = particleTable->FindParticle(Control::PARTICLE_TYPE);
+    G4ParticleDefinition *particle = particleTable->FindParticle("e-");
     if (!particle) {
-        G4cerr << "ERROR: Unknown particle type: " << Control::PARTICLE_TYPE << G4endl;
-        G4cerr << "Falling back to electron" << G4endl;
+        G4cerr << "ERROR: Failed to find default particle 'e-'" << G4endl;
         particle = particleTable->FindParticle("e-");
     }
     
     fParticleGun->SetParticleDefinition(particle);
     
-    fParticleGun->SetParticleEnergy(Control::PARTICLE_ENERGY * GeV);
+    // Default energy; can be overridden by macro commands
+    fParticleGun->SetParticleEnergy(10.0 * GeV);
     
     fParticleGun->SetParticleMomentumDirection(momentumDirection);
     
-    G4cout << "\nParticle gun (header-configured)" << G4endl;
-    G4cout << "  type: " << Control::PARTICLE_TYPE << ", E = " << Control::PARTICLE_ENERGY << " GeV" << G4endl;
+    G4cout << "\nParticle gun defaults (overridable via macros)" << G4endl;
+    G4cout << "  type: e- , E = 10 GeV" << G4endl;
 
     const G4double detSize = fDetector->GetDetSize();
     const G4int radius      = fDetector->GetNeighborhoodRadius(); // typically 4 for a 9x9 grid
