@@ -24,16 +24,10 @@ make -j$(nproc)
 
 ## Usage
 
-### Batch Mode
+### Batch Mode (required)
 ```bash
-# Multi-threaded with macro file
+# Macro-driven run (required)
 ./epicChargeSharing -m ../macros/run.mac
-```
-
-### GUI Mode
-```bash
-# Multi-threaded (default uses all CPU cores)
-./epicChargeSharing
 ```
 
 ## Repository Structure
@@ -45,7 +39,6 @@ epicChargeSharing/
 │   ├── EventAction.cc            # Event processing & charge sharing
 │   └── ...
 ├── include/                      # Header files
-│   ├── Control.hh               # Main configuration constants
 │   ├── Constants.hh             # Physics constants
 │   └── ...
 ├── macros/                       # GEANT4 macro files

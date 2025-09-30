@@ -13,13 +13,9 @@
 #include "DetectorConstruction.hh"
 #include "ActionInitialization.hh"
 
-#include "Control.hh"
-
 int main(int argc, char** argv)
 {
-    // Default settings
     G4bool isBatch = false;
-    G4bool headerMode = false;
     G4String macroFile = "";
     G4int requestedThreads = -1; // -1: use all available cores
     
@@ -40,10 +36,7 @@ int main(int argc, char** argv)
                 return 1;
             }
         }
-        else if (arg == "-header") {
-            headerMode = true;
-            isBatch = true; // Force batch mode for header-only execution
-        }
+        // Disable header/interactive-only modes: only macro-driven runs allowed
         else if (arg == "-t") {
             if (i + 1 < argc) {
                 requestedThreads = std::atoi(argv[++i]);
@@ -68,12 +61,8 @@ int main(int argc, char** argv)
         setenv("QT_QPA_PLATFORM", "offscreen", 1);
     }
     
-    // Only create UI executive if we're not in batch mode
+    // No interactive UI; macro-driven only
     G4UIExecutive *ui = nullptr;
-    if (!isBatch) {
-        // Use Qt session for interactive mode
-        ui = new G4UIExecutive(argc, argv, "Qt");
-    }
 
     // Create the appropriate run manager with enhanced multithreading support
     G4RunManager* runManager = nullptr;
@@ -145,76 +134,25 @@ int main(int argc, char** argv)
     // Get pointer to UI manager
     G4UImanager *uiManager = G4UImanager::GetUIpointer();
     
-    // Initialize visualization only in interactive mode
-    G4VisManager *visManager = nullptr;
+    // Batch mode execution only
+    if (macroFile.empty()) {
+        G4cerr << "Error: No macro file specified. Use -m <path-to-macro>." << G4endl;
+        delete runManager;
+        return 1;
+    }
     
-    if (!isBatch) {
-        // Only in interactive mode, set up visualization
-        visManager = new G4VisExecutive();
-        visManager->Initialize();
-        
-        // Execute the visualization macro
-        G4String command = "/control/execute macros/vis.mac";
-        G4int status = uiManager->ApplyCommand(command);
-        if (status != 0) {
-            uiManager->ApplyCommand("/control/execute vis.mac");
-        }
-        
-        ui->SessionStart();
-        delete ui;
-    } else {
-        // Batch mode execution
-        if (headerMode) {
-            // Header mode: initialize and run using only Control.hh constants
-            G4cout << "\n=== HEADER MODE EXECUTION ===\n"
-                   << "Particle: " << Control::PARTICLE_TYPE << " @ " << Control::PARTICLE_ENERGY << " GeV\n"
-                   << "Number of events: " << Control::NUMBER_OF_EVENTS << "\n"
-                   << "===============================" << G4endl;
-            
-            // Initialize the run manager
-            uiManager->ApplyCommand("/run/initialize");
-            
-            // Set verbosity (minimal for batch processing)
-            uiManager->ApplyCommand("/control/verbose 0");
-            uiManager->ApplyCommand("/run/verbose 0");
-            uiManager->ApplyCommand("/event/verbose 0");
-            uiManager->ApplyCommand("/tracking/verbose 0");
-            
-            // Run the simulation using the number of events from Control.hh
-            G4String beamOnCommand = "/run/beamOn " + std::to_string(Control::NUMBER_OF_EVENTS);
-            G4int status = uiManager->ApplyCommand(beamOnCommand);
-            
-            if (status != 0) {
-                G4cerr << "Error executing beamOn command" << G4endl;
-                delete runManager;
-                return 1;
-            }
-            
-            G4cout << "Header mode execution completed successfully" << G4endl;
-            
-        } else {
-            // Traditional macro file mode
-            if (macroFile.empty()) {
-                G4cerr << "Error: No macro file specified for batch mode" << G4endl;
-                delete runManager;
-                return 1;
-            }
-            
-            G4cout << "Executing macro file: " << macroFile << G4endl;
-            G4String command = "/control/execute ";
-            command += macroFile;
-            G4int status = uiManager->ApplyCommand(command);
-            
-            if (status != 0) {
-                G4cerr << "Error executing macro file: " << macroFile << G4endl;
-                delete runManager;
-                return 1;
-            }
-        }
+    G4cout << "Executing macro file: " << macroFile << G4endl;
+    G4String command = "/control/execute ";
+    command += macroFile;
+    G4int status = uiManager->ApplyCommand(command);
+    
+    if (status != 0) {
+        G4cerr << "Error executing macro file: " << macroFile << G4endl;
+        delete runManager;
+        return 1;
     }
     
     // Clean up
-    if (visManager) delete visManager;
     delete runManager;
     
     // Restore original environment variable if it was changed
