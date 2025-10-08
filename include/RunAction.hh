@@ -79,6 +79,7 @@ private:
     static std::condition_variable fWorkerCompletionCV;
     static std::mutex fSyncMutex;
     static std::atomic<bool> fAllWorkersCompleted;
+    std::mutex fTreeMutex;
     
     G4double fTrueX;
     G4double fTrueY;

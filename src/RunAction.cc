@@ -638,7 +638,7 @@ void RunAction::FillTree()
     }
 
     try {
-        std::lock_guard<std::mutex> lock(fRootMutex);
+        std::lock_guard<std::mutex> lock(fTreeMutex);
         
         // Fill the tree with all current data (including scorer data)
         G4int fillResult = fTree->Fill();
@@ -754,19 +754,38 @@ void RunAction::WaitForAllWorkersToComplete()
     if (G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread()) {
         std::unique_lock<std::mutex> lock(fSyncMutex);
         
-        G4cout << "RunAction: Master thread waiting for " << fTotalWorkers.load() << " workers to complete..." << G4endl;
-        
-        // Wait for all workers to complete with timeout
-        auto timeout = std::chrono::seconds(30); // 30 Sec timeout
-        bool completed = fWorkerCompletionCV.wait_for(lock, timeout, []() {
-            return fAllWorkersCompleted.load();
-        });
-        
-        if (completed) {
-            G4cout << "RunAction: All workers completed successfully" << G4endl;
-        } else {
-            G4cerr << "RunAction: Warning - Timeout waiting for workers to complete!" << G4endl;
+        const int totalWorkers = fTotalWorkers.load();
+        if (totalWorkers <= 0) {
+            G4cout << "RunAction: No worker threads active, skipping wait." << G4endl;
+            return;
         }
+
+        G4cout << "RunAction: Master thread waiting for " << totalWorkers << " workers to complete..." << G4endl;
+
+        const auto logInterval = std::chrono::seconds(5);
+        auto nextLog = std::chrono::steady_clock::now() + logInterval;
+
+        while (!fAllWorkersCompleted.load()) {
+            if (fWorkerCompletionCV.wait_until(lock, nextLog, []() {
+                    return fAllWorkersCompleted.load();
+                })) {
+                break;
+            }
+
+            const int completedWorkers = fWorkersCompleted.load();
+            const int totalNow = fTotalWorkers.load();
+            int remaining = totalNow - completedWorkers;
+            if (remaining < 0) {
+                remaining = 0;
+            }
+            if (remaining > 0) {
+                G4cout << "RunAction: Waiting for " << remaining << " worker"
+                       << (remaining == 1 ? "" : "s") << " to finish..." << G4endl;
+            }
+            nextLog = std::chrono::steady_clock::now() + logInterval;
+        }
+
+        G4cout << "RunAction: All workers completed successfully" << G4endl;
     }
 }
 
