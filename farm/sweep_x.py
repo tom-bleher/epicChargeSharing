@@ -8,7 +8,8 @@ import subprocess
 from pathlib import Path
 
 # Configuration
-REPO_ROOT = Path("/home/tom/Desktop/Putza/epicChargeSharing").resolve()
+# Resolve repository root relative to this script so the tool works anywhere
+REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_FILE = REPO_ROOT / "src" / "PrimaryGenerator.cc"
 BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"

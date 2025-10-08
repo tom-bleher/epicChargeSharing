@@ -54,7 +54,7 @@ void DetectorConstruction::SetPixelCornerOffset(G4double cornerOffset)
     
     // Trigger geometry reconstruction if we're already initialized
     G4RunManager* runManager = G4RunManager::GetRunManager();
-    if (runManager && runManager->GetRunManagerType() != G4RunManager::sequentialRM) {
+    if (runManager) {
         G4cout << "Requesting geometry update..." << G4endl;
         runManager->GeometryHasBeenModified();
     }

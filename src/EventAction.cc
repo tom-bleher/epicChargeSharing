@@ -250,6 +250,7 @@ void EventAction::CalcNeighborhoodChargeSharing(const G4ThreeVector& hitPos)
   std::vector<G4bool>   inBoundsGrid(totalCells, false);
   fNeighborhoodDistance.reserve(totalCells);
   fNeighborhoodAlpha.reserve(totalCells);
+  constexpr G4double guardFactor = 1.0 + 1e-6;  // keep log(distance/d0) strictly positive
   
   for (G4int di = -gridRadius; di <= gridRadius; ++di) {
     for (G4int dj = -gridRadius; dj <= gridRadius; ++dj) {
@@ -275,8 +276,11 @@ void EventAction::CalcNeighborhoodChargeSharing(const G4ThreeVector& hitPos)
       const G4double alpha = CalcPixelAlphaSubtended(hitX, hitY, pixelCenterX, pixelCenterY, pixelSize, pixelSize);
       
       G4double weight = 0.0;
-      const G4double logValue = std::log(distance / d0);
-      weight = alpha / logValue;
+      const G4double safeDistance = std::max(distance, d0 * guardFactor);
+      const G4double logValue = std::log(safeDistance / d0);
+      if (logValue > 0.0) {
+        weight = alpha / logValue;
+      }
       
       inBoundsGrid[idx] = true;
       weightGrid[idx] = weight;
