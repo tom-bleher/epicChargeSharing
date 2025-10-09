@@ -32,26 +32,32 @@ make -j$(nproc)
 
 ## Repository Structure
 
-```
-epicChargeSharing/
-├── src/                          # Source implementation
-│   ├── DetectorConstruction.cc   # Detector geometry
-│   ├── EventAction.cc            # Event processing & charge sharing
-│   └── ...
-├── include/                      # Header files
-│   ├── Constants.hh             # Physics constants
-│   └── ...
-├── macros/                       # GEANT4 macro files
-│   └── vis.mac                  # Visualization setup
-├── proc/                         # ROOT processing macros
-│   ├── processing2D.C
-│   ├── processing3D.C
-│   └── ...
-├── analysis/                     # Analysis scripts
-│   ├── python/                  # Python analysis tools
-│   └── root/                    # ROOT analysis scripts
-└── CMakeLists.txt               # Build configuration
-```
+    epicChargeSharing/
+    |-- src/                      # Source implementation
+    |   |-- DetectorConstruction.cc
+    |   |-- EventAction.cc
+    |   |-- RunAction.cc
+    |   |-- fitGaus1D.C
+    |   \-- fitGaus2D.C
+    |-- include/                  # Header files
+    |   |-- Constants.hh
+    |   \-- ...
+    |-- macros/                   # GEANT4 macro files
+    |   \-- vis.mac               # Visualization setup
+    |-- proc/                     # ROOT post-processing macros
+    |   |-- fit/
+    |   |   |-- plotFitGaus1D.C
+    |   |   |-- plotFitGaus2D.C
+    |   |   \-- ...
+    |   |-- grid/
+    |   |   |-- plotChargeNeighborhood.C
+    |   |   \-- ...
+    |   \-- gui/
+    |       \-- ...
+    |-- analysis/
+    |   |-- python/
+    |   \-- root/
+    \-- CMakeLists.txt            # Build configuration
 
 ## Contact
 

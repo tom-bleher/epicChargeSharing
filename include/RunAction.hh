@@ -69,6 +69,8 @@ public:
     void FillTree();
 
 private:
+    void RunPostProcessingFits();
+
     std::unique_ptr<RootFileWriterHelper> fRootWriter;
     std::mutex fTreeMutex;
 

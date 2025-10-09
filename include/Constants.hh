@@ -72,8 +72,8 @@ namespace Constants {
     // POST-RUN PROCESSING (Gaussian fits over the charge neighborhood)
     // ========================
     // Control whether to run ROOT post-processing macros automatically after the run finishes
-    const G4bool RUN_PROCESSING_2D = true;   // Calls proc/processing2D.C
-    const G4bool RUN_PROCESSING_3D = true;  // Calls proc/processing3D.C
+    const G4bool FIT_GAUS_1D = true;   // Calls src/fitGaus1D.C
+    const G4bool FIT_GAUS_2D = true;   // Calls src/fitGaus2D.C
 
 } // namespace Constants
 
