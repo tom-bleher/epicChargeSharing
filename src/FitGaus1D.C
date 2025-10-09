@@ -1,4 +1,4 @@
-// ROOT macro: processing2D.C
+// ROOT macro: FitGaus1D.C
 // Performs 1D Gaussian fits on central row and column of the charge neighborhood
 // using Q_f (noisy charge per pixel) to reconstruct (x_rec_2d, y_rec_2d) and
 // deltas, and appends them as new branches. Falls back to Q_i if Q_f is absent.
@@ -53,7 +53,7 @@ namespace {
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
 // of the event's maximum charge within the neighborhood. The same error is
 // applied to all data points used in the fits for that event.
-int processing2D(const char* filename = "../build/epicChargeSharing.root",
+int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                  double errorPercentOfMax = 5.0,
                  bool saveParamA = true,
                  bool saveParamMu = true,
@@ -75,14 +75,14 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   // Open file for update
   TFile* file = TFile::Open(filename, "UPDATE");
   if (!file || file->IsZombie()) {
-    ::Error("processing2D", "Cannot open file: %s", filename);
+    ::Error("FitGaus1D", "Cannot open file: %s", filename);
     return 1;
   }
 
   // Get tree (check first to provide clearer error when wrong file is passed)
   TTree* tree = dynamic_cast<TTree*>(file->Get("Hits"));
   if (!tree) {
-    ::Error("processing2D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
+    ::Error("FitGaus1D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
     file->Close();
     delete file;
     return 3;
@@ -166,7 +166,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     pixelSpacing = inferSpacingFromTree(tree);
   }
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
-    ::Error("processing2D", "Pixel spacing not available (metadata missing and inference failed). Aborting.");
+    ::Error("FitGaus1D", "Pixel spacing not available (metadata missing and inference failed). Aborting.");
     file->Close();
     delete file;
     return 2;
@@ -184,7 +184,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     else if (hasBranch("F_i")) chosenCharge = "F_i";
     else if (hasBranch("Q_i")) chosenCharge = "Q_i";
     else {
-      ::Error("processing2D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
+      ::Error("FitGaus1D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
       file->Close();
       delete file;
       return 4;
@@ -433,7 +433,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   std::iota(indices.begin(), indices.end(), 0);
   ROOT::TThreadExecutor exec; // uses ROOT IMT pool size by default
   // Suppress expected Minuit2 error spam during Fumili2 attempts; we'll fallback to MIGRAD if needed
-  const int prevErrorLevel_processing2D = gErrorIgnoreLevel;
+  const int prevErrorLevel_FitGaus1D = gErrorIgnoreLevel;
   gErrorIgnoreLevel = kFatal;
   exec.Foreach([&](int i){
     const bool isPix = v_is_pixel[i] != 0;
@@ -856,7 +856,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
     }
   }, indices);
   // Restore previous error level
-  gErrorIgnoreLevel = prevErrorLevel_processing2D;
+  gErrorIgnoreLevel = prevErrorLevel_FitGaus1D;
 
   // Sequentially write outputs to the tree (thread-safe)
   for (Long64_t i = 0; i < nEntries; ++i) {
@@ -942,7 +942,7 @@ int processing2D(const char* filename = "../build/epicChargeSharing.root",
   file->Close();
   delete file;
 
-  ::Info("processing2D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
+  ::Info("FitGaus1D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
   return 0;
 }
 
