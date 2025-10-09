@@ -280,22 +280,24 @@ void DetectorConstruction::WriteGeometryLog(const PixelGridStats& stats,
            << "  coverage:            " << stats.coverage << G4endl;
 }
 
-void DetectorConstruction::SyncRunMetadata() const
+void DetectorConstruction::SyncRunMetadata()
 {
     if (auto* runManager = G4RunManager::GetRunManager()) {
-        if (auto* runAction = static_cast<RunAction*>(runManager->GetUserRunAction())) {
-            runAction->SetDetectorGridParameters(
-                fPixelSize,
-                fPixelSpacing,
-                fPixelCornerOffset,
-                fDetSize,
-                fNumBlocksPerSide);
-            runAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
+        if (const auto* userRunAction = runManager->GetUserRunAction()) {
+            if (auto* runAction = const_cast<RunAction*>(dynamic_cast<const RunAction*>(userRunAction))) {
+                runAction->SetDetectorGridParameters(
+                    fPixelSize,
+                    fPixelSpacing,
+                    fPixelCornerOffset,
+                    fDetSize,
+                    fNumBlocksPerSide);
+                runAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
 
-            G4cout << "Updated RunAction with final grid parameters:" << G4endl
-                   << "  Final detector size: " << fDetSize / mm << " mm" << G4endl
-                   << "  Fixed pixel corner offset: " << fPixelCornerOffset / mm << " mm" << G4endl
-                   << "  Final number of blocks per side: " << fNumBlocksPerSide << G4endl;
+                G4cout << "Updated RunAction with final grid parameters:" << G4endl
+                       << "  Final detector size: " << fDetSize / mm << " mm" << G4endl
+                       << "  Fixed pixel corner offset: " << fPixelCornerOffset / mm << " mm" << G4endl
+                       << "  Final number of blocks per side: " << fNumBlocksPerSide << G4endl;
+            }
         }
     }
 }
