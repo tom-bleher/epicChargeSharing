@@ -237,7 +237,7 @@ void ChargeSharingCalculator::ComputeNeighborhoodGeometry()
 
     const G4double firstPixelPos = -detSize / 2 + pixelCornerOffset + pixelSize / 2;
     const G4int gridRadius = std::max(0, fNeighborhoodRadius);
-    const G4int gridDim = 2 * gridRadius + 1;
+    // gridDim not needed here; kept internal for indexing where used
 
     for (G4int di = -gridRadius; di <= gridRadius; ++di) {
         for (G4int dj = -gridRadius; dj <= gridRadius; ++dj) {

@@ -69,7 +69,7 @@ private:
     PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical, const MaterialSet& mats, G4bool checkOverlaps);
     void InitializePixelGainSigmas();
     void WriteGeometryLog(const PixelGridStats& stats, G4double originalDetSize) const;
-    void SyncRunMetadata() const;
+    void SyncRunMetadata();
 
     G4double fPixelSize;
     G4double fPixelWidth;

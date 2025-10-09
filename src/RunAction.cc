@@ -79,6 +79,27 @@ private:
     bool fAllWorkersCompleted{false};
 };
 
+static std::once_flag gRootInitFlag;
+static std::mutex gRootIOMutex;
+
+void InitializeROOTThreading()
+{
+    // Keep ROOT in batch mode; avoid enabling ROOT implicit MT or TThread here
+    // to reduce chances of interpreter/merger thread-safety issues.
+    gROOT->SetBatch(true);
+}
+
+G4String WorkerFileName(G4int threadId)
+{
+    std::ostringstream oss;
+    oss << "epicChargeSharing_t" << threadId << ".root";
+    return oss.str();
+}
+
+} // namespace
+
+// Move RootFileWriterHelper to global scope so it matches the forward
+// declaration in include/RunAction.hh and is a complete type in this TU.
 class RootFileWriterHelper
 {
 public:
@@ -96,8 +117,9 @@ public:
     TFile* File() const { return fRootFile; }
     TTree* Tree() const { return fTree; }
 
-    bool SafeWrite(bool isMultithreaded, bool isWorker)
+    bool SafeWrite(bool /*isMultithreaded*/, bool isWorker)
     {
+        std::lock_guard<std::mutex> globalLock(gRootIOMutex);
         std::unique_lock<std::mutex> lock(fMutex, std::defer_lock);
         if (!isWorker) {
             lock.lock();
@@ -122,6 +144,7 @@ public:
 
     bool Validate(const G4String& filename)
     {
+        std::lock_guard<std::mutex> globalLock(gRootIOMutex);
         if (filename.empty()) {
             G4cerr << "RunAction: Error - Empty filename provided for validation" << G4endl;
             return false;
@@ -163,6 +186,7 @@ public:
 
     void Cleanup()
     {
+        std::lock_guard<std::mutex> globalLock(gRootIOMutex);
         std::lock_guard<std::mutex> lock(fMutex);
         if (fRootFile) {
             if (fRootFile->IsOpen()) {
@@ -184,6 +208,7 @@ public:
                                    G4int numBlocksPerSide,
                                    G4int neighborhoodRadius)
     {
+        std::lock_guard<std::mutex> globalLock(gRootIOMutex);
         std::lock_guard<std::mutex> lock(fMutex);
         if (!fRootFile || fRootFile->IsZombie()) {
             return;
@@ -210,36 +235,6 @@ private:
     TTree* fTree{nullptr};
     bool fOwnsObjects{false};
 };
-
-static std::once_flag gRootInitFlag;
-
-void InitializeROOTThreading()
-{
-    if (G4Threading::IsMultithreadedApplication()) {
-        TThread::Initialize();
-        gROOT->SetBatch(true);
-
-#if ROOT_VERSION_CODE >= ROOT_VERSION(6, 18, 0)
-        try {
-            if (!ROOT::IsImplicitMTEnabled()) {
-                ROOT::EnableImplicitMT();
-                G4cout << "ROOT: implicit MT enabled" << G4endl;
-            }
-        } catch (...) {
-            G4cout << "ROOT multi-threading not available in this version" << G4endl;
-        }
-#endif
-    }
-}
-
-G4String WorkerFileName(G4int threadId)
-{
-    std::ostringstream oss;
-    oss << "epicChargeSharing_t" << threadId << ".root";
-    return oss.str();
-}
-
-} // namespace
 
 RunAction::RunAction()
     : G4UserRunAction(),
@@ -303,35 +298,37 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     }
 
     if (!isMT || isWorker) {
-        auto* rootFile = TFile::Open(fileName.c_str(), "RECREATE");
+        std::unique_lock<std::mutex> rootInitLock(gRootIOMutex);
+        auto* rootFile = new TFile(fileName.c_str(), "RECREATE");
         if (!rootFile || rootFile->IsZombie()) {
             G4Exception("RunAction::BeginOfRunAction",
                         "RootFileOpenFailure",
                         FatalException,
                         ("Unable to open ROOT file " + fileName).c_str());
         }
+        rootFile->SetCompressionLevel(0);
 
         auto* tree = new TTree("Hits", "AC-LGAD charge sharing hits");
 
-        tree->Branch("true_x", &fTrueX);
-        tree->Branch("true_y", &fTrueY);
-        tree->Branch("pixel_x", &fPixelX);
-        tree->Branch("pixel_y", &fPixelY);
-        tree->Branch("edep", &fEdep);
-        tree->Branch("delta_x", &fPixelTrueDeltaX);
-        tree->Branch("delta_y", &fPixelTrueDeltaY);
-        tree->Branch("first_contact_is_pixel", &fFirstContactIsPixel);
-        tree->Branch("geometric_is_pixel", &fGeometricIsPixel);
-        tree->Branch("is_pixel_hit", &fIsPixelHit);
-        tree->Branch("charge_fraction", &fNeighborhoodChargeFractions);
-        tree->Branch("charge_coulomb", &fNeighborhoodCharge);
-        tree->Branch("charge_coulomb_noise", &fNeighborhoodChargeNew);
-        tree->Branch("charge_coulomb_final", &fNeighborhoodChargeFinal);
-        tree->Branch("distance_mm", &fNeighborhoodDistance);
-        tree->Branch("alpha_rad", &fNeighborhoodAlpha);
-        tree->Branch("pixel_center_x", &fNeighborhoodPixelX);
-        tree->Branch("pixel_center_y", &fNeighborhoodPixelY);
-        tree->Branch("pixel_ids", &fNeighborhoodPixelID);
+        tree->Branch("TrueX", &fTrueX, "TrueX/D");
+        tree->Branch("TrueY", &fTrueY, "TrueY/D");
+        tree->Branch("PixelX", &fPixelX, "PixelX/D");
+        tree->Branch("PixelY", &fPixelY, "PixelY/D");
+        tree->Branch("Edep", &fEdep, "Edep/D");
+        tree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "PixelTrueDeltaX/D");
+        tree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "PixelTrueDeltaY/D");
+        tree->Branch("FirstContactIsPixel", &fFirstContactIsPixel, "FirstContactIsPixel/O");
+        tree->Branch("GeometricIsPixel", &fGeometricIsPixel, "GeometricIsPixel/O");
+        tree->Branch("isPixelHit", &fIsPixelHit, "isPixelHit/O");
+        tree->Branch("F_i", &fNeighborhoodChargeFractions);
+        tree->Branch("Q_i", &fNeighborhoodCharge);
+        tree->Branch("Q_n", &fNeighborhoodChargeNew);
+        tree->Branch("Q_f", &fNeighborhoodChargeFinal);
+        tree->Branch("d_i", &fNeighborhoodDistance);
+        tree->Branch("alpha_i", &fNeighborhoodAlpha);
+        tree->Branch("NeighborhoodPixelX", &fNeighborhoodPixelX);
+        tree->Branch("NeighborhoodPixelY", &fNeighborhoodPixelY);
+        tree->Branch("NeighborhoodPixelID", &fNeighborhoodPixelID);
 
         fRootWriter->Attach(rootFile, tree, true);
     } else {
@@ -383,34 +380,116 @@ void RunAction::EndOfRunAction(const G4Run* run)
     // Master thread in MT mode
     WaitForAllWorkersToComplete();
 
-    std::vector<G4String> workerFiles;
     const G4int totalWorkers = G4Threading::GetNumberOfRunningWorkerThreads();
+    std::vector<G4String> workerFiles;
     workerFiles.reserve(totalWorkers);
     for (G4int tid = 0; tid < totalWorkers; ++tid) {
         workerFiles.push_back(WorkerFileName(tid));
     }
 
-    TFileMerger merger;
-    merger.OutputFile("epicChargeSharing.root");
-    for (const auto& workerFile : workerFiles) {
-        if (std::filesystem::exists(workerFile.c_str())) {
-            if (!merger.AddFile(workerFile.c_str())) {
-                G4cerr << "RunAction: Failed to add " << workerFile << " to merger" << G4endl;
+    std::vector<G4String> existingFiles;
+    existingFiles.reserve(workerFiles.size());
+    for (const auto& wf : workerFiles) {
+        if (std::filesystem::exists(wf.c_str()) && std::filesystem::file_size(wf.c_str()) > 0) {
+            existingFiles.push_back(wf);
+        }
+    }
+
+    if (existingFiles.empty()) {
+        G4cout << "RunAction: No worker ROOT files found after MT run; skipping merge" << G4endl;
+        return;
+    }
+
+    auto mergeFiles = [](const std::vector<G4String>& inputs,
+                         const G4String& output) -> bool {
+        if (inputs.empty()) {
+            return false;
+        }
+
+        TFileMerger merger(kFALSE);
+        merger.SetFastMethod(kFALSE);
+        merger.SetNotrees(kFALSE);
+        if (!merger.OutputFile(output.c_str(), "RECREATE")) {
+            G4cerr << "RunAction: Unable to set output file " << output << " for merger" << G4endl;
+            return false;
+        }
+
+        bool added = false;
+        for (const auto& file : inputs) {
+            if (std::filesystem::exists(file.c_str())) {
+                if (merger.AddFile(file.c_str())) {
+                    added = true;
+                } else {
+                    G4cerr << "RunAction: Failed to queue " << file << " for merge" << G4endl;
+                }
+            }
+        }
+
+        if (!added) {
+            G4cerr << "RunAction: No readable worker files were added to the merger" << G4endl;
+            return false;
+        }
+
+        return merger.Merge();
+    };
+
+    bool mergeOk = false;
+    {
+        std::lock_guard<std::mutex> ioLock(gRootIOMutex);
+        mergeOk = mergeFiles(existingFiles, "epicChargeSharing.root");
+        if (mergeOk && fGridPixelSize > 0) {
+            std::unique_ptr<TFile> mergedFile(TFile::Open("epicChargeSharing.root", "UPDATE"));
+            if (mergedFile && !mergedFile->IsZombie()) {
+                mergedFile->cd();
+                TNamed pixelSizeMeta("GridPixelSize_mm", Form("%.6f", fGridPixelSize));
+                TNamed pixelSpacingMeta("GridPixelSpacing_mm", Form("%.6f", fGridPixelSpacing));
+                TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm",
+                                             Form("%.6f", fGridPixelCornerOffset));
+                TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", fGridDetSize));
+                TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
+                const G4int radiusValue =
+                    fGridNeighborhoodRadius > 0 ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS;
+                TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", radiusValue));
+
+                pixelSizeMeta.Write("", TObject::kOverwrite);
+                pixelSpacingMeta.Write("", TObject::kOverwrite);
+                pixelCornerOffsetMeta.Write("", TObject::kOverwrite);
+                detSizeMeta.Write("", TObject::kOverwrite);
+                numBlocksMeta.Write("", TObject::kOverwrite);
+                neighborhoodRadiusMeta.Write("", TObject::kOverwrite);
+
+                mergedFile->Flush();
+                mergedFile->Close();
+            } else {
+                G4cerr << "RunAction: Failed to open merged ROOT file for metadata update" << G4endl;
             }
         }
     }
 
-    if (merger.Merge()) {
-        if (!ValidateRootFile("epicChargeSharing.root")) {
-            G4cerr << "RunAction: Merged ROOT file validation failed" << G4endl;
-        } else {
-            G4cout << "RunAction: Merged ROOT file written successfully" << G4endl;
-            // Master thread: run post-processing fits on merged output
-            RunPostProcessingFits();
-        }
-    } else {
+    if (!mergeOk) {
         G4cerr << "RunAction: ROOT file merge failed" << G4endl;
+        return;
     }
+
+    if (!ValidateRootFile("epicChargeSharing.root")) {
+        G4cerr << "RunAction: Merged ROOT file validation failed" << G4endl;
+        return;
+    }
+
+    G4cout << "RunAction: Merged ROOT file written successfully" << G4endl;
+
+    for (const auto& file : existingFiles) {
+        std::error_code ec;
+        if (std::filesystem::remove(file.c_str(), ec)) {
+            G4cout << "RunAction: Removed worker file " << file << G4endl;
+        } else if (ec) {
+            G4cerr << "RunAction: Could not remove worker file " << file << " (" << ec.message()
+                   << ")" << G4endl;
+        }
+    }
+
+    // Master thread: run post-processing fits on merged output
+    RunPostProcessingFits();
 }
 
 void RunAction::RunPostProcessingFits()
