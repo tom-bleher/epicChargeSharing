@@ -262,12 +262,12 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   TBranch* br_sigx = nullptr;
   TBranch* br_sigy = nullptr;
   TBranch* br_B = nullptr;
-  if (saveParamA)   br_A   = ensureAndResetBranch("Gauss3D_A", &gauss3d_A);
-  if (saveParamMux) br_mux = ensureAndResetBranch("Gauss3D_mux", &gauss3d_mux);
-  if (saveParamMuy) br_muy = ensureAndResetBranch("Gauss3D_muy", &gauss3d_muy);
-  if (saveParamSigx) br_sigx = ensureAndResetBranch("Gauss3D_sigx", &gauss3d_sigx);
-  if (saveParamSigy) br_sigy = ensureAndResetBranch("Gauss3D_sigy", &gauss3d_sigy);
-  if (saveParamB)   br_B   = ensureAndResetBranch("Gauss3D_B", &gauss3d_B);
+  if (saveParamA)   br_A   = ensureAndResetBranch("Gauss2D_A", &gauss3d_A);
+  if (saveParamMux) br_mux = ensureAndResetBranch("Gauss2D_mux", &gauss3d_mux);
+  if (saveParamMuy) br_muy = ensureAndResetBranch("Gauss2D_muy", &gauss3d_muy);
+  if (saveParamSigx) br_sigx = ensureAndResetBranch("Gauss2D_sigx", &gauss3d_sigx);
+  if (saveParamSigy) br_sigy = ensureAndResetBranch("Gauss2D_sigy", &gauss3d_sigy);
+  if (saveParamB)   br_B   = ensureAndResetBranch("Gauss2D_B", &gauss3d_B);
 
   // 2D fit function kept for reference. We use Minuit2 on a compact window.
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
