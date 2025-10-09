@@ -119,42 +119,20 @@ G4ThreeVector EventAction::DetermineHitPosition() const
 
 G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
 {
-    const G4double pixelSize = fDetector->GetPixelSize();
-    const G4double pixelSpacing = fDetector->GetPixelSpacing();
-    const G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
-    const G4double detSize = fDetector->GetDetSize();
-    const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
-    const G4ThreeVector detectorPos = fDetector->GetDetectorPos();
+    const auto location = fDetector->FindNearestPixel(pos);
 
-    const G4ThreeVector relativePos = pos - detectorPos;
-    const G4double firstPixelPos = -detSize / 2 + pixelCornerOffset + pixelSize / 2;
+    fPixelIndexI = location.indexI;
+    fPixelIndexJ = location.indexJ;
 
-    G4int i = static_cast<G4int>(std::round((relativePos.x() - firstPixelPos) / pixelSpacing));
-    G4int j = static_cast<G4int>(std::round((relativePos.y() - firstPixelPos) / pixelSpacing));
-
-    const G4bool isWithinDetector =
-        (i >= 0 && i < numBlocksPerSide && j >= 0 && j < numBlocksPerSide);
-
-    i = std::max(0, std::min(i, numBlocksPerSide - 1));
-    j = std::max(0, std::min(j, numBlocksPerSide - 1));
-
-    const G4double pixelX = firstPixelPos + i * pixelSpacing;
-    const G4double pixelY = firstPixelPos + j * pixelSpacing;
-    const G4double pixelZ =
-        detectorPos.z() + Constants::DETECTOR_WIDTH / 2 + Constants::PIXEL_WIDTH / 2;
-
-    fPixelIndexI = i;
-    fPixelIndexJ = j;
-
-    if (isWithinDetector) {
-        fPixelTrueDeltaX = std::abs(pixelX - pos.x());
-        fPixelTrueDeltaY = std::abs(pixelY - pos.y());
+    if (location.withinDetector) {
+        fPixelTrueDeltaX = std::abs(location.center.x() - pos.x());
+        fPixelTrueDeltaY = std::abs(location.center.y() - pos.y());
     } else {
         fPixelTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
         fPixelTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
     }
 
-    return {pixelX, pixelY, pixelZ};
+    return location.center;
 }
 
 void EventAction::UpdatePixelAndHitClassification(const G4ThreeVector& hitPos,
