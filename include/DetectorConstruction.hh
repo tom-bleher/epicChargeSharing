@@ -19,6 +19,7 @@ class G4PVPlacement;
 class G4VisAttributes;
 class G4MultiFunctionalDetector;
 class G4VPrimitiveScorer;
+class G4Material;
 
 class DetectorConstruction : public G4VUserDetectorConstruction
 {
@@ -50,6 +51,26 @@ public:
     void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
     
 private:
+    struct MaterialSet {
+        G4Material* world;
+        G4Material* silicon;
+        G4Material* aluminum;
+    };
+
+    struct PixelGridStats {
+        G4double totalPixelArea;
+        G4double detectorArea;
+        G4double coverage;
+    };
+
+    MaterialSet PrepareMaterials() const;
+    G4VPhysicalVolume* BuildWorld(const MaterialSet& mats, G4bool checkOverlaps, G4LogicalVolume*& logicWorld);
+    G4LogicalVolume* BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats, G4bool checkOverlaps, G4double originalDetSize);
+    PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical, const MaterialSet& mats, G4bool checkOverlaps);
+    void InitializePixelGainSigmas();
+    void WriteGeometryLog(const PixelGridStats& stats, G4double originalDetSize) const;
+    void SyncRunMetadata() const;
+
     G4double fPixelSize;
     G4double fPixelWidth;
     G4double fPixelSpacing;

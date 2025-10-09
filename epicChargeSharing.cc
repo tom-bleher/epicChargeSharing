@@ -1,201 +1,261 @@
-#include <iostream>
+#include <cstdlib>
+#include <memory>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
-#include "G4RunManager.hh"
 #include "G4MTRunManager.hh"
-#include "G4UImanager.hh"
-#include "G4VisManager.hh"
-#include "G4VisExecutive.hh"
-#include "G4UIExecutive.hh"
+#include "G4RunManager.hh"
 #include "G4Threading.hh"
-#include "G4ScoringManager.hh"
+#include "G4UImanager.hh"
+#include "G4UIExecutive.hh"
+#include "G4VisExecutive.hh"
+#include "G4VisManager.hh"
 
-#include "PhysicsList.hh"
-#include "DetectorConstruction.hh"
 #include "ActionInitialization.hh"
+#include "DetectorConstruction.hh"
+#include "PhysicsList.hh"
 
 #include <filesystem>
+#include <iostream>
+
+namespace
+{
+struct ProgramOptions {
+    G4bool isBatch{false};
+    G4String macroFile{};
+    G4int requestedThreads{-1};
+};
+
+#ifdef _WIN32
+void SetEnv(const std::string& key, const std::string& value)
+{
+    _putenv_s(key.c_str(), value.c_str());
+}
+
+void UnsetEnv(const std::string& key)
+{
+    _putenv_s(key.c_str(), "");
+}
+#else
+void SetEnv(const std::string& key, const std::string& value)
+{
+    ::setenv(key.c_str(), value.c_str(), 1);
+}
+
+void UnsetEnv(const std::string& key)
+{
+    ::unsetenv(key.c_str());
+}
+#endif
+
+class EnvironmentGuard
+{
+public:
+    EnvironmentGuard() = default;
+
+    EnvironmentGuard(std::string key, std::string value)
+    {
+        Apply(std::move(key), std::move(value));
+    }
+
+    ~EnvironmentGuard()
+    {
+        Restore();
+    }
+
+    void Apply(std::string key, std::string value)
+    {
+        Restore();
+        fKey = std::move(key);
+        const char* current = std::getenv(fKey.c_str());
+        if (current) {
+            fPrevious.emplace(current);
+        }
+        SetEnv(fKey, value);
+        fApplied = true;
+    }
+
+    void Restore()
+    {
+        if (!fApplied) {
+            return;
+        }
+        if (fPrevious) {
+            SetEnv(fKey, *fPrevious);
+        } else {
+            UnsetEnv(fKey);
+        }
+        fApplied = false;
+        fPrevious.reset();
+    }
+
+    EnvironmentGuard(const EnvironmentGuard&) = delete;
+    EnvironmentGuard& operator=(const EnvironmentGuard&) = delete;
+    EnvironmentGuard(EnvironmentGuard&& other) noexcept
+    {
+        *this = std::move(other);
+    }
+    EnvironmentGuard& operator=(EnvironmentGuard&& other) noexcept
+    {
+        if (this != &other) {
+            Restore();
+            fKey = std::move(other.fKey);
+            fPrevious = std::move(other.fPrevious);
+            fApplied = other.fApplied;
+            other.fApplied = false;
+        }
+        return *this;
+    }
+
+private:
+    std::string fKey;
+    std::optional<std::string> fPrevious;
+    bool fApplied{false};
+};
+
+ProgramOptions ParseArguments(int argc, char** argv)
+{
+    ProgramOptions opts;
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+
+        if (arg == "-m") {
+            opts.isBatch = true;
+            if (i + 1 < argc) {
+                opts.macroFile = argv[++i];
+            } else {
+                throw std::runtime_error("Error: -m requires a filename argument");
+            }
+        } else if (arg == "-t") {
+            if (i + 1 < argc) {
+                opts.requestedThreads = std::atoi(argv[++i]);
+                if (opts.requestedThreads <= 0) {
+                    throw std::runtime_error("Error: Invalid number of threads");
+                }
+            } else {
+                throw std::runtime_error("Error: -t requires a number argument");
+            }
+        } else {
+            throw std::runtime_error("Error: Unknown option: " + arg);
+        }
+    }
+
+    return opts;
+}
+
+G4RunManager* CreateRunManager(const ProgramOptions& opts)
+{
+#ifdef G4MULTITHREADED
+    if (opts.requestedThreads != 1) {
+        auto* mtRunManager = new G4MTRunManager;
+
+        G4int nThreads = 0;
+        if (opts.requestedThreads > 0) {
+            nThreads = opts.requestedThreads;
+        } else {
+            nThreads = G4Threading::G4GetNumberOfCores();
+        }
+
+        const G4int maxThreads = G4Threading::G4GetNumberOfCores();
+        if (nThreads > maxThreads) {
+            G4cout << "Warning: Requested " << nThreads << " threads, but only " << maxThreads
+                   << " cores available. Using " << maxThreads << " threads." << G4endl;
+            nThreads = maxThreads;
+        }
+
+        mtRunManager->SetNumberOfThreads(nThreads);
+
+        G4cout << "=== MULTITHREADING ENABLED ===\n"
+               << "Mode: " << (opts.isBatch ? "Batch" : "Interactive") << "\n"
+               << "Threads: " << nThreads << " (of " << maxThreads << " available cores)\n"
+               << "===============================" << G4endl;
+
+        return mtRunManager;
+    }
+#endif
+    G4cout << "=== SINGLE-THREADED MODE ===\n"
+           << "Mode: " << (opts.isBatch ? "Batch" : "Interactive") << "\n"
+           << "=============================" << G4endl;
+    return new G4RunManager;
+}
+
+void ConfigureInitialization(G4RunManager* runManager, DetectorConstruction* detector)
+{
+    runManager->SetUserInitialization(detector);
+    runManager->SetUserInitialization(new PhysicsList());
+    runManager->SetUserInitialization(new ActionInitialization(detector));
+}
+
+bool ExecuteBatchMode(G4RunManager* runManager, const ProgramOptions& opts)
+{
+    G4UImanager* uiManager = G4UImanager::GetUIpointer();
+    G4cout << "Executing macro file: " << opts.macroFile << G4endl;
+    G4String command = "/control/execute " + opts.macroFile;
+    G4int status = uiManager->ApplyCommand(command);
+    if (status != 0) {
+        G4cerr << "Error executing macro file: " << opts.macroFile << G4endl;
+        return false;
+    }
+    return true;
+}
+
+void ExecuteInteractiveMode(G4RunManager* runManager, int argc, char** argv)
+{
+    auto ui = std::make_unique<G4UIExecutive>(argc, argv);
+    auto visManager = std::make_unique<G4VisExecutive>();
+    visManager->Initialize();
+
+    G4UImanager* uiManager = G4UImanager::GetUIpointer();
+
+    try {
+        if (std::filesystem::exists("vis.mac")) {
+            uiManager->ApplyCommand("/control/execute vis.mac");
+        } else if (std::filesystem::exists("macros/vis.mac")) {
+            uiManager->ApplyCommand("/control/execute macros/vis.mac");
+        }
+    } catch (...) {
+        // ignore missing vis macro
+    }
+
+    ui->SessionStart();
+}
+
+} // namespace
 
 int main(int argc, char** argv)
 {
-    G4bool isBatch = false;
-    G4String macroFile = "";
-    G4int requestedThreads = -1; // -1: use all available cores
-    
-    // Set QT_QPA_PLATFORM environment variable to avoid Qt issues in batch mode
-    char* oldQtPlatform = getenv("QT_QPA_PLATFORM");
-    std::string oldQtPlatformValue = oldQtPlatform ? oldQtPlatform : "";
-    
-    // Parse command line arguments
-    for (G4int i = 1; i < argc; i++) {
-        G4String arg = argv[i];
-        
-        if (arg == "-m") {
-            isBatch = true;
-            if (i + 1 < argc) {
-                macroFile = argv[++i];
-            } else {
-                G4cerr << "Error: -m requires a filename argument" << G4endl;
+    try {
+        const ProgramOptions opts = ParseArguments(argc, argv);
+
+        EnvironmentGuard qtGuard;
+        EnvironmentGuard uiGuard;
+
+        if (opts.isBatch) {
+            qtGuard.Apply("QT_QPA_PLATFORM", "offscreen");
+            uiGuard.Apply("EPIC_INTERACTIVE_UI", "0");
+        } else {
+            uiGuard.Apply("EPIC_INTERACTIVE_UI", "1");
+        }
+
+        auto* detector = new DetectorConstruction();
+        std::unique_ptr<G4RunManager> runManager(CreateRunManager(opts));
+        ConfigureInitialization(runManager.get(), detector);
+
+        if (opts.isBatch) {
+            const bool success = ExecuteBatchMode(runManager.get(), opts);
+            if (!success) {
                 return 1;
             }
-        }
-        else if (arg == "-t") {
-            if (i + 1 < argc) {
-                requestedThreads = std::atoi(argv[++i]);
-                if (requestedThreads <= 0) {
-                    G4cerr << "Error: Invalid number of threads: " << requestedThreads << G4endl;
-                    return 1;
-                }
-            } else {
-                G4cerr << "Error: -t requires a number argument" << G4endl;
-                return 1;
-            }
-        }
-        else {
-            G4cerr << "Error: Unknown option: " << arg << G4endl;
-            return 1;
-        }
-    }
-    
-    // Set QT_QPA_PLATFORM=offscreen in batch mode to avoid Qt issues
-    if (isBatch) {
-        G4cout << "Setting batch mode environment variables..." << G4endl;
-        setenv("QT_QPA_PLATFORM", "offscreen", 1);
-        setenv("EPIC_INTERACTIVE_UI", "0", 1);
-    }
-    
-    // Interactive UI (default when no -m is provided)
-    G4UIExecutive *ui = nullptr;
-
-    // Create the appropriate run manager with enhanced multithreading support
-    G4RunManager* runManager = nullptr;
-    
-    #ifdef G4MULTITHREADED
-    if (requestedThreads != 1) {
-        // Use multithreaded mode unless explicitly set to 1 thread
-        G4MTRunManager* mtRunManager = new G4MTRunManager;
-        
-        // Determine number of threads to use
-        G4int nThreads;
-        if (requestedThreads > 0) {
-            nThreads = requestedThreads;
         } else {
-            // Use all available cores by default
-            nThreads = G4Threading::G4GetNumberOfCores();
+            ExecuteInteractiveMode(runManager.get(), argc, argv);
         }
-        
-        // Ensure we don't exceed system capabilities
-        G4int maxThreads = G4Threading::G4GetNumberOfCores();
-        if (nThreads > maxThreads) {
-            G4cout << "Warning: Requested " << nThreads << " threads, but only " 
-                   << maxThreads << " cores available. Using " << maxThreads << " threads." << G4endl;
-            nThreads = maxThreads;
-        }
-        
-        mtRunManager->SetNumberOfThreads(nThreads);
-        
-        G4cout << "=== MULTITHREADING ENABLED ===\n"
-               << "Mode: " << (isBatch ? "Batch" : "Interactive") << "\n"
-               << "Threads: " << nThreads << " (of " << maxThreads << " available cores)\n"
-               << "===============================" << G4endl;
-        
-        runManager = mtRunManager;
-    } else {
-        // Use single-threaded mode when explicitly requested with -t 1
-        runManager = new G4RunManager;
-        G4cout << "=== SINGLE-THREADED MODE ===\n"
-               << "Mode: " << (isBatch ? "Batch" : "Interactive") << "\n"
-               << "=============================" << G4endl;
+
+        return 0;
+    } catch (const std::exception& ex) {
+        G4cerr << ex.what() << G4endl;
+        return 1;
     }
-    #else
-        runManager = new G4RunManager;
-        G4cout << "=== SINGLE-THREADED MODE ===\n"
-               << "Reason: GEANT4 compiled without multithreading support\n"
-               << "Mode: " << (isBatch ? "Batch" : "Interactive") << "\n"
-               << "=============================" << G4endl;
-    #endif
-    
-    // ---------------------------------------------------------------
-    // Enable command-based scoring so that the Multi-Functional
-    // Detector’s primitive scorers actually create their hits
-    // collections. Without this call the scorer collections are not
-    // instantiated and CollectScorerData() finds no data.
-    // ---------------------------------------------------------------
-    G4ScoringManager::GetScoringManager();
-
-    // Physics List
-    runManager->SetUserInitialization(new PhysicsList());
-
-    // Detector Construction
-    DetectorConstruction* detConstruction = new DetectorConstruction();
-    runManager->SetUserInitialization(detConstruction);
-
-    // Action Initialization with detector construction
-    runManager->SetUserInitialization(new ActionInitialization(detConstruction));
-
-
-    // Get pointer to UI manager
-    G4UImanager *uiManager = G4UImanager::GetUIpointer();
-    
-    if (macroFile.empty()) {
-        // Interactive session: bring back GUI by default
-        ui = new G4UIExecutive(argc, argv);
-        setenv("EPIC_INTERACTIVE_UI", "1", 1);
-        
-        // Visualization
-        G4VisManager* visManager = new G4VisExecutive;
-        visManager->Initialize();
-        
-        // Execute visualization macro if present in build dir or source macros dir
-        try {
-            if (std::filesystem::exists("vis.mac")) {
-                uiManager->ApplyCommand("/control/execute vis.mac");
-            } else if (std::filesystem::exists("macros/vis.mac")) {
-                uiManager->ApplyCommand("/control/execute macros/vis.mac");
-            }
-        } catch (...) {
-            // ignore missing vis macro
-        }
-        
-        ui->SessionStart();
-        delete ui;
-        ui = nullptr;
-        
-        // Clean up
-        delete visManager;
-        delete runManager;
-    } else {
-        // Batch mode: execute provided macro file
-        G4cout << "Executing macro file: " << macroFile << G4endl;
-        G4String command = "/control/execute ";
-        command += macroFile;
-        G4int status = uiManager->ApplyCommand(command);
-        
-        // Clean up
-        delete runManager;
-        
-        if (status != 0) {
-            G4cerr << "Error executing macro file: " << macroFile << G4endl;
-            // Restore original environment variable if it was changed
-            if (isBatch) {
-                if (!oldQtPlatformValue.empty()) {
-                    setenv("QT_QPA_PLATFORM", oldQtPlatformValue.c_str(), 1);
-                } else {
-                    unsetenv("QT_QPA_PLATFORM");
-                }
-            }
-            return 1;
-        }
-    }
-    
-    // Restore original environment variable if it was changed
-    if (isBatch) {
-        if (!oldQtPlatformValue.empty()) {
-            setenv("QT_QPA_PLATFORM", oldQtPlatformValue.c_str(), 1);
-        } else {
-            unsetenv("QT_QPA_PLATFORM");
-        }
-    }
-
-    return 0;
 }
-
