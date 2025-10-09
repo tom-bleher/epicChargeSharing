@@ -244,6 +244,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 # Ensure our new utility files are included
 list(APPEND sources
     ${PROJECT_SOURCE_DIR}/src/ActionInitialization.cc
+    ${PROJECT_SOURCE_DIR}/src/ChargeSharingCalculator.cc
     ${PROJECT_SOURCE_DIR}/src/DetectorConstruction.cc
     ${PROJECT_SOURCE_DIR}/src/EventAction.cc
     ${PROJECT_SOURCE_DIR}/src/PhysicsList.cc

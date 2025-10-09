@@ -1,23 +1,16 @@
 /**
  * @file RunAction.cc
- * @brief Manages run lifecycle, ROOT I/O (thread-safe), and post-run merging/processing.
+ * @brief Run lifecycle management with dedicated helpers for ROOT I/O and worker synchronisation.
  */
 #include "RunAction.hh"
+
 #include "Constants.hh"
 #include "DetectorConstruction.hh"
 
 #include "G4RunManager.hh"
-#include "G4Run.hh"
-#include "G4SystemOfUnits.hh"
+#include "G4Exception.hh"
 #include "G4Threading.hh"
-
-#include <sstream>
-#include <fstream>
-#include <thread>
-#include <chrono>
-#include <cstdio>
-#include <filesystem>
-#include <cstdlib>
+#include "G4SystemOfUnits.hh"
 
 #include "TFile.h"
 #include "TTree.h"
@@ -30,28 +23,204 @@
 #include "TString.h"
 #include "TSystem.h"
 
-std::mutex RunAction::fRootMutex;
-std::atomic<int> RunAction::fWorkersCompleted{0};
-std::atomic<int> RunAction::fTotalWorkers{0};
-std::condition_variable RunAction::fWorkerCompletionCV;
-std::mutex RunAction::fSyncMutex;
-std::atomic<bool> RunAction::fAllWorkersCompleted{false};
+#include <atomic>
+#include <filesystem>
+#include <mutex>
+#include <sstream>
+#include <string>
+#include <utility>
+
+namespace
+{
+class WorkerSyncHelper
+{
+public:
+    static WorkerSyncHelper& Instance()
+    {
+        static WorkerSyncHelper instance;
+        return instance;
+    }
+
+    void Reset(G4int totalWorkers)
+    {
+        std::lock_guard<std::mutex> lock(fMutex);
+        fWorkersCompleted.store(0);
+        fTotalWorkers = std::max(0, totalWorkers);
+        fAllWorkersCompleted = (fTotalWorkers == 0);
+    }
+
+    void SignalWorkerCompletion()
+    {
+        std::unique_lock<std::mutex> lock(fMutex);
+        const int completed = ++fWorkersCompleted;
+        if (completed >= fTotalWorkers && !fAllWorkersCompleted) {
+            fAllWorkersCompleted = true;
+            lock.unlock();
+            fCv.notify_all();
+        }
+    }
+
+    void WaitForAllWorkers()
+    {
+        std::unique_lock<std::mutex> lock(fMutex);
+        if (fTotalWorkers == 0) {
+            return;
+        }
+        fCv.wait(lock, [this]() { return fAllWorkersCompleted; });
+    }
+
+private:
+    WorkerSyncHelper() = default;
+
+    std::mutex fMutex;
+    std::condition_variable fCv;
+    std::atomic<int> fWorkersCompleted{0};
+    int fTotalWorkers{0};
+    bool fAllWorkersCompleted{false};
+};
+
+class RootFileWriterHelper
+{
+public:
+    RootFileWriterHelper() = default;
+    ~RootFileWriterHelper() { Cleanup(); }
+
+    void Attach(TFile* file, TTree* tree, bool ownsObjects)
+    {
+        std::lock_guard<std::mutex> lock(fMutex);
+        fRootFile = file;
+        fTree = tree;
+        fOwnsObjects = ownsObjects;
+    }
+
+    TFile* File() const { return fRootFile; }
+    TTree* Tree() const { return fTree; }
+
+    bool SafeWrite(bool isMultithreaded, bool isWorker)
+    {
+        std::unique_lock<std::mutex> lock(fMutex, std::defer_lock);
+        if (!isWorker) {
+            lock.lock();
+        }
+
+        if (!fRootFile || !fTree || fRootFile->IsZombie()) {
+            G4cerr << "RunAction: Cannot write - invalid ROOT file or tree" << G4endl;
+            return false;
+        }
+
+        try {
+            fTree->FlushBaskets();
+            fRootFile->cd();
+            fTree->Write("", TObject::kOverwrite);
+            fRootFile->Flush();
+            return true;
+        } catch (const std::exception& e) {
+            G4cerr << "RunAction: Exception writing ROOT file: " << e.what() << G4endl;
+            return false;
+        }
+    }
+
+    bool Validate(const G4String& filename)
+    {
+        if (filename.empty()) {
+            G4cerr << "RunAction: Error - Empty filename provided for validation" << G4endl;
+            return false;
+        }
+
+        TFile* testFile = nullptr;
+        try {
+            testFile = TFile::Open(filename.c_str(), "READ");
+            if (!testFile || testFile->IsZombie()) {
+                G4cerr << "RunAction: Error - Cannot open or corrupted file: " << filename << G4endl;
+                delete testFile;
+                return false;
+            }
+
+            auto* testTree = dynamic_cast<TTree*>(testFile->Get("Hits"));
+            if (!testTree) {
+                G4cerr << "RunAction: Error - No 'Hits' tree found in file: " << filename << G4endl;
+                testFile->Close();
+                delete testFile;
+                return false;
+            }
+
+            const bool isValid = testTree->GetEntries() > 0;
+            if (!isValid) {
+                G4cerr << "RunAction: Warning - Empty tree in file: " << filename << G4endl;
+            }
+            testFile->Close();
+            delete testFile;
+            return isValid;
+        } catch (const std::exception& e) {
+            G4cerr << "RunAction: Exception during file validation: " << e.what() << G4endl;
+            if (testFile) {
+                testFile->Close();
+                delete testFile;
+            }
+            return false;
+        }
+    }
+
+    void Cleanup()
+    {
+        std::lock_guard<std::mutex> lock(fMutex);
+        if (fRootFile) {
+            if (fRootFile->IsOpen()) {
+                fRootFile->Close();
+            }
+            if (fOwnsObjects) {
+                delete fRootFile;
+            }
+        }
+        fRootFile = nullptr;
+        fTree = nullptr;
+        fOwnsObjects = false;
+    }
+
+    void WriteMetadataSingleThread(G4double pixelSize,
+                                   G4double pixelSpacing,
+                                   G4double pixelCornerOffset,
+                                   G4double detSize,
+                                   G4int numBlocksPerSide,
+                                   G4int neighborhoodRadius)
+    {
+        std::lock_guard<std::mutex> lock(fMutex);
+        if (!fRootFile || fRootFile->IsZombie()) {
+            return;
+        }
+        fRootFile->cd();
+        TNamed pixelSizeMeta("GridPixelSize_mm", Form("%.6f", pixelSize));
+        TNamed pixelSpacingMeta("GridPixelSpacing_mm", Form("%.6f", pixelSpacing));
+        TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm", Form("%.6f", pixelCornerOffset));
+        TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", detSize));
+        TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", numBlocksPerSide));
+        TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", neighborhoodRadius));
+
+        pixelSizeMeta.Write("", TObject::kOverwrite);
+        pixelSpacingMeta.Write("", TObject::kOverwrite);
+        pixelCornerOffsetMeta.Write("", TObject::kOverwrite);
+        detSizeMeta.Write("", TObject::kOverwrite);
+        numBlocksMeta.Write("", TObject::kOverwrite);
+        neighborhoodRadiusMeta.Write("", TObject::kOverwrite);
+    }
+
+private:
+    mutable std::mutex fMutex;
+    TFile* fRootFile{nullptr};
+    TTree* fTree{nullptr};
+    bool fOwnsObjects{false};
+};
 
 static std::once_flag gRootInitFlag;
 
-static void InitializeROOTThreading() {
+void InitializeROOTThreading()
+{
     if (G4Threading::IsMultithreadedApplication()) {
-        // Initialize ROOT threading support
         TThread::Initialize();
-        gROOT->SetBatch(true); // Ensure batch mode for MT
-        
-        // Additional ROOT threading safety settings
-        gErrorIgnoreLevel = kWarning; // Suppress minor ROOT warnings in MT mode
-        
-        // Enable ROOT thread safety if available - use different methods for different versions
-        #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
+        gROOT->SetBatch(true);
+
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6, 18, 0)
         try {
-            // ROOT 6.18+ supports implicit multi-threading
             if (!ROOT::IsImplicitMTEnabled()) {
                 ROOT::EnableImplicitMT();
                 G4cout << "ROOT: implicit MT enabled" << G4endl;
@@ -59,858 +228,328 @@ static void InitializeROOTThreading() {
         } catch (...) {
             G4cout << "ROOT multi-threading not available in this version" << G4endl;
         }
-        #else
-        G4cout << "ROOT version < 6.18, using basic threading support" << G4endl;
-        #endif
-        
-        G4cout << "ROOT threading: initialized" << G4endl;
+#endif
     }
 }
 
-static bool IsInteractiveUI()
+G4String WorkerFileName(G4int threadId)
 {
-    const char* v = std::getenv("EPIC_INTERACTIVE_UI");
-    return (v && v[0] == '1');
+    std::ostringstream oss;
+    oss << "epicChargeSharing_t" << threadId << ".root";
+    return oss.str();
 }
 
-static void RunPostProcessingMacros(const G4String& rootFilePath)
-{
-    // If we're in interactive UI mode, skip fitting entirely to avoid GUI freezes
-    if (IsInteractiveUI()) {
-        G4cout << "Interactive UI detected: skipping post-run fitting (processing2D/3D)." << G4endl;
-        return;
-    }
-
-    if (!(Constants::RUN_PROCESSING_2D || Constants::RUN_PROCESSING_3D)) {
-        return;
-    }
-
-    G4cout << "Starting fitting simulated data in " << rootFilePath << G4endl;
-
-    // Ensure ROOT implicit MT is enabled for parallel fitting inside macros
-    #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
-    try {
-        if (!ROOT::IsImplicitMTEnabled()) {
-            ROOT::EnableImplicitMT();
-            G4cout << "ROOT: implicit MT enabled for post-processing" << G4endl;
-        }
-    } catch (...) {
-        // ignore if not available
-    }
-    #endif
-
-    // Build ACLiC outputs in a local cache under build/ to avoid writing into source tree
-    if (gSystem) {
-        gSystem->mkdir("proc_cache", true);
-        gSystem->SetBuildDir("proc_cache");
-    }
-
-    // Helper to run macros either in-process (batch) or via an external ROOT process (interactive UI)
-    auto runMacro2D = [&](const char* macroPath) {
-        if (!macroPath) return;
-        if (IsInteractiveUI()) {
-            // External ROOT to avoid conflicts with the Geant4 UI/Qt when fitting
-            std::string absFile = std::filesystem::absolute(rootFilePath.c_str()).string();
-            std::string cmd = std::string("root -l -b -q ")
-                + "-e \"gSystem->mkdir(\\\"proc_cache\\\", true)\" "
-                + "-e \"gSystem->SetBuildDir(\\\"proc_cache\\\")\" "
-                + "-e \".L " + macroPath + "++\" "
-                + "-e \"processing2D(\\\"" + absFile + "\\\")\"";
-            int rc = std::system(cmd.c_str());
-            if (rc != 0) {
-                G4cerr << "External ROOT processing2D failed with code " << rc << G4endl;
-            }
-        } else {
-            const G4String loadCmdRebuild = Form(".L %s++", macroPath);
-            gROOT->ProcessLine(loadCmdRebuild.c_str());
-            const G4String callCmd = Form("processing2D(\"%s\");", rootFilePath.c_str());
-            gROOT->ProcessLine(callCmd.c_str());
-        }
-    };
-
-    auto runMacro3D = [&](const char* macroPath) {
-        if (!macroPath) return;
-        if (IsInteractiveUI()) {
-            std::string absFile = std::filesystem::absolute(rootFilePath.c_str()).string();
-            std::string cmd = std::string("root -l -b -q ")
-                + "-e \"gSystem->mkdir(\\\"proc_cache\\\", true)\" "
-                + "-e \"gSystem->SetBuildDir(\\\"proc_cache\\\")\" "
-                + "-e \".L " + macroPath + "++\" "
-                + "-e \"processing3D(\\\"" + absFile + "\\\")\"";
-            int rc = std::system(cmd.c_str());
-            if (rc != 0) {
-                G4cerr << "External ROOT processing3D failed with code " << rc << G4endl;
-            }
-        } else {
-            const G4String loadCmdRebuild = Form(".L %s++", macroPath);
-            gROOT->ProcessLine(loadCmdRebuild.c_str());
-            const G4String callCmd = Form("processing3D(\"%s\");", rootFilePath.c_str());
-            gROOT->ProcessLine(callCmd.c_str());
-        }
-    };
-
-    if (Constants::RUN_PROCESSING_2D) {
-        const G4String macroPath2D = G4String(PROJECT_SOURCE_DIR) + "/src/fitGaus.C";
-        runMacro2D(macroPath2D.c_str());
-    }
-    if (Constants::RUN_PROCESSING_3D) {
-        const G4String macroPath3D = G4String(PROJECT_SOURCE_DIR) + "/src/fitGaus3D.C";
-        runMacro3D(macroPath3D.c_str());
-    }
-}
+} // namespace
 
 RunAction::RunAction()
-: G4UserRunAction(),
-  fRootFile(nullptr),
-  fTree(nullptr),
-  fTrueX(0),
-  fTrueY(0),
-  fPixelX(0),
-  fPixelY(0),
-  fEdep(0),
-  fPixelTrueDeltaX(0),
-  fPixelTrueDeltaY(0)
-
+    : G4UserRunAction(),
+      fRootWriter(std::make_unique<RootFileWriterHelper>()),
+      fTrueX(0.0),
+      fTrueY(0.0),
+      fPixelX(0.0),
+      fPixelY(0.0),
+      fEdep(0.0),
+      fPixelTrueDeltaX(0.0),
+      fPixelTrueDeltaY(0.0),
+      fGridPixelSize(0.0),
+      fGridPixelSpacing(0.0),
+      fGridPixelCornerOffset(0.0),
+      fGridDetSize(0.0),
+      fGridNumBlocksPerSide(0)
 {
-    fGridPixelSize = 0.0;
-    fGridPixelSpacing = 0.0;
-    fGridPixelCornerOffset = 0.0;
-    fGridDetSize = 0.0;
-    fGridNumBlocksPerSide = 0;
-    fGridNeighborhoodRadius = 0;
 }
 
-RunAction::~RunAction() = default;
+RunAction::~RunAction()
+{
+    CleanupRootObjects();
+}
+
+TFile* RunAction::GetRootFile() const
+{
+    return fRootWriter ? fRootWriter->File() : nullptr;
+}
+
+TTree* RunAction::GetTree() const
+{
+    return fRootWriter ? fRootWriter->Tree() : nullptr;
+}
 
 void RunAction::BeginOfRunAction(const G4Run* run)
-{ 
+{
     std::call_once(gRootInitFlag, InitializeROOTThreading);
-    
-    if (!G4Threading::IsWorkerThread()) {
-        ResetSynchronization();
-    }
-    
+
+    const bool isMT = G4Threading::IsMultithreadedApplication();
+    const bool isWorker = G4Threading::IsWorkerThread();
+
     if (!run) {
         G4cerr << "RunAction: Error - Invalid run object in BeginOfRunAction" << G4endl;
         return;
     }
-    
-    // Synchronize detector grid parameters from the constructed geometry
-    // Ensures worker threads also get the final adjusted geometry parameters
-    if (auto* runMgr = G4RunManager::GetRunManager()) {
-        auto* userDet = runMgr->GetUserDetectorConstruction();
-        if (auto* det = dynamic_cast<const DetectorConstruction*>(userDet)) {
-            SetDetectorGridParameters(
-                det->GetPixelSize(),
-                det->GetPixelSpacing(),
-                det->GetPixelCornerOffset(),
-                det->GetDetSize(),
-                det->GetNumBlocksPerSide()
-            );
-            SetNeighborhoodRadiusMeta(det->GetNeighborhoodRadius());
-        }
+
+    if (isMT && !isWorker) {
+        WorkerSyncHelper::Instance().Reset(G4Threading::GetNumberOfRunningWorkerThreads());
     }
-    
+
     G4String fileName;
-    if (G4Threading::IsMultithreadedApplication()) {
-        if (G4Threading::IsWorkerThread()) {
-            // Worker thread: create unique file for this thread
-            G4int threadId = G4Threading::G4GetThreadId();
-            std::ostringstream oss;
-            oss << "epicChargeSharing_t" << threadId << ".root";
-            fileName = oss.str();
+    if (isMT) {
+        if (isWorker) {
+            const G4int threadId = G4Threading::G4GetThreadId();
+            fileName = WorkerFileName(threadId);
         } else {
-            // Master thread: this file will be created during merge
             fileName = "epicChargeSharing.root";
         }
     } else {
-        // Single-threaded mode
         fileName = "epicChargeSharing.root";
     }
-    
-    // Only create ROOT file for worker threads or single-threaded mode
-    if (!G4Threading::IsMultithreadedApplication() || G4Threading::IsWorkerThread()) {
-        // Global lock only needed on master; workers have independent files
-        const bool needGlobalLock = G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread();
-        std::unique_ptr<std::lock_guard<std::mutex>> maybeLock;
-        if (needGlobalLock) {
-            maybeLock.reset(new std::lock_guard<std::mutex>(fRootMutex));
-        }
-        
-        // Create the ROOT file with optimized settings
-        fRootFile = new TFile(fileName.c_str(), "RECREATE", "", 1); // default compression setting; adjust below
-        
-        if (fRootFile->IsZombie()) {
-            G4cerr << "Cannot create ROOT file: " << fileName << G4endl;
-            delete fRootFile;
-            fRootFile = nullptr;
-            return;
-        }
-        fRootFile->SetCompressionLevel(0);
-        
-        G4cout << "ROOT file: " << fileName << G4endl;
-        
-        // Create the ROOT tree with optimized settings
-        fTree = new TTree("Hits", "Particle hits and fitting results");
-        if (!fTree) {
-            G4cerr << "RunAction: Error - Failed to create ROOT tree" << G4endl;
-            delete fRootFile;
-            fRootFile = nullptr;
-            return;
-        }
-        if (G4Threading::IsMultithreadedApplication() && G4Threading::IsWorkerThread()) {
-            fTree->SetAutoFlush(100000);   // Larger baskets for worker throughput
-            fTree->SetAutoSave(200000);
-        } else {
-            fTree->SetAutoFlush(10000);
-            fTree->SetAutoSave(50000);
-        }
-        
-        // Create branches
-        // =============================================
-        // HITS BRANCHES
-        // =============================================
-        fTree->Branch("TrueX", &fTrueX, "x_hit/D")->SetTitle("True Position X [mm]");
-        fTree->Branch("TrueY", &fTrueY, "y_hit/D")->SetTitle("True Position Y [mm]");
-        fTree->Branch("PixelX", &fPixelX, "x_px/D")->SetTitle("Nearest Pixel Center X [mm]");
-        fTree->Branch("PixelY", &fPixelY, "y_px/D")->SetTitle("Nearest Pixel Center Y [mm]");
-        fTree->Branch("Edep", &fEdep, "e_dep/D")->SetTitle("Energy deposit in silicon [MeV]");
-        {
-            TBranch* b = fTree->Branch("isPixelHit", &fIsPixelHit, "isPixelHit/O");
-            if (b) b->SetTitle("Geometric or First Contact Pixel Hit");
-        }
-        fTree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "px_hit_delta_x/D")->SetTitle("|x_hit - x_px| [mm]");
-        fTree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "px_hit_delta_y/D")->SetTitle("|y_hit - y_px| [mm]"); 
-        
-        fTree->Branch("F_i", &fNeighborhoodChargeFractions)->SetTitle("Charge Fractions F_i for Neighborhood Grid Pixels");
-        fTree->Branch("Q_i", &fNeighborhoodCharge)->SetTitle("Induced charge per pixel Q_i = F_i * Q_tot [C]");
-        //fTree->Branch("Q_n", &fNeighborhoodChargeNew)->SetTitle("Intermediate charge per pixel Q_new = Qi * Gauss(1,sigma_gain) [C]");
-        fTree->Branch("Q_f", &fNeighborhoodChargeFinal)->SetTitle("Noisy charge per pixel Q_i_final [C]");
-        //fTree->Branch("d_i", &fNeighborhoodDistance)->SetTitle("Distance from hit to neighborhood pixel center [mm]");
-        //fTree->Branch("alpha_i", &fNeighborhoodAlpha)->SetTitle("Subtended angle alpha used in weighting [rad]");
-        
-        // Full-grid pixel geometry and IDs (constant per run/thread)
-        //fTree->Branch("GridPixelX", &fGridPixelX)->SetTitle("Full-grid pixel centers X [mm] (row-major, size N^2)");
-        //fTree->Branch("GridPixelY", &fGridPixelY)->SetTitle("Full-grid pixel centers Y [mm] (row-major, size N^2)");
-        //fTree->Branch("GridPixelID", &fGridPixelID)->SetTitle("Full-grid pixel IDs (row-major i*N + j, size N^2)");
 
-        // Neighborhood pixel geometry and IDs
-        //fTree->Branch("NeighborhoodPixelX", &fNeighborhoodPixelX)->SetTitle("Neighborhood pixel centers X [mm] (row-major, size (2r+1)^2)");
-        //fTree->Branch("NeighborhoodPixelY", &fNeighborhoodPixelY)->SetTitle("Neighborhood pixel centers Y [mm] (row-major, size (2r+1)^2)");
-        //fTree->Branch("NeighborhoodPixelID", &fNeighborhoodPixelID)->SetTitle("Neighborhood pixel IDs (global grid IDs; -1 for OOB)");
-        
-        G4cout << "ROOT tree 'Hits': " << fTree->GetNbranches() << " branches" << G4endl;
-    
+    if (!isMT || isWorker) {
+        auto* rootFile = TFile::Open(fileName.c_str(), "RECREATE");
+        if (!rootFile || rootFile->IsZombie()) {
+            G4Exception("RunAction::BeginOfRunAction",
+                        "RootFileOpenFailure",
+                        FatalException,
+                        ("Unable to open ROOT file " + fileName).c_str());
+        }
+
+        auto* tree = new TTree("Hits", "AC-LGAD charge sharing hits");
+
+        tree->Branch("true_x", &fTrueX);
+        tree->Branch("true_y", &fTrueY);
+        tree->Branch("pixel_x", &fPixelX);
+        tree->Branch("pixel_y", &fPixelY);
+        tree->Branch("edep", &fEdep);
+        tree->Branch("delta_x", &fPixelTrueDeltaX);
+        tree->Branch("delta_y", &fPixelTrueDeltaY);
+        tree->Branch("first_contact_is_pixel", &fFirstContactIsPixel);
+        tree->Branch("geometric_is_pixel", &fGeometricIsPixel);
+        tree->Branch("is_pixel_hit", &fIsPixelHit);
+        tree->Branch("charge_fraction", &fNeighborhoodChargeFractions);
+        tree->Branch("charge_coulomb", &fNeighborhoodCharge);
+        tree->Branch("charge_coulomb_noise", &fNeighborhoodChargeNew);
+        tree->Branch("charge_coulomb_final", &fNeighborhoodChargeFinal);
+        tree->Branch("distance_mm", &fNeighborhoodDistance);
+        tree->Branch("alpha_rad", &fNeighborhoodAlpha);
+        tree->Branch("pixel_center_x", &fNeighborhoodPixelX);
+        tree->Branch("pixel_center_y", &fNeighborhoodPixelY);
+        tree->Branch("pixel_ids", &fNeighborhoodPixelID);
+
+        fRootWriter->Attach(rootFile, tree, true);
+    } else {
+        fRootWriter->Attach(nullptr, nullptr, false);
     }
 }
 
 void RunAction::EndOfRunAction(const G4Run* run)
 {
-    // Safety check for valid run
     if (!run) {
         G4cerr << "RunAction: Error - Invalid run object in EndOfRunAction" << G4endl;
         return;
     }
-    
-    G4int nofEvents = run->GetNumberOfEvent();
-    G4String fileName = "";
-    G4int nEntries = 0;
-    
-    // Worker threads: Write their individual files safely
-    if (!G4Threading::IsMultithreadedApplication() || G4Threading::IsWorkerThread()) {
-        
-        if (fRootFile && !fRootFile->IsZombie()) {
-            fileName = fRootFile->GetName();
-        }
-        
-        if (fTree) {
-            nEntries = fTree->GetEntries();
-        }
-        
-        if (fRootFile && fTree && nofEvents > 0) {
-            G4cout << "Worker thread writing ROOT file with " << nEntries 
-                   << " entries from " << nofEvents << " events" << G4endl;
-            
-            // Use the new safe write method
-            if (SafeWriteRootFile()) {
-            G4cout << "Worker thread: Successfully wrote " << fileName << G4endl;
-                // In single-threaded mode, ensure the file is fully closed before post-processing
-                if (!G4Threading::IsMultithreadedApplication()) {
-                    // Close and release ROOT objects to avoid UPDATE opening warnings/recovery
-                    CleanupRootObjects();
-                    // Run post-processing macros on a cleanly closed file
-                    RunPostProcessingMacros(fileName);
-                }
-            } else {
-                G4cerr << "Worker thread: Failed to write " << fileName << G4endl;
+
+    const bool isMT = G4Threading::IsMultithreadedApplication();
+    const bool isWorker = G4Threading::IsWorkerThread();
+
+    const G4int nofEvents = run->GetNumberOfEvent();
+
+    if (!isMT || isWorker) {
+        if (nofEvents > 0 && SafeWriteRootFile()) {
+            G4cout << "RunAction: Successfully wrote ROOT file with " << nofEvents << " events"
+                   << G4endl;
+            if (!isMT) {
+                fRootWriter->WriteMetadataSingleThread(fGridPixelSize,
+                                                       fGridPixelSpacing,
+                                                       fGridPixelCornerOffset,
+                                                       fGridDetSize,
+                                                       fGridNumBlocksPerSide,
+                                                       fGridNeighborhoodRadius > 0
+                                                           ? fGridNeighborhoodRadius
+                                                           : Constants::NEIGHBORHOOD_RADIUS);
             }
+        } else if (nofEvents > 0) {
+            G4cerr << "RunAction: Failed to write ROOT file" << G4endl;
         }
-        
-        // Clean up worker ROOT objects (idempotent if already closed above)
+
         CleanupRootObjects();
-        
-        // Signal completion to master thread
-        SignalWorkerCompletion();
-        
-        return; // Worker threads are done
+        if (isMT) {
+            SignalWorkerCompletion();
+        }
+        return;
     }
-    
-    // Master thread: Wait for workers then merge files
-    G4cout << "Master thread: Waiting for all worker threads to complete..." << G4endl;
-    
-    // Use the new robust synchronization
+
+    // Master thread in MT mode
     WaitForAllWorkersToComplete();
-    
-    // Now perform the robust file merging
-    if (G4Threading::IsMultithreadedApplication()) {
-        G4cout << "Master thread: Starting robust file merging..." << G4endl;
-        
-        try {
-            // Use separate lock scope for merging
-            std::lock_guard<std::mutex> lock(fRootMutex);
-            
-            // Be conservative: disable ROOT implicit MT during merge to avoid crashes in IO
-            #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
-            bool wasIMT = false;
-            try {
-                wasIMT = ROOT::IsImplicitMTEnabled();
-                if (wasIMT) {
-                    ROOT::DisableImplicitMT();
-                    G4cout << "ROOT: implicit MT disabled for merge" << G4endl;
-                }
-            } catch (...) {
-                // ignore if not available
+
+    std::vector<G4String> workerFiles;
+    const G4int totalWorkers = G4Threading::GetNumberOfRunningWorkerThreads();
+    workerFiles.reserve(totalWorkers);
+    for (G4int tid = 0; tid < totalWorkers; ++tid) {
+        workerFiles.push_back(WorkerFileName(tid));
+    }
+
+    TFileMerger merger;
+    merger.OutputFile("epicChargeSharing.root");
+    for (const auto& workerFile : workerFiles) {
+        if (std::filesystem::exists(workerFile.c_str())) {
+            if (!merger.AddFile(workerFile.c_str())) {
+                G4cerr << "RunAction: Failed to add " << workerFile << " to merger" << G4endl;
             }
-            #endif
-            
-            G4int nThreads = fTotalWorkers.load();
-            std::vector<G4String> workerFileNames;
-            workerFileNames.reserve(nThreads);
-            for (G4int i = 0; i < nThreads; i++) {
-                std::ostringstream oss;
-                oss << "epicChargeSharing_t" << i << ".root";
-                workerFileNames.push_back(oss.str());
-            }
-
-            // Quick filter: keep only existing, non-empty files (no ROOT open)
-            std::vector<G4String> existingFiles;
-            existingFiles.reserve(workerFileNames.size());
-            for (const auto& wf : workerFileNames) {
-                try {
-                    if (std::filesystem::exists(wf.c_str()) && std::filesystem::file_size(wf.c_str()) > 0) {
-                        existingFiles.push_back(wf);
-                    }
-                } catch (...) {
-                    // ignore and skip problematic paths
-                }
-            }
-
-            if (existingFiles.empty()) {
-                G4cerr << "Master thread: No worker files found for merging!" << G4endl;
-                // Re-enable IMT if it was previously on
-                #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
-                try {
-                    if (wasIMT) {
-                        ROOT::EnableImplicitMT();
-                        G4cout << "ROOT: implicit MT re-enabled after merge" << G4endl;
-                    }
-                } catch (...) {}
-                #endif
-                return;
-            }
-
-            // Helper: merge files with fast path and fallback
-            auto mergeFiles = [&](const std::vector<G4String>& inputs, const G4String& output) -> bool {
-                auto doMerge = [&](Bool_t fast) -> Bool_t {
-                    TFileMerger merger(kFALSE);
-                    merger.SetFastMethod(fast);
-                    merger.SetNotrees(kFALSE);
-                    if (!merger.OutputFile(output.c_str(), "RECREATE", 1)) {
-                        G4cerr << "Master thread: Failed to set output file for merger!" << G4endl;
-                        return kFALSE;
-                    }
-                    Int_t added = 0;
-                    for (const auto& in : inputs) {
-                        // Add only files that still exist at this moment
-                        if (std::filesystem::exists(in.c_str())) {
-                            if (merger.AddFile(in.c_str())) {
-                                added++;
-                            } else {
-                                G4cerr << "Master thread: Skipped unreadable file " << in << G4endl;
-                            }
-                        }
-                    }
-                    if (added == 0) {
-                        G4cerr << "Master thread: No readable input files for merge to " << output << G4endl;
-                        return kFALSE;
-                    }
-                    return merger.Merge();
-                };
-
-                Bool_t ok = kFALSE;
-                try { ok = doMerge(kTRUE); } catch (...) { ok = kFALSE; }
-                if (!ok) {
-                    G4cout << "Master thread: Fast merge failed; retrying with safe merge..." << G4endl;
-                    try { ok = doMerge(kFALSE); } catch (...) { ok = kFALSE; }
-                }
-                return ok;
-            };
-
-            // Chunked merge to limit simultaneously opened files
-            const std::size_t kBatchSize = 16; // limit open files and memory usage
-            std::vector<G4String> chunkOutputs;
-
-            if (existingFiles.size() > kBatchSize) {
-                for (std::size_t offset = 0, chunkIdx = 0; offset < existingFiles.size(); offset += kBatchSize, ++chunkIdx) {
-                    const std::size_t end = std::min(offset + kBatchSize, existingFiles.size());
-                    std::vector<G4String> chunk(existingFiles.begin() + offset, existingFiles.begin() + end);
-                    G4String chunkName = Form("epicChargeSharing_chunk_%zu.root", chunkIdx);
-                    if (!mergeFiles(chunk, chunkName)) {
-                        G4cerr << "Master thread: Chunk merge failed" << G4endl;
-                        // Attempt to clean partial chunk
-                        try { std::filesystem::remove(chunkName.c_str()); } catch (...) {}
-                        #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
-                        try {
-                            if (wasIMT) {
-                                ROOT::EnableImplicitMT();
-                                G4cout << "ROOT: implicit MT re-enabled after merge" << G4endl;
-                            }
-                        } catch (...) {}
-                        #endif
-                        return;
-                    }
-                    chunkOutputs.push_back(chunkName);
-                }
-            }
-
-            const bool usedChunks = !chunkOutputs.empty();
-            const std::vector<G4String>& finalInputs = usedChunks ? chunkOutputs : existingFiles;
-
-            G4cout << "Master thread: Merging " << finalInputs.size() << " file(s) into final output" << G4endl;
-
-            if (!mergeFiles(finalInputs, "epicChargeSharing.root")) {
-                G4cerr << "Master thread: File merging failed!" << G4endl;
-                // cleanup chunks if any
-                for (const auto& f : chunkOutputs) { try { std::filesystem::remove(f.c_str()); } catch (...) {} }
-                #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
-                try {
-                    if (wasIMT) {
-                        ROOT::EnableImplicitMT();
-                        G4cout << "ROOT: implicit MT re-enabled after merge" << G4endl;
-                    }
-                } catch (...) {}
-                #endif
-                return;
-            }
-
-            G4cout << "Master thread: File merging completed successfully" << G4endl;
-
-            // Remove temporary chunk files
-            for (const auto& f : chunkOutputs) { try { std::filesystem::remove(f.c_str()); } catch (...) {} }
-            
-            // Add metadata to the merged file
-            // NOTE: This is the ONLY place metadata should be written to avoid duplicates
-            // Worker threads write only their tree data, master adds metadata once to final file
-            if (fGridPixelSize > 0) {
-                TFile* mergedFile = TFile::Open("epicChargeSharing.root", "UPDATE");
-                if (mergedFile && !mergedFile->IsZombie()) {
-                    mergedFile->cd();
-                    
-                    TNamed pixelSizeMeta("GridPixelSize_mm", Form("%.6f", fGridPixelSize));
-                    TNamed pixelSpacingMeta("GridPixelSpacing_mm", Form("%.6f", fGridPixelSpacing));
-                    TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm", Form("%.6f", fGridPixelCornerOffset));
-                    TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", fGridDetSize));
-                    TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
-                    TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", fGridNeighborhoodRadius > 0 ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS));
-                    
-                    pixelSizeMeta.Write();
-                    pixelSpacingMeta.Write();
-                    pixelCornerOffsetMeta.Write();
-                    detSizeMeta.Write();
-                    numBlocksMeta.Write();
-                    neighborhoodRadiusMeta.Write();
-                    
-                    mergedFile->Close();
-                    delete mergedFile;
-                    
-                    G4cout << "Master thread: Saved detector grid metadata to merged file" << G4endl;
-                } else {
-                    G4cerr << "Master thread: Failed to open merged file for metadata" << G4endl;
-                }
-            }
-            
-            // Verify the merged file
-            TFile* verifyFile = TFile::Open("epicChargeSharing.root", "READ");
-            if (verifyFile && !verifyFile->IsZombie()) {
-                TTree* verifyTree = (TTree*)verifyFile->Get("Hits");
-                if (verifyTree) {
-                    G4cout << "Master thread: Successfully created merged file with " 
-                           << verifyTree->GetEntries() << " entries" << G4endl;
-                }
-                verifyFile->Close();
-                delete verifyFile;
-            } else {
-                G4cerr << "Master thread: Failed to verify merged file" << G4endl;
-            }
-            
-            // Clean up worker files after success merge
-            for (const auto& file : existingFiles) {
-                try {
-                    if (std::filesystem::exists(file.c_str())) {
-                        if (std::filesystem::remove(file.c_str())) {
-                            G4cout << "Master thread: Cleaned up " << file << G4endl;
-                        } else {
-                            G4cerr << "Master thread: Failed to clean up " << file << G4endl;
-                        }
-                    }
-                } catch (...) {}
-            }
-
-            // Re-enable IMT before running post-processing macros (they can use IMT)
-            #if ROOT_VERSION_CODE >= ROOT_VERSION(6,18,0)
-            try {
-                if (wasIMT) {
-                    ROOT::EnableImplicitMT();
-                    G4cout << "ROOT: implicit MT re-enabled after merge" << G4endl;
-                }
-            } catch (...) {}
-            #endif
-
-            // After merging and metadata write, run post-processing macros on the final file
-            RunPostProcessingMacros("epicChargeSharing.root");
-            
-        } catch (const std::exception& e) {
-            G4cerr << "Master thread: Exception during robust file merging: " << e.what() << G4endl;
         }
     }
-    
-    G4cout << "Master thread: File operations completed" << G4endl;
+
+    if (merger.Merge()) {
+        if (!ValidateRootFile("epicChargeSharing.root")) {
+            G4cerr << "RunAction: Merged ROOT file validation failed" << G4endl;
+        } else {
+            G4cout << "RunAction: Merged ROOT file written successfully" << G4endl;
+        }
+    } else {
+        G4cerr << "RunAction: ROOT file merge failed" << G4endl;
+    }
 }
 
-void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z) 
+void RunAction::ResetSynchronization()
 {
-    // Store energy deposition in MeV (Geant4 internal energy unit is MeV)
+    if (G4Threading::IsMultithreadedApplication()) {
+        WorkerSyncHelper::Instance().Reset(G4Threading::GetNumberOfRunningWorkerThreads());
+    }
+}
+
+void RunAction::SignalWorkerCompletion()
+{
+    if (G4Threading::IsMultithreadedApplication()) {
+        WorkerSyncHelper::Instance().SignalWorkerCompletion();
+    }
+}
+
+void RunAction::WaitForAllWorkersToComplete()
+{
+    if (G4Threading::IsMultithreadedApplication()) {
+        WorkerSyncHelper::Instance().WaitForAllWorkers();
+    }
+}
+
+bool RunAction::SafeWriteRootFile()
+{
+    const bool isMT = G4Threading::IsMultithreadedApplication();
+    const bool isWorker = G4Threading::IsWorkerThread();
+    return fRootWriter->SafeWrite(isMT, isWorker);
+}
+
+bool RunAction::ValidateRootFile(const G4String& filename)
+{
+    return fRootWriter->Validate(filename);
+}
+
+void RunAction::CleanupRootObjects()
+{
+    fRootWriter->Cleanup();
+}
+
+void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
+{
+    std::lock_guard<std::mutex> lock(fTreeMutex);
     fEdep = edep;
-    
-    // Store positions in mm (Geant4 internal length unit is mm)
     fTrueX = x;
     fTrueY = y;
+    (void)z;
 }
 
-void RunAction::SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY)
+void RunAction::SetPixelClassification(G4bool isPixelHit,
+                                       G4double pixelTrueDeltaX,
+                                       G4double pixelTrueDeltaY)
 {
-    // Store the classification and delta values from pixel center to true position
+    std::lock_guard<std::mutex> lock(fTreeMutex);
     fIsPixelHit = isPixelHit;
     fPixelTrueDeltaX = pixelTrueDeltaX;
     fPixelTrueDeltaY = pixelTrueDeltaY;
 }
 
 void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
-                                 const std::vector<G4double>& chargeCoulombs)
+                                          const std::vector<G4double>& chargeCoulombs)
 {
-    // Store the neighborhood (9x9) grid charge sharing data for non-pixel hits
-    fNeighborhoodChargeFractions = chargeFractions;
-    fNeighborhoodCharge = chargeCoulombs;
-}
-
-void RunAction::SetNeighborhoodChargeFinalData(const std::vector<G4double>& chargeCoulombsFinal)
-{
-    fNeighborhoodChargeFinal = chargeCoulombsFinal;
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    if (fNeighborhoodChargeFractions.capacity() < chargeFractions.size()) {
+        fNeighborhoodChargeFractions.reserve(chargeFractions.size());
+    }
+    if (fNeighborhoodCharge.capacity() < chargeCoulombs.size()) {
+        fNeighborhoodCharge.reserve(chargeCoulombs.size());
+    }
+    fNeighborhoodChargeFractions.assign(chargeFractions.begin(), chargeFractions.end());
+    fNeighborhoodCharge.assign(chargeCoulombs.begin(), chargeCoulombs.end());
 }
 
 void RunAction::SetNeighborhoodChargeNewData(const std::vector<G4double>& chargeCoulombsNew)
 {
-    fNeighborhoodChargeNew = chargeCoulombsNew;
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    if (fNeighborhoodChargeNew.capacity() < chargeCoulombsNew.size()) {
+        fNeighborhoodChargeNew.reserve(chargeCoulombsNew.size());
+    }
+    fNeighborhoodChargeNew.assign(chargeCoulombsNew.begin(), chargeCoulombsNew.end());
+}
+
+void RunAction::SetNeighborhoodChargeFinalData(const std::vector<G4double>& chargeCoulombsFinal)
+{
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    if (fNeighborhoodChargeFinal.capacity() < chargeCoulombsFinal.size()) {
+        fNeighborhoodChargeFinal.reserve(chargeCoulombsFinal.size());
+    }
+    fNeighborhoodChargeFinal.assign(chargeCoulombsFinal.begin(), chargeCoulombsFinal.end());
 }
 
 void RunAction::SetNeighborhoodDistanceAlphaData(const std::vector<G4double>& distances,
-                                          const std::vector<G4double>& alphas)
+                                                 const std::vector<G4double>& alphas)
 {
-    fNeighborhoodDistance = distances;
-    fNeighborhoodAlpha = alphas;
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    if (fNeighborhoodDistance.capacity() < distances.size()) {
+        fNeighborhoodDistance.reserve(distances.size());
+    }
+    if (fNeighborhoodAlpha.capacity() < alphas.size()) {
+        fNeighborhoodAlpha.reserve(alphas.size());
+    }
+    fNeighborhoodDistance.assign(distances.begin(), distances.end());
+    fNeighborhoodAlpha.assign(alphas.begin(), alphas.end());
 }
 
-void RunAction::FillTree()
+void RunAction::SetDetectorGridParameters(G4double pixelSize,
+                                          G4double pixelSpacing,
+                                          G4double pixelCornerOffset,
+                                          G4double detSize,
+                                          G4int numBlocksPerSide)
 {
-    if (!fTree || !fRootFile || fRootFile->IsZombie()) {
-        G4cerr << "Error: Invalid ROOT file or tree in FillTree()" << G4endl;
-        return;
-    }
-
-    try {
-        std::lock_guard<std::mutex> lock(fTreeMutex);
-        
-        // Fill the tree with all current data (including scorer data)
-        G4int fillResult = fTree->Fill();
-        
-        // Validate successful tree filling
-        if (fillResult < 0) {
-            G4cerr << "Error: Tree Fill() returned error code " << fillResult << G4endl;
-            return;
-        }
-
-        
-    } catch (const std::exception& e) {
-        G4cerr << "Exception in FillTree: " << e.what() << G4endl;
-    }
-}
-
-void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, 
-                                           G4double pixelCornerOffset, G4double detSize, 
-                                           G4int numBlocksPerSide)
-{
-    // Safety check for valid parameters
-    if (pixelSize <= 0 || pixelSpacing <= 0 || detSize <= 0 || numBlocksPerSide <= 0) {
-        G4cerr << "RunAction: Error - Invalid detector grid parameters provided" << G4endl;
-        return;
-    }
-    
-    // Store the detector grid parameters for saving to ROOT metadata
     fGridPixelSize = pixelSize;
     fGridPixelSpacing = pixelSpacing;
     fGridPixelCornerOffset = pixelCornerOffset;
     fGridDetSize = detSize;
     fGridNumBlocksPerSide = numBlocksPerSide;
-    
-    G4cout << "RunAction: Detector grid parameters set:" << G4endl;
-    G4cout << "  Pixel Size: " << fGridPixelSize << " mm" << G4endl;
-    G4cout << "  Pixel Spacing: " << fGridPixelSpacing << " mm" << G4endl;
-    G4cout << "  Pixel Corner Offset: " << fGridPixelCornerOffset << " mm" << G4endl;
-    G4cout << "  Detector Size: " << fGridDetSize << " mm" << G4endl;
-    G4cout << "  Number of Blocks per Side: " << fGridNumBlocksPerSide << G4endl;
-
-    // Populate full-grid pixel IDs (row-major with i major)
-    fGridPixelID.clear();
-    fGridPixelX.clear();
-    fGridPixelY.clear();
-    const G4int n = fGridNumBlocksPerSide;
-    if (n > 0) {
-        const size_t total = static_cast<size_t>(n) * static_cast<size_t>(n);
-        fGridPixelID.reserve(total);
-        fGridPixelX.reserve(total);
-        fGridPixelY.reserve(total);
-
-        const G4double firstPixelPos = -fGridDetSize/2 + fGridPixelCornerOffset + fGridPixelSize/2;
-        for (G4int i = 0; i < n; ++i) {
-            for (G4int j = 0; j < n; ++j) {
-                const G4int id = i * n + j; // row-major: x-index major
-                fGridPixelID.push_back(id);
-                const G4double x = firstPixelPos + i * fGridPixelSpacing;
-                const G4double y = firstPixelPos + j * fGridPixelSpacing;
-                fGridPixelX.push_back(x);
-                fGridPixelY.push_back(y);
-            }
-        }
-    }
 }
 
 void RunAction::SetNeighborhoodPixelData(const std::vector<G4double>& xs,
-                                  const std::vector<G4double>& ys,
-                                  const std::vector<G4int>& ids)
+                                         const std::vector<G4double>& ys,
+                                         const std::vector<G4int>& ids)
 {
-    fNeighborhoodPixelX = xs;
-    fNeighborhoodPixelY = ys;
-    fNeighborhoodPixelID = ids;
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    if (fNeighborhoodPixelX.capacity() < xs.size()) {
+        fNeighborhoodPixelX.reserve(xs.size());
+    }
+    if (fNeighborhoodPixelY.capacity() < ys.size()) {
+        fNeighborhoodPixelY.reserve(ys.size());
+    }
+    if (fNeighborhoodPixelID.capacity() < ids.size()) {
+        fNeighborhoodPixelID.reserve(ids.size());
+    }
+    fNeighborhoodPixelX.assign(xs.begin(), xs.end());
+    fNeighborhoodPixelY.assign(ys.begin(), ys.end());
+    fNeighborhoodPixelID.assign(ids.begin(), ids.end());
 }
 
-// =============================================
-// THREAD SYNCHRONIZATION METHODS
-// =============================================
-
-void RunAction::ResetSynchronization()
+void RunAction::FillTree()
 {
-    std::lock_guard<std::mutex> lock(fSyncMutex);
-    fWorkersCompleted = 0;
-    fTotalWorkers = 0;
-    fAllWorkersCompleted = false;
-    
-    if (G4Threading::IsMultithreadedApplication()) {
-        fTotalWorkers = G4Threading::GetNumberOfRunningWorkerThreads();
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    auto* tree = GetTree();
+    if (!tree) {
+        return;
     }
-    
-    G4cout << "RunAction: Reset synchronization for " << fTotalWorkers.load() << " worker threads" << G4endl;
-}
-
-void RunAction::SignalWorkerCompletion()
-{
-    if (!G4Threading::IsMultithreadedApplication() || G4Threading::IsWorkerThread()) {
-        std::unique_lock<std::mutex> lock(fSyncMutex);
-        fWorkersCompleted++;
-        
-        G4cout << "RunAction: Worker thread completed (" << fWorkersCompleted.load() 
-               << "/" << fTotalWorkers.load() << ")" << G4endl;
-        
-        if (fWorkersCompleted >= fTotalWorkers) {
-            fAllWorkersCompleted = true;
-            lock.unlock();
-            fWorkerCompletionCV.notify_all();
-            G4cout << "RunAction: All worker threads completed, notifying master" << G4endl;
-        }
-    }
-}
-
-void RunAction::WaitForAllWorkersToComplete()
-{
-    if (G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread()) {
-        std::unique_lock<std::mutex> lock(fSyncMutex);
-        
-        const int totalWorkers = fTotalWorkers.load();
-        if (totalWorkers <= 0) {
-            G4cout << "RunAction: No worker threads active, skipping wait." << G4endl;
-            return;
-        }
-
-        G4cout << "RunAction: Master thread waiting for " << totalWorkers << " workers to complete..." << G4endl;
-
-        const auto logInterval = std::chrono::seconds(5);
-        auto nextLog = std::chrono::steady_clock::now() + logInterval;
-
-        while (!fAllWorkersCompleted.load()) {
-            if (fWorkerCompletionCV.wait_until(lock, nextLog, []() {
-                    return fAllWorkersCompleted.load();
-                })) {
-                break;
-            }
-
-            const int completedWorkers = fWorkersCompleted.load();
-            const int totalNow = fTotalWorkers.load();
-            int remaining = totalNow - completedWorkers;
-            if (remaining < 0) {
-                remaining = 0;
-            }
-            if (remaining > 0) {
-                G4cout << "RunAction: Waiting for " << remaining << " worker"
-                       << (remaining == 1 ? "" : "s") << " to finish..." << G4endl;
-            }
-            nextLog = std::chrono::steady_clock::now() + logInterval;
-        }
-
-        G4cout << "RunAction: All workers completed successfully" << G4endl;
-    }
-}
-
-// =============================================
-// SAFE ROOT FILE OPERATIONS
-// =============================================
-
-bool RunAction::ValidateRootFile(const G4String& filename)
-{
-    if (filename.empty()) {
-        G4cerr << "RunAction: Error - Empty filename provided for validation" << G4endl;
-        return false;
-    }
-    
-    TFile* testFile = nullptr;
-    try {
-        testFile = TFile::Open(filename.c_str(), "READ");
-        if (!testFile || testFile->IsZombie()) {
-            G4cerr << "RunAction: Error - Cannot open or corrupted file: " << filename << G4endl;
-            if (testFile) delete testFile;
-            return false;
-        }
-        
-        TTree* testTree = (TTree*)testFile->Get("Hits");
-        if (!testTree) {
-            G4cerr << "RunAction: Error - No 'Hits' tree found in file: " << filename << G4endl;
-            testFile->Close();
-            delete testFile;
-            return false;
-        }
-        
-        bool isValid = testTree->GetEntries() > 0;
-        if (!isValid) {
-            G4cerr << "RunAction: Warning - Empty tree in file: " << filename << G4endl;
-        }
-        
-        testFile->Close();
-        delete testFile;
-        
-        return isValid;
-        
-    } catch (const std::exception& e) {
-        G4cerr << "RunAction: Exception during file validation: " << e.what() << G4endl;
-        if (testFile) {
-            testFile->Close();
-            delete testFile;
-        }
-        return false;
-    }
-}
-
-bool RunAction::SafeWriteRootFile()
-{
-    // Global lock only for master-thread operations; workers write independently
-    const bool needGlobalLock = G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread();
-    std::unique_ptr<std::lock_guard<std::mutex>> maybeLock;
-    if (needGlobalLock) {
-        maybeLock.reset(new std::lock_guard<std::mutex>(fRootMutex));
-    }
-    
-    if (!fRootFile || !fTree || fRootFile->IsZombie()) {
-        G4cerr << "RunAction: Cannot write - invalid ROOT file or tree" << G4endl;
-        return false;
-    }
-    
-    try {
-        // In single-threaded mode, write metadata here since there's no merging
-        // In multi-threaded mode, metadata is written only by master thread after merging
-        if (!G4Threading::IsMultithreadedApplication() && fGridPixelSize > 0) {
-            fRootFile->cd();
-            
-            // Create and write metadata objects
-            TNamed pixelSizeMeta("GridPixelSize_mm", Form("%.6f", fGridPixelSize));
-            TNamed pixelSpacingMeta("GridPixelSpacing_mm", Form("%.6f", fGridPixelSpacing));
-            TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm", Form("%.6f", fGridPixelCornerOffset));
-            TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", fGridDetSize));
-            TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
-            TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", fGridNeighborhoodRadius > 0 ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS));
-            
-            pixelSizeMeta.Write();
-            pixelSpacingMeta.Write();
-            pixelCornerOffsetMeta.Write();
-            detSizeMeta.Write();
-            numBlocksMeta.Write();
-            neighborhoodRadiusMeta.Write();
-            
-            G4cout << "RunAction: Saved detector grid metadata to single-threaded file" << G4endl;
-        }
-        
-        // Make sure all in-memory baskets are flushed only once at end-of-run
-        fTree->FlushBaskets();   // replaces thousands of small AutoSave flushes
-        
-        // Write the full tree in a single operation (metadata added above for single-threaded, by master for multi-threaded)
-        fRootFile->cd();
-        fTree->Write();
-        // Final flush for the file header / directory structure
-        fRootFile->Flush();
-        
-        G4cout << "RunAction: Successfully wrote ROOT file with " << fTree->GetEntries() << " entries" << G4endl;
-        return true;
-        
-    } catch (const std::exception& e) {
-        G4cerr << "RunAction: Exception writing ROOT file: " << e.what() << G4endl;
-        return false;
-    }
-}
-
-void RunAction::CleanupRootObjects()
-{
-    std::lock_guard<std::mutex> lock(fRootMutex);
-    
-    try {
-        if (fRootFile) {
-            if (fRootFile->IsOpen() && !fRootFile->IsZombie()) {
-                fRootFile->Close();
-            }
-            delete fRootFile;
-            fRootFile = nullptr;
-            fTree = nullptr; // Tree is owned by file
-            G4cout << "RunAction: Successfully cleaned up ROOT objects" << G4endl;
-        }
-    } catch (const std::exception& e) {
-        G4cerr << "RunAction: Exception during ROOT cleanup: " << e.what() << G4endl;
-        // Force cleanup even if exception occurred
-        fRootFile = nullptr;
-        fTree = nullptr;
+    if (tree->Fill() < 0) {
+        G4cerr << "RunAction: Tree Fill() returned error" << G4endl;
     }
 }
