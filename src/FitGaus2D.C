@@ -1,4 +1,4 @@
-// ROOT macro: processing3D.C
+// ROOT macro: FitGaus2D.C
 // Performs 2D Gaussian fit on the full charge neighborhood to reconstruct
 // deltas, and appends them as new branches.
 // Uses Q_f (noisy charge per pixel, Coulombs) when available; falls back to Q_i.
@@ -55,7 +55,7 @@ namespace {
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
 // of the event's maximum charge within the neighborhood. The same error is
 // applied to all data points used in the fit for that event.
-int processing3D(const char* filename = "../build/epicChargeSharing.root",
+int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
                  double errorPercentOfMax = 5.0,
                  bool saveParamA = true,
                  bool saveParamMux = true,
@@ -73,14 +73,14 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
   // Open file for update
   TFile* file = TFile::Open(filename, "UPDATE");
   if (!file || file->IsZombie()) {
-    ::Error("processing3D", "Cannot open file: %s", filename);
+    ::Error("FitGaus2D", "Cannot open file: %s", filename);
     return 1;
   }
 
   // Get tree (check first for clearer diagnostics)
   TTree* tree = dynamic_cast<TTree*>(file->Get("Hits"));
   if (!tree) {
-    ::Error("processing3D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
+    ::Error("FitGaus2D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
     file->Close();
     delete file;
     return 3;
@@ -164,7 +164,7 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
     pixelSpacing = inferSpacingFromTree(tree);
   }
   if (!IsFinite3D(pixelSpacing) || pixelSpacing <= 0) {
-    ::Error("processing3D", "Pixel spacing not available (metadata missing and inference failed). Aborting.");
+    ::Error("FitGaus2D", "Pixel spacing not available (metadata missing and inference failed). Aborting.");
     file->Close();
     delete file;
     return 2;
@@ -182,7 +182,7 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
     else if (hasBranch("F_i")) chosenCharge = "F_i";
     else if (hasBranch("Q_i")) chosenCharge = "Q_i";
     else {
-      ::Error("processing3D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
+      ::Error("FitGaus2D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
       file->Close();
       delete file;
       return 4;
@@ -309,7 +309,7 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
   std::iota(indices.begin(), indices.end(), 0);
   ROOT::TThreadExecutor exec;
   // Suppress expected Minuit2 error spam during Fumili2 attempts; we'll fallback to MIGRAD if needed
-  const int prevErrorLevel_processing3D = gErrorIgnoreLevel;
+  const int prevErrorLevel_FitGaus2D = gErrorIgnoreLevel;
   gErrorIgnoreLevel = kFatal;
   exec.Foreach([&](int i){
     const bool isPix = v_is_pixel[i] != 0;
@@ -543,7 +543,7 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
     }
   }, indices);
   // Restore previous error level
-  gErrorIgnoreLevel = prevErrorLevel_processing3D;
+  gErrorIgnoreLevel = prevErrorLevel_FitGaus2D;
 
   // Sequentially write outputs
   for (Long64_t i = 0; i < nEntries; ++i) {
@@ -581,18 +581,18 @@ int processing3D(const char* filename = "../build/epicChargeSharing.root",
   file->Close();
   delete file;
 
-  ::Info("processing3D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
+  ::Info("FitGaus2D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
   return 0;
 }
 
 
 // Backward-compatible wrapper matching the previous signature.
 // Maps saveFitParameters=true to saving all individual parameters.
-int processing3D(const char* filename,
-                 double errorPercentOfMax,
-                 bool saveFitParameters,
-                 const char* chargeBranch) {
-  return processing3D(filename,
+int FitGaus2D(const char* filename,
+              double errorPercentOfMax,
+              bool saveFitParameters,
+              const char* chargeBranch) {
+  return FitGaus2D(filename,
                       errorPercentOfMax,
                       /*saveParamA*/   saveFitParameters,
                       /*saveParamMux*/ saveFitParameters,
