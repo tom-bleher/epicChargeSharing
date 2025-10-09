@@ -251,10 +251,10 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     return br;
   };
 
-  TBranch* br_x_rec = ensureAndResetBranch("ReconX_3D", &x_rec_3d);
-  TBranch* br_y_rec = ensureAndResetBranch("ReconY_3D", &y_rec_3d);
-  TBranch* br_dx_signed = ensureAndResetBranch("ReconTrueDeltaX_3D", &rec_hit_delta_x_3d_signed);
-  TBranch* br_dy_signed = ensureAndResetBranch("ReconTrueDeltaY_3D", &rec_hit_delta_y_3d_signed);
+  TBranch* br_x_rec = ensureAndResetBranch("ReconX_2D", &x_rec_3d);
+  TBranch* br_y_rec = ensureAndResetBranch("ReconY_2D", &y_rec_3d);
+  TBranch* br_dx_signed = ensureAndResetBranch("ReconTrueDeltaX_2D", &rec_hit_delta_x_3d_signed);
+  TBranch* br_dy_signed = ensureAndResetBranch("ReconTrueDeltaY_2D", &rec_hit_delta_y_3d_signed);
   // Parameter branches
   TBranch* br_A = nullptr;
   TBranch* br_mux = nullptr;
