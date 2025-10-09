@@ -370,6 +370,10 @@ void RunAction::EndOfRunAction(const G4Run* run)
         }
 
         CleanupRootObjects();
+        if (!isMT) {
+            // Single-threaded: run post-processing fits once the file is closed
+            RunPostProcessingFits();
+        }
         if (isMT) {
             SignalWorkerCompletion();
         }
@@ -401,9 +405,49 @@ void RunAction::EndOfRunAction(const G4Run* run)
             G4cerr << "RunAction: Merged ROOT file validation failed" << G4endl;
         } else {
             G4cout << "RunAction: Merged ROOT file written successfully" << G4endl;
+            // Master thread: run post-processing fits on merged output
+            RunPostProcessingFits();
         }
     } else {
         G4cerr << "RunAction: ROOT file merge failed" << G4endl;
+    }
+}
+
+void RunAction::RunPostProcessingFits()
+{
+    // Optionally execute ROOT macros that write reconstructed branches into epicChargeSharing.root
+    if (!Constants::FIT_GAUS_1D && !Constants::FIT_GAUS_2D) {
+        return;
+    }
+
+    // Ensure ROOT is in batch mode to avoid any UI attempts
+    gROOT->SetBatch(true);
+
+    // Build POSIX-style paths so the ROOT interpreter handles them consistently on Windows
+    TString sourceDir = TString(PROJECT_SOURCE_DIR);
+    sourceDir.ReplaceAll("\\", "/");
+    const TString macro1D = sourceDir + "/src/FitGaus1D.C";
+    const TString macro2D = sourceDir + "/src/FitGaus2D.C";
+    const TString rootFile = "epicChargeSharing.root"; // produced in current working directory
+
+    auto runMacro = [&](const TString& macroPath, const char* entryPoint) {
+        // Load the macro (interpreted). Using interpreted mode avoids platform-specific ACLiC complications.
+        gROOT->ProcessLine(TString::Format(".L %s", macroPath.Data()));
+        // Call the entry point with just the filename, relying on macro defaults for other parameters.
+        const TString call = TString::Format("%s(\"%s\")", entryPoint, rootFile.Data());
+        const Long_t status = gROOT->ProcessLine(call);
+        if (status != 0) {
+            G4cout << "Post-processing: call '" << entryPoint << "' returned status " << status << G4endl;
+        }
+    };
+
+    // 1D row/column fits
+    if (Constants::FIT_GAUS_1D) {
+        runMacro(macro1D, "FitGaus1D");
+    }
+    // 2D neighborhood fit
+    if (Constants::FIT_GAUS_2D) {
+        runMacro(macro2D, "FitGaus2D");
     }
 }
 
