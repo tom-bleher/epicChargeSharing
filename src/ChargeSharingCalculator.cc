@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <mutex>
 
 ChargeSharingCalculator::ChargeSharingCalculator(const DetectorConstruction* detector)
     : fDetector(detector),
@@ -89,38 +90,17 @@ void ChargeSharingCalculator::ReserveBuffers()
     fResult.alphas.reserve(totalCells);
     fResult.pixelX.reserve(totalCells);
     fResult.pixelY.reserve(totalCells);
-    fResult.pixelIds.reserve(totalCells);
-    fWeightGrid.assign(totalCells, 0.0);
-    fInBoundsGrid.assign(totalCells, false);
+   fResult.pixelIds.reserve(totalCells);
+    fWeightGrid.resize(totalCells);
+    fInBoundsGrid.resize(totalCells);
 }
 
 G4ThreeVector ChargeSharingCalculator::CalcNearestPixel(const G4ThreeVector& pos)
 {
-    const G4double pixelSize = fDetector->GetPixelSize();
-    const G4double pixelSpacing = fDetector->GetPixelSpacing();
-    const G4double pixelCornerOffset = fDetector->GetPixelCornerOffset();
-    const G4double detSize = fDetector->GetDetSize();
-    const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
-    const G4ThreeVector detectorPos = fDetector->GetDetectorPos();
-
-    const G4ThreeVector relativePos = pos - detectorPos;
-    const G4double firstPixelPos = -detSize / 2 + pixelCornerOffset + pixelSize / 2;
-
-    G4int i = static_cast<G4int>(std::round((relativePos.x() - firstPixelPos) / pixelSpacing));
-    G4int j = static_cast<G4int>(std::round((relativePos.y() - firstPixelPos) / pixelSpacing));
-
-    i = std::max(0, std::min(i, numBlocksPerSide - 1));
-    j = std::max(0, std::min(j, numBlocksPerSide - 1));
-
-    const G4double pixelX = firstPixelPos + i * pixelSpacing;
-    const G4double pixelY = firstPixelPos + j * pixelSpacing;
-    const G4double pixelZ =
-        detectorPos.z() + Constants::DETECTOR_WIDTH / 2 + Constants::PIXEL_WIDTH / 2;
-
-    fResult.pixelIndexI = i;
-    fResult.pixelIndexJ = j;
-
-    return {pixelX, pixelY, pixelZ};
+    const auto location = fDetector->FindNearestPixel(pos);
+    fResult.pixelIndexI = location.indexI;
+    fResult.pixelIndexJ = location.indexJ;
+    return location.center;
 }
 
 G4double ChargeSharingCalculator::CalcPixelAlphaSubtended(G4double hitX,
@@ -158,7 +138,21 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
 
     const G4double firstPixelPos = -detSize / 2 + pixelCornerOffset + pixelSize / 2;
-    const G4double d0Length = d0 * micrometer;
+    const G4double rawD0Length = d0 * micrometer;
+    constexpr G4double minD0Length = 1e-6 * micrometer;
+    static std::once_flag invalidD0WarningFlag;
+    G4double d0Length = rawD0Length;
+    if (!std::isfinite(d0Length) || d0Length <= 0.0) {
+        std::call_once(invalidD0WarningFlag,
+                       []() {
+                           G4Exception("ChargeSharingCalculator::ComputeChargeFractions",
+                                       "InvalidD0",
+                                       JustWarning,
+                                       "d0 parameter is non-positive; clamping to minimum value to avoid instability.");
+                       });
+        d0Length = minD0Length;
+    }
+    d0Length = std::max(d0Length, minD0Length);
     const G4double hitX = hitPos.x();
     const G4double hitY = hitPos.y();
 
@@ -168,11 +162,10 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
     constexpr G4double guardFactor = 1.0 + 1e-6;
 
-    for (G4int idx = 0; idx < totalCells; ++idx) {
-        fWeightGrid[idx] = 0.0;
-        fInBoundsGrid[idx] = false;
-    }
+    std::fill(fWeightGrid.begin(), fWeightGrid.end(), 0.0);
+    std::fill(fInBoundsGrid.begin(), fInBoundsGrid.end(), false);
 
+    G4double totalWeight = 0.0;
     for (G4int di = -gridRadius; di <= gridRadius; ++di) {
         for (G4int dj = -gridRadius; dj <= gridRadius; ++dj) {
             const G4int idx = (di + gridRadius) * gridDim + (dj + gridRadius);
@@ -197,19 +190,15 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
             const G4double safeDistance = std::max(distance, d0Length * guardFactor);
             const G4double logValue = std::log(safeDistance / d0Length);
-            const G4double weight = (logValue > 0.0) ? (alpha / logValue) : 0.0;
+            const G4double weight = (logValue > 0.0 && std::isfinite(logValue))
+                                        ? (alpha / logValue)
+                                        : 0.0;
 
             fInBoundsGrid[idx] = true;
             fWeightGrid[idx] = weight;
             fResult.distances.push_back(distance);
             fResult.alphas.push_back(alpha);
-        }
-    }
-
-    G4double totalWeight = 0.0;
-    for (G4int idx = 0; idx < totalCells; ++idx) {
-        if (fInBoundsGrid[idx]) {
-            totalWeight += fWeightGrid[idx];
+            totalWeight += weight;
         }
     }
 

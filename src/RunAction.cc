@@ -24,6 +24,7 @@
 #include "TSystem.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <filesystem>
 #include <mutex>
 #include <sstream>
@@ -142,7 +143,7 @@ public:
         }
     }
 
-    bool Validate(const G4String& filename)
+    bool Validate(const G4String& filename, bool* hasEntries)
     {
         std::lock_guard<std::mutex> globalLock(gRootIOMutex);
         if (filename.empty()) {
@@ -167,13 +168,16 @@ public:
                 return false;
             }
 
-            const bool isValid = testTree->GetEntries() > 0;
-            if (!isValid) {
+            const Long64_t entryCount = testTree->GetEntries();
+            if (hasEntries) {
+                *hasEntries = (entryCount > 0);
+            }
+            if (entryCount <= 0) {
                 G4cerr << "RunAction: Warning - Empty tree in file: " << filename << G4endl;
             }
             testFile->Close();
             delete testFile;
-            return isValid;
+            return true;
         } catch (const std::exception& e) {
             G4cerr << "RunAction: Exception during file validation: " << e.what() << G4endl;
             if (testFile) {
@@ -349,25 +353,29 @@ void RunAction::EndOfRunAction(const G4Run* run)
     const G4int nofEvents = run->GetNumberOfEvent();
 
     if (!isMT || isWorker) {
-        if (nofEvents > 0 && SafeWriteRootFile()) {
-            G4cout << "RunAction: Successfully wrote ROOT file with " << nofEvents << " events"
-                   << G4endl;
-            if (!isMT) {
-                fRootWriter->WriteMetadataSingleThread(fGridPixelSize,
-                                                       fGridPixelSpacing,
-                                                       fGridPixelCornerOffset,
-                                                       fGridDetSize,
-                                                       fGridNumBlocksPerSide,
-                                                       fGridNeighborhoodRadius > 0
-                                                           ? fGridNeighborhoodRadius
-                                                           : Constants::NEIGHBORHOOD_RADIUS);
+        bool wroteOutput = false;
+        if (nofEvents > 0) {
+            if (SafeWriteRootFile()) {
+                wroteOutput = true;
+                G4cout << "RunAction: Successfully wrote ROOT file with " << nofEvents << " events"
+                       << G4endl;
+                if (!isMT) {
+                    fRootWriter->WriteMetadataSingleThread(fGridPixelSize,
+                                                           fGridPixelSpacing,
+                                                           fGridPixelCornerOffset,
+                                                           fGridDetSize,
+                                                           fGridNumBlocksPerSide,
+                                                           fGridNeighborhoodRadius > 0
+                                                               ? fGridNeighborhoodRadius
+                                                               : Constants::NEIGHBORHOOD_RADIUS);
+                }
+            } else {
+                G4cerr << "RunAction: Failed to write ROOT file" << G4endl;
             }
-        } else if (nofEvents > 0) {
-            G4cerr << "RunAction: Failed to write ROOT file" << G4endl;
         }
 
         CleanupRootObjects();
-        if (!isMT) {
+        if (!isMT && wroteOutput) {
             // Single-threaded: run post-processing fits once the file is closed
             RunPostProcessingFits();
         }
@@ -471,7 +479,8 @@ void RunAction::EndOfRunAction(const G4Run* run)
         return;
     }
 
-    if (!ValidateRootFile("epicChargeSharing.root")) {
+    bool mergedHasEntries = false;
+    if (!ValidateRootFile("epicChargeSharing.root", &mergedHasEntries)) {
         G4cerr << "RunAction: Merged ROOT file validation failed" << G4endl;
         return;
     }
@@ -486,6 +495,12 @@ void RunAction::EndOfRunAction(const G4Run* run)
             G4cerr << "RunAction: Could not remove worker file " << file << " (" << ec.message()
                    << ")" << G4endl;
         }
+    }
+
+    if (!mergedHasEntries) {
+        G4cout << "RunAction: Merged ROOT file has no entries; skipping post-processing fits"
+               << G4endl;
+        return;
     }
 
     // Master thread: run post-processing fits on merged output
@@ -558,9 +573,9 @@ bool RunAction::SafeWriteRootFile()
     return fRootWriter->SafeWrite(isMT, isWorker);
 }
 
-bool RunAction::ValidateRootFile(const G4String& filename)
+bool RunAction::ValidateRootFile(const G4String& filename, bool* hasEntries)
 {
-    return fRootWriter->Validate(filename);
+    return fRootWriter->Validate(filename, hasEntries);
 }
 
 void RunAction::CleanupRootObjects()

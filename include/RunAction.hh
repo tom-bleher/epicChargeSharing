@@ -35,7 +35,7 @@ public:
     static void ResetSynchronization();
 
     bool SafeWriteRootFile();
-    bool ValidateRootFile(const G4String& filename);
+    bool ValidateRootFile(const G4String& filename, bool* hasEntries = nullptr);
     void CleanupRootObjects();
 
     void SetEventData(G4double edep, G4double x, G4double y, G4double z);

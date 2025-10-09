@@ -307,6 +307,33 @@ G4ThreeVector DetectorConstruction::GetDetectorPos() const
     return G4ThreeVector(0., 0., Constants::DETECTOR_Z_POSITION);
 }
 
+DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const G4ThreeVector& pos) const
+{
+    PixelLocation result{};
+
+    const G4ThreeVector detectorPos = GetDetectorPos();
+    const G4ThreeVector relativePos = pos - detectorPos;
+    const G4double firstPixelPos = -fDetSize / 2 + fPixelCornerOffset + fPixelSize / 2;
+
+    G4int i = static_cast<G4int>(std::round((relativePos.x() - firstPixelPos) / fPixelSpacing));
+    G4int j = static_cast<G4int>(std::round((relativePos.y() - firstPixelPos) / fPixelSpacing));
+
+    result.withinDetector =
+        (i >= 0 && i < fNumBlocksPerSide && j >= 0 && j < fNumBlocksPerSide);
+
+    i = std::max(0, std::min(i, fNumBlocksPerSide - 1));
+    j = std::max(0, std::min(j, fNumBlocksPerSide - 1));
+
+    const G4double pixelX = firstPixelPos + i * fPixelSpacing;
+    const G4double pixelY = firstPixelPos + j * fPixelSpacing;
+    const G4double pixelZ = detectorPos.z() + fDetWidth / 2 + fPixelWidth / 2;
+
+    result.center = {pixelX, pixelY, pixelZ};
+    result.indexI = i;
+    result.indexJ = j;
+    return result;
+}
+
 void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea,
                                                     G4double detectorArea,
                                                     G4double pixelAreaRatio) const
