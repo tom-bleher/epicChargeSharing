@@ -11,9 +11,9 @@ if(POLICY CMP0074)
     cmake_policy(SET CMP0074 NEW)  # find_package uses PackageName_ROOT variables
 endif()
 
-# Set C++17 as minimum standard for broader compatibility
+# Set C++20 as minimum standard to match ROOT requirements
 # Individual targets will use target_compile_features for explicit requirements
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -283,7 +283,7 @@ message(STATUS "ROOT Libraries: ${ROOT_LIBRARIES}")
 add_executable(epicChargeSharing epicChargeSharing.cc ${sources} ${headers})
 
 # Set explicit C++ standard requirements for this target
-target_compile_features(epicChargeSharing PRIVATE cxx_std_17)
+target_compile_features(epicChargeSharing PRIVATE cxx_std_20)
 
 # Link libraries including threading support
 target_link_libraries(epicChargeSharing 
