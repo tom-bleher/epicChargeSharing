@@ -32,6 +32,7 @@
 #include <memory>
 #include <random>
 #include <utility>
+#include <limits>
 
 namespace {
   // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
@@ -47,6 +48,18 @@ namespace {
   inline bool IsFinite(double v) {
     return std::isfinite(v);
   }
+
+  constexpr double kElectronCharge = 1.602176634e-19; // Coulombs
+
+  inline double ComputeQiQnPercent(double qi, double qn) {
+    if (!IsFinite(qi) || !IsFinite(qn)) return std::numeric_limits<double>::quiet_NaN();
+    const double electronsN = qn / kElectronCharge;
+    if (!IsFinite(electronsN) || electronsN <= 0.0) return std::numeric_limits<double>::quiet_NaN();
+    const double electronsI = qi / kElectronCharge;
+    if (!IsFinite(electronsI) || electronsI < 0.0) return std::numeric_limits<double>::quiet_NaN();
+    const double percent = (electronsI / electronsN) * 100.0;
+    return (IsFinite(percent) && percent >= 0.0) ? percent : std::numeric_limits<double>::quiet_NaN();
+  }
 }
 
 // Replay Q_f/F_i fits (from saved parameters) and additionally fit Q_i points
@@ -57,7 +70,8 @@ int processing2D_replay_qifit(const char* filename =
                               double errorPercentOfMax = 5.0,
                               Long64_t nRandomEvents = 300,
                               bool plotQiOverlayPts = true,
-                              bool doQiFit = true) {
+                              bool doQiFit = true,
+                              bool useQiQnPercentErrors = false) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
@@ -168,6 +182,8 @@ int processing2D_replay_qifit(const char* filename =
   Bool_t is_pixel_true = kFALSE;
   std::vector<double>* Q = nullptr;
   std::vector<double>* QiVec = nullptr; // Optional overlay + fitting source
+  std::vector<double>* QnVec = nullptr;
+  bool enableQiQnErrors = useQiQnPercentErrors;
   // Saved fit parameters
   double rowA = NAN, rowMu = NAN, rowSig = NAN, rowB = NAN;
   double colA = NAN, colMu = NAN, colSig = NAN, colB = NAN;
@@ -184,6 +200,14 @@ int processing2D_replay_qifit(const char* filename =
   const bool haveQiBranch = (tree->GetBranch("Q_i") != nullptr);
   if (haveQiBranch) {
     tree->SetBranchAddress("Q_i", &QiVec);
+  }
+  const bool haveQnBranch = (tree->GetBranch("Q_n") != nullptr);
+  if (haveQnBranch) {
+    tree->SetBranchAddress("Q_n", &QnVec);
+  }
+  if (enableQiQnErrors && (!haveQiBranch || !haveQnBranch)) {
+    ::Warning("processing2D_replay_qifit", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
+    enableQiQnErrors = false;
   }
 
   bool haveRowA = tree->GetBranch("GaussRowA") != nullptr;
@@ -243,6 +267,9 @@ int processing2D_replay_qifit(const char* filename =
     tree->GetEntry(eventIndex);
 
     if (is_pixel_true || !Q || Q->empty()) continue;
+    const bool haveQiQnForEvent = enableQiQnErrors &&
+                                  QiVec && QnVec &&
+                                  QiVec->size() == QnVec->size();
 
     const size_t total = Q->size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
@@ -303,6 +330,31 @@ int processing2D_replay_qifit(const char* filename =
     if ((int)x_row_fit.size() < 3) { x_row_fit = x_row; q_row_fit = q_row; rowIdx_fit = rowIdx; }
     if ((int)y_col_fit.size() < 3) { y_col_fit = y_col; q_col_fit = q_col; colIdx_fit = colIdx; }
 
+    std::vector<double> rowErrors;
+    std::vector<double> colErrors;
+    if (haveQiQnForEvent) {
+      rowErrors.reserve(rowIdx_fit.size());
+      for (int idx : rowIdx_fit) {
+        double candidate = std::numeric_limits<double>::quiet_NaN();
+        if (idx >= 0 && QiVec && QnVec &&
+            static_cast<size_t>(idx) < QiVec->size() &&
+            static_cast<size_t>(idx) < QnVec->size()) {
+          candidate = ComputeQiQnPercent((*QiVec)[idx], (*QnVec)[idx]);
+        }
+        rowErrors.push_back(candidate);
+      }
+      colErrors.reserve(colIdx_fit.size());
+      for (int idx : colIdx_fit) {
+        double candidate = std::numeric_limits<double>::quiet_NaN();
+        if (idx >= 0 && QiVec && QnVec &&
+            static_cast<size_t>(idx) < QiVec->size() &&
+            static_cast<size_t>(idx) < QnVec->size()) {
+          candidate = ComputeQiQnPercent((*QiVec)[idx], (*QnVec)[idx]);
+        }
+        colErrors.push_back(candidate);
+      }
+    }
+
     // Must have mus to draw recon lines for saved Q_f/F_i parameters
     bool haveMuRow = haveRowMu && IsFinite(rowMu);
     bool haveMuCol = haveColMu && IsFinite(colMu);
@@ -315,9 +367,21 @@ int processing2D_replay_qifit(const char* filename =
     const double uniformSigma = (qmaxNeighborhood > 0 && relErr > 0.0)
                               ? relErr * qmaxNeighborhood
                               : 0.0;
+    auto selectError = [&](double candidate) -> double {
+      if (std::isfinite(candidate) && candidate > 0.0) return candidate;
+      if (uniformSigma > 0.0) return uniformSigma;
+      return 1.0;
+    };
+    auto hasFinitePositive = [](const std::vector<double>& vals) {
+      for (double v : vals) {
+        if (std::isfinite(v) && v > 0.0) return true;
+      }
+      return false;
+    };
+    const bool rowHasErrorBars = (uniformSigma > 0.0) || (haveQiQnForEvent && hasFinitePositive(rowErrors));
+    const bool colHasErrorBars = (uniformSigma > 0.0) || (haveQiQnForEvent && hasFinitePositive(colErrors));
 
     // Build graphs for kept points only (to mirror original drawing)
-    bool useWeights = (uniformSigma > 0.0);
     TGraph* baseRowPtr = nullptr;
     TGraph* baseColPtr = nullptr;
     TGraph gRowPlain;
@@ -325,23 +389,31 @@ int processing2D_replay_qifit(const char* filename =
     TGraphErrors gRowErr;
     TGraphErrors gColErr;
 
-    if (useWeights) {
+    if (rowHasErrorBars) {
       gRowErr = TGraphErrors(static_cast<int>(x_row_fit.size()));
       for (int k = 0; k < gRowErr.GetN(); ++k) {
         gRowErr.SetPoint(k, x_row_fit[k], q_row_fit[k]);
-        gRowErr.SetPointError(k, 0.0, uniformSigma);
+        const double candidate = (haveQiQnForEvent && k < static_cast<int>(rowErrors.size())) ? rowErrors[k]
+                                                                                              : std::numeric_limits<double>::quiet_NaN();
+        gRowErr.SetPointError(k, 0.0, selectError(candidate));
       }
       baseRowPtr = &gRowErr;
-      gColErr = TGraphErrors(static_cast<int>(y_col_fit.size()));
-      for (int k = 0; k < gColErr.GetN(); ++k) {
-        gColErr.SetPoint(k, y_col_fit[k], q_col_fit[k]);
-        gColErr.SetPointError(k, 0.0, uniformSigma);
-      }
-      baseColPtr = &gColErr;
     } else {
       gRowPlain = TGraph(static_cast<int>(x_row_fit.size()));
       for (int k = 0; k < gRowPlain.GetN(); ++k) gRowPlain.SetPoint(k, x_row_fit[k], q_row_fit[k]);
       baseRowPtr = &gRowPlain;
+    }
+
+    if (colHasErrorBars) {
+      gColErr = TGraphErrors(static_cast<int>(y_col_fit.size()));
+      for (int k = 0; k < gColErr.GetN(); ++k) {
+        gColErr.SetPoint(k, y_col_fit[k], q_col_fit[k]);
+        const double candidate = (haveQiQnForEvent && k < static_cast<int>(colErrors.size())) ? colErrors[k]
+                                                                                              : std::numeric_limits<double>::quiet_NaN();
+        gColErr.SetPointError(k, 0.0, selectError(candidate));
+      }
+      baseColPtr = &gColErr;
+    } else {
       gColPlain = TGraph(static_cast<int>(y_col_fit.size()));
       for (int k = 0; k < gColPlain.GetN(); ++k) gColPlain.SetPoint(k, y_col_fit[k], q_col_fit[k]);
       baseColPtr = &gColPlain;
@@ -381,22 +453,48 @@ int processing2D_replay_qifit(const char* filename =
       std::vector<double> y_col_qi, q_col_qi;
       x_row_qi.reserve(rowIdx.size()); q_row_qi.reserve(rowIdx.size());
       y_col_qi.reserve(colIdx.size()); q_col_qi.reserve(colIdx.size());
+      std::vector<double> rowErrorsQi;
+      std::vector<double> colErrorsQi;
+      if (haveQiQnForEvent) {
+        rowErrorsQi.reserve(rowIdx.size());
+        colErrorsQi.reserve(colIdx.size());
+      }
       for (size_t k = 0; k < rowIdx.size(); ++k) {
         const int idx = rowIdx[k];
         if (idx >= 0 && idx < (int)QiVec->size()) {
           const double qqi = (*QiVec)[idx];
-          if (IsFinite(qqi) && qqi >= 0.0) { x_row_qi.push_back(x_row[k]); q_row_qi.push_back(qqi); }
+          if (IsFinite(qqi) && qqi >= 0.0) {
+            x_row_qi.push_back(x_row[k]);
+            q_row_qi.push_back(qqi);
+            if (haveQiQnForEvent && QnVec && idx >= 0 && static_cast<size_t>(idx) < QnVec->size()) {
+              rowErrorsQi.push_back(ComputeQiQnPercent(qqi, (*QnVec)[idx]));
+            } else if (haveQiQnForEvent) {
+              rowErrorsQi.push_back(std::numeric_limits<double>::quiet_NaN());
+            }
+          }
         }
       }
       for (size_t k = 0; k < colIdx.size(); ++k) {
         const int idx = colIdx[k];
         if (idx >= 0 && idx < (int)QiVec->size()) {
           const double qqi = (*QiVec)[idx];
-          if (IsFinite(qqi) && qqi >= 0.0) { y_col_qi.push_back(y_col[k]); q_col_qi.push_back(qqi); }
+          if (IsFinite(qqi) && qqi >= 0.0) {
+            y_col_qi.push_back(y_col[k]);
+            q_col_qi.push_back(qqi);
+            if (haveQiQnForEvent && QnVec && idx >= 0 && static_cast<size_t>(idx) < QnVec->size()) {
+              colErrorsQi.push_back(ComputeQiQnPercent(qqi, (*QnVec)[idx]));
+            } else if (haveQiQnForEvent) {
+              colErrorsQi.push_back(std::numeric_limits<double>::quiet_NaN());
+            }
+          }
         }
       }
+      const double uniformSigmaQi = (qmaxNeighborhoodQi > 0 && relErr > 0.0)
+                                  ? relErr * qmaxNeighborhoodQi
+                                  : 0.0;
 
       auto fit1DQi = [&](const std::vector<double>& xs, const std::vector<double>& qs,
+                          const std::vector<double>* errVals,
                           double muLo, double muHi,
                           double& outA, double& outMu, double& outSig, double& outB) -> bool {
         if (xs.size() < 3 || qs.size() < 3) return false;
@@ -422,16 +520,20 @@ int processing2D_replay_qifit(const char* filename =
         };
         double sigInit = sigmaSeed1D(xs, qs, B0);
 
-        // Build BinData with uniform errors from Qi neighborhood max (or 1.0)
-        const double qmaxRef = (qmaxNeighborhoodQi > 0 && relErr > 0.0) ? qmaxNeighborhoodQi : 0.0;
-        const double eyVal = (qmaxRef > 0.0) ? (relErr * qmaxRef) : 1.0;
-
         ROOT::Math::WrappedMultiTF1 wLoc(fRowQi, 1); // function signature is same; we will not use fRowQi object here
         TF1 fLoc("fQiLoc", GaussPlusB, -1e9, 1e9, 4);
         fLoc.SetParameters(A0, mu0, sigInit, B0);
         ROOT::Math::WrappedMultiTF1 wModel(fLoc, 1);
         ROOT::Fit::BinData data(static_cast<int>(xs.size()), 1);
-        for (size_t i=0;i<xs.size();++i) data.Add(xs[i], qs[i], eyVal);
+        auto selectErrorQi = [&](double candidate)->double {
+          if (std::isfinite(candidate) && candidate > 0.0) return candidate;
+          if (uniformSigmaQi > 0.0) return uniformSigmaQi;
+          return 1.0;
+        };
+        for (size_t i=0;i<xs.size();++i) {
+          const double candidate = (errVals && i < errVals->size()) ? (*errVals)[i] : std::numeric_limits<double>::quiet_NaN();
+          data.Add(xs[i], qs[i], selectErrorQi(candidate));
+        }
         ROOT::Fit::Fitter fitter;
         fitter.Config().SetMinimizer("Minuit2", "Fumili2");
         fitter.Config().MinimizerOptions().SetStrategy(0);
@@ -471,11 +573,15 @@ int processing2D_replay_qifit(const char* filename =
       const double muXHi = x_px + 0.5 * pixelSpacing;
       const double muYLo = y_px - 0.5 * pixelSpacing;
       const double muYHi = y_px + 0.5 * pixelSpacing;
+      const bool rowErrorSizeMatch = haveQiQnForEvent && (rowErrorsQi.size() == x_row_qi.size());
+      const bool colErrorSizeMatch = haveQiQnForEvent && (colErrorsQi.size() == y_col_qi.size());
+      const std::vector<double>* rowErrPtrQi = rowErrorSizeMatch ? &rowErrorsQi : nullptr;
+      const std::vector<double>* colErrPtrQi = colErrorSizeMatch ? &colErrorsQi : nullptr;
       if (x_row_qi.size() >= 3) {
-        didRowFitQi = fit1DQi(x_row_qi, q_row_qi, muXLo, muXHi, A_row_qi, muRowQi, S_row_qi, B_row_qi);
+        didRowFitQi = fit1DQi(x_row_qi, q_row_qi, rowErrPtrQi, muXLo, muXHi, A_row_qi, muRowQi, S_row_qi, B_row_qi);
       }
       if (y_col_qi.size() >= 3) {
-        didColFitQi = fit1DQi(y_col_qi, q_col_qi, muYLo, muYHi, A_col_qi, muColQi, S_col_qi, B_col_qi);
+        didColFitQi = fit1DQi(y_col_qi, q_col_qi, colErrPtrQi, muYLo, muYHi, A_col_qi, muColQi, S_col_qi, B_col_qi);
       }
     }
 
@@ -516,7 +622,7 @@ int processing2D_replay_qifit(const char* filename =
 
     // Draw COLUMN (left)
     pL.cd();
-    baseColPtr->Draw(useWeights ? "AP" : "AP");
+    baseColPtr->Draw("AP");
     // Ensure x-axis covers the full neighborhood, not only kept points
     {
       auto minmaxY_all = std::minmax_element(y_col.begin(), y_col.end());
@@ -673,7 +779,7 @@ int processing2D_replay_qifit(const char* filename =
 
     // Draw ROW (right)
     pR.cd();
-    baseRowPtr->Draw(useWeights ? "AP" : "AP");
+    baseRowPtr->Draw("AP");
     // Ensure x-axis covers the full neighborhood, not only kept points
     {
       auto minmaxX_all = std::minmax_element(x_row.begin(), x_row.end());
@@ -844,20 +950,18 @@ int plotProcessing2DReplayQiFit() {
   return processing2D_replay_qifit();
 }
 
-int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax) {
-  return processing2D_replay_qifit(filename, errorPercentOfMax);
+int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax, bool useQiQnPercentErrors = false) {
+  return processing2D_replay_qifit(filename, errorPercentOfMax, 300, true, true, useQiQnPercentErrors);
 }
 
-int plotProcessing2DReplayQiFit(Long64_t nRandomEvents) {
-  return processing2D_replay_qifit("../build/epicChargeSharing.root", 5.0, nRandomEvents);
+int plotProcessing2DReplayQiFit(Long64_t nRandomEvents, bool useQiQnPercentErrors = false) {
+  return processing2D_replay_qifit("../build/epicChargeSharing.root", 5.0, nRandomEvents, true, true, useQiQnPercentErrors);
 }
 
-int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents) {
-  return processing2D_replay_qifit(filename, errorPercentOfMax, nRandomEvents);
+int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool useQiQnPercentErrors = false) {
+  return processing2D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, true, true, useQiQnPercentErrors);
 }
 
-int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool plotQiOverlayPts, bool doQiFit) {
-  return processing2D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, plotQiOverlayPts, doQiFit);
+int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool plotQiOverlayPts, bool doQiFit, bool useQiQnPercentErrors = false) {
+  return processing2D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, plotQiOverlayPts, doQiFit, useQiQnPercentErrors);
 }
-
-
