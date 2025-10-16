@@ -50,6 +50,18 @@ namespace {
   }
 
   inline bool IsFinite3D(double v) { return std::isfinite(v); }
+
+  constexpr double kElectronCharge = 1.602176634e-19; // Coulombs
+
+  inline double ComputeQiQnPercent(double qi, double qn) {
+    if (!IsFinite3D(qi) || !IsFinite3D(qn)) return std::numeric_limits<double>::quiet_NaN();
+    const double electronsN = qn / kElectronCharge;
+    if (!IsFinite3D(electronsN) || electronsN <= 0.0) return std::numeric_limits<double>::quiet_NaN();
+    const double electronsI = qi / kElectronCharge;
+    if (!IsFinite3D(electronsI) || electronsI < 0.0) return std::numeric_limits<double>::quiet_NaN();
+    const double percent = (electronsI / electronsN) * 100.0;
+    return (IsFinite3D(percent) && percent >= 0.0) ? percent : std::numeric_limits<double>::quiet_NaN();
+  }
 }
 
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
@@ -63,7 +75,8 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveParamSigx = true,
                  bool saveParamSigy = true,
                  bool saveParamB = true,
-                 const char* chargeBranch = "Q_f") {
+                 const char* chargeBranch = "Q_f",
+                 bool useQiQnPercentErrors = false) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(400);
@@ -198,6 +211,11 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   Bool_t is_pixel_hit = kFALSE;
   // Use Q_f (noisy) for fits; fall back to Q_i (Coulombs)
   std::vector<double>* Q = nullptr;
+  std::vector<double>* Qi = nullptr;
+  std::vector<double>* Qn = nullptr;
+  bool enableQiQnErrors = useQiQnPercentErrors;
+  bool haveQiBranchForErrors = false;
+  bool haveQnBranchForErrors = false;
 
   // Speed up I/O: deactivate all branches, then enable only what we read
   tree->SetBranchStatus("*", 0);
@@ -208,6 +226,17 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchStatus("isPixelHit", 1);
   // Enable only the chosen charge branch
   tree->SetBranchStatus(chosenCharge.c_str(), 1);
+  if (enableQiQnErrors) {
+    haveQiBranchForErrors = tree->GetBranch("Q_i") != nullptr;
+    haveQnBranchForErrors = tree->GetBranch("Q_n") != nullptr;
+    if (haveQiBranchForErrors && haveQnBranchForErrors) {
+      tree->SetBranchStatus("Q_i", 1);
+      tree->SetBranchStatus("Q_n", 1);
+    } else {
+      ::Warning("FitGaus2D", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
+      enableQiQnErrors = false;
+    }
+  }
 
   tree->SetBranchAddress("TrueX", &x_hit);
   tree->SetBranchAddress("TrueY", &y_hit);
@@ -215,6 +244,12 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchAddress("PixelY", &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
+  if (enableQiQnErrors && haveQiBranchForErrors) {
+    tree->SetBranchAddress("Q_i", &Qi);
+  }
+  if (enableQiQnErrors && haveQnBranchForErrors) {
+    tree->SetBranchAddress("Q_n", &Qn);
+  }
 
   // New branches (outputs).
   // Use NaN so invalid/unfitted entries are ignored in ROOT histograms.
@@ -281,6 +316,12 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double> v_x_px(nEntries), v_y_px(nEntries);
   std::vector<char> v_is_pixel(nEntries);
   std::vector<std::vector<double>> v_Q(nEntries);
+  std::vector<std::vector<double>> v_Qi;
+  std::vector<std::vector<double>> v_Qn;
+  if (enableQiQnErrors) {
+    v_Qi.resize(nEntries);
+    v_Qn.resize(nEntries);
+  }
   for (Long64_t i = 0; i < nEntries; ++i) {
     tree->GetEntry(i);
     v_x_hit[i] = x_hit;
@@ -289,6 +330,10 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     v_y_px[i]  = y_px;
     v_is_pixel[i] = is_pixel_hit ? 1 : 0;
     if (Q && !Q->empty()) v_Q[i] = *Q; else v_Q[i].clear();
+    if (enableQiQnErrors) {
+      if (Qi && !Qi->empty()) v_Qi[i] = *Qi; else v_Qi[i].clear();
+      if (Qn && !Qn->empty()) v_Qn[i] = *Qn; else v_Qn[i].clear();
+    }
   }
 
   // Prepare output buffers
@@ -324,12 +369,23 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       return;
     }
     const int R = (N - 1) / 2;
+    const bool haveQiQnForEvent = enableQiQnErrors &&
+                                  static_cast<size_t>(i) < v_Qi.size() &&
+                                  static_cast<size_t>(i) < v_Qn.size() &&
+                                  v_Qi[i].size() == v_Qn[i].size() &&
+                                  v_Qi[i].size() == QLoc.size();
+    const std::vector<double>* QiLocPtr = haveQiQnForEvent ? &v_Qi[i] : nullptr;
+    const std::vector<double>* QnLocPtr = haveQiQnForEvent ? &v_Qn[i] : nullptr;
 
     TGraph2D g2d;
     int p = 0;
     double qmaxNeighborhood = -1e300;
     const double x_px_loc = v_x_px[i];
     const double y_px_loc = v_y_px[i];
+    std::vector<double> err_vals;
+    if (haveQiQnForEvent) {
+      err_vals.reserve(N * N);
+    }
     for (int di = -R; di <= R; ++di) {
       for (int dj = -R; dj <= R; ++dj) {
         const int idx = (di + R) * N + (dj + R);
@@ -338,6 +394,10 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
         const double x = x_px_loc + di * pixelSpacing;
         const double y = y_px_loc + dj * pixelSpacing;
         g2d.SetPoint(p++, x, y, q);
+        if (haveQiQnForEvent) {
+          const double errVal = ComputeQiQnPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx]);
+          err_vals.push_back(errVal);
+        }
         if (q > qmaxNeighborhood) qmaxNeighborhood = q;
       }
     }
@@ -360,6 +420,11 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     // Error model and sigma bounds
     const double relErr = std::max(0.0, errorPercentOfMax) * 0.01;
     const double uniformSigma = (qmaxNeighborhood > 0 && relErr > 0.0) ? relErr * qmaxNeighborhood : 0.0;
+    auto selectError = [&](double candidate) -> double {
+      if (std::isfinite(candidate) && candidate > 0.0) return candidate;
+      if (uniformSigma > 0.0) return uniformSigma;
+      return 1.0;
+    };
     // Constrain sigma to be within [pixel size, radius * pitch]
     const double sigLoBound = pixelSize;
     const double sigHiBound = std::max(sigLoBound, static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
@@ -431,6 +496,10 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     Xf.assign(Xarr, Xarr + g2d.GetN());
     Yf.assign(Yarr, Yarr + g2d.GetN());
     Zf.assign(Zarr, Zarr + g2d.GetN());
+    const std::vector<double>* errValsPtr = nullptr;
+    if (haveQiQnForEvent && err_vals.size() == static_cast<size_t>(g2d.GetN())) {
+      errValsPtr = &err_vals;
+    }
 
     // Build range
     double xMinR =  1e300, xMaxR = -1e300; double yMinR =  1e300, yMaxR = -1e300;
@@ -456,7 +525,9 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     const int nPts = (int)Xf.size();
     ROOT::Fit::BinData data2D(nPts, 2);
     for (int k = 0; k < nPts; ++k) {
-      const double ey = (uniformSigma > 0.0) ? uniformSigma : 1.0; double xy[2] = {Xf[k], Yf[k]}; data2D.Add(xy, Zf[k], ey);
+      const double candidate = (errValsPtr && k < static_cast<int>(errValsPtr->size())) ? (*errValsPtr)[k] : std::numeric_limits<double>::quiet_NaN();
+      double xy[2] = {Xf[k], Yf[k]};
+      data2D.Add(xy, Zf[k], selectError(candidate));
     }
     ROOT::Fit::Fitter fitter;
     fitter.Config().SetMinimizer("Minuit2", "Fumili2");
