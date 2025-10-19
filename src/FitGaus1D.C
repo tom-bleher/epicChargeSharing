@@ -12,6 +12,7 @@
 #include <TF1.h>
 #include <TROOT.h>
 #include <TError.h>
+#include <TMath.h>
 #include <Math/MinimizerOptions.h>
 // Minuit2 least-squares API
 #include <Math/Factory.h>
@@ -34,6 +35,8 @@
 #include <atomic>
 #include <ROOT/TThreadExecutor.hxx>
 
+#include "ChargeUtils.h"
+
 namespace {
   // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
   double GaussPlusB(double* x, double* p) {
@@ -47,18 +50,6 @@ namespace {
 
   inline bool IsFinite(double v) {
     return std::isfinite(v);
-  }
-
-  constexpr double kElectronCharge = 1.602176634e-19; // Coulombs
-
-  inline double ComputeQiQnPercent(double qi, double qn) {
-    if (!IsFinite(qi) || !IsFinite(qn)) return std::numeric_limits<double>::quiet_NaN();
-    const double electronsN = qn / kElectronCharge;
-    if (!IsFinite(electronsN) || electronsN <= 0.0) return std::numeric_limits<double>::quiet_NaN();
-    const double electronsI = qi / kElectronCharge;
-    if (!IsFinite(electronsI) || electronsI < 0.0) return std::numeric_limits<double>::quiet_NaN();
-    const double percent = (electronsI / electronsN) * 100.0;
-    return (IsFinite(percent) && percent >= 0.0) ? percent : std::numeric_limits<double>::quiet_NaN();
   }
 }
 
@@ -78,7 +69,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveDiagParamSigma = true,
                  bool saveDiagParamB = true,
                  bool saveLineMeans = true,
-                 bool useQiQnPercentErrors = false) {
+                 bool useQnQiPercentErrors = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
@@ -215,7 +206,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double>* Q = nullptr; // used for fits (charges in Coulombs)
   std::vector<double>* Qi = nullptr; // initial charge (for error model)
   std::vector<double>* Qn = nullptr; // noiseless charge (for error model)
-  bool enableQiQnErrors = useQiQnPercentErrors;
+  bool enableQiQnErrors = useQnQiPercentErrors;
   bool haveQiBranchForErrors = false;
   bool haveQnBranchForErrors = false;
 
@@ -266,10 +257,16 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   double GaussRowMu = INVALID_VALUE;
   double GaussRowSigma = INVALID_VALUE;
   double GaussRowB = INVALID_VALUE;
+  double GaussRowChi2 = INVALID_VALUE;
+  double GaussRowNdf = INVALID_VALUE;
+  double GaussRowProb = INVALID_VALUE;
   double GaussColA = INVALID_VALUE;
   double GaussColMu = INVALID_VALUE;
   double GaussColSigma = INVALID_VALUE;
   double GaussColB = INVALID_VALUE;
+  double GaussColChi2 = INVALID_VALUE;
+  double GaussColNdf = INVALID_VALUE;
+  double GaussColProb = INVALID_VALUE;
 
   // Optional diagonal reconstructions and parameters
   double ReconMDiagX = INVALID_VALUE;   // main diagonal (dj = di)
@@ -278,6 +275,8 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   double ReconSDiagY  = INVALID_VALUE;
   double GaussMDiagA = INVALID_VALUE, GaussMDiagMu = INVALID_VALUE, GaussMDiagSigma = INVALID_VALUE, GaussMDiagB = INVALID_VALUE;
   double GaussSDiagA = INVALID_VALUE, GaussSDiagMu = INVALID_VALUE, GaussSDiagSigma = INVALID_VALUE, GaussSDiagB = INVALID_VALUE;
+  double GaussMDiagChi2 = INVALID_VALUE, GaussMDiagNdf = INVALID_VALUE, GaussMDiagProb = INVALID_VALUE;
+  double GaussSDiagChi2 = INVALID_VALUE, GaussSDiagNdf = INVALID_VALUE, GaussSDiagProb = INVALID_VALUE;
   // Signed deltas for diagonals
   double ReconTrueDeltaMDiagX = INVALID_VALUE;
   double ReconTrueDeltaMDiagY = INVALID_VALUE;
@@ -317,10 +316,16 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   TBranch* br_row_mu = nullptr;
   TBranch* br_row_sigma = nullptr;
   TBranch* br_row_B = nullptr;
+  TBranch* br_row_chi2 = nullptr;
+  TBranch* br_row_ndf = nullptr;
+  TBranch* br_row_prob = nullptr;
   TBranch* br_col_A = nullptr;
   TBranch* br_col_mu = nullptr;
   TBranch* br_col_sigma = nullptr;
   TBranch* br_col_B = nullptr;
+  TBranch* br_col_chi2 = nullptr;
+  TBranch* br_col_ndf = nullptr;
+  TBranch* br_col_prob = nullptr;
   // Diagonal parameter/output branches
   TBranch* br_x_rec_diag_main = nullptr;
   TBranch* br_y_rec_diag_main = nullptr;
@@ -330,10 +335,16 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   TBranch* br_d1_mu = nullptr;
   TBranch* br_d1_sigma = nullptr;
   TBranch* br_d1_B = nullptr;
+  TBranch* br_d1_chi2 = nullptr;
+  TBranch* br_d1_ndf = nullptr;
+  TBranch* br_d1_prob = nullptr;
   TBranch* br_d2_A = nullptr;
   TBranch* br_d2_mu = nullptr;
   TBranch* br_d2_sigma = nullptr;
   TBranch* br_d2_B = nullptr;
+  TBranch* br_d2_chi2 = nullptr;
+  TBranch* br_d2_ndf = nullptr;
+  TBranch* br_d2_prob = nullptr;
   // Diagonal signed delta branches
   TBranch* br_mdiag_dx_signed = nullptr;
   TBranch* br_mdiag_dy_signed = nullptr;
@@ -360,6 +371,12 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     br_row_B     = ensureAndResetBranch("GaussRowB", &GaussRowB);
     br_col_B     = ensureAndResetBranch("GaussColB", &GaussColB);
   }
+  br_row_chi2 = ensureAndResetBranch("GaussRowChi2", &GaussRowChi2);
+  br_row_ndf  = ensureAndResetBranch("GaussRowNdf", &GaussRowNdf);
+  br_row_prob = ensureAndResetBranch("GaussRowProb", &GaussRowProb);
+  br_col_chi2 = ensureAndResetBranch("GaussColChi2", &GaussColChi2);
+  br_col_ndf  = ensureAndResetBranch("GaussColNdf", &GaussColNdf);
+  br_col_prob = ensureAndResetBranch("GaussColProb", &GaussColProb);
 
   // Create diagonal branches if requested
   if (fitDiagonals) {
@@ -393,6 +410,12 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       br_d1_B = ensureAndResetBranch("GaussMDiagB", &GaussMDiagB);
       br_d2_B = ensureAndResetBranch("GaussSDiagB", &GaussSDiagB);
     }
+    br_d1_chi2 = ensureAndResetBranch("GaussMDiagChi2", &GaussMDiagChi2);
+    br_d1_ndf  = ensureAndResetBranch("GaussMDiagNdf", &GaussMDiagNdf);
+    br_d1_prob = ensureAndResetBranch("GaussMDiagProb", &GaussMDiagProb);
+    br_d2_chi2 = ensureAndResetBranch("GaussSDiagChi2", &GaussSDiagChi2);
+    br_d2_ndf  = ensureAndResetBranch("GaussSDiagNdf", &GaussSDiagNdf);
+    br_d2_prob = ensureAndResetBranch("GaussSDiagProb", &GaussSDiagProb);
   }
 
   // Fitting function for 1D gaussian + const (locals created per-fit below)
@@ -436,15 +459,21 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double> out_row_mu(nEntries, INVALID_VALUE);
   std::vector<double> out_row_sigma(nEntries, INVALID_VALUE);
   std::vector<double> out_row_B(nEntries, INVALID_VALUE);
+  std::vector<double> out_row_chi2(nEntries, INVALID_VALUE);
+  std::vector<double> out_row_ndf(nEntries, INVALID_VALUE);
+  std::vector<double> out_row_prob(nEntries, INVALID_VALUE);
   std::vector<double> out_col_A(nEntries, INVALID_VALUE);
   std::vector<double> out_col_mu(nEntries, INVALID_VALUE);
   std::vector<double> out_col_sigma(nEntries, INVALID_VALUE);
   std::vector<double> out_col_B(nEntries, INVALID_VALUE);
+  std::vector<double> out_col_chi2(nEntries, INVALID_VALUE);
+  std::vector<double> out_col_ndf(nEntries, INVALID_VALUE);
+  std::vector<double> out_col_prob(nEntries, INVALID_VALUE);
 
   // Diagonal buffers
   std::vector<double> out_x_rec_diag_main, out_y_rec_diag_main, out_x_rec_diag_sec, out_y_rec_diag_sec;
-  std::vector<double> out_d1_A, out_d1_mu, out_d1_sigma, out_d1_B;
-  std::vector<double> out_d2_A, out_d2_mu, out_d2_sigma, out_d2_B;
+  std::vector<double> out_d1_A, out_d1_mu, out_d1_sigma, out_d1_B, out_d1_chi2, out_d1_ndf, out_d1_prob;
+  std::vector<double> out_d2_A, out_d2_mu, out_d2_sigma, out_d2_B, out_d2_chi2, out_d2_ndf, out_d2_prob;
   std::vector<double> out_mdiag_dx_s, out_mdiag_dy_s, out_sdiag_dx_s, out_sdiag_dy_s;
   // Mean-of-lines buffers
   std::vector<double> out_x_mean_lines, out_y_mean_lines, out_dx_mean_s, out_dy_mean_s;
@@ -457,10 +486,16 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     out_d1_mu.assign(nEntries, INVALID_VALUE);
     out_d1_sigma.assign(nEntries, INVALID_VALUE);
     out_d1_B.assign(nEntries, INVALID_VALUE);
+    out_d1_chi2.assign(nEntries, INVALID_VALUE);
+    out_d1_ndf.assign(nEntries, INVALID_VALUE);
+    out_d1_prob.assign(nEntries, INVALID_VALUE);
     out_d2_A.assign(nEntries, INVALID_VALUE);
     out_d2_mu.assign(nEntries, INVALID_VALUE);
     out_d2_sigma.assign(nEntries, INVALID_VALUE);
     out_d2_B.assign(nEntries, INVALID_VALUE);
+    out_d2_chi2.assign(nEntries, INVALID_VALUE);
+    out_d2_ndf.assign(nEntries, INVALID_VALUE);
+    out_d2_prob.assign(nEntries, INVALID_VALUE);
     out_mdiag_dx_s.assign(nEntries, INVALID_VALUE);
     out_mdiag_dy_s.assign(nEntries, INVALID_VALUE);
     out_sdiag_dx_s.assign(nEntries, INVALID_VALUE);
@@ -525,7 +560,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           x_row.push_back(x);
           q_row.push_back(q);
           if (haveQiQnForEvent) {
-            const double errVal = ComputeQiQnPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx]);
+            const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
             err_row.push_back(errVal);
           }
         }
@@ -534,7 +569,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           y_col.push_back(y);
           q_col.push_back(q);
           if (haveQiQnForEvent) {
-            const double errVal = ComputeQiQnPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx]);
+            const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
             err_col.push_back(errVal);
           }
         }
@@ -731,12 +766,18 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       out_row_mu[i]    = fitRow.Result().Parameter(1);
       out_row_sigma[i] = fitRow.Result().Parameter(2);
       out_row_B[i]     = fitRow.Result().Parameter(3);
+      out_row_chi2[i]  = fitRow.Result().Chi2();
+      out_row_ndf[i]   = fitRow.Result().Ndf();
+      out_row_prob[i]  = (fitRow.Result().Ndf() > 0) ? TMath::Prob(fitRow.Result().Chi2(), fitRow.Result().Ndf()) : INVALID_VALUE;
     }
     if (okColFit) {
       out_col_A[i]     = fitCol.Result().Parameter(0);
       out_col_mu[i]    = fitCol.Result().Parameter(1);
       out_col_sigma[i] = fitCol.Result().Parameter(2);
       out_col_B[i]     = fitCol.Result().Parameter(3);
+      out_col_chi2[i]  = fitCol.Result().Chi2();
+      out_col_ndf[i]   = fitCol.Result().Ndf();
+      out_col_prob[i]  = (fitCol.Result().Ndf() > 0) ? TMath::Prob(fitCol.Result().Chi2(), fitCol.Result().Ndf()) : INVALID_VALUE;
     }
     double muX = NAN, muY = NAN;
     if (okRowFit) muX = fitRow.Result().Parameter(1);
@@ -785,7 +826,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
             s_d1.push_back(s);
             q_d1.push_back(q);
             if (haveQiQnForEvent) {
-              const double errVal = ComputeQiQnPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx]);
+              const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
               err_d1.push_back(errVal);
             }
           }
@@ -799,7 +840,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
             s_d2.push_back(s);
             q_d2.push_back(q);
             if (haveQiQnForEvent) {
-              const double errVal = ComputeQiQnPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx]);
+              const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
               err_d2.push_back(errVal);
             }
           }
@@ -809,7 +850,8 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                          const std::vector<double>& q_vals_in,
                          const std::vector<double>* err_vals_in,
                          double muLo, double muHi,
-                         double& outA, double& outMu, double& outSig, double& outB) -> bool {
+                         double& outA, double& outMu, double& outSig, double& outB,
+                         double& outChi2, double& outNdf, double& outProb) -> bool {
         if (s_vals_in.size() < 3) return false;
         // Seeds from min/max
         auto mm = std::minmax_element(q_vals_in.begin(), q_vals_in.end());
@@ -885,6 +927,9 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           outMu = fitter.Result().Parameter(1);
           outSig = fitter.Result().Parameter(2);
           outB = fitter.Result().Parameter(3);
+          outChi2 = fitter.Result().Chi2();
+          outNdf  = fitter.Result().Ndf();
+          outProb = (fitter.Result().Ndf() > 0) ? TMath::Prob(fitter.Result().Chi2(), fitter.Result().Ndf()) : INVALID_VALUE;
           return true;
         }
         // Fallback: baseline-subtracted weighted centroid
@@ -892,6 +937,9 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         for (size_t k=0;k<s_vals.size();++k) { double w = std::max(0.0, q_vals[k] - B0); wsum += w; sw += w * s_vals[k]; }
         if (wsum > 0) {
           outA = A0; outB = B0; outSig = sigInit; outMu = sw / wsum;
+          outChi2 = INVALID_VALUE;
+          outNdf = INVALID_VALUE;
+          outProb = INVALID_VALUE;
           return true;
         }
         return false;
@@ -903,8 +951,10 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       double A2=INVALID_VALUE, mu2=INVALID_VALUE, S2=INVALID_VALUE, B2=INVALID_VALUE;
       const std::vector<double>* err_d1_ptr = haveQiQnForEvent ? &err_d1 : nullptr;
       const std::vector<double>* err_d2_ptr = haveQiQnForEvent ? &err_d2 : nullptr;
-      bool ok1 = fitDiag(s_d1, q_d1, err_d1_ptr, muLo, muHi, A1, mu1, S1, B1);
-      bool ok2 = fitDiag(s_d2, q_d2, err_d2_ptr, muLo, muHi, A2, mu2, S2, B2);
+      double chi2_1 = INVALID_VALUE, ndf_1 = INVALID_VALUE, prob_1 = INVALID_VALUE;
+      double chi2_2 = INVALID_VALUE, ndf_2 = INVALID_VALUE, prob_2 = INVALID_VALUE;
+      bool ok1 = fitDiag(s_d1, q_d1, err_d1_ptr, muLo, muHi, A1, mu1, S1, B1, chi2_1, ndf_1, prob_1);
+      bool ok2 = fitDiag(s_d2, q_d2, err_d2_ptr, muLo, muHi, A2, mu2, S2, B2, chi2_2, ndf_2, prob_2);
       if (ok1) {
         // Transform diagonal coordinate mu -> (x,y)
         const double dx = mu1 - x_px_loc;
@@ -913,6 +963,9 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         out_mdiag_dx_s[i] = (v_x_hit[i] - out_x_rec_diag_main[i]);
         out_mdiag_dy_s[i] = (v_y_hit[i] - out_y_rec_diag_main[i]);
         if (saveDiagParamA) out_d1_A[i] = A1; if (saveDiagParamMu) out_d1_mu[i] = mu1; if (saveDiagParamSigma) out_d1_sigma[i] = S1; if (saveDiagParamB) out_d1_B[i] = B1;
+        out_d1_chi2[i] = chi2_1;
+        out_d1_ndf[i]  = ndf_1;
+        out_d1_prob[i] = prob_1;
       }
       if (ok2) {
         const double dx = mu2 - x_px_loc;
@@ -921,6 +974,9 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         out_sdiag_dx_s[i] = (v_x_hit[i] - out_x_rec_diag_sec[i]);
         out_sdiag_dy_s[i] = (v_y_hit[i] - out_y_rec_diag_sec[i]);
         if (saveDiagParamA) out_d2_A[i] = A2; if (saveDiagParamMu) out_d2_mu[i] = mu2; if (saveDiagParamSigma) out_d2_sigma[i] = S2; if (saveDiagParamB) out_d2_B[i] = B2;
+        out_d2_chi2[i] = chi2_2;
+        out_d2_ndf[i]  = ndf_2;
+        out_d2_prob[i] = prob_2;
       }
       // Compute mean-of-lines recon (row/diagonals for X, col/diagonals for Y)
       if (saveLineMeans) {
@@ -960,10 +1016,16 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     GaussRowMu = out_row_mu[i];
     GaussRowSigma = out_row_sigma[i];
     GaussRowB = out_row_B[i];
+    GaussRowChi2 = out_row_chi2[i];
+    GaussRowNdf = out_row_ndf[i];
+    GaussRowProb = out_row_prob[i];
     GaussColA = out_col_A[i];
     GaussColMu = out_col_mu[i];
     GaussColSigma = out_col_sigma[i];
     GaussColB = out_col_B[i];
+    GaussColChi2 = out_col_chi2[i];
+    GaussColNdf = out_col_ndf[i];
+    GaussColProb = out_col_prob[i];
     br_x_rec->Fill();
     br_y_rec->Fill();
     br_dx_signed->Fill();
@@ -972,10 +1034,16 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     if (br_row_mu) br_row_mu->Fill();
     if (br_row_sigma) br_row_sigma->Fill();
     if (br_row_B) br_row_B->Fill();
+    if (br_row_chi2) br_row_chi2->Fill();
+    if (br_row_ndf) br_row_ndf->Fill();
+    if (br_row_prob) br_row_prob->Fill();
     if (br_col_A) br_col_A->Fill();
     if (br_col_mu) br_col_mu->Fill();
     if (br_col_sigma) br_col_sigma->Fill();
     if (br_col_B) br_col_B->Fill();
+    if (br_col_chi2) br_col_chi2->Fill();
+    if (br_col_ndf) br_col_ndf->Fill();
+    if (br_col_prob) br_col_prob->Fill();
     if (fitDiagonals) {
       ReconMDiagX = out_x_rec_diag_main.empty() ? INVALID_VALUE : out_x_rec_diag_main[i];
       ReconMDiagY = out_y_rec_diag_main.empty() ? INVALID_VALUE : out_y_rec_diag_main[i];
@@ -1007,18 +1075,30 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       GaussMDiagMu = out_d1_mu.empty()? INVALID_VALUE : out_d1_mu[i];
       GaussMDiagSigma = out_d1_sigma.empty()? INVALID_VALUE : out_d1_sigma[i];
       GaussMDiagB = out_d1_B.empty()? INVALID_VALUE : out_d1_B[i];
+      GaussMDiagChi2 = out_d1_chi2.empty()? INVALID_VALUE : out_d1_chi2[i];
+      GaussMDiagNdf = out_d1_ndf.empty()? INVALID_VALUE : out_d1_ndf[i];
+      GaussMDiagProb = out_d1_prob.empty()? INVALID_VALUE : out_d1_prob[i];
       GaussSDiagA = out_d2_A.empty()? INVALID_VALUE : out_d2_A[i];
       GaussSDiagMu = out_d2_mu.empty()? INVALID_VALUE : out_d2_mu[i];
       GaussSDiagSigma = out_d2_sigma.empty()? INVALID_VALUE : out_d2_sigma[i];
       GaussSDiagB = out_d2_B.empty()? INVALID_VALUE : out_d2_B[i];
+      GaussSDiagChi2 = out_d2_chi2.empty()? INVALID_VALUE : out_d2_chi2[i];
+      GaussSDiagNdf = out_d2_ndf.empty()? INVALID_VALUE : out_d2_ndf[i];
+      GaussSDiagProb = out_d2_prob.empty()? INVALID_VALUE : out_d2_prob[i];
       if (br_d1_A && saveDiagParamA) br_d1_A->Fill();
       if (br_d1_mu && saveDiagParamMu) br_d1_mu->Fill();
       if (br_d1_sigma && saveDiagParamSigma) br_d1_sigma->Fill();
       if (br_d1_B && saveDiagParamB) br_d1_B->Fill();
+      if (br_d1_chi2) br_d1_chi2->Fill();
+      if (br_d1_ndf) br_d1_ndf->Fill();
+      if (br_d1_prob) br_d1_prob->Fill();
       if (br_d2_A && saveDiagParamA) br_d2_A->Fill();
       if (br_d2_mu && saveDiagParamMu) br_d2_mu->Fill();
       if (br_d2_sigma && saveDiagParamSigma) br_d2_sigma->Fill();
       if (br_d2_B && saveDiagParamB) br_d2_B->Fill();
+      if (br_d2_chi2) br_d2_chi2->Fill();
+      if (br_d2_ndf) br_d2_ndf->Fill();
+      if (br_d2_prob) br_d2_prob->Fill();
     }
     nProcessed++;
   }

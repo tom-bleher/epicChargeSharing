@@ -8,6 +8,24 @@
 namespace Constants {
     
     // ========================
+    // CHARGE SHARING MODEL SELECTION
+    // ========================
+    enum class ChargeSharingModel {
+        Log,
+        Linear
+    };
+
+    // CHARGE_SHARING_MODEL controls the charge sharing formulation used.
+    // Log: legacy logarithmic model; Linear: new linear attenuation model.
+    const ChargeSharingModel CHARGE_SHARING_MODEL = ChargeSharingModel::Log;
+
+    // Linear model beta parameters based on pixel pitch window (in microns).
+    const G4double LINEAR_CHARGE_MODEL_BETA_NARROW = 0.003;      // for 100 - 200 um pitch
+    const G4double LINEAR_CHARGE_MODEL_BETA_WIDE = 0.002;        // for 200 - 500 um pitch
+    const G4double LINEAR_CHARGE_MODEL_MIN_PITCH = 100.0 * micrometer;
+    const G4double LINEAR_CHARGE_MODEL_BOUNDARY_PITCH = 200.0 * micrometer;
+    const G4double LINEAR_CHARGE_MODEL_MAX_PITCH = 500.0 * micrometer;
+    // ========================
     // DETECTOR GEOMETRY CONSTANTS
     // ========================
     

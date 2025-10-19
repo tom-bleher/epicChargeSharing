@@ -12,6 +12,7 @@
 #include <TF2.h>
 #include <TROOT.h>
 #include <TError.h>
+#include <TMath.h>
 #include <Math/MinimizerOptions.h>
 // Minuit2 least-squares API
 #include <Math/Factory.h>
@@ -34,6 +35,8 @@
 #include <atomic>
 #include <ROOT/TThreadExecutor.hxx>
 
+#include "ChargeUtils.h"
+
 namespace {
   // 2D Gaussian with constant offset:
   // A * exp(-0.5 * ((x-mux)^2/sigx^2 + (y-muy)^2/sigy^2)) + B
@@ -50,18 +53,6 @@ namespace {
   }
 
   inline bool IsFinite3D(double v) { return std::isfinite(v); }
-
-  constexpr double kElectronCharge = 1.602176634e-19; // Coulombs
-
-  inline double ComputeQiQnPercent(double qi, double qn) {
-    if (!IsFinite3D(qi) || !IsFinite3D(qn)) return std::numeric_limits<double>::quiet_NaN();
-    const double electronsN = qn / kElectronCharge;
-    if (!IsFinite3D(electronsN) || electronsN <= 0.0) return std::numeric_limits<double>::quiet_NaN();
-    const double electronsI = qi / kElectronCharge;
-    if (!IsFinite3D(electronsI) || electronsI < 0.0) return std::numeric_limits<double>::quiet_NaN();
-    const double percent = (electronsI / electronsN) * 100.0;
-    return (IsFinite3D(percent) && percent >= 0.0) ? percent : std::numeric_limits<double>::quiet_NaN();
-  }
 }
 
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
@@ -76,7 +67,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveParamSigy = true,
                  bool saveParamB = true,
                  const char* chargeBranch = "Q_f",
-                 bool useQiQnPercentErrors = false) {
+                 bool useQnQiPercentErrors = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(400);
@@ -213,7 +204,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double>* Q = nullptr;
   std::vector<double>* Qi = nullptr;
   std::vector<double>* Qn = nullptr;
-  bool enableQiQnErrors = useQiQnPercentErrors;
+  bool enableQiQnErrors = useQnQiPercentErrors;
   bool haveQiBranchForErrors = false;
   bool haveQnBranchForErrors = false;
 
@@ -265,6 +256,9 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   double gauss3d_sigx = INVALID_VALUE;
   double gauss3d_sigy = INVALID_VALUE;
   double gauss3d_B = INVALID_VALUE;
+  double gauss3d_chi2 = INVALID_VALUE;
+  double gauss3d_ndf = INVALID_VALUE;
+  double gauss3d_prob = INVALID_VALUE;
   
   auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
     TBranch* br = tree->GetBranch(name);
@@ -303,6 +297,9 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   if (saveParamSigx) br_sigx = ensureAndResetBranch("Gauss2D_sigx", &gauss3d_sigx);
   if (saveParamSigy) br_sigy = ensureAndResetBranch("Gauss2D_sigy", &gauss3d_sigy);
   if (saveParamB)   br_B   = ensureAndResetBranch("Gauss2D_B", &gauss3d_B);
+  TBranch* br_chi2 = ensureAndResetBranch("Gauss2D_Chi2", &gauss3d_chi2);
+  TBranch* br_ndf  = ensureAndResetBranch("Gauss2D_Ndf", &gauss3d_ndf);
+  TBranch* br_prob = ensureAndResetBranch("Gauss2D_Prob", &gauss3d_prob);
 
   // 2D fit function kept for reference. We use Minuit2 on a compact window.
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
@@ -348,6 +345,9 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double> out_sigx(nEntries, INVALID_VALUE);
   std::vector<double> out_sigy(nEntries, INVALID_VALUE);
   std::vector<double> out_B(nEntries, INVALID_VALUE);
+  std::vector<double> out_chi2(nEntries, INVALID_VALUE);
+  std::vector<double> out_ndf(nEntries, INVALID_VALUE);
+  std::vector<double> out_prob(nEntries, INVALID_VALUE);
 
   // Parallel computation across entries
   std::vector<int> indices(nEntries);
@@ -395,7 +395,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
         const double y = y_px_loc + dj * pixelSpacing;
         g2d.SetPoint(p++, x, y, q);
         if (haveQiQnForEvent) {
-          const double errVal = ComputeQiQnPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx]);
+          const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
           err_vals.push_back(errVal);
         }
         if (q > qmaxNeighborhood) qmaxNeighborhood = q;
@@ -580,6 +580,9 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       out_sigx[i] = fitter.Result().Parameter(3);
       out_sigy[i] = fitter.Result().Parameter(4);
       out_B[i]    = fitter.Result().Parameter(5);
+      out_chi2[i] = fitter.Result().Chi2();
+      out_ndf[i]  = fitter.Result().Ndf();
+      out_prob[i] = (fitter.Result().Ndf() > 0) ? TMath::Prob(fitter.Result().Chi2(), fitter.Result().Ndf()) : INVALID_VALUE;
       const double xr = out_mux[i];
       const double yr = out_muy[i];
       out_x_rec[i] = xr; out_y_rec[i] = yr;

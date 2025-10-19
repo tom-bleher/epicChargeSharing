@@ -10,6 +10,7 @@
 #include "G4VPhysicalVolume.hh"
 #include "G4ThreeVector.hh"
 #include <vector>
+#include <mutex>
 
 class EventAction;
 class G4LogicalVolume;
@@ -47,6 +48,8 @@ public:
     
     G4double GetPixelSize() const { return fPixelSize; }
     G4double GetPixelSpacing() const { return fPixelSpacing; }
+    G4double GetPixelPitch() const { return fPixelSpacing; }
+    G4double GetLinearChargeModelBeta(G4double pitch) const;
     G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
@@ -87,6 +90,8 @@ private:
     G4double fDetSize;
     G4double fDetWidth;
     G4int fNumBlocksPerSide;
+
+    mutable std::once_flag fLinearModelWarningFlag;
 
     EventAction* fEventAction;
     

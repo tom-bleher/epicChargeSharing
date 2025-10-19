@@ -15,6 +15,7 @@
 #include <TLatex.h>
 #include <TStyle.h>
 #include <TSystem.h>
+#include <TMath.h>
 
 #include <Math/MinimizerOptions.h>
 #include <Math/Factory.h>
@@ -57,18 +58,21 @@ namespace {
     if (!IsFinite(electronsN) || electronsN <= 0.0) return std::numeric_limits<double>::quiet_NaN();
     const double electronsI = qi / kElectronCharge;
     if (!IsFinite(electronsI) || electronsI < 0.0) return std::numeric_limits<double>::quiet_NaN();
-    const double percent = (electronsI / electronsN) * 100.0;
+    const double percent = (electronsN / electronsI)*1e-15;
+    //std::cout << "Qn/Qi: " << percent << std::endl;
+    //std::cout << "electronsN: " << electronsN << std::endl;
+    //std::cout << "electronsI: " << electronsI << std::endl;
     return (IsFinite(percent) && percent >= 0.0) ? percent : std::numeric_limits<double>::quiet_NaN();
   }
 }
 
 // Replay Q_f/F_i fits (from saved parameters) and additionally fit Q_i points
-// exactly like diagnostic/fit/plotProcessing2D.C does, drawing dashed green
+// exactly like diagnostic/fit/plotProcessing1D.C does, drawing dashed green
 // Gaussian curves and vertical recon lines for Q_i with legend deltas.
-int processing2D_replay_qifit(const char* filename =
-                                "/home/tom/Desktop/Putza/epicChargeSharing/noisy/0um.root",
+int processing1D_replay_qifit(const char* filename =
+                              "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root",
                               double errorPercentOfMax = 5.0,
-                              Long64_t nRandomEvents = 300,
+                              Long64_t nRandomEvents = 100,
                               bool plotQiOverlayPts = true,
                               bool doQiFit = true,
                               bool useQiQnPercentErrors = false) {
@@ -85,7 +89,7 @@ int processing2D_replay_qifit(const char* filename =
     TString fallback = "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root";
     file = TFile::Open(fallback, "READ");
     if (!file || file->IsZombie()) {
-      ::Error("processing2D_replay_qifit", "Cannot open file: %s or fallback: %s", filename, fallback.Data());
+      ::Error("processing1D_replay_qifit", "Cannot open file: %s or fallback: %s", filename, fallback.Data());
       if (file) { file->Close(); delete file; }
       return 1;
     }
@@ -94,7 +98,7 @@ int processing2D_replay_qifit(const char* filename =
   // Get tree
   TTree* tree = dynamic_cast<TTree*>(file->Get("Hits"));
   if (!tree) {
-    ::Error("processing2D_replay_qifit", "Hits tree not found in file: %s", filename);
+    ::Error("processing1D_replay_qifit", "Hits tree not found in file: %s", filename);
     file->Close();
     delete file;
     return 2;
@@ -155,7 +159,7 @@ int processing2D_replay_qifit(const char* filename =
     pixelSpacing = inferSpacingFromTree(tree);
   }
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
-    ::Error("processing2D_replay_qifit", "Pixel spacing unavailable (metadata missing and inference failed). Aborting.");
+    ::Error("processing1D_replay_qifit", "Pixel spacing unavailable (metadata missing and inference failed). Aborting.");
     file->Close();
     delete file;
     return 3;
@@ -170,7 +174,7 @@ int processing2D_replay_qifit(const char* filename =
   else if (tree->GetBranch("F_i")) chosenCharge = "F_i";
   else if (tree->GetBranch("Q_i")) chosenCharge = "Q_i";
   else {
-    ::Error("processing2D_replay_qifit", "No charge branch found (tried Q_f, F_i, Q_i)");
+    ::Error("processing1D_replay_qifit", "No charge branch found (tried Q_f, F_i, Q_i)");
     file->Close();
     delete file;
     return 4;
@@ -186,7 +190,9 @@ int processing2D_replay_qifit(const char* filename =
   bool enableQiQnErrors = useQiQnPercentErrors;
   // Saved fit parameters
   double rowA = NAN, rowMu = NAN, rowSig = NAN, rowB = NAN;
+  double rowChi2 = NAN, rowNdf = NAN, rowProb = NAN;
   double colA = NAN, colMu = NAN, colSig = NAN, colB = NAN;
+  double colChi2 = NAN, colNdf = NAN, colProb = NAN;
   // Saved removal masks (0 = kept, 1 = removed)
   std::vector<int>* rowMask = nullptr;
   std::vector<int>* colMask = nullptr;
@@ -206,7 +212,7 @@ int processing2D_replay_qifit(const char* filename =
     tree->SetBranchAddress("Q_n", &QnVec);
   }
   if (enableQiQnErrors && (!haveQiBranch || !haveQnBranch)) {
-    ::Warning("processing2D_replay_qifit", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
+    ::Warning("processing1D_replay_qifit", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
     enableQiQnErrors = false;
   }
 
@@ -214,19 +220,31 @@ int processing2D_replay_qifit(const char* filename =
   bool haveRowMu = tree->GetBranch("GaussRowMu") != nullptr;
   bool haveRowSig = tree->GetBranch("GaussRowSigma") != nullptr;
   bool haveRowB = tree->GetBranch("GaussRowB") != nullptr;
+  bool haveRowChi2 = tree->GetBranch("GaussRowChi2") != nullptr;
+  bool haveRowNdf = tree->GetBranch("GaussRowNdf") != nullptr;
+  bool haveRowProb = tree->GetBranch("GaussRowProb") != nullptr;
   bool haveColA = tree->GetBranch("GaussColA") != nullptr;
   bool haveColMu = tree->GetBranch("GaussColMu") != nullptr;
   bool haveColSig = tree->GetBranch("GaussColSigma") != nullptr;
   bool haveColB = tree->GetBranch("GaussColB") != nullptr;
+  bool haveColChi2 = tree->GetBranch("GaussColChi2") != nullptr;
+  bool haveColNdf = tree->GetBranch("GaussColNdf") != nullptr;
+  bool haveColProb = tree->GetBranch("GaussColProb") != nullptr;
   bool haveAnyParams = haveRowMu && haveColMu; // at least mus to draw rec lines
   if (haveRowA) tree->SetBranchAddress("GaussRowA", &rowA);
   if (haveRowMu) tree->SetBranchAddress("GaussRowMu", &rowMu);
   if (haveRowSig) tree->SetBranchAddress("GaussRowSigma", &rowSig);
   if (haveRowB) tree->SetBranchAddress("GaussRowB", &rowB);
+  if (haveRowChi2) tree->SetBranchAddress("GaussRowChi2", &rowChi2);
+  if (haveRowNdf) tree->SetBranchAddress("GaussRowNdf", &rowNdf);
+  if (haveRowProb) tree->SetBranchAddress("GaussRowProb", &rowProb);
   if (haveColA) tree->SetBranchAddress("GaussColA", &colA);
   if (haveColMu) tree->SetBranchAddress("GaussColMu", &colMu);
   if (haveColSig) tree->SetBranchAddress("GaussColSigma", &colSig);
   if (haveColB) tree->SetBranchAddress("GaussColB", &colB);
+  if (haveColChi2) tree->SetBranchAddress("GaussColChi2", &colChi2);
+  if (haveColNdf) tree->SetBranchAddress("GaussColNdf", &colNdf);
+  if (haveColProb) tree->SetBranchAddress("GaussColProb", &colProb);
 
   bool haveRowMask = tree->GetBranch("GaussRowMaskRemoved") != nullptr;
   bool haveColMask = tree->GetBranch("GaussColMaskRemoved") != nullptr;
@@ -237,7 +255,7 @@ int processing2D_replay_qifit(const char* filename =
   gROOT->SetBatch(true);
   gStyle->SetOptFit(0);
   gStyle->SetOptStat(0);
-  TCanvas c("c2up_replay_qifit", "processing2D replay + Qi fit", 1800, 700);
+  TCanvas c("c2up_replay_qifit", "processing1D replay + Qi fit", 1800, 700);
   TPad pL("pL", "column-left", 0.0, 0.0, 0.5, 1.0);
   TPad pR("pR", "row-right",  0.5, 0.0, 1.0, 1.0);
   pL.SetTicks(1,1);
@@ -246,7 +264,7 @@ int processing2D_replay_qifit(const char* filename =
   pR.Draw();
 
   // Open multipage PDF
-  c.Print("2Dfits_replay_qifit.pdf[");
+  c.Print("1Dfits_replay_qifit.pdf[");
 
   TF1 fRow("fRow_replay", GaussPlusB, -1e9, 1e9, 4);
   TF1 fCol("fCol_replay", GaussPlusB, -1e9, 1e9, 4);
@@ -429,12 +447,14 @@ int processing2D_replay_qifit(const char* filename =
     baseColPtr->SetLineColor(kBlue+2);
 
     // =========================
-    // Optional Q_i fits (match plotProcessing2D.C logic)
+    // Optional Q_i fits (match plotProcessing1D.C logic)
     // =========================
     bool haveQi = (haveQiBranch && QiVec);
     bool didRowFitQi = false, didColFitQi = false;
     double A_row_qi = NAN, B_row_qi = NAN, S_row_qi = NAN, muRowQi = NAN;
+    double chi2_row_qi = NAN, ndf_row_qi = NAN, prob_row_qi = NAN;
     double A_col_qi = NAN, B_col_qi = NAN, S_col_qi = NAN, muColQi = NAN;
+    double chi2_col_qi = NAN, ndf_col_qi = NAN, prob_col_qi = NAN;
     double qmaxNeighborhoodQi = -1e300;
     if (haveQi && doQiFit) {
       // compute qmax over full neighborhood for Qi
@@ -496,7 +516,11 @@ int processing2D_replay_qifit(const char* filename =
       auto fit1DQi = [&](const std::vector<double>& xs, const std::vector<double>& qs,
                           const std::vector<double>* errVals,
                           double muLo, double muHi,
-                          double& outA, double& outMu, double& outSig, double& outB) -> bool {
+                          double& outA, double& outMu, double& outSig, double& outB,
+                          double& outChi2, double& outNdf, double& outProb) -> bool {
+        outChi2 = std::numeric_limits<double>::quiet_NaN();
+        outNdf  = std::numeric_limits<double>::quiet_NaN();
+        outProb = std::numeric_limits<double>::quiet_NaN();
         if (xs.size() < 3 || qs.size() < 3) return false;
         auto mm = std::minmax_element(qs.begin(), qs.end());
         double A0 = std::max(1e-18, *mm.second - *mm.first);
@@ -556,10 +580,14 @@ int processing2D_replay_qifit(const char* filename =
         fitter.Config().ParSettings(3).SetValue(B0);
         bool ok = fitter.Fit(data);
         if (ok) {
-          outA = fitter.Result().Parameter(0);
-          outMu = fitter.Result().Parameter(1);
-          outSig = fitter.Result().Parameter(2);
-          outB = fitter.Result().Parameter(3);
+          const auto& res = fitter.Result();
+          outA = res.Parameter(0);
+          outMu = res.Parameter(1);
+          outSig = res.Parameter(2);
+          outB = res.Parameter(3);
+          outChi2 = res.Chi2();
+          outNdf  = res.Ndf();
+          outProb = (res.Ndf() > 0) ? TMath::Prob(res.Chi2(), res.Ndf()) : std::numeric_limits<double>::quiet_NaN();
           return true;
         }
         // Fallback: baseline-subtracted weighted centroid
@@ -578,10 +606,14 @@ int processing2D_replay_qifit(const char* filename =
       const std::vector<double>* rowErrPtrQi = rowErrorSizeMatch ? &rowErrorsQi : nullptr;
       const std::vector<double>* colErrPtrQi = colErrorSizeMatch ? &colErrorsQi : nullptr;
       if (x_row_qi.size() >= 3) {
-        didRowFitQi = fit1DQi(x_row_qi, q_row_qi, rowErrPtrQi, muXLo, muXHi, A_row_qi, muRowQi, S_row_qi, B_row_qi);
+        didRowFitQi = fit1DQi(x_row_qi, q_row_qi, rowErrPtrQi, muXLo, muXHi,
+                               A_row_qi, muRowQi, S_row_qi, B_row_qi,
+                               chi2_row_qi, ndf_row_qi, prob_row_qi);
       }
       if (y_col_qi.size() >= 3) {
-        didColFitQi = fit1DQi(y_col_qi, q_col_qi, colErrPtrQi, muYLo, muYHi, A_col_qi, muColQi, S_col_qi, B_col_qi);
+        didColFitQi = fit1DQi(y_col_qi, q_col_qi, colErrPtrQi, muYLo, muYHi,
+                               A_col_qi, muColQi, S_col_qi, B_col_qi,
+                               chi2_col_qi, ndf_col_qi, prob_col_qi);
       }
     }
 
@@ -768,11 +800,27 @@ int processing2D_replay_qifit(const char* filename =
     legCRight.AddEntry((TObject*)nullptr, Form("y_{true} = %.4f mm", y_true), "");
     legCRight.AddEntry((TObject*)nullptr, Form("y_{rec}(Q_{f}) = %.4f mm", colMu), "");
     if (didColFit) legCRight.AddEntry((TObject*)nullptr, Form("#sigma_{fit}(Q_{f}) = %.3f mm", colSig), "");
+    if (didColFit && haveColChi2 && haveColNdf && IsFinite(colChi2) && IsFinite(colNdf) && colNdf > 0.0) {
+      legCRight.AddEntry((TObject*)nullptr,
+                         Form("#chi^{2}/ndf (Q_{f}) = %.2f/%d", colChi2, static_cast<int>(std::lround(colNdf))),
+                         "");
+      if (haveColProb && IsFinite(colProb)) {
+        legCRight.AddEntry((TObject*)nullptr, Form("P(Q_{f}) = %.3g", colProb), "");
+      }
+    }
     legCRight.AddEntry((TObject*)nullptr, Form("y_{true}-y_{px} = %.1f #mum", 1000.0*(y_true - y_px)), "");
     legCRight.AddEntry((TObject*)nullptr, Form("y_{true}-y_{rec}(Q_{f}) = %.1f #mum", 1000.0*(y_true - colMu)), "");
     if (didColFitQi) {
       legCRight.AddEntry((TObject*)nullptr, Form("y_{rec}(Q_{i}) = %.4f mm", muColQi), "");
       legCRight.AddEntry((TObject*)nullptr, Form("#sigma_{Q_{i}} = %.3f mm", S_col_qi), "");
+      if (IsFinite(chi2_col_qi) && IsFinite(ndf_col_qi) && ndf_col_qi > 0.0) {
+        legCRight.AddEntry((TObject*)nullptr,
+                           Form("#chi^{2}/ndf (Q_{i}) = %.2f/%d", chi2_col_qi, static_cast<int>(std::lround(ndf_col_qi))),
+                           "");
+        if (IsFinite(prob_col_qi)) {
+          legCRight.AddEntry((TObject*)nullptr, Form("P(Q_{i}) = %.3g", prob_col_qi), "");
+        }
+      }
       legCRight.AddEntry((TObject*)nullptr, Form("y_{true}-y_{rec}(Q_{i}) = %.1f #mum", 1000.0*(y_true - muColQi)), "");
     }
     legCRight.Draw();
@@ -920,48 +968,64 @@ int processing2D_replay_qifit(const char* filename =
     legRight.AddEntry((TObject*)nullptr, Form("x_{true} = %.4f mm", x_true), "");
     legRight.AddEntry((TObject*)nullptr, Form("x_{rec}(Q_{f}) = %.4f mm", rowMu), "");
     if (didRowFit) legRight.AddEntry((TObject*)nullptr, Form("#sigma_{fit}(Q_{f}) = %.3f mm", rowSig), "");
+    if (didRowFit && haveRowChi2 && haveRowNdf && IsFinite(rowChi2) && IsFinite(rowNdf) && rowNdf > 0.0) {
+      legRight.AddEntry((TObject*)nullptr,
+                        Form("#chi^{2}/ndf (Q_{f}) = %.2f/%d", rowChi2, static_cast<int>(std::lround(rowNdf))),
+                        "");
+      if (haveRowProb && IsFinite(rowProb)) {
+        legRight.AddEntry((TObject*)nullptr, Form("P(Q_{f}) = %.3g", rowProb), "");
+      }
+    }
     legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{px} = %.1f #mum", 1000.0*(x_true - x_px)), "");
     legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{rec}(Q_{f}) = %.1f #mum", 1000.0*(x_true - rowMu)), "");
     if (didRowFitQi) {
       legRight.AddEntry((TObject*)nullptr, Form("x_{rec}(Q_{i}) = %.4f mm", muRowQi), "");
       legRight.AddEntry((TObject*)nullptr, Form("#sigma_{Q_{i}} = %.3f mm", S_row_qi), "");
+      if (IsFinite(chi2_row_qi) && IsFinite(ndf_row_qi) && ndf_row_qi > 0.0) {
+        legRight.AddEntry((TObject*)nullptr,
+                          Form("#chi^{2}/ndf (Q_{i}) = %.2f/%d", chi2_row_qi, static_cast<int>(std::lround(ndf_row_qi))),
+                          "");
+        if (IsFinite(prob_row_qi)) {
+          legRight.AddEntry((TObject*)nullptr, Form("P(Q_{i}) = %.3g", prob_row_qi), "");
+        }
+      }
       legRight.AddEntry((TObject*)nullptr, Form("x_{true}-x_{rec}(Q_{i}) = %.1f #mum", 1000.0*(x_true - muRowQi)), "");
     }
     legRight.Draw();
 
     // Print page
     c.cd();
-    c.Print("2Dfits_replay_qifit.pdf");
+    c.Print("1Dfits_replay_qifit.pdf");
     nPages++;
   }
 
-  c.Print("2Dfits_replay_qifit.pdf]");
+  c.Print("1Dfits_replay_qifit.pdf]");
 
   file->Close();
   delete file;
 
-  ::Info("processing2D_replay_qifit", "Generated %lld pages (considered %lld events).", nPages, nConsidered);
+  ::Info("processing1D_replay_qifit", "Generated %lld pages (considered %lld events).", nPages, nConsidered);
   return 0;
 }
 
 
-// ROOT auto-exec wrappers so `root -l -b -q plotProcessing2DReplayQiFit.C` works
-int plotProcessing2DReplayQiFit() {
-  return processing2D_replay_qifit();
+// ROOT auto-exec wrappers so `root -l -b -q plotFitGaus1DReplayQiFit.C` works
+int plotFitGaus1DReplayQiFit() {
+  return processing1D_replay_qifit();
 }
 
-int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax, bool useQiQnPercentErrors = false) {
-  return processing2D_replay_qifit(filename, errorPercentOfMax, 300, true, true, useQiQnPercentErrors);
+int plotFitGaus1DReplayQiFit(const char* filename, double errorPercentOfMax, bool useQiQnPercentErrors = false) {
+  return processing1D_replay_qifit(filename, errorPercentOfMax, 300, true, true, useQiQnPercentErrors);
 }
 
-int plotProcessing2DReplayQiFit(Long64_t nRandomEvents, bool useQiQnPercentErrors = false) {
-  return processing2D_replay_qifit("../build/epicChargeSharing.root", 5.0, nRandomEvents, true, true, useQiQnPercentErrors);
+int plotFitGaus1DReplayQiFit(Long64_t nRandomEvents, bool useQiQnPercentErrors = false) {
+  return processing1D_replay_qifit("../build/epicChargeSharing.root", 0.0, nRandomEvents, true, true, useQiQnPercentErrors);
 }
 
-int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool useQiQnPercentErrors = false) {
-  return processing2D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, true, true, useQiQnPercentErrors);
+int plotFitGaus1DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool useQiQnPercentErrors = false) {
+  return processing1D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, true, true, useQiQnPercentErrors);
 }
 
-int plotProcessing2DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool plotQiOverlayPts, bool doQiFit, bool useQiQnPercentErrors = false) {
-  return processing2D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, plotQiOverlayPts, doQiFit, useQiQnPercentErrors);
+int plotFitGaus1DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool plotQiOverlayPts, bool doQiFit, bool useQiQnPercentErrors = false) {
+  return processing1D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, plotQiOverlayPts, doQiFit, useQiQnPercentErrors);
 }
