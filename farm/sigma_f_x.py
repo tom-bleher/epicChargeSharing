@@ -8,7 +8,7 @@ Tasks:
     - ReconTrueDeltaRowX
     - ReconTrueDeltaSDiagX
     - ReconTrueDeltaMDiagX
-    - ReconTrueDeltaX_3D
+    - ReconTrueDeltaX_2D
     - ReconTrueDeltaMeanX
     Fit a Gaussian to the histogram and extract sigma (sigma_f) and its fit error.
  3) Save a PNG with the histogram and the fitted Gaussian overlay for each file/branch.
@@ -43,7 +43,7 @@ import uproot
 # ---------------------------- Configuration ---------------------------------
 
 REPO_ROOT = "/home/tom/Desktop/Putza/epicChargeSharing"
-INPUT_DIR = f"{REPO_ROOT}/Q_f"
+INPUT_DIR = f"{REPO_ROOT}/0.00err"
 OUTPUT_BASE = f"{REPO_ROOT}/proc/fit/uproot_gaussian_out"
 TREE_NAME = "Hits"
 
@@ -51,7 +51,7 @@ BRANCHES = [
     "ReconTrueDeltaRowX",
     "ReconTrueDeltaSDiagX",
     "ReconTrueDeltaMDiagX",
-    "ReconTrueDeltaX_3D",
+    "ReconTrueDeltaX_2D",
     "ReconTrueDeltaMeanX",
 ]
 

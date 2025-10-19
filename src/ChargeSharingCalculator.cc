@@ -165,6 +165,8 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     std::fill(fWeightGrid.begin(), fWeightGrid.end(), 0.0);
     std::fill(fInBoundsGrid.begin(), fInBoundsGrid.end(), false);
 
+    const auto chargeModel = Constants::CHARGE_SHARING_MODEL;
+
     G4double totalWeight = 0.0;
     for (G4int di = -gridRadius; di <= gridRadius; ++di) {
         for (G4int dj = -gridRadius; dj <= gridRadius; ++dj) {
@@ -190,9 +192,21 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
             const G4double safeDistance = std::max(distance, d0Length * guardFactor);
             const G4double logValue = std::log(safeDistance / d0Length);
-            const G4double weight = (logValue > 0.0 && std::isfinite(logValue))
-                                        ? (alpha / logValue)
-                                        : 0.0;
+            const G4double logWeight = (logValue > 0.0 && std::isfinite(logValue))
+                                           ? (alpha / logValue)
+                                           : 0.0;
+
+            G4double linearWeight = 0.0;
+            if (chargeModel == Constants::ChargeSharingModel::Linear) {
+                const G4double pitch = pixelSpacing;
+                const G4double beta = fDetector->GetLinearChargeModelBeta(pitch);
+                const G4double attenuation = std::max(0.0, 1.0 - beta * distance / micrometer);
+                linearWeight = attenuation * alpha;
+            }
+
+            const G4double weight = (chargeModel == Constants::ChargeSharingModel::Log)
+                                        ? logWeight
+                                        : linearWeight;
 
             fInBoundsGrid[idx] = true;
             fWeightGrid[idx] = weight;

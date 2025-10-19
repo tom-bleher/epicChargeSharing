@@ -29,6 +29,8 @@
 #include <ctime>
 #include <string>
 #include <filesystem>
+#include <mutex>
+#include <sstream>
 
 DetectorConstruction::DetectorConstruction()
     : G4VUserDetectorConstruction(),
@@ -334,6 +336,63 @@ DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const
     return result;
 }
 
+void DetectorConstruction::ConstructSDandField()
+{
+    G4ScoringManager::GetScoringManager();
+
+    auto* mfd = new G4MultiFunctionalDetector("SiliconDetector");
+    G4SDManager::GetSDMpointer()->AddNewDetector(mfd);
+
+    G4VPrimitiveScorer* energyScorer = new G4PSEnergyDeposit("EnergyDeposit");
+    mfd->RegisterPrimitive(energyScorer);
+
+    SetSensitiveDetector("logicCube", mfd);
+
+    G4VSensitiveDetector* attachedDetector =
+        fLogicSilicon ? fLogicSilicon->GetSensitiveDetector() : nullptr;
+    if (attachedDetector == mfd) {
+        G4cout << "Multi-Functional Detector 'SiliconDetector' successfully attached to silicon "
+                  "volume"
+               << G4endl;
+    } else {
+        G4cerr << "ERROR: Failed to attach Multi-Functional Detector to silicon volume" << G4endl;
+    }
+
+    G4cout << "MFD: created, attached to silicon, primitives: " << mfd->GetNumberOfPrimitives()
+           << G4endl;
+}
+
+G4double DetectorConstruction::GetLinearChargeModelBeta(G4double pitch) const
+{
+    if (pitch >= Constants::LINEAR_CHARGE_MODEL_MIN_PITCH &&
+        pitch <= Constants::LINEAR_CHARGE_MODEL_BOUNDARY_PITCH) {
+        return Constants::LINEAR_CHARGE_MODEL_BETA_NARROW;
+    }
+
+    if (pitch > Constants::LINEAR_CHARGE_MODEL_BOUNDARY_PITCH &&
+        pitch <= Constants::LINEAR_CHARGE_MODEL_MAX_PITCH) {
+        return Constants::LINEAR_CHARGE_MODEL_BETA_WIDE;
+    }
+
+    std::call_once(fLinearModelWarningFlag,
+                   [pitch]() {
+                       std::ostringstream oss;
+                       oss << "Linear charge sharing model: pixel pitch " << pitch / micrometer
+                           << " um outside supported range ["
+                           << Constants::LINEAR_CHARGE_MODEL_MIN_PITCH / micrometer
+                           << ", "
+                           << Constants::LINEAR_CHARGE_MODEL_MAX_PITCH / micrometer
+                           << "]. Using narrow beta.";
+                       const std::string message = oss.str();
+                       G4Exception("DetectorConstruction::GetLinearChargeModelBeta",
+                                   "LinearModelOutOfRange",
+                                   JustWarning,
+                                   message.c_str());
+                   });
+
+    return Constants::LINEAR_CHARGE_MODEL_BETA_NARROW;
+}
+
 void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea,
                                                     G4double detectorArea,
                                                     G4double pixelAreaRatio) const
@@ -412,30 +471,4 @@ void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
         G4cout << "EventAction not yet available - radius will be set when EventAction is connected"
                << G4endl;
     }
-}
-
-void DetectorConstruction::ConstructSDandField()
-{
-    G4ScoringManager::GetScoringManager();
-
-    auto* mfd = new G4MultiFunctionalDetector("SiliconDetector");
-    G4SDManager::GetSDMpointer()->AddNewDetector(mfd);
-
-    G4VPrimitiveScorer* energyScorer = new G4PSEnergyDeposit("EnergyDeposit");
-    mfd->RegisterPrimitive(energyScorer);
-
-    SetSensitiveDetector("logicCube", mfd);
-
-    G4VSensitiveDetector* attachedDetector =
-        fLogicSilicon ? fLogicSilicon->GetSensitiveDetector() : nullptr;
-    if (attachedDetector == mfd) {
-        G4cout << "Multi-Functional Detector 'SiliconDetector' successfully attached to silicon "
-                  "volume"
-               << G4endl;
-    } else {
-        G4cerr << "ERROR: Failed to attach Multi-Functional Detector to silicon volume" << G4endl;
-    }
-
-    G4cout << "MFD: created, attached to silicon, primitives: " << mfd->GetNumberOfPrimitives()
-           << G4endl;
 }
