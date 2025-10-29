@@ -20,7 +20,7 @@ inline double ComputeQnQiPercent(double qi, double qn, double maxQi) {
   if (!std::isfinite(ratio) || ratio <= 0.0) {
     return std::numeric_limits<double>::quiet_NaN();
   }
-  const double scaledError = 0.05 * maxQi * ratio;
+  const double scaledError = 0.065 * maxQi * ratio;
   if (!std::isfinite(scaledError) || scaledError <= 0.0) {
     return std::numeric_limits<double>::quiet_NaN();
   }

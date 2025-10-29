@@ -20,12 +20,11 @@ RUN_MAC = (BUILD_DIR / "run.mac") if (BUILD_DIR / "run.mac").exists() else (REPO
 GROUP1 = [25, 50, 75, 100, 125, 150, 175]
 # Second group: [+-325, +-350, ..., +-475]
 GROUP2 = []#[325, 350, 375, 400, 425, 450, 475]
-POSITIONS = []
+POSITIONS = [0]
 for p in GROUP1:
     POSITIONS.extend([p, -p])
 for p in GROUP2:
     POSITIONS.extend([p, -p])
-POSITIONS.extend([0])
 
 # Regex pattern to locate the x position line in PrimaryGenerator.cc
 # We expect a line like:     const G4double x = -25.0*um;

@@ -35,6 +35,8 @@
 #include <utility>
 #include <limits>
 
+#include "../../src/ChargeUtils.h"
+
 namespace {
   // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
   double GaussPlusB(double* x, double* p) {
@@ -49,33 +51,18 @@ namespace {
   inline bool IsFinite(double v) {
     return std::isfinite(v);
   }
-
-  constexpr double kElectronCharge = 1.602176634e-19; // Coulombs
-
-  inline double ComputeQiQnPercent(double qi, double qn) {
-    if (!IsFinite(qi) || !IsFinite(qn)) return std::numeric_limits<double>::quiet_NaN();
-    const double electronsN = qn / kElectronCharge;
-    if (!IsFinite(electronsN) || electronsN <= 0.0) return std::numeric_limits<double>::quiet_NaN();
-    const double electronsI = qi / kElectronCharge;
-    if (!IsFinite(electronsI) || electronsI < 0.0) return std::numeric_limits<double>::quiet_NaN();
-    const double percent = (electronsN / electronsI)*1e-15;
-    //std::cout << "Qn/Qi: " << percent << std::endl;
-    //std::cout << "electronsN: " << electronsN << std::endl;
-    //std::cout << "electronsI: " << electronsI << std::endl;
-    return (IsFinite(percent) && percent >= 0.0) ? percent : std::numeric_limits<double>::quiet_NaN();
-  }
 }
 
 // Replay Q_f/F_i fits (from saved parameters) and additionally fit Q_i points
 // exactly like diagnostic/fit/plotProcessing1D.C does, drawing dashed green
 // Gaussian curves and vertical recon lines for Q_i with legend deltas.
 int processing1D_replay_qifit(const char* filename =
-                              "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root",
+                              "/home/tomble/epicChargeSharing/0um.root",
                               double errorPercentOfMax = 5.0,
                               Long64_t nRandomEvents = 100,
                               bool plotQiOverlayPts = true,
                               bool doQiFit = true,
-                              bool useQiQnPercentErrors = false) {
+                              bool useQiQnPercentErrors = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
@@ -300,14 +287,22 @@ int processing1D_replay_qifit(const char* filename =
     std::vector<int> rowIdx, colIdx; // indices into flattened NxN neighborhood
     x_row.reserve(N); q_row.reserve(N);
     y_col.reserve(N); q_col.reserve(N);
-    rowIdx.reserve(N); colIdx.reserve(N);
+   rowIdx.reserve(N); colIdx.reserve(N);
     double qmaxNeighborhood = -1e300;
+    double qmaxQiNeighborhood = -1e300;
     for (int di = -R; di <= R; ++di) {
       for (int dj = -R; dj <= R; ++dj) {
         const int idx  = (di + R) * N + (dj + R);
         const double q = (*Q)[idx];
         if (!IsFinite(q) || q < 0) continue;
         if (q > qmaxNeighborhood) qmaxNeighborhood = q;
+        if (haveQiQnForEvent && QiVec && idx >= 0 &&
+            static_cast<size_t>(idx) < QiVec->size()) {
+          const double qiCandidate = (*QiVec)[idx];
+          if (IsFinite(qiCandidate) && qiCandidate > qmaxQiNeighborhood) {
+            qmaxQiNeighborhood = qiCandidate;
+          }
+        }
         if (dj == 0) {
           const double x = x_px + di * pixelSpacing;
           x_row.push_back(x);
@@ -357,7 +352,7 @@ int processing1D_replay_qifit(const char* filename =
         if (idx >= 0 && QiVec && QnVec &&
             static_cast<size_t>(idx) < QiVec->size() &&
             static_cast<size_t>(idx) < QnVec->size()) {
-          candidate = ComputeQiQnPercent((*QiVec)[idx], (*QnVec)[idx]);
+          candidate = ComputeQnQiPercent((*QiVec)[idx], (*QnVec)[idx], qmaxQiNeighborhood);
         }
         rowErrors.push_back(candidate);
       }
@@ -367,7 +362,7 @@ int processing1D_replay_qifit(const char* filename =
         if (idx >= 0 && QiVec && QnVec &&
             static_cast<size_t>(idx) < QiVec->size() &&
             static_cast<size_t>(idx) < QnVec->size()) {
-          candidate = ComputeQiQnPercent((*QiVec)[idx], (*QnVec)[idx]);
+          candidate = ComputeQnQiPercent((*QiVec)[idx], (*QnVec)[idx], qmaxQiNeighborhood);
         }
         colErrors.push_back(candidate);
       }
@@ -455,7 +450,7 @@ int processing1D_replay_qifit(const char* filename =
     double chi2_row_qi = NAN, ndf_row_qi = NAN, prob_row_qi = NAN;
     double A_col_qi = NAN, B_col_qi = NAN, S_col_qi = NAN, muColQi = NAN;
     double chi2_col_qi = NAN, ndf_col_qi = NAN, prob_col_qi = NAN;
-    double qmaxNeighborhoodQi = -1e300;
+    double qmaxNeighborhoodQi = qmaxQiNeighborhood;
     if (haveQi && doQiFit) {
       // compute qmax over full neighborhood for Qi
       for (int di = -R; di <= R; ++di) {
@@ -487,7 +482,7 @@ int processing1D_replay_qifit(const char* filename =
             x_row_qi.push_back(x_row[k]);
             q_row_qi.push_back(qqi);
             if (haveQiQnForEvent && QnVec && idx >= 0 && static_cast<size_t>(idx) < QnVec->size()) {
-              rowErrorsQi.push_back(ComputeQiQnPercent(qqi, (*QnVec)[idx]));
+              rowErrorsQi.push_back(ComputeQnQiPercent(qqi, (*QnVec)[idx], qmaxNeighborhoodQi));
             } else if (haveQiQnForEvent) {
               rowErrorsQi.push_back(std::numeric_limits<double>::quiet_NaN());
             }
@@ -502,7 +497,7 @@ int processing1D_replay_qifit(const char* filename =
             y_col_qi.push_back(y_col[k]);
             q_col_qi.push_back(qqi);
             if (haveQiQnForEvent && QnVec && idx >= 0 && static_cast<size_t>(idx) < QnVec->size()) {
-              colErrorsQi.push_back(ComputeQiQnPercent(qqi, (*QnVec)[idx]));
+              colErrorsQi.push_back(ComputeQnQiPercent(qqi, (*QnVec)[idx], qmaxNeighborhoodQi));
             } else if (haveQiQnForEvent) {
               colErrorsQi.push_back(std::numeric_limits<double>::quiet_NaN());
             }
