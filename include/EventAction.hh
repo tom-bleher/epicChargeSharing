@@ -7,12 +7,14 @@
 
 #include "ChargeSharingCalculator.hh"
 
+#include <memory>
 #include <vector>
 
 class RunAction;
 class DetectorConstruction;
 class SteppingAction;
 class G4Event;
+class G4GenericMessenger;
 
 /**
  * Event-level bookkeeping and data extraction.
@@ -46,6 +48,8 @@ public:
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
 
     void CollectScorerData(const G4Event* event);
+
+    void SetEmitDistanceAlpha(G4bool enabled);
 
 private:
     G4ThreeVector DetermineHitPosition() const;
@@ -81,6 +85,8 @@ private:
     ChargeSharingCalculator fChargeSharing;
     std::vector<G4double> fNeighborhoodChargeNew;
     std::vector<G4double> fNeighborhoodChargeFinal;
+    G4bool fEmitDistanceAlphaOutputs{false};
+    std::unique_ptr<G4GenericMessenger> fMessenger;
 };
 
 #endif // EVENTACTION_HH

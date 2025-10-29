@@ -23,9 +23,11 @@
 #include "TString.h"
 #include "TSystem.h"
 
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
 #include <filesystem>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -273,9 +275,63 @@ TTree* RunAction::GetTree() const
     return fRootWriter ? fRootWriter->Tree() : nullptr;
 }
 
+void RunAction::EnsureVectorSized(std::vector<G4double>& vec, G4double initValue) const
+{
+    if (static_cast<G4int>(vec.size()) != fNeighborhoodCapacity) {
+        vec.assign(std::max(0, fNeighborhoodCapacity), initValue);
+    } else {
+        std::fill(vec.begin(), vec.end(), initValue);
+    }
+}
+
+void RunAction::EnsureVectorSized(std::vector<G4int>& vec, G4int initValue) const
+{
+    if (static_cast<G4int>(vec.size()) != fNeighborhoodCapacity) {
+        vec.assign(std::max(0, fNeighborhoodCapacity), initValue);
+    } else {
+        std::fill(vec.begin(), vec.end(), initValue);
+    }
+}
+
+void RunAction::EnsureBranchBuffersInitialized()
+{
+    G4int radius = fGridNeighborhoodRadius >= 0 ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS;
+    if (radius < 0) {
+        radius = 0;
+    }
+    const G4int desiredCapacity = std::max(1, (2 * radius + 1) * (2 * radius + 1));
+    if (desiredCapacity != fNeighborhoodCapacity ||
+        static_cast<G4int>(fNeighborhoodChargeFractions.size()) != desiredCapacity) {
+        fNeighborhoodCapacity = desiredCapacity;
+        fNeighborhoodChargeFractions.clear();
+        fNeighborhoodCharge.clear();
+        fNeighborhoodChargeNew.clear();
+        fNeighborhoodChargeFinal.clear();
+        fNeighborhoodDistance.clear();
+        fNeighborhoodAlpha.clear();
+        fNeighborhoodPixelX.clear();
+        fNeighborhoodPixelY.clear();
+        fNeighborhoodPixelID.clear();
+    }
+
+    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
+    EnsureVectorSized(fNeighborhoodChargeFractions, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
+    EnsureVectorSized(fNeighborhoodCharge, 0.0);
+    EnsureVectorSized(fNeighborhoodChargeNew, 0.0);
+    EnsureVectorSized(fNeighborhoodChargeFinal, 0.0);
+    EnsureVectorSized(fNeighborhoodDistance, nan);
+    EnsureVectorSized(fNeighborhoodAlpha, nan);
+    EnsureVectorSized(fNeighborhoodPixelX, nan);
+    EnsureVectorSized(fNeighborhoodPixelY, nan);
+    EnsureVectorSized(fNeighborhoodPixelID, -1);
+    fNeighborhoodActiveCells = 0;
+}
+
 void RunAction::BeginOfRunAction(const G4Run* run)
 {
     std::call_once(gRootInitFlag, InitializeROOTThreading);
+
+    EnsureBranchBuffersInitialized();
 
     const bool isMT = G4Threading::IsMultithreadedApplication();
     const bool isWorker = G4Threading::IsWorkerThread();
@@ -321,15 +377,15 @@ void RunAction::BeginOfRunAction(const G4Run* run)
         tree->Branch("Edep", &fEdep, "Edep/D");
         tree->Branch("PixelTrueDeltaX", &fPixelTrueDeltaX, "PixelTrueDeltaX/D");
         tree->Branch("PixelTrueDeltaY", &fPixelTrueDeltaY, "PixelTrueDeltaY/D");
-        tree->Branch("FirstContactIsPixel", &fFirstContactIsPixel, "FirstContactIsPixel/O");
-        tree->Branch("GeometricIsPixel", &fGeometricIsPixel, "GeometricIsPixel/O");
         tree->Branch("isPixelHit", &fIsPixelHit, "isPixelHit/O");
+        tree->Branch("NeighborhoodSize", &fNeighborhoodActiveCells, "NeighborhoodSize/I");
+
         tree->Branch("F_i", &fNeighborhoodChargeFractions);
         tree->Branch("Q_i", &fNeighborhoodCharge);
         tree->Branch("Q_n", &fNeighborhoodChargeNew);
         tree->Branch("Q_f", &fNeighborhoodChargeFinal);
-        tree->Branch("d_i", &fNeighborhoodDistance);
-        tree->Branch("alpha_i", &fNeighborhoodAlpha);
+        // tree->Branch("d_i", &fNeighborhoodDistance);
+        // tree->Branch("alpha_i", &fNeighborhoodAlpha);
         tree->Branch("NeighborhoodPixelX", &fNeighborhoodPixelX);
         tree->Branch("NeighborhoodPixelY", &fNeighborhoodPixelY);
         tree->Branch("NeighborhoodPixelID", &fNeighborhoodPixelID);
@@ -592,6 +648,47 @@ void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
     (void)z;
 }
 
+void RunAction::UpdateEventSummary(const EventSummaryData& summary)
+{
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    fEdep = summary.edep;
+    fTrueX = summary.hitX;
+    fTrueY = summary.hitY;
+    (void)summary.hitZ;
+    fPixelX = summary.nearestPixelX;
+    fPixelY = summary.nearestPixelY;
+    fPixelTrueDeltaX = summary.pixelTrueDeltaX;
+    fPixelTrueDeltaY = summary.pixelTrueDeltaY;
+    fFirstContactIsPixel = summary.firstContactIsPixel;
+    fGeometricIsPixel = summary.geometricIsPixel;
+    fIsPixelHit = summary.isPixelHitCombined;
+}
+
+void RunAction::SetNearestPixelPos(G4double x, G4double y)
+{
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    fPixelX = x;
+    fPixelY = y;
+}
+
+void RunAction::SetFirstContactIsPixel(G4bool v)
+{
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    fFirstContactIsPixel = v;
+}
+
+void RunAction::SetGeometricIsPixel(G4bool v)
+{
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    fGeometricIsPixel = v;
+}
+
+void RunAction::SetIsPixelHitCombined(G4bool v)
+{
+    std::lock_guard<std::mutex> lock(fTreeMutex);
+    fIsPixelHit = v;
+}
+
 void RunAction::SetPixelClassification(G4bool isPixelHit,
                                        G4double pixelTrueDeltaX,
                                        G4double pixelTrueDeltaY)
@@ -606,46 +703,88 @@ void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFra
                                           const std::vector<G4double>& chargeCoulombs)
 {
     std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodChargeFractions.capacity() < chargeFractions.size()) {
-        fNeighborhoodChargeFractions.reserve(chargeFractions.size());
+    if (fNeighborhoodCapacity <= 0) {
+        return;
     }
-    if (fNeighborhoodCharge.capacity() < chargeCoulombs.size()) {
-        fNeighborhoodCharge.reserve(chargeCoulombs.size());
+
+    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
+    if (chargeFractions.size() > capacity || chargeCoulombs.size() > capacity) {
+        static std::once_flag warnFlag;
+        std::call_once(warnFlag, []() {
+            G4cerr << "RunAction: Neighborhood data exceeds fixed branch capacity; truncating to configured radius." << G4endl;
+        });
     }
-    fNeighborhoodChargeFractions.assign(chargeFractions.begin(), chargeFractions.end());
-    fNeighborhoodCharge.assign(chargeCoulombs.begin(), chargeCoulombs.end());
+
+    const std::size_t copyCount = std::min({chargeFractions.size(), chargeCoulombs.size(), capacity});
+    std::fill(fNeighborhoodChargeFractions.begin(), fNeighborhoodChargeFractions.end(),
+              Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
+    std::fill(fNeighborhoodCharge.begin(), fNeighborhoodCharge.end(), 0.0);
+
+    if (copyCount > 0) {
+        std::copy_n(chargeFractions.begin(), copyCount, fNeighborhoodChargeFractions.begin());
+        std::copy_n(chargeCoulombs.begin(), copyCount, fNeighborhoodCharge.begin());
+    }
+
+    fNeighborhoodActiveCells = static_cast<G4int>(copyCount);
 }
 
 void RunAction::SetNeighborhoodChargeNewData(const std::vector<G4double>& chargeCoulombsNew)
 {
     std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodChargeNew.capacity() < chargeCoulombsNew.size()) {
-        fNeighborhoodChargeNew.reserve(chargeCoulombsNew.size());
+    if (fNeighborhoodCapacity <= 0) {
+        return;
     }
-    fNeighborhoodChargeNew.assign(chargeCoulombsNew.begin(), chargeCoulombsNew.end());
+
+    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
+    const std::size_t copyCount = std::min<std::size_t>(chargeCoulombsNew.size(), capacity);
+
+    std::fill(fNeighborhoodChargeNew.begin(), fNeighborhoodChargeNew.end(), 0.0);
+    if (copyCount > 0) {
+        std::copy_n(chargeCoulombsNew.begin(), copyCount, fNeighborhoodChargeNew.begin());
+    }
 }
 
 void RunAction::SetNeighborhoodChargeFinalData(const std::vector<G4double>& chargeCoulombsFinal)
 {
     std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodChargeFinal.capacity() < chargeCoulombsFinal.size()) {
-        fNeighborhoodChargeFinal.reserve(chargeCoulombsFinal.size());
+    if (fNeighborhoodCapacity <= 0) {
+        return;
     }
-    fNeighborhoodChargeFinal.assign(chargeCoulombsFinal.begin(), chargeCoulombsFinal.end());
+
+    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
+    const std::size_t copyCount = std::min<std::size_t>(chargeCoulombsFinal.size(), capacity);
+
+    std::fill(fNeighborhoodChargeFinal.begin(), fNeighborhoodChargeFinal.end(), 0.0);
+    if (copyCount > 0) {
+        std::copy_n(chargeCoulombsFinal.begin(), copyCount, fNeighborhoodChargeFinal.begin());
+    }
 }
 
 void RunAction::SetNeighborhoodDistanceAlphaData(const std::vector<G4double>& distances,
                                                  const std::vector<G4double>& alphas)
 {
     std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodDistance.capacity() < distances.size()) {
-        fNeighborhoodDistance.reserve(distances.size());
+    if (fNeighborhoodCapacity <= 0) {
+        return;
     }
-    if (fNeighborhoodAlpha.capacity() < alphas.size()) {
-        fNeighborhoodAlpha.reserve(alphas.size());
+
+    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
+    const std::size_t distCopy = std::min<std::size_t>(distances.size(), capacity);
+    const std::size_t alphaCopy = std::min<std::size_t>(alphas.size(), capacity);
+
+    if (distCopy == 0 && alphaCopy == 0) {
+        return;
     }
-    fNeighborhoodDistance.assign(distances.begin(), distances.end());
-    fNeighborhoodAlpha.assign(alphas.begin(), alphas.end());
+
+    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
+    std::fill(fNeighborhoodDistance.begin(), fNeighborhoodDistance.end(), nan);
+    std::fill(fNeighborhoodAlpha.begin(), fNeighborhoodAlpha.end(), nan);
+    if (distCopy > 0) {
+        std::copy_n(distances.begin(), distCopy, fNeighborhoodDistance.begin());
+    }
+    if (alphaCopy > 0) {
+        std::copy_n(alphas.begin(), alphaCopy, fNeighborhoodAlpha.begin());
+    }
 }
 
 void RunAction::SetDetectorGridParameters(G4double pixelSize,
@@ -661,23 +800,53 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize,
     fGridNumBlocksPerSide = numBlocksPerSide;
 }
 
+void RunAction::SetNeighborhoodRadiusMeta(G4int radius)
+{
+    fGridNeighborhoodRadius = radius;
+
+    if (GetTree()) {
+        static std::once_flag warnFlag;
+        std::call_once(warnFlag, []() {
+            G4cerr << "RunAction: Neighborhood radius changed after tree creation; fixed-size branches retain original capacity." << G4endl;
+        });
+        return;
+    }
+
+    fNeighborhoodCapacity = 0;
+    fNeighborhoodChargeFractions.clear();
+    fNeighborhoodCharge.clear();
+    fNeighborhoodChargeNew.clear();
+    fNeighborhoodChargeFinal.clear();
+    fNeighborhoodDistance.clear();
+    fNeighborhoodAlpha.clear();
+    fNeighborhoodPixelX.clear();
+    fNeighborhoodPixelY.clear();
+    fNeighborhoodPixelID.clear();
+    fNeighborhoodActiveCells = 0;
+}
+
 void RunAction::SetNeighborhoodPixelData(const std::vector<G4double>& xs,
                                          const std::vector<G4double>& ys,
                                          const std::vector<G4int>& ids)
 {
     std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodPixelX.capacity() < xs.size()) {
-        fNeighborhoodPixelX.reserve(xs.size());
+    if (fNeighborhoodCapacity <= 0) {
+        return;
     }
-    if (fNeighborhoodPixelY.capacity() < ys.size()) {
-        fNeighborhoodPixelY.reserve(ys.size());
+
+    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
+    const std::size_t copyCount = std::min({xs.size(), ys.size(), static_cast<std::size_t>(ids.size()), capacity});
+    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
+
+    std::fill(fNeighborhoodPixelX.begin(), fNeighborhoodPixelX.end(), nan);
+    std::fill(fNeighborhoodPixelY.begin(), fNeighborhoodPixelY.end(), nan);
+    std::fill(fNeighborhoodPixelID.begin(), fNeighborhoodPixelID.end(), -1);
+
+    if (copyCount > 0) {
+        std::copy_n(xs.begin(), copyCount, fNeighborhoodPixelX.begin());
+        std::copy_n(ys.begin(), copyCount, fNeighborhoodPixelY.begin());
+        std::copy_n(ids.begin(), copyCount, fNeighborhoodPixelID.begin());
     }
-    if (fNeighborhoodPixelID.capacity() < ids.size()) {
-        fNeighborhoodPixelID.reserve(ids.size());
-    }
-    fNeighborhoodPixelX.assign(xs.begin(), xs.end());
-    fNeighborhoodPixelY.assign(ys.begin(), ys.end());
-    fNeighborhoodPixelID.assign(ids.begin(), ids.end());
 }
 
 void RunAction::FillTree()

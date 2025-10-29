@@ -10,10 +10,12 @@
 #include "Constants.hh"
 
 #include "G4Event.hh"
+#include "G4GenericMessenger.hh"
+#include "G4StateManager.hh"
+#include "G4HCofThisEvent.hh"
+#include "G4SDManager.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4THitsMap.hh"
-#include "G4SDManager.hh"
-#include "G4HCofThisEvent.hh"
 
 #include "Randomize.hh"
 
@@ -25,6 +27,12 @@ namespace
 {
 const std::vector<G4double> kEmptyDoubleVector;
 const std::vector<G4int> kEmptyIntVector;
+}
+
+void EventAction::SetEmitDistanceAlpha(G4bool enabled)
+{
+    fEmitDistanceAlphaOutputs = enabled;
+    fChargeSharing.SetEmitDistanceAlpha(enabled);
 }
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
@@ -48,10 +56,22 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
     if (detector) {
         fChargeSharing.SetNeighborhoodRadius(detector->GetNeighborhoodRadius());
     }
+    fChargeSharing.SetEmitDistanceAlpha(fEmitDistanceAlphaOutputs);
+
+    fMessenger = std::make_unique<G4GenericMessenger>(this,
+                                                      "/epic/chargeSharing/",
+                                                      "Charge sharing configuration");
+    auto& cmd = fMessenger->DeclareProperty("computeDistanceAlpha",
+                                            fEmitDistanceAlphaOutputs,
+                                            "Enable per-neighbor distance and alpha outputs");
+    cmd.SetStates(G4State_PreInit, G4State_Idle);
+    cmd.SetToBeBroadcasted(true);
 }
 
 void EventAction::BeginOfEventAction(const G4Event* /*event*/)
 {
+    fChargeSharing.SetEmitDistanceAlpha(fEmitDistanceAlphaOutputs);
+
     if (fSteppingAction) {
         fSteppingAction->Reset();
     }
@@ -99,12 +119,19 @@ void EventAction::EndOfEventAction(const G4Event* event)
         fRunAction->SetNeighborhoodPixelData(kEmptyDoubleVector, kEmptyDoubleVector, kEmptyIntVector);
     }
 
-    fRunAction->SetEventData(finalEdep, hitPos.x(), hitPos.y(), hitPos.z());
-    fRunAction->SetNearestPixelPos(nearestPixel.x(), nearestPixel.y());
-    fRunAction->SetFirstContactIsPixel(firstContactIsPixel);
-    fRunAction->SetGeometricIsPixel(geometricIsPixel);
-    fRunAction->SetIsPixelHitCombined(isPixelHitCombined);
-    fRunAction->SetPixelClassification(isPixelHitCombined, fPixelTrueDeltaX, fPixelTrueDeltaY);
+    RunAction::EventSummaryData summary{};
+    summary.edep = finalEdep;
+    summary.hitX = hitPos.x();
+    summary.hitY = hitPos.y();
+    summary.hitZ = hitPos.z();
+    summary.nearestPixelX = nearestPixel.x();
+    summary.nearestPixelY = nearestPixel.y();
+    summary.pixelTrueDeltaX = fPixelTrueDeltaX;
+    summary.pixelTrueDeltaY = fPixelTrueDeltaY;
+    summary.firstContactIsPixel = firstContactIsPixel;
+    summary.geometricIsPixel = geometricIsPixel;
+    summary.isPixelHitCombined = isPixelHitCombined;
+    fRunAction->UpdateEventSummary(summary);
 
     fRunAction->FillTree();
 }
@@ -203,7 +230,11 @@ void EventAction::ComputeChargeSharingForEvent(const G4ThreeVector& hitPos, G4do
     fRunAction->SetNeighborhoodChargeData(result.fractions, result.charges);
     fRunAction->SetNeighborhoodChargeNewData(fNeighborhoodChargeNew);
     fRunAction->SetNeighborhoodChargeFinalData(fNeighborhoodChargeFinal);
-    fRunAction->SetNeighborhoodDistanceAlphaData(result.distances, result.alphas);
+    if (fEmitDistanceAlphaOutputs) {
+        fRunAction->SetNeighborhoodDistanceAlphaData(result.distances, result.alphas);
+    } else {
+        fRunAction->SetNeighborhoodDistanceAlphaData(kEmptyDoubleVector, kEmptyDoubleVector);
+    }
     fRunAction->SetNeighborhoodPixelData(result.pixelX, result.pixelY, result.pixelIds);
 }
 

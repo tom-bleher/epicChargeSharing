@@ -33,6 +33,7 @@
 #include <limits>
 #include <numeric>
 #include <atomic>
+#include <span>
 #include <ROOT/TThreadExecutor.hxx>
 
 #include "ChargeUtils.h"
@@ -51,6 +52,98 @@ namespace {
   inline bool IsFinite(double v) {
     return std::isfinite(v);
   }
+
+  struct FlatVectorStore {
+    void Initialize(size_t nEntries, size_t reservePerEntry = 0) {
+      offsets.assign(nEntries, -1);
+      sizes.assign(nEntries, 0);
+      values.clear();
+      if (reservePerEntry > 0) {
+        values.reserve(nEntries * reservePerEntry);
+      }
+    }
+
+    void Store(size_t index, const std::vector<double>& src) {
+      if (src.empty()) {
+        return;
+      }
+      offsets[index] = static_cast<int>(values.size());
+      sizes[index] = static_cast<int>(src.size());
+      values.insert(values.end(), src.begin(), src.end());
+    }
+
+    [[nodiscard]] std::span<const double> Get(size_t index) const {
+      const int offset = offsets[index];
+      const int size = sizes[index];
+      if (offset < 0 || size <= 0) {
+        return {};
+      }
+      return {values.data() + offset, static_cast<size_t>(size)};
+    }
+
+    void ClearValues() {
+      values.clear();
+    }
+
+    std::vector<double> values;
+    std::vector<int> offsets;
+    std::vector<int> sizes;
+  };
+
+  struct FitWorkBuffers {
+    std::vector<double> x_row;
+    std::vector<double> q_row;
+    std::vector<double> err_row;
+    std::vector<double> y_col;
+    std::vector<double> q_col;
+    std::vector<double> err_col;
+    std::vector<double> s_d1;
+    std::vector<double> q_d1;
+    std::vector<double> err_d1;
+    std::vector<double> s_d2;
+    std::vector<double> q_d2;
+    std::vector<double> err_d2;
+
+    void PrepareRowCol(int n, bool needErrors) {
+      EnsureCapacity(x_row, n);
+      EnsureCapacity(q_row, n);
+      EnsureCapacity(y_col, n);
+      EnsureCapacity(q_col, n);
+      if (needErrors) {
+        EnsureCapacity(err_row, n);
+        EnsureCapacity(err_col, n);
+      } else {
+        err_row.clear();
+        err_col.clear();
+      }
+    }
+
+    void PrepareDiag(int n, bool needErrors) {
+      EnsureCapacity(s_d1, n);
+      EnsureCapacity(q_d1, n);
+      EnsureCapacity(s_d2, n);
+      EnsureCapacity(q_d2, n);
+      if (needErrors) {
+        EnsureCapacity(err_d1, n);
+        EnsureCapacity(err_d2, n);
+      } else {
+        err_d1.clear();
+        err_d2.clear();
+      }
+    }
+
+   private:
+    static void EnsureCapacity(std::vector<double>& v, int n) {
+      if (n <= 0) {
+        v.clear();
+        return;
+      }
+      if (static_cast<int>(v.capacity()) < n) {
+        v.reserve(n);
+      }
+      v.clear();
+    }
+  };
 }
 
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
@@ -63,7 +156,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveParamSigma = true,
                  bool saveParamB = true,
                  const char* chargeBranch = "Q_f",
-                 bool fitDiagonals = true,
+                 bool fitDiagonals = false,
                  bool saveDiagParamA = true,
                  bool saveDiagParamMu = true,
                  bool saveDiagParamSigma = true,
@@ -424,28 +517,58 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   Long64_t nProcessed = 0;
   std::atomic<long long> nFitted{0};
 
-  // Preload inputs sequentially to avoid ROOT I/O races
+  // Preload inputs sequentially to avoid ROOT I/O races while keeping memory contiguous
   std::vector<double> v_x_hit(nEntries), v_y_hit(nEntries);
   std::vector<double> v_x_px(nEntries), v_y_px(nEntries);
   std::vector<char> v_is_pixel(nEntries);
-  std::vector<std::vector<double>> v_Q(nEntries);
-  std::vector<std::vector<double>> v_Qi;
-  std::vector<std::vector<double>> v_Qn;
+  std::vector<int> v_gridDim(nEntries, 0);
+  std::vector<char> v_hasQiQn(nEntries, 0);
+
+  const int approxNeighborSide = (neighborhoodRadiusMeta > 0)
+                                   ? (2 * neighborhoodRadiusMeta + 1)
+                                   : 5;
+  const size_t approxNeighborSize = static_cast<size_t>(approxNeighborSide) * approxNeighborSide;
+
+  FlatVectorStore chargeStore;
+  chargeStore.Initialize(static_cast<size_t>(nEntries), approxNeighborSize);
+  FlatVectorStore qiStore;
+  FlatVectorStore qnStore;
   if (enableQiQnErrors) {
-    v_Qi.resize(nEntries);
-    v_Qn.resize(nEntries);
+    qiStore.Initialize(static_cast<size_t>(nEntries), approxNeighborSize);
+    qnStore.Initialize(static_cast<size_t>(nEntries), approxNeighborSize);
   }
+
   for (Long64_t i = 0; i < nEntries; ++i) {
     tree->GetEntry(i);
     v_x_hit[i] = x_hit;
     v_y_hit[i] = y_hit;
     v_x_px[i]  = x_px;
     v_y_px[i]  = y_px;
-    v_is_pixel[i] = is_pixel_hit ? 1 : 0;
-    if (Q && !Q->empty()) v_Q[i] = *Q; else v_Q[i].clear();
-    if (enableQiQnErrors) {
-      if (Qi && !Qi->empty()) v_Qi[i] = *Qi; else v_Qi[i].clear();
-      if (Qn && !Qn->empty()) v_Qn[i] = *Qn; else v_Qn[i].clear();
+    const bool pixelEvent = is_pixel_hit ? true : false;
+    v_is_pixel[i] = pixelEvent ? 1 : 0;
+    if (pixelEvent || !Q || Q->empty()) {
+      continue;
+    }
+
+    chargeStore.Store(static_cast<size_t>(i), *Q);
+    const int total = static_cast<int>(Q->size());
+    const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
+    if (N >= 3 && N * N == total) {
+      v_gridDim[i] = N;
+    } else {
+      v_gridDim[i] = 0;
+    }
+
+    if (!enableQiQnErrors || !Qi || !Qn) {
+      continue;
+    }
+    if (Qi->size() != Q->size() || Qn->size() != Q->size() || Qi->empty() || Qn->empty()) {
+      continue;
+    }
+    qiStore.Store(static_cast<size_t>(i), *Qi);
+    qnStore.Store(static_cast<size_t>(i), *Qn);
+    if (v_gridDim[i] > 0) {
+      v_hasQiQn[i] = 1;
     }
   }
 
@@ -516,36 +639,38 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   const int prevErrorLevel_FitGaus1D = gErrorIgnoreLevel;
   gErrorIgnoreLevel = kFatal;
   exec.Foreach([&](int i){
-    const bool isPix = v_is_pixel[i] != 0;
-    const auto &QLoc = v_Q[i];
-    if (isPix || QLoc.empty()) {
+    if (v_is_pixel[i] != 0) {
       return;
     }
 
-    const size_t total = QLoc.size();
-    const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
-    if (N * N != static_cast<int>(total) || N < 3) {
+    const auto QLoc = chargeStore.Get(static_cast<size_t>(i));
+    if (QLoc.empty()) {
+      return;
+    }
+    const int N = v_gridDim[i];
+    if (N < 3 || static_cast<size_t>(N * N) != QLoc.size()) {
       return;
     }
     const int R = (N - 1) / 2;
-    const bool haveQiQnForEvent = enableQiQnErrors &&
-                                  static_cast<size_t>(i) < v_Qi.size() &&
-                                  static_cast<size_t>(i) < v_Qn.size() &&
-                                  v_Qi[i].size() == v_Qn[i].size() &&
-                                  v_Qi[i].size() == QLoc.size();
-    const std::vector<double>* QiLocPtr = (haveQiQnForEvent) ? &v_Qi[i] : nullptr;
-    const std::vector<double>* QnLocPtr = (haveQiQnForEvent) ? &v_Qn[i] : nullptr;
-
-    std::vector<double> x_row; x_row.reserve(N);
-    std::vector<double> q_row; q_row.reserve(N);
-    std::vector<double> y_col; y_col.reserve(N);
-    std::vector<double> q_col; q_col.reserve(N);
-    std::vector<double> err_row;
-    std::vector<double> err_col;
+    bool haveQiQnForEvent = enableQiQnErrors && v_hasQiQn[i] != 0;
+    std::span<const double> QiLoc;
+    std::span<const double> QnLoc;
     if (haveQiQnForEvent) {
-      err_row.reserve(N);
-      err_col.reserve(N);
+      QiLoc = qiStore.Get(static_cast<size_t>(i));
+      QnLoc = qnStore.Get(static_cast<size_t>(i));
+      if (QiLoc.size() != QLoc.size() || QnLoc.size() != QLoc.size()) {
+        haveQiQnForEvent = false;
+      }
     }
+
+    static thread_local FitWorkBuffers fitBuffers;
+    fitBuffers.PrepareRowCol(N, haveQiQnForEvent);
+    auto& x_row = fitBuffers.x_row;
+    auto& q_row = fitBuffers.q_row;
+    auto& y_col = fitBuffers.y_col;
+    auto& q_col = fitBuffers.q_col;
+    auto& err_row = fitBuffers.err_row;
+    auto& err_col = fitBuffers.err_col;
     double qmaxNeighborhood = -1e300;
     double qmaxQiNeighborhood = -1e300;
     const double x_px_loc = v_x_px[i];
@@ -557,7 +682,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         if (!IsFinite(q) || q < 0) continue;
         double qiVal = 0.0;
         if (haveQiQnForEvent) {
-          qiVal = (*QiLocPtr)[idx];
+          qiVal = QiLoc[idx];
           if (std::isfinite(qiVal) && qiVal > qmaxQiNeighborhood) {
             qmaxQiNeighborhood = qiVal;
           }
@@ -568,7 +693,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           x_row.push_back(x);
           q_row.push_back(q);
           if (haveQiQnForEvent) {
-            const double errVal = ComputeQnQiPercent(qiVal, (*QnLocPtr)[idx], qmaxQiNeighborhood);
+            const double errVal = ComputeQnQiPercent(qiVal, QnLoc[idx], qmaxQiNeighborhood);
             err_row.push_back(errVal);
           }
         }
@@ -577,7 +702,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           y_col.push_back(y);
           q_col.push_back(q);
           if (haveQiQnForEvent) {
-            const double errVal = ComputeQnQiPercent(qiVal, (*QnLocPtr)[idx], qmaxQiNeighborhood);
+            const double errVal = ComputeQnQiPercent(qiVal, QnLoc[idx], qmaxQiNeighborhood);
             err_col.push_back(errVal);
           }
         }
@@ -654,11 +779,6 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     double sigInitRow = sigmaSeed1D(x_row, q_row, B0_row);
     double sigInitCol = sigmaSeed1D(y_col, q_col, B0_col);
 
-    std::vector<double> x_row_fit = x_row;
-    std::vector<double> q_row_fit = q_row;
-    std::vector<double> y_col_fit = y_col;
-    std::vector<double> q_col_fit = q_col;
-
     // sigInitRow/sigInitCol were computed above on unfiltered data. They are possibly
     // updated after clipping in the block above.
 
@@ -667,8 +787,8 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     fRowLoc.SetParameters(A0_row, mu0_row, sigInitRow, B0_row);
     fColLoc.SetParameters(A0_col, mu0_col, sigInitCol, B0_col);
 
-    auto minmaxX = std::minmax_element(x_row_fit.begin(), x_row_fit.end());
-    auto minmaxY = std::minmax_element(y_col_fit.begin(), y_col_fit.end());
+    auto minmaxX = std::minmax_element(x_row.begin(), x_row.end());
+    auto minmaxY = std::minmax_element(y_col.begin(), y_col.end());
     const double xMin = *minmaxX.first - 0.5 * pixelSpacing;
     const double xMax = *minmaxX.second + 0.5 * pixelSpacing;
     const double yMin = *minmaxY.first - 0.5 * pixelSpacing;
@@ -694,17 +814,17 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
 
     ROOT::Math::WrappedMultiTF1 wRow(fRowLoc, 1);
     ROOT::Math::WrappedMultiTF1 wCol(fColLoc, 1);
-    ROOT::Fit::BinData dataRow(static_cast<int>(x_row_fit.size()), 1);
-    ROOT::Fit::BinData dataCol(static_cast<int>(y_col_fit.size()), 1);
-    for (size_t k = 0; k < x_row_fit.size(); ++k) {
+    ROOT::Fit::BinData dataRow(static_cast<int>(x_row.size()), 1);
+    ROOT::Fit::BinData dataCol(static_cast<int>(y_col.size()), 1);
+    for (size_t k = 0; k < x_row.size(); ++k) {
       const double candidate = (haveQiQnForEvent && k < err_row.size()) ? err_row[k] : std::numeric_limits<double>::quiet_NaN();
       const double ey = selectError(candidate);
-      dataRow.Add(x_row_fit[k], q_row_fit[k], ey);
+      dataRow.Add(x_row[k], q_row[k], ey);
     }
-    for (size_t k = 0; k < y_col_fit.size(); ++k) {
+    for (size_t k = 0; k < y_col.size(); ++k) {
       const double candidate = (haveQiQnForEvent && k < err_col.size()) ? err_col[k] : std::numeric_limits<double>::quiet_NaN();
       const double ey = selectError(candidate);
-      dataCol.Add(y_col_fit[k], q_col_fit[k], ey);
+      dataCol.Add(y_col[k], q_col[k], ey);
     }
     ROOT::Fit::Fitter fitRow;
     ROOT::Fit::Fitter fitCol;
@@ -792,12 +912,12 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     if (okColFit) muY = fitCol.Result().Parameter(1);
     if (!okRowFit) {
       double wsum = 0.0, xw = 0.0;
-      for (size_t k=0;k<x_row_fit.size();++k) { double w = std::max(0.0, q_row_fit[k] - B0_row); wsum += w; xw += w * x_row_fit[k]; }
+      for (size_t k=0;k<x_row.size();++k) { double w = std::max(0.0, q_row[k] - B0_row); wsum += w; xw += w * x_row[k]; }
       if (wsum > 0) { muX = xw / wsum; }
     }
     if (!okColFit) {
       double wsum = 0.0, yw = 0.0;
-      for (size_t k=0;k<y_col_fit.size();++k) { double w = std::max(0.0, q_col_fit[k] - B0_col); wsum += w; yw += w * y_col_fit[k]; }
+      for (size_t k=0;k<y_col.size();++k) { double w = std::max(0.0, q_col[k] - B0_col); wsum += w; yw += w * y_col[k]; }
       if (wsum > 0) { muY = yw / wsum; }
     }
     const bool okRow = IsFinite(muX);
@@ -813,17 +933,13 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     // Diagonal fits (optional)
     // =========================
     if (fitDiagonals) {
-      // Build main (dj=di) and secondary (dj=-di) diagonal samples
-      std::vector<double> s_d1; s_d1.reserve(N);
-      std::vector<double> q_d1; q_d1.reserve(N);
-      std::vector<double> s_d2; s_d2.reserve(N);
-      std::vector<double> q_d2; q_d2.reserve(N);
-      std::vector<double> err_d1;
-      std::vector<double> err_d2;
-      if (haveQiQnForEvent) {
-        err_d1.reserve(N);
-        err_d2.reserve(N);
-      }
+      fitBuffers.PrepareDiag(N, haveQiQnForEvent);
+      auto& s_d1 = fitBuffers.s_d1;
+      auto& q_d1 = fitBuffers.q_d1;
+      auto& err_d1 = fitBuffers.err_d1;
+      auto& s_d2 = fitBuffers.s_d2;
+      auto& q_d2 = fitBuffers.q_d2;
+      auto& err_d2 = fitBuffers.err_d2;
       for (int k = -R; k <= R; ++k) {
         // main diagonal
         {
@@ -834,7 +950,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
             s_d1.push_back(s);
             q_d1.push_back(q);
             if (haveQiQnForEvent) {
-              const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
+              const double errVal = ComputeQnQiPercent(QiLoc[idx], QnLoc[idx], qmaxQiNeighborhood);
               err_d1.push_back(errVal);
             }
           }
@@ -848,7 +964,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
             s_d2.push_back(s);
             q_d2.push_back(q);
             if (haveQiQnForEvent) {
-              const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
+              const double errVal = ComputeQnQiPercent(QiLoc[idx], QnLoc[idx], qmaxQiNeighborhood);
               err_d2.push_back(errVal);
             }
           }
@@ -867,9 +983,6 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         double B0 = *mm.first; // allow negative baseline seed
         int idxMax = std::distance(q_vals_in.begin(), std::max_element(q_vals_in.begin(), q_vals_in.end()));
         double mu0 = s_vals_in[idxMax];
-        // Copy for optional clipping
-        std::vector<double> s_vals = s_vals_in;
-        std::vector<double> q_vals = q_vals_in;
         // Sigma seed and bounds like rows/cols
         const double sigLoBound = pixelSize;
         const double sigHiBound = std::max(sigLoBound, static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
@@ -891,16 +1004,16 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           if (s > sigHiBound) s = sigHiBound;
           return s;
         };
-        double sigInit = sigmaSeed1D_local(s_vals, q_vals, B0);
+        double sigInit = sigmaSeed1D_local(s_vals_in, q_vals_in, B0);
         // Prepare wrapped TF1
         TF1 fLoc("fDiagLoc", GaussPlusB, -1e9, 1e9, 4);
         fLoc.SetParameters(A0, mu0, sigInit, B0);
         ROOT::Math::WrappedMultiTF1 wLoc(fLoc, 1);
-        ROOT::Fit::BinData data(static_cast<int>(s_vals.size()), 1);
-        for (size_t k=0;k<s_vals.size();++k) {
+        ROOT::Fit::BinData data(static_cast<int>(s_vals_in.size()), 1);
+        for (size_t k=0;k<s_vals_in.size();++k) {
           const double candidate = (err_vals_in && k < err_vals_in->size()) ? (*err_vals_in)[k] : std::numeric_limits<double>::quiet_NaN();
           const double ey = selectError(candidate);
-          data.Add(s_vals[k], q_vals[k], ey);
+          data.Add(s_vals_in[k], q_vals_in[k], ey);
         }
         ROOT::Fit::Fitter fitter;
         fitter.Config().SetMinimizer("Minuit2", "Fumili2");
@@ -942,7 +1055,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         }
         // Fallback: baseline-subtracted weighted centroid
         double wsum = 0.0, sw = 0.0;
-        for (size_t k=0;k<s_vals.size();++k) { double w = std::max(0.0, q_vals[k] - B0); wsum += w; sw += w * s_vals[k]; }
+        for (size_t k=0;k<s_vals_in.size();++k) { double w = std::max(0.0, q_vals_in[k] - B0); wsum += w; sw += w * s_vals_in[k]; }
         if (wsum > 0) {
           outA = A0; outB = B0; outSig = sigInit; outMu = sw / wsum;
           outChi2 = INVALID_VALUE;

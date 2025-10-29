@@ -40,11 +40,27 @@ public:
 
     void SetEventData(G4double edep, G4double x, G4double y, G4double z);
 
-    void SetNearestPixelPos(G4double x, G4double y) { fPixelX = x; fPixelY = y; }
+    struct EventSummaryData
+    {
+        G4double edep{0.0};
+        G4double hitX{0.0};
+        G4double hitY{0.0};
+        G4double hitZ{0.0};
+        G4double nearestPixelX{0.0};
+        G4double nearestPixelY{0.0};
+        G4double pixelTrueDeltaX{0.0};
+        G4double pixelTrueDeltaY{0.0};
+        G4bool firstContactIsPixel{false};
+        G4bool geometricIsPixel{false};
+        G4bool isPixelHitCombined{false};
+    };
 
-    void SetFirstContactIsPixel(G4bool v) { fFirstContactIsPixel = v; }
-    void SetGeometricIsPixel(G4bool v) { fGeometricIsPixel = v; }
-    void SetIsPixelHitCombined(G4bool v) { fIsPixelHit = v; }
+    void UpdateEventSummary(const EventSummaryData& summary);
+
+    void SetNearestPixelPos(G4double x, G4double y);
+    void SetFirstContactIsPixel(G4bool v);
+    void SetGeometricIsPixel(G4bool v);
+    void SetIsPixelHitCombined(G4bool v);
 
     void SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY);
 
@@ -60,7 +76,7 @@ public:
                                    G4double pixelCornerOffset,
                                    G4double detSize,
                                    G4int numBlocksPerSide);
-    void SetNeighborhoodRadiusMeta(G4int radius) { fGridNeighborhoodRadius = radius; }
+    void SetNeighborhoodRadiusMeta(G4int radius);
 
     void SetNeighborhoodPixelData(const std::vector<G4double>& xs,
                                   const std::vector<G4double>& ys,
@@ -70,6 +86,9 @@ public:
 
 private:
     void RunPostProcessingFits();
+    void EnsureBranchBuffersInitialized();
+    void EnsureVectorSized(std::vector<G4double>& vec, G4double initValue) const;
+    void EnsureVectorSized(std::vector<G4int>& vec, G4int initValue) const;
 
     std::unique_ptr<RootFileWriterHelper> fRootWriter;
     std::mutex fTreeMutex;
@@ -96,6 +115,9 @@ private:
     std::vector<G4double> fNeighborhoodPixelX;
     std::vector<G4double> fNeighborhoodPixelY;
     std::vector<G4int> fNeighborhoodPixelID;
+
+    G4int fNeighborhoodCapacity{0};
+    G4int fNeighborhoodActiveCells{0};
 
     G4double fGridPixelSize;
     G4double fGridPixelSpacing;

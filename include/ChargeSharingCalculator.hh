@@ -33,6 +33,8 @@ public:
     void SetDetector(const DetectorConstruction* detector);
     void SetNeighborhoodRadius(G4int radius);
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
+    void SetEmitDistanceAlpha(G4bool enabled) { fEmitDistanceAlpha = enabled; }
+    G4bool GetEmitDistanceAlpha() const { return fEmitDistanceAlpha; }
 
     void ResetForEvent();
 
@@ -58,13 +60,19 @@ private:
                                 G4double amplificationFactor,
                                 G4double d0,
                                 G4double elementaryCharge);
-    void ComputeNeighborhoodGeometry();
+    void BuildOffsets();
 
     const DetectorConstruction* fDetector;
     G4int fNeighborhoodRadius;
     Result fResult;
     std::vector<G4double> fWeightGrid;
     std::vector<G4bool> fInBoundsGrid;
+    struct Offset { int di; int dj; int idx; };
+    std::vector<Offset> fOffsets;
+    int fGridDim{0};
+    int fOffsetsDim{0};
+    G4bool fEmitDistanceAlpha{false};
+    G4bool fNeedsReset{true};
 };
 
 #endif // CHARGESHARINGCALCULATOR_HH
