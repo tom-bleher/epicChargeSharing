@@ -380,6 +380,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     TGraph2D g2d;
     int p = 0;
     double qmaxNeighborhood = -1e300;
+    double qmaxQiNeighborhood = -1e300;
     const double x_px_loc = v_x_px[i];
     const double y_px_loc = v_y_px[i];
     std::vector<double> err_vals;
@@ -395,7 +396,11 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
         const double y = y_px_loc + dj * pixelSpacing;
         g2d.SetPoint(p++, x, y, q);
         if (haveQiQnForEvent) {
-          const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
+          const double qiVal = (*QiLocPtr)[idx];
+          if (std::isfinite(qiVal) && qiVal > qmaxQiNeighborhood) {
+            qmaxQiNeighborhood = qiVal;
+          }
+          const double errVal = ComputeQnQiPercent(qiVal, (*QnLocPtr)[idx], qmaxQiNeighborhood);
           err_vals.push_back(errVal);
         }
         if (q > qmaxNeighborhood) qmaxNeighborhood = q;
@@ -524,10 +529,14 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     ROOT::Math::WrappedMultiTF1 wModel(fModel, 2);
     const int nPts = (int)Xf.size();
     ROOT::Fit::BinData data2D(nPts, 2);
+    std::vector<double> sigmaVals;
+    sigmaVals.reserve(nPts);
     for (int k = 0; k < nPts; ++k) {
       const double candidate = (errValsPtr && k < static_cast<int>(errValsPtr->size())) ? (*errValsPtr)[k] : std::numeric_limits<double>::quiet_NaN();
       double xy[2] = {Xf[k], Yf[k]};
-      data2D.Add(xy, Zf[k], selectError(candidate));
+      const double sigmaUsed = selectError(candidate);
+      data2D.Add(xy, Zf[k], sigmaUsed);
+      sigmaVals.push_back(sigmaUsed);
     }
     ROOT::Fit::Fitter fitter;
     fitter.Config().SetMinimizer("Minuit2", "Fumili2");
@@ -573,16 +582,42 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       okFit = fitter.Fit(data2D);
     }
     if (okFit) {
+      const ROOT::Fit::FitResult& fitRes = fitter.Result();
+      double params[6];
+      for (int ip = 0; ip < 6; ++ip) {
+        params[ip] = fitRes.Parameter(ip);
+      }
+      double chi2Calc = 0.0;
+      for (int k = 0; k < nPts; ++k) {
+        double xyVals[2] = {Xf[k], Yf[k]};
+        const double model = Gauss2DPlusB(xyVals, params);
+        const double sigma = (k < static_cast<int>(sigmaVals.size()) && sigmaVals[k] > 0.0) ? sigmaVals[k] : 1.0;
+        const double pull = (Zf[k] - model) / sigma;
+        chi2Calc += pull * pull;
+      }
+      int nFree = fitRes.NFreeParameters();
+      if (nFree <= 0) {
+        nFree = fitRes.NPar();
+      }
+      int ndfCalc = nPts - nFree;
+      if (ndfCalc < 0) {
+        ndfCalc = 0;
+      }
       // Save parameters on successful fit
-      out_A[i]    = fitter.Result().Parameter(0);
-      out_mux[i]  = fitter.Result().Parameter(1);
-      out_muy[i]  = fitter.Result().Parameter(2);
-      out_sigx[i] = fitter.Result().Parameter(3);
-      out_sigy[i] = fitter.Result().Parameter(4);
-      out_B[i]    = fitter.Result().Parameter(5);
-      out_chi2[i] = fitter.Result().Chi2();
-      out_ndf[i]  = fitter.Result().Ndf();
-      out_prob[i] = (fitter.Result().Ndf() > 0) ? TMath::Prob(fitter.Result().Chi2(), fitter.Result().Ndf()) : INVALID_VALUE;
+      out_A[i]    = params[0];
+      out_mux[i]  = params[1];
+      out_muy[i]  = params[2];
+      out_sigx[i] = params[3];
+      out_sigy[i] = params[4];
+      out_B[i]    = params[5];
+      out_chi2[i] = chi2Calc;
+      if (ndfCalc > 0) {
+        out_ndf[i]  = static_cast<double>(ndfCalc);
+        out_prob[i] = TMath::Prob(chi2Calc, ndfCalc);
+      } else {
+        out_ndf[i]  = INVALID_VALUE;
+        out_prob[i] = INVALID_VALUE;
+      }
       const double xr = out_mux[i];
       const double yr = out_muy[i];
       out_x_rec[i] = xr; out_y_rec[i] = yr;

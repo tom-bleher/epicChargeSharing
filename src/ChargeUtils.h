@@ -6,11 +6,11 @@
 
 inline constexpr double kElectronCharge = 1.602176634e-19;  // Coulombs
 
-inline double ComputeQnQiPercent(double qi, double qn, double maxQ) {
-  if (!std::isfinite(qi) || !std::isfinite(qn) || !std::isfinite(maxQ)) {
+inline double ComputeQnQiPercent(double qi, double qn, double maxQi) {
+  if (!std::isfinite(qi) || !std::isfinite(qn) || !std::isfinite(maxQi)) {
     return std::numeric_limits<double>::quiet_NaN();
   }
-  if (maxQ <= 0.0) {
+  if (maxQi <= 0.0) {
     return std::numeric_limits<double>::quiet_NaN();
   }
   if (qi == 0.0) {
@@ -20,7 +20,7 @@ inline double ComputeQnQiPercent(double qi, double qn, double maxQ) {
   if (!std::isfinite(ratio) || ratio <= 0.0) {
     return std::numeric_limits<double>::quiet_NaN();
   }
-  const double scaledError = 0.05 * maxQ * ratio;
+  const double scaledError = 0.05 * maxQi * ratio;
   if (!std::isfinite(scaledError) || scaledError <= 0.0) {
     return std::numeric_limits<double>::quiet_NaN();
   }

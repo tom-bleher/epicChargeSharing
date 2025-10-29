@@ -547,6 +547,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       err_col.reserve(N);
     }
     double qmaxNeighborhood = -1e300;
+    double qmaxQiNeighborhood = -1e300;
     const double x_px_loc = v_x_px[i];
     const double y_px_loc = v_y_px[i];
     for (int di = -R; di <= R; ++di) {
@@ -554,13 +555,20 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         const int idx  = (di + R) * N + (dj + R);
         const double q = QLoc[idx];
         if (!IsFinite(q) || q < 0) continue;
+        double qiVal = 0.0;
+        if (haveQiQnForEvent) {
+          qiVal = (*QiLocPtr)[idx];
+          if (std::isfinite(qiVal) && qiVal > qmaxQiNeighborhood) {
+            qmaxQiNeighborhood = qiVal;
+          }
+        }
         if (q > qmaxNeighborhood) qmaxNeighborhood = q;
         if (dj == 0) {
           const double x = x_px_loc + di * pixelSpacing;
           x_row.push_back(x);
           q_row.push_back(q);
           if (haveQiQnForEvent) {
-            const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
+            const double errVal = ComputeQnQiPercent(qiVal, (*QnLocPtr)[idx], qmaxQiNeighborhood);
             err_row.push_back(errVal);
           }
         }
@@ -569,7 +577,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           y_col.push_back(y);
           q_col.push_back(q);
           if (haveQiQnForEvent) {
-            const double errVal = ComputeQnQiPercent((*QiLocPtr)[idx], (*QnLocPtr)[idx], qmaxNeighborhood);
+            const double errVal = ComputeQnQiPercent(qiVal, (*QnLocPtr)[idx], qmaxQiNeighborhood);
             err_col.push_back(errVal);
           }
         }

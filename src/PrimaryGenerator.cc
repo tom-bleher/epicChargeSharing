@@ -84,7 +84,7 @@ void PrimaryGenerator::GenerateRandomPos()
     */
     const G4double spacing = fDetector->GetPixelSpacing();
 
-    const G4double x = 0.0*um;
+    const G4double x = 25.0*um;
     const G4double y = 0.5 * spacing;
     const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
 
