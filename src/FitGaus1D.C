@@ -1128,11 +1128,10 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   // Restore previous error level
   gErrorIgnoreLevel = prevErrorLevel_FitGaus1D;
 
-  // Avoid re-reading original data while filling new branches
-  tree->SetBranchStatus("*", 0);
-  // Sequentially write outputs to the tree (thread-safe)
+  // Sequentially write outputs to the tree (thread-safe). Use LoadTree to
+  // advance entries without triggering I/O on the original branches.
   for (Long64_t i = 0; i < nEntries; ++i) {
-    tree->GetEntry(i); // ensure correct entry numbering for branch fill
+    tree->LoadTree(i);
     ReconRowX = out_x_rec[i];
     ReconColY = out_y_rec[i];
     ReconTrueDeltaRowX = out_dx_s[i];
