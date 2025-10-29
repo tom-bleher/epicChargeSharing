@@ -48,10 +48,7 @@ public:
 private:
     void ReserveBuffers();
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
-    G4double CalcPixelAlphaSubtended(G4double hitX,
-                                     G4double hitY,
-                                     G4double pixelCenterX,
-                                     G4double pixelCenterY,
+    G4double CalcPixelAlphaSubtended(G4double distance,
                                      G4double pixelWidth,
                                      G4double pixelHeight) const;
     void ComputeChargeFractions(const G4ThreeVector& hitPos,

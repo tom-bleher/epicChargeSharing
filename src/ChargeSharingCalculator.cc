@@ -144,17 +144,10 @@ G4ThreeVector ChargeSharingCalculator::CalcNearestPixel(const G4ThreeVector& pos
     return location.center;
 }
 
-G4double ChargeSharingCalculator::CalcPixelAlphaSubtended(G4double hitX,
-                                                          G4double hitY,
-                                                          G4double pixelCenterX,
-                                                          G4double pixelCenterY,
+G4double ChargeSharingCalculator::CalcPixelAlphaSubtended(G4double distance,
                                                           G4double pixelWidth,
                                                           G4double pixelHeight) const
 {
-    const G4double dx = hitX - pixelCenterX;
-    const G4double dy = hitY - pixelCenterY;
-    // hypot is robust and may vectorize better
-    const G4double distance = std::hypot(dx, dy);
     const G4double l = (pixelWidth + pixelHeight) / 2.0;
 
     const G4double numerator = (l / 2.0) * std::sqrt(2.0);
@@ -203,14 +196,20 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const G4int totalCells = gridDim * gridDim;
 
     constexpr G4double guardFactor = 1.0 + 1e-6;
+    const G4double minSafeDistance = d0Length * guardFactor;
+    const G4double invD0Length = 1.0 / d0Length;
+
+    const G4double nearestX = fResult.nearestPixelCenter.x();
+    const G4double nearestY = fResult.nearestPixelCenter.y();
+    const G4double baseDx = hitX - nearestX;
+    const G4double baseDy = hitY - nearestY;
+    const G4bool recordDistanceAlpha = fEmitDistanceAlpha;
 
     const auto chargeModel = Constants::CHARGE_SHARING_MODEL;
     const bool useLinearModel = (chargeModel == Constants::ChargeSharingModel::Linear);
     const G4double beta = useLinearModel ? fDetector->GetLinearChargeModelBeta(pixelSpacing) : 0.0;
 
     G4double totalWeight = 0.0;
-    const G4double nearestX = fResult.nearestPixelCenter.x();
-    const G4double nearestY = fResult.nearestPixelCenter.y();
 
     for (const auto& off : fOffsets) {
         const G4int di = off.di;
@@ -230,13 +229,14 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
         const G4double pixelCenterY = nearestY + dj * pixelSpacing;
         const G4int globalId = gridPixelI * numBlocksPerSide + gridPixelJ;
 
-        const G4double dx = hitX - pixelCenterX;
-        const G4double dy = hitY - pixelCenterY;
-        const G4double distance = std::hypot(dx, dy);
-        const G4double alpha = CalcPixelAlphaSubtended(hitX, hitY, pixelCenterX, pixelCenterY, pixelSize, pixelSize);
+        const G4double dx = baseDx - di * pixelSpacing;
+        const G4double dy = baseDy - dj * pixelSpacing;
+        const G4double distanceSquared = dx * dx + dy * dy;
+        const G4double distance = std::sqrt(distanceSquared);
+        const G4double alpha = CalcPixelAlphaSubtended(distance, pixelSize, pixelSize);
 
-        const G4double safeDistance = std::max(distance, d0Length * guardFactor);
-        const G4double logValue = std::log(safeDistance / d0Length);
+        const G4double safeDistance = std::max(distance, minSafeDistance);
+        const G4double logValue = std::log(safeDistance * invD0Length);
         const G4double logWeight = (logValue > 0.0 && std::isfinite(logValue)) ? (alpha / logValue) : 0.0;
 
         G4double weight = logWeight;
@@ -247,7 +247,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
         fInBoundsGrid[idx] = true;
         fWeightGrid[idx] = weight;
-        if (fEmitDistanceAlpha) {
+        if (recordDistanceAlpha) {
             fResult.distances[idx] = distance;
             fResult.alphas[idx] = alpha;
         }
