@@ -42,8 +42,8 @@ import uproot
 
 # ---------------------------- Configuration ---------------------------------
 
-REPO_ROOT = "/home/tom/Desktop/Putza/epicChargeSharing"
-INPUT_DIR = f"{REPO_ROOT}/0.00err"
+REPO_ROOT = "/home/tomble/epicChargeSharing"
+INPUT_DIR = f"{REPO_ROOT}/0.00MaxQfLog"
 OUTPUT_BASE = f"{REPO_ROOT}/proc/fit/uproot_gaussian_out"
 TREE_NAME = "Hits"
 

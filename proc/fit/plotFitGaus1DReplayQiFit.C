@@ -57,12 +57,13 @@ namespace {
 // exactly like diagnostic/fit/plotProcessing1D.C does, drawing dashed green
 // Gaussian curves and vertical recon lines for Q_i with legend deltas.
 int processing1D_replay_qifit(const char* filename =
-                              "/home/tomble/epicChargeSharing/0um.root",
+                              "/home/tomble/epicChargeSharing/build/epicChargeSharing.root",
                               double errorPercentOfMax = 5.0,
-                              Long64_t nRandomEvents = 100,
+                              Long64_t nRandomEvents = 200,
                               bool plotQiOverlayPts = true,
                               bool doQiFit = true,
-                              bool useQiQnPercentErrors = true) {
+                              bool useQiQnPercentErrors = false,
+                              const char* outputPdfPath = nullptr) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
@@ -251,7 +252,11 @@ int processing1D_replay_qifit(const char* filename =
   pR.Draw();
 
   // Open multipage PDF
-  c.Print("1Dfits_replay_qifit.pdf[");
+  const std::string outputPdf = (outputPdfPath && outputPdfPath[0] != '\0')
+                                  ? outputPdfPath
+                                  : "1Dfits_replay_qifit.pdf";
+
+  c.Print((outputPdf + "[").c_str());
 
   TF1 fRow("fRow_replay", GaussPlusB, -1e9, 1e9, 4);
   TF1 fCol("fCol_replay", GaussPlusB, -1e9, 1e9, 4);
@@ -990,11 +995,11 @@ int processing1D_replay_qifit(const char* filename =
 
     // Print page
     c.cd();
-    c.Print("1Dfits_replay_qifit.pdf");
+    c.Print(outputPdf.c_str());
     nPages++;
   }
 
-  c.Print("1Dfits_replay_qifit.pdf]");
+  c.Print((outputPdf + "]").c_str());
 
   file->Close();
   delete file;
@@ -1023,4 +1028,8 @@ int plotFitGaus1DReplayQiFit(const char* filename, double errorPercentOfMax, Lon
 
 int plotFitGaus1DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool plotQiOverlayPts, bool doQiFit, bool useQiQnPercentErrors = false) {
   return processing1D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, plotQiOverlayPts, doQiFit, useQiQnPercentErrors);
+}
+
+int plotFitGaus1DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool plotQiOverlayPts, bool doQiFit, bool useQiQnPercentErrors, const char* outputPdfPath) {
+  return processing1D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, plotQiOverlayPts, doQiFit, useQiQnPercentErrors, outputPdfPath);
 }

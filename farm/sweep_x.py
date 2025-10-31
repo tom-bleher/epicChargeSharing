@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import re
 import sys
 import time
 import shutil
 import subprocess
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 # Configuration
 # Resolve repository root relative to this script so the tool works anywhere
@@ -14,6 +17,7 @@ SRC_FILE = REPO_ROOT / "src" / "PrimaryGenerator.cc"
 BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"
 RUN_MAC = (BUILD_DIR / "run.mac") if (BUILD_DIR / "run.mac").exists() else (REPO_ROOT / "macros" / "run.mac")
+DEFAULT_OUTPUT_BASE = REPO_ROOT / "sweep_x_runs"
 
 # Positions to sweep (micrometers)
 # First group: [+-25, +-50, ..., +-175]
@@ -29,6 +33,21 @@ for p in GROUP2:
 # Regex pattern to locate the x position line in PrimaryGenerator.cc
 # We expect a line like:     const G4double x = -25.0*um;
 X_LINE_REGEX = re.compile(r"^(\s*)const\s+G4double\s+x\s*=\s*([-+]?\d+(?:\.\d+)?)\s*\*\s*um\s*;\s*$")
+
+
+def determine_output_dir(output_dir_arg: Optional[str]) -> Path:
+    if output_dir_arg:
+        candidate = Path(output_dir_arg)
+        if not candidate.is_absolute():
+            candidate = (REPO_ROOT / candidate).resolve()
+        else:
+            candidate = candidate.resolve()
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        candidate = (DEFAULT_OUTPUT_BASE / timestamp).resolve()
+
+    candidate.mkdir(parents=True, exist_ok=True)
+    return candidate
 
 
 def read_file_text(path: Path) -> str:
@@ -127,20 +146,37 @@ def find_output_root() -> Path:
 def rename_output_to(target_name: Path):
     source = find_output_root()
     wait_for_root_close(source)
+    target_name.parent.mkdir(parents=True, exist_ok=True)
     if target_name.exists():
         target_name.unlink()
     shutil.move(str(source), str(target_name))
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Sweep x positions and collect output ROOT files into a dedicated directory."
+    )
+    parser.add_argument(
+        "--output-dir",
+        dest="output_dir",
+        type=str,
+        help="Directory to store output ROOT files. If relative, resolved against the repository root. Default: timestamped folder under sweep_x_runs/.",
+    )
+    args = parser.parse_args()
+
     os.chdir(str(REPO_ROOT))
 
     configure_build_if_needed()
 
     original_text = read_file_text(SRC_FILE)
 
+    output_dir = determine_output_dir(args.output_dir)
+    print(f"Writing output ROOT files to {output_dir}")
+
     try:
         for x_um in POSITIONS:
-            out_name = REPO_ROOT / (f"{int(x_um)}um.root" if float(x_um).is_integer() else f"{x_um}um.root")
+            out_name = output_dir / (
+                f"{int(x_um)}um.root" if float(x_um).is_integer() else f"{x_um}um.root"
+            )
 
             print(f"=== Running for x = {x_um} um (multithreaded) ===")
 
