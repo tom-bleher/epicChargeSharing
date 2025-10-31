@@ -162,7 +162,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveDiagParamSigma = true,
                  bool saveDiagParamB = true,
                  bool saveLineMeans = true,
-                 bool useQnQiPercentErrors = true) {
+                 bool useQnQiPercentErrors = false) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
