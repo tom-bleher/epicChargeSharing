@@ -702,7 +702,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           if (std::isfinite(qiVal) && qiVal > qmaxQiNeighborhood) {
             qmaxQiNeighborhood = qiVal;
           }
-          errCandidate = ComputeQnQiPercent(qiVal, QnLoc[idx], qmaxQiNeighborhood);
+          errCandidate = charge_uncert::QnQiScaled(qiVal, QnLoc[idx], qmaxQiNeighborhood);
         }
         if (q > qmaxNeighborhood) qmaxNeighborhood = q;
         if (dj == 0) {
@@ -745,15 +745,8 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       return;
     }
 
-    const double relErr = std::max(0.0, errorPercentOfMax) * 0.01;
-    const double uniformSigma = (qmaxNeighborhood > 0 && relErr > 0.0)
-                              ? relErr * qmaxNeighborhood
-                              : 0.0;
-    auto selectError = [&](double candidate) -> double {
-      if (std::isfinite(candidate) && candidate > 0.0) return candidate;
-      if (uniformSigma > 0.0) return uniformSigma;
-      return 1.0;
-    };
+    const double uniformSigma = charge_uncert::UniformPercentOfMax(
+        errorPercentOfMax, qmaxNeighborhood);
 
     auto minmaxRow = std::minmax_element(q_row.begin(), q_row.end());
     auto minmaxCol = std::minmax_element(q_col.begin(), q_col.end());
@@ -851,12 +844,12 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     ROOT::Fit::BinData dataCol(static_cast<int>(y_col.size()), 1);
     for (size_t k = 0; k < x_row.size(); ++k) {
       const double candidate = (haveQiQnForEvent && k < err_row.size()) ? err_row[k] : std::numeric_limits<double>::quiet_NaN();
-      const double ey = selectError(candidate);
+      const double ey = charge_uncert::SelectVerticalSigma(candidate, uniformSigma);
       dataRow.Add(x_row[k], q_row[k], ey);
     }
     for (size_t k = 0; k < y_col.size(); ++k) {
       const double candidate = (haveQiQnForEvent && k < err_col.size()) ? err_col[k] : std::numeric_limits<double>::quiet_NaN();
-      const double ey = selectError(candidate);
+      const double ey = charge_uncert::SelectVerticalSigma(candidate, uniformSigma);
       dataCol.Add(y_col[k], q_col[k], ey);
     }
     ROOT::Fit::Fitter fitRow;
@@ -1014,7 +1007,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         ROOT::Fit::BinData data(static_cast<int>(s_vals_in.size()), 1);
         for (size_t k=0;k<s_vals_in.size();++k) {
           const double candidate = (err_vals_in && k < err_vals_in->size()) ? (*err_vals_in)[k] : std::numeric_limits<double>::quiet_NaN();
-          const double ey = selectError(candidate);
+          const double ey = charge_uncert::SelectVerticalSigma(candidate, uniformSigma);
           data.Add(s_vals_in[k], q_vals_in[k], ey);
         }
         ROOT::Fit::Fitter fitter;

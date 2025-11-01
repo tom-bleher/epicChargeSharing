@@ -67,7 +67,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveParamSigy = true,
                  bool saveParamB = true,
                  const char* chargeBranch = "Q_f",
-                 bool useQnQiPercentErrors = true) {
+                 bool useQnQiPercentErrors = false) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(400);
@@ -400,7 +400,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
           if (std::isfinite(qiVal) && qiVal > qmaxQiNeighborhood) {
             qmaxQiNeighborhood = qiVal;
           }
-          const double errVal = ComputeQnQiPercent(qiVal, (*QnLocPtr)[idx], qmaxQiNeighborhood);
+          const double errVal = charge_uncert::QnQiScaled(qiVal, (*QnLocPtr)[idx], qmaxQiNeighborhood);
           err_vals.push_back(errVal);
         }
         if (q > qmaxNeighborhood) qmaxNeighborhood = q;
@@ -423,13 +423,8 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     double muy0 = g2d.GetY()[idxMax];
 
     // Error model and sigma bounds
-    const double relErr = std::max(0.0, errorPercentOfMax) * 0.01;
-    const double uniformSigma = (qmaxNeighborhood > 0 && relErr > 0.0) ? relErr * qmaxNeighborhood : 0.0;
-    auto selectError = [&](double candidate) -> double {
-      if (std::isfinite(candidate) && candidate > 0.0) return candidate;
-      if (uniformSigma > 0.0) return uniformSigma;
-      return 1.0;
-    };
+    const double uniformSigma = charge_uncert::UniformPercentOfMax(
+        errorPercentOfMax, qmaxNeighborhood);
     // Constrain sigma to be within [pixel size, radius * pitch]
     const double sigLoBound = pixelSize;
     const double sigHiBound = std::max(sigLoBound, static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
@@ -489,7 +484,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       }
       return;
     }
-    // Note: relErr/uniformSigma/sigma seeds computed above
+    // Note: uniformSigma and sigma seeds were computed above
 
     // Build arrays
     std::vector<double> Xf, Yf, Zf;
@@ -534,7 +529,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     for (int k = 0; k < nPts; ++k) {
       const double candidate = (errValsPtr && k < static_cast<int>(errValsPtr->size())) ? (*errValsPtr)[k] : std::numeric_limits<double>::quiet_NaN();
       double xy[2] = {Xf[k], Yf[k]};
-      const double sigmaUsed = selectError(candidate);
+      const double sigmaUsed = charge_uncert::SelectVerticalSigma(candidate, uniformSigma);
       data2D.Add(xy, Zf[k], sigmaUsed);
       sigmaVals.push_back(sigmaUsed);
     }
@@ -591,7 +586,9 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       for (int k = 0; k < nPts; ++k) {
         double xyVals[2] = {Xf[k], Yf[k]};
         const double model = Gauss2DPlusB(xyVals, params);
-        const double sigma = (k < static_cast<int>(sigmaVals.size()) && sigmaVals[k] > 0.0) ? sigmaVals[k] : 1.0;
+      const double sigma = (k < static_cast<int>(sigmaVals.size()) && sigmaVals[k] > 0.0)
+                               ? sigmaVals[k]
+                               : charge_uncert::SelectVerticalSigma(std::numeric_limits<double>::quiet_NaN(), uniformSigma);
         const double pull = (Zf[k] - model) / sigma;
         chi2Calc += pull * pull;
       }
