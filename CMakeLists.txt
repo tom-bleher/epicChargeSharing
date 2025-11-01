@@ -17,14 +17,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Accumulate compile and link options for the main target
+set(_project_compile_options)
+set(_project_link_options)
+set(_project_release_compile_options)
+
 # Encourage consistent diagnostics
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+    list(APPEND _project_compile_options -Wall -Wextra -Wpedantic)
 endif()
-
-# Add compiler optimization and multithreading support
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -Wall -Wextra")
 
 # Enable multithreading support
 find_package(Threads REQUIRED)
@@ -46,7 +47,12 @@ if(PROFILE)
 endif()
 if(EC_FAST_MATH)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        add_compile_options(-ffast-math -fno-math-errno -ffp-contract=fast -march=${EC_MARCH} -mtune=${EC_MARCH})
+        list(APPEND _project_compile_options
+             -ffast-math
+             -fno-math-errno
+             -ffp-contract=fast
+             "-march=${EC_MARCH}"
+             "-mtune=${EC_MARCH}")
         message(STATUS "EC_FAST_MATH enabled: -ffast-math -fno-math-errno -ffp-contract=fast -march=${EC_MARCH} -mtune=${EC_MARCH}")
     else()
         message(WARNING "EC_FAST_MATH is enabled, but not supported for ${CMAKE_CXX_COMPILER_ID}")
@@ -55,8 +61,8 @@ endif()
 
 if(EC_PROFILE)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        add_compile_options(-pg -fno-omit-frame-pointer)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+        list(APPEND _project_compile_options -pg -fno-omit-frame-pointer)
+        list(APPEND _project_link_options -pg)
         message(STATUS "EC_PROFILE enabled: adding -pg and -fno-omit-frame-pointer")
     else()
         message(WARNING "EC_PROFILE requested, but unsupported for ${CMAKE_CXX_COMPILER_ID}")
@@ -79,7 +85,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     
     # Add additional optimization flags for multithreaded performance
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -funroll-loops")
+        list(APPEND _project_release_compile_options -funroll-loops)
         message(STATUS "Added -funroll-loops for ${CMAKE_CXX_COMPILER_ID}")
     endif()
 endif()
@@ -96,170 +102,60 @@ else()
     message(WARNING "Geant4 was not built with multithreading support. Consider rebuilding Geant4 with -DGEANT4_BUILD_MULTITHREADED=ON for optimal performance.")
 endif()
 
-# Try to find ROOT using different methods
-# Method 1: Use ROOT's provided scripts
-execute_process(
-  COMMAND bash -c "which root-config || echo NOTFOUND"
-  OUTPUT_VARIABLE ROOT_CONFIG_EXECUTABLE
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  RESULT_VARIABLE ROOT_CONFIG_RESULT
-  TIMEOUT 10
-)
+set(ROOT_COMPONENTS Core RIO Hist Tree Graf Minuit MathCore Matrix)
 
-if(ROOT_CONFIG_EXECUTABLE AND NOT "${ROOT_CONFIG_EXECUTABLE}" STREQUAL "NOTFOUND")
-  message(STATUS "Found ROOT config at: ${ROOT_CONFIG_EXECUTABLE}")
-  
-  # Check if root-config is actually executable
-  execute_process(
-    COMMAND ${ROOT_CONFIG_EXECUTABLE} --version
-    OUTPUT_VARIABLE ROOT_VERSION
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    RESULT_VARIABLE ROOT_VERSION_RESULT
-    ERROR_QUIET
-    TIMEOUT 10
-  )
-  
-  if(ROOT_VERSION_RESULT EQUAL 0)
-    message(STATUS "ROOT version: ${ROOT_VERSION}")
-    
-    # Check ROOT version for ABI compatibility
-    if(ROOT_VERSION VERSION_LESS "6.20.0")
-        message(WARNING "ROOT version ${ROOT_VERSION} is older than recommended (6.20+). Consider upgrading to avoid potential ABI issues.")
-    elseif(ROOT_VERSION VERSION_GREATER_EQUAL "6.30.0")
-        message(WARNING "ROOT version ${ROOT_VERSION} is very new. Monitor for potential compatibility issues.")
+# Help CMake locate ROOT installations such as the snap package
+set(_root_hint_paths)
+if(DEFINED ROOT_DIR)
+    list(APPEND _root_hint_paths "${ROOT_DIR}")
+endif()
+
+find_program(ROOT_CONFIG_EXECUTABLE
+    NAMES root-config
+    HINTS "$ENV{ROOTSYS}/bin" /snap/bin
+    DOC "Path to the root-config helper from ROOT")
+
+if(ROOT_CONFIG_EXECUTABLE)
+    execute_process(
+        COMMAND ${ROOT_CONFIG_EXECUTABLE} --prefix
+        OUTPUT_VARIABLE _root_prefix
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(_root_prefix)
+        set(_root_prefix_real "${_root_prefix}")
+        if(NOT IS_ABSOLUTE "${_root_prefix_real}")
+            get_filename_component(_root_prefix_real "${_root_prefix_real}" ABSOLUTE)
+        endif()
+        set(_candidate_root_cmake_paths
+            "${_root_prefix_real}/cmake"
+            "${_root_prefix_real}/lib/cmake/ROOT")
+        foreach(_candidate IN LISTS _candidate_root_cmake_paths)
+            if(EXISTS "${_candidate}/ROOTConfig.cmake")
+                list(APPEND _root_hint_paths "${_candidate}")
+                if(NOT DEFINED ROOT_DIR)
+                    set(ROOT_DIR "${_candidate}" CACHE PATH "Path to ROOTConfig.cmake detected via root-config" FORCE)
+                endif()
+            endif()
+        endforeach()
+        list(APPEND CMAKE_PREFIX_PATH "${_root_prefix_real}")
     endif()
-    
-    # If root-config works correctly, get configuration details
-    execute_process(
-      COMMAND ${ROOT_CONFIG_EXECUTABLE} --prefix
-      OUTPUT_VARIABLE ROOT_PREFIX
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      TIMEOUT 10
-    )
-    
-    execute_process(
-      COMMAND ${ROOT_CONFIG_EXECUTABLE} --cflags
-      OUTPUT_VARIABLE ROOT_CFLAGS
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      TIMEOUT 10
-    )
-    
-    execute_process(
-      COMMAND ${ROOT_CONFIG_EXECUTABLE} --libs
-      OUTPUT_VARIABLE ROOT_LIBS
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      TIMEOUT 10
-    )
-    
-    execute_process(
-      COMMAND ${ROOT_CONFIG_EXECUTABLE} --incdir
-      OUTPUT_VARIABLE ROOT_INCLUDE_DIR
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      TIMEOUT 10
-    )
-    
-    execute_process(
-      COMMAND ${ROOT_CONFIG_EXECUTABLE} --libdir
-      OUTPUT_VARIABLE ROOT_LIBRARY_DIR
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      TIMEOUT 10
-    )
-  else()
-    message(STATUS "root-config found but not executable, will try alternative methods")
-    set(ROOT_CONFIG_EXECUTABLE "")
-  endif()
-  
-  if(ROOT_PREFIX AND ROOT_INCLUDE_DIR AND ROOT_LIBRARY_DIR)
-    message(STATUS "ROOT prefix: ${ROOT_PREFIX}")
-    message(STATUS "ROOT include dir: ${ROOT_INCLUDE_DIR}")
-    message(STATUS "ROOT library dir: ${ROOT_LIBRARY_DIR}")
-    
-    include_directories(${ROOT_INCLUDE_DIR})
-    link_directories(${ROOT_LIBRARY_DIR})
-    
-    set(ROOT_FOUND TRUE)
-  else()
-    message(WARNING "Failed to get ROOT configuration from root-config, trying fallback methods")
-    set(ROOT_CONFIG_EXECUTABLE "")
-  endif()
+endif()
+
+if(_root_hint_paths)
+    list(REMOVE_DUPLICATES _root_hint_paths)
+    find_package(ROOT CONFIG REQUIRED COMPONENTS ${ROOT_COMPONENTS} HINTS ${_root_hint_paths})
 else()
-  # Method 2: Standard CMake find_package
-  find_package(ROOT QUIET)
-  
-  if(NOT ROOT_FOUND)
-    # Method 3: Try explicit paths if using snap
-    if(EXISTS "/snap/root-framework/current/usr/local")
-      set(ROOT_PREFIX "/snap/root-framework/current/usr/local")
-      set(ROOT_INCLUDE_DIR "${ROOT_PREFIX}/include")
-      set(ROOT_LIBRARY_DIR "${ROOT_PREFIX}/lib")
-      include_directories(${ROOT_INCLUDE_DIR})
-      link_directories(${ROOT_LIBRARY_DIR})
-      set(ROOT_FOUND TRUE)
-      
-      message(STATUS "Using ROOT from snap at: ${ROOT_PREFIX}")
-    endif()
-  endif()
+    find_package(ROOT CONFIG REQUIRED COMPONENTS ${ROOT_COMPONENTS})
 endif()
 
-# Final fallback: allow manual specification of ROOT paths
-if(NOT ROOT_FOUND)
-  # Check for common ROOT installation locations
-  foreach(dir "/usr/local" "/opt/root" "/usr" "/opt" "/snap/root-framework/current/usr/local")
-    if(EXISTS "${dir}/include/root" OR EXISTS "${dir}/include/ROOT" OR EXISTS "${dir}/include/TROOT.h")
-      set(ROOT_PREFIX "${dir}")
-      
-      # Try to determine include and lib directories
-      if(EXISTS "${dir}/include/root")
-        set(ROOT_INCLUDE_DIR "${dir}/include/root")
-      elseif(EXISTS "${dir}/include/ROOT")
-        set(ROOT_INCLUDE_DIR "${dir}/include/ROOT") 
-      else()
-        set(ROOT_INCLUDE_DIR "${dir}/include")
-      endif()
-      
-      if(EXISTS "${dir}/lib/root")
-        set(ROOT_LIBRARY_DIR "${dir}/lib/root")
-      else()
-        set(ROOT_LIBRARY_DIR "${dir}/lib")
-      endif()
-      
-      include_directories(${ROOT_INCLUDE_DIR})
-      link_directories(${ROOT_LIBRARY_DIR})
-      set(ROOT_FOUND TRUE)
-      
-      message(STATUS "Using ROOT found in: ${dir}")
-      break()
-    endif()
-  endforeach()
-  
-  # Allow user to manually specify ROOT paths via environment variables
-  if(NOT ROOT_FOUND AND DEFINED ENV{ROOTSYS})
-    set(ROOT_PREFIX $ENV{ROOTSYS})
-    set(ROOT_INCLUDE_DIR "${ROOT_PREFIX}/include")
-    set(ROOT_LIBRARY_DIR "${ROOT_PREFIX}/lib")
-    include_directories(${ROOT_INCLUDE_DIR})
-    link_directories(${ROOT_LIBRARY_DIR})
-    set(ROOT_FOUND TRUE)
-    message(STATUS "Using ROOT from ROOTSYS environment variable: ${ROOT_PREFIX}")
-  endif()
-  
-  # If still not found, exit with error
-  if(NOT ROOT_FOUND)
-    message(STATUS "Could not find ROOT automatically.")
-    # Instead of failing, continue with dummy settings and warn
-    message(WARNING "Will attempt to build without ROOT paths. You may need to set ROOT paths manually.")
-    set(ROOT_FOUND TRUE)
-    set(ROOT_LIBRARIES "")
-  endif()
-endif()
+set(ROOT_LIB_TARGETS)
+foreach(component IN LISTS ROOT_COMPONENTS)
+    list(APPEND ROOT_LIB_TARGETS ROOT::${component})
+endforeach()
 
 include(${Geant4_USE_FILE})
 
-# Set include directories
-include_directories(${PROJECT_SOURCE_DIR}/include)
-
-# Ensure our new utility files are included
-list(APPEND sources
+# Consolidate project sources
+set(epicChargeSharing_sources
     ${PROJECT_SOURCE_DIR}/src/ActionInitialization.cc
     ${PROJECT_SOURCE_DIR}/src/ChargeSharingCalculator.cc
     ${PROJECT_SOURCE_DIR}/src/DetectorConstruction.cc
@@ -267,57 +163,50 @@ list(APPEND sources
     ${PROJECT_SOURCE_DIR}/src/PhysicsList.cc
     ${PROJECT_SOURCE_DIR}/src/PrimaryGenerator.cc
     ${PROJECT_SOURCE_DIR}/src/RunAction.cc
+    ${PROJECT_SOURCE_DIR}/src/internal/RunActionSupport.cc
     ${PROJECT_SOURCE_DIR}/src/SteppingAction.cc
 )
-list(APPEND headers 
-    ${PROJECT_SOURCE_DIR}/include/ActionInitialization.hh
-    ${PROJECT_SOURCE_DIR}/include/Constants.hh
-    ${PROJECT_SOURCE_DIR}/include/DetectorConstruction.hh
-    ${PROJECT_SOURCE_DIR}/include/EventAction.hh
-    ${PROJECT_SOURCE_DIR}/include/PhysicsList.hh
-    ${PROJECT_SOURCE_DIR}/include/PrimaryGenerator.hh
-    ${PROJECT_SOURCE_DIR}/include/RunAction.hh
-    ${PROJECT_SOURCE_DIR}/include/SteppingAction.hh
-)
-
-# Define ROOT libraries needed - only if ROOT was found properly
-if(ROOT_FOUND AND NOT "${ROOT_LIBS}" STREQUAL "")
-  # Use the libraries returned by root-config if available, and add Minuit
-  set(ROOT_LIBRARIES ${ROOT_LIBS} -lMinuit)
-else()
-  # Fall back to common ROOT libraries including math libraries for fitting
-  if(ROOT_FOUND)
-    message(STATUS "Using default ROOT libraries")
-    set(ROOT_LIBRARIES "-lCore -lRIO -lHist -lTree -lGraf -lMinuit -lMathCore -lMatrix")
-  else()
-    set(ROOT_LIBRARIES "")
-  endif()
-endif()
-
-message(STATUS "ROOT Libraries: ${ROOT_LIBRARIES}")
 
 # Create the executable with enhanced performance settings
-add_executable(epicChargeSharing epicChargeSharing.cc ${sources} ${headers})
+add_executable(epicChargeSharing ${PROJECT_SOURCE_DIR}/epicChargeSharing.cc)
+target_sources(epicChargeSharing PRIVATE ${epicChargeSharing_sources})
 
 # Set explicit C++ standard requirements for this target
 target_compile_features(epicChargeSharing PRIVATE cxx_std_20)
 
-# Link libraries including threading support
-target_link_libraries(epicChargeSharing 
-    ${Geant4_LIBRARIES} 
-    ${ROOT_LIBRARIES} 
-    Threads::Threads
+target_include_directories(epicChargeSharing
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
 )
+
+# Link libraries including threading support
+target_link_libraries(epicChargeSharing
+    PRIVATE
+        ${Geant4_LIBRARIES}
+        Threads::Threads
+        ${ROOT_LIB_TARGETS}
+)
+
+if(_project_compile_options)
+    target_compile_options(epicChargeSharing PRIVATE ${_project_compile_options})
+endif()
+
+if(_project_release_compile_options)
+    foreach(flag IN LISTS _project_release_compile_options)
+        target_compile_options(epicChargeSharing PRIVATE $<$<CONFIG:Release>:${flag}>)
+    endforeach()
+endif()
+
+if(_project_link_options)
+    string(REPLACE ";" " " _link_flags "${_project_link_options}")
+    set_property(TARGET epicChargeSharing APPEND_STRING PROPERTY LINK_FLAGS " ${_link_flags}")
+endif()
 
 # Provide the project source dir to the code for locating resources (e.g., ROOT macros)
 target_compile_definitions(epicChargeSharing PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 # Set target-specific properties for optimization
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set_target_properties(epicChargeSharing PROPERTIES
-        COMPILE_FLAGS "-O3"
-    )
-    
     # Enable interprocedural optimization for this target if supported
     if(LTO_SUPPORTED)
         set_property(TARGET epicChargeSharing PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
