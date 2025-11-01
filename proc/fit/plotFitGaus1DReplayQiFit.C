@@ -59,16 +59,44 @@ namespace {
 int processing1D_replay_qifit(const char* filename =
                               "/home/tomble/epicChargeSharing/build/epicChargeSharing.root",
                               double errorPercentOfMax = 5.0,
-                              Long64_t nRandomEvents = 200,
+                              Long64_t nRandomEvents = 100,
                               bool plotQiOverlayPts = true,
                               bool doQiFit = true,
                               bool useQiQnPercentErrors = false,
-                              const char* outputPdfPath = nullptr) {
+                              const char* outputPdfPath = nullptr,
+                              bool useDistanceWeightedErrors = true,
+                              double distanceErrorScalePixels = 0.5,
+                              double distanceErrorExponent = 1.5,
+                              double distanceErrorFloorPercent = 2.0,
+                              double distanceErrorCapPercent = 10.0,
+                              bool distanceErrorPreferTruthCenter = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
   ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
+
+  const bool distanceErrorsEnabled = useDistanceWeightedErrors;
+  const double distScalePx = (std::isfinite(distanceErrorScalePixels) &&
+                              distanceErrorScalePixels > 0.0)
+                                 ? distanceErrorScalePixels
+                                 : 1.0;
+  const double distExponent = std::isfinite(distanceErrorExponent)
+                                  ? std::max(0.0, distanceErrorExponent)
+                                  : 1.0;
+  const double distFloorPct = std::isfinite(distanceErrorFloorPercent)
+                                  ? std::max(0.0, distanceErrorFloorPercent)
+                                  : 0.0;
+  const double distCapPct = std::isfinite(distanceErrorCapPercent)
+                                ? std::max(0.0, distanceErrorCapPercent)
+                                : 0.0;
+  const bool distPreferTruthCenter = distanceErrorPreferTruthCenter;
+
+  if (distanceErrorsEnabled && useQiQnPercentErrors) {
+    ::Warning("processing1D_replay_qifit",
+              "Distance-weighted uncertainties requested; ignoring Q_n/Q_i"
+              " vertical uncertainty model when plotting.");
+  }
 
   // Open file for read (try provided path, then fallback to build/ path)
   TFile* file = TFile::Open(filename, "READ");
@@ -175,7 +203,7 @@ int processing1D_replay_qifit(const char* filename =
   std::vector<double>* Q = nullptr;
   std::vector<double>* QiVec = nullptr; // Optional overlay + fitting source
   std::vector<double>* QnVec = nullptr;
-  bool enableQiQnErrors = useQiQnPercentErrors;
+  bool enableQiQnErrors = useQiQnPercentErrors && !distanceErrorsEnabled;
   // Saved fit parameters
   double rowA = NAN, rowMu = NAN, rowSig = NAN, rowB = NAN;
   double rowChi2 = NAN, rowNdf = NAN, rowProb = NAN;
@@ -378,6 +406,83 @@ int processing1D_replay_qifit(const char* filename =
     bool haveMuCol = haveColMu && IsFinite(colMu);
     if (!(haveMuRow && haveMuCol)) continue;
 
+    double centerX = rowMu;
+    double centerY = colMu;
+    if (distanceErrorsEnabled) {
+      if (distPreferTruthCenter) {
+        if (IsFinite(x_true)) {
+          centerX = x_true;
+        }
+        if (IsFinite(y_true)) {
+          centerY = y_true;
+        }
+      }
+      if (!IsFinite(centerX)) {
+        centerX = rowMu;
+      }
+      if (!IsFinite(centerX)) {
+        centerX = x_px;
+      }
+      if (!IsFinite(centerY)) {
+        centerY = colMu;
+      }
+      if (!IsFinite(centerY)) {
+        centerY = y_px;
+      }
+    }
+
+    std::vector<double> distRowErrors;
+    std::vector<double> distColErrors;
+    bool rowDistanceApplied = false;
+    bool colDistanceApplied = false;
+    const bool canApplyDistanceBase = distanceErrorsEnabled && IsFinite(centerX) &&
+                                      IsFinite(centerY) && IsFinite(pixelSpacing) &&
+                                      pixelSpacing > 0.0 &&
+                                      IsFinite(qmaxNeighborhood) &&
+                                      qmaxNeighborhood > 0.0;
+    if (canApplyDistanceBase) {
+      if (!x_row_fit.empty()) {
+        distRowErrors.reserve(x_row_fit.size());
+        bool anyFinite = false;
+        for (double xr : x_row_fit) {
+          double sigma = charge_uncert::DistancePowerSigma(
+              std::abs(xr - centerX), qmaxNeighborhood, pixelSpacing,
+              distScalePx, distExponent, distFloorPct, distCapPct);
+          if (std::isfinite(sigma) && sigma > 0.0) {
+            anyFinite = true;
+            distRowErrors.push_back(sigma);
+          } else {
+            distRowErrors.push_back(std::numeric_limits<double>::quiet_NaN());
+          }
+        }
+        if (anyFinite) {
+          rowDistanceApplied = true;
+        } else {
+          distRowErrors.clear();
+        }
+      }
+      if (!y_col_fit.empty()) {
+        distColErrors.reserve(y_col_fit.size());
+        bool anyFinite = false;
+        for (double yc : y_col_fit) {
+          double sigma = charge_uncert::DistancePowerSigma(
+              std::abs(yc - centerY), qmaxNeighborhood, pixelSpacing,
+              distScalePx, distExponent, distFloorPct, distCapPct);
+          if (std::isfinite(sigma) && sigma > 0.0) {
+            anyFinite = true;
+            distColErrors.push_back(sigma);
+          } else {
+            distColErrors.push_back(std::numeric_limits<double>::quiet_NaN());
+          }
+        }
+        if (anyFinite) {
+          colDistanceApplied = true;
+        } else {
+          distColErrors.clear();
+        }
+      }
+    }
+
     nConsidered++;
 
     // Optional uniform vertical uncertainty from percent-of-max for chosenCharge
@@ -396,8 +501,10 @@ int processing1D_replay_qifit(const char* filename =
       }
       return false;
     };
-    const bool rowHasErrorBars = (uniformSigma > 0.0) || (haveQiQnForEvent && hasFinitePositive(rowErrors));
-    const bool colHasErrorBars = (uniformSigma > 0.0) || (haveQiQnForEvent && hasFinitePositive(colErrors));
+    const bool rowHasErrorBars = rowDistanceApplied || (uniformSigma > 0.0) ||
+                                 (haveQiQnForEvent && hasFinitePositive(rowErrors));
+    const bool colHasErrorBars = colDistanceApplied || (uniformSigma > 0.0) ||
+                                 (haveQiQnForEvent && hasFinitePositive(colErrors));
 
     // Build graphs for kept points only (to mirror original drawing)
     TGraph* baseRowPtr = nullptr;
@@ -411,8 +518,12 @@ int processing1D_replay_qifit(const char* filename =
       gRowErr = TGraphErrors(static_cast<int>(x_row_fit.size()));
       for (int k = 0; k < gRowErr.GetN(); ++k) {
         gRowErr.SetPoint(k, x_row_fit[k], q_row_fit[k]);
-        const double candidate = (haveQiQnForEvent && k < static_cast<int>(rowErrors.size())) ? rowErrors[k]
-                                                                                              : std::numeric_limits<double>::quiet_NaN();
+        double candidate = std::numeric_limits<double>::quiet_NaN();
+        if (rowDistanceApplied && k < static_cast<int>(distRowErrors.size())) {
+          candidate = distRowErrors[k];
+        } else if (haveQiQnForEvent && k < static_cast<int>(rowErrors.size())) {
+          candidate = rowErrors[k];
+        }
         gRowErr.SetPointError(k, 0.0, selectError(candidate));
       }
       baseRowPtr = &gRowErr;
@@ -426,8 +537,12 @@ int processing1D_replay_qifit(const char* filename =
       gColErr = TGraphErrors(static_cast<int>(y_col_fit.size()));
       for (int k = 0; k < gColErr.GetN(); ++k) {
         gColErr.SetPoint(k, y_col_fit[k], q_col_fit[k]);
-        const double candidate = (haveQiQnForEvent && k < static_cast<int>(colErrors.size())) ? colErrors[k]
-                                                                                              : std::numeric_limits<double>::quiet_NaN();
+        double candidate = std::numeric_limits<double>::quiet_NaN();
+        if (colDistanceApplied && k < static_cast<int>(distColErrors.size())) {
+          candidate = distColErrors[k];
+        } else if (haveQiQnForEvent && k < static_cast<int>(colErrors.size())) {
+          candidate = colErrors[k];
+        }
         gColErr.SetPointError(k, 0.0, selectError(candidate));
       }
       baseColPtr = &gColErr;
@@ -512,6 +627,58 @@ int processing1D_replay_qifit(const char* filename =
       const double uniformSigmaQi = (qmaxNeighborhoodQi > 0 && relErr > 0.0)
                                   ? relErr * qmaxNeighborhoodQi
                                   : 0.0;
+
+      std::vector<double> rowDistErrorsQi;
+      std::vector<double> colDistErrorsQi;
+      bool rowDistanceQiApplied = false;
+      bool colDistanceQiApplied = false;
+      const bool canApplyDistanceQi = distanceErrorsEnabled && IsFinite(centerX) &&
+                                      IsFinite(centerY) && IsFinite(pixelSpacing) &&
+                                      pixelSpacing > 0.0 &&
+                                      IsFinite(qmaxNeighborhoodQi) &&
+                                      qmaxNeighborhoodQi > 0.0;
+      if (canApplyDistanceQi) {
+        if (!x_row_qi.empty()) {
+          rowDistErrorsQi.reserve(x_row_qi.size());
+          bool anyFinite = false;
+          for (double xr : x_row_qi) {
+            double sigma = charge_uncert::DistancePowerSigma(
+                std::abs(xr - centerX), qmaxNeighborhoodQi, pixelSpacing,
+                distScalePx, distExponent, distFloorPct, distCapPct);
+            if (std::isfinite(sigma) && sigma > 0.0) {
+              anyFinite = true;
+              rowDistErrorsQi.push_back(sigma);
+            } else {
+              rowDistErrorsQi.push_back(std::numeric_limits<double>::quiet_NaN());
+            }
+          }
+          if (anyFinite) {
+            rowDistanceQiApplied = true;
+          } else {
+            rowDistErrorsQi.clear();
+          }
+        }
+        if (!y_col_qi.empty()) {
+          colDistErrorsQi.reserve(y_col_qi.size());
+          bool anyFinite = false;
+          for (double yc : y_col_qi) {
+            double sigma = charge_uncert::DistancePowerSigma(
+                std::abs(yc - centerY), qmaxNeighborhoodQi, pixelSpacing,
+                distScalePx, distExponent, distFloorPct, distCapPct);
+            if (std::isfinite(sigma) && sigma > 0.0) {
+              anyFinite = true;
+              colDistErrorsQi.push_back(sigma);
+            } else {
+              colDistErrorsQi.push_back(std::numeric_limits<double>::quiet_NaN());
+            }
+          }
+          if (anyFinite) {
+            colDistanceQiApplied = true;
+          } else {
+            colDistErrorsQi.clear();
+          }
+        }
+      }
 
       auto fit1DQi = [&](const std::vector<double>& xs, const std::vector<double>& qs,
                           const std::vector<double>* errVals,
@@ -603,8 +770,20 @@ int processing1D_replay_qifit(const char* filename =
       const double muYHi = y_px + 0.5 * pixelSpacing;
       const bool rowErrorSizeMatch = haveQiQnForEvent && (rowErrorsQi.size() == x_row_qi.size());
       const bool colErrorSizeMatch = haveQiQnForEvent && (colErrorsQi.size() == y_col_qi.size());
-      const std::vector<double>* rowErrPtrQi = rowErrorSizeMatch ? &rowErrorsQi : nullptr;
-      const std::vector<double>* colErrPtrQi = colErrorSizeMatch ? &colErrorsQi : nullptr;
+      const bool rowDistSizeMatch = rowDistanceQiApplied && (rowDistErrorsQi.size() == x_row_qi.size());
+      const bool colDistSizeMatch = colDistanceQiApplied && (colDistErrorsQi.size() == y_col_qi.size());
+      const std::vector<double>* rowErrPtrQi = nullptr;
+      if (rowDistSizeMatch) {
+        rowErrPtrQi = &rowDistErrorsQi;
+      } else if (rowErrorSizeMatch) {
+        rowErrPtrQi = &rowErrorsQi;
+      }
+      const std::vector<double>* colErrPtrQi = nullptr;
+      if (colDistSizeMatch) {
+        colErrPtrQi = &colDistErrorsQi;
+      } else if (colErrorSizeMatch) {
+        colErrPtrQi = &colErrorsQi;
+      }
       if (x_row_qi.size() >= 3) {
         didRowFitQi = fit1DQi(x_row_qi, q_row_qi, rowErrPtrQi, muXLo, muXHi,
                                A_row_qi, muRowQi, S_row_qi, B_row_qi,
@@ -1030,6 +1209,30 @@ int plotFitGaus1DReplayQiFit(const char* filename, double errorPercentOfMax, Lon
   return processing1D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, plotQiOverlayPts, doQiFit, useQiQnPercentErrors);
 }
 
-int plotFitGaus1DReplayQiFit(const char* filename, double errorPercentOfMax, Long64_t nRandomEvents, bool plotQiOverlayPts, bool doQiFit, bool useQiQnPercentErrors, const char* outputPdfPath) {
-  return processing1D_replay_qifit(filename, errorPercentOfMax, nRandomEvents, plotQiOverlayPts, doQiFit, useQiQnPercentErrors, outputPdfPath);
+int plotFitGaus1DReplayQiFit(const char* filename,
+                             double errorPercentOfMax,
+                             Long64_t nRandomEvents,
+                             bool plotQiOverlayPts,
+                             bool doQiFit,
+                             bool useQiQnPercentErrors,
+                             const char* outputPdfPath,
+                             bool useDistanceWeightedErrors = false,
+                             double distanceErrorScalePixels = 1.0,
+                             double distanceErrorExponent = 1.0,
+                             double distanceErrorFloorPercent = 1.0,
+                             double distanceErrorCapPercent = 50.0,
+                             bool distanceErrorPreferTruthCenter = true) {
+  return processing1D_replay_qifit(filename,
+                                   errorPercentOfMax,
+                                   nRandomEvents,
+                                   plotQiOverlayPts,
+                                   doQiFit,
+                                   useQiQnPercentErrors,
+                                   outputPdfPath,
+                                   useDistanceWeightedErrors,
+                                   distanceErrorScalePixels,
+                                   distanceErrorExponent,
+                                   distanceErrorFloorPercent,
+                                   distanceErrorCapPercent,
+                                   distanceErrorPreferTruthCenter);
 }
