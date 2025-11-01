@@ -67,12 +67,40 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveParamSigy = true,
                  bool saveParamB = true,
                  const char* chargeBranch = "Q_f",
-                 bool useQnQiPercentErrors = false) {
+                 bool useQnQiPercentErrors = false,
+                 bool useDistanceWeightedErrors = false,
+                 double distanceErrorScalePixels = 1.0,
+                 double distanceErrorExponent = 1.0,
+                 double distanceErrorFloorPercent = 1.0,
+                 double distanceErrorCapPercent = 50.0,
+                 bool distanceErrorPreferTruthCenter = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(400);
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
   ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
+
+  const bool distanceErrorsEnabled = useDistanceWeightedErrors;
+  const double distScalePx = (std::isfinite(distanceErrorScalePixels) &&
+                              distanceErrorScalePixels > 0.0)
+                                 ? distanceErrorScalePixels
+                                 : 1.0;
+  const double distExponent = std::isfinite(distanceErrorExponent)
+                                  ? std::max(0.0, distanceErrorExponent)
+                                  : 1.0;
+  const double distFloorPct = std::isfinite(distanceErrorFloorPercent)
+                                  ? std::max(0.0, distanceErrorFloorPercent)
+                                  : 0.0;
+  const double distCapPct = std::isfinite(distanceErrorCapPercent)
+                                ? std::max(0.0, distanceErrorCapPercent)
+                                : 0.0;
+  const bool distPreferTruthCenter = distanceErrorPreferTruthCenter;
+
+  if (distanceErrorsEnabled && useQnQiPercentErrors) {
+    ::Warning("FitGaus2D",
+              "Distance-weighted uncertainties requested; ignoring Q_n/Q_i"
+              " vertical uncertainty model.");
+  }
 
   // Open file for update
   TFile* file = TFile::Open(filename, "UPDATE");
@@ -204,7 +232,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double>* Q = nullptr;
   std::vector<double>* Qi = nullptr;
   std::vector<double>* Qn = nullptr;
-  bool enableQiQnErrors = useQnQiPercentErrors;
+  bool enableQiQnErrors = useQnQiPercentErrors && !distanceErrorsEnabled;
   bool haveQiBranchForErrors = false;
   bool haveQnBranchForErrors = false;
 
@@ -363,6 +391,9 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       return;
     }
 
+    static thread_local std::vector<double> dist_err_vals;
+    dist_err_vals.clear();
+
     const size_t total = QLoc.size();
     const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
     if (N * N != static_cast<int>(total) || N < 3) {
@@ -421,6 +452,31 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     double B0 = zmin;
     double mux0 = g2d.GetX()[idxMax];
     double muy0 = g2d.GetY()[idxMax];
+
+    double centerX = mux0;
+    double centerY = muy0;
+    if (distanceErrorsEnabled) {
+      if (distPreferTruthCenter) {
+        if (IsFinite3D(v_x_hit[i])) {
+          centerX = v_x_hit[i];
+        }
+        if (IsFinite3D(v_y_hit[i])) {
+          centerY = v_y_hit[i];
+        }
+      }
+      if (!IsFinite3D(centerX)) {
+        centerX = mux0;
+      }
+      if (!IsFinite3D(centerX)) {
+        centerX = v_x_px[i];
+      }
+      if (!IsFinite3D(centerY)) {
+        centerY = muy0;
+      }
+      if (!IsFinite3D(centerY)) {
+        centerY = v_y_px[i];
+      }
+    }
 
     // Error model and sigma bounds
     const double uniformSigma = charge_uncert::UniformPercentOfMax(
@@ -501,6 +557,30 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       errValsPtr = &err_vals;
     }
 
+    bool distanceErrorApplied = false;
+    if (distanceErrorsEnabled && !Xf.empty() && IsFinite3D(pixelSpacing) &&
+        pixelSpacing > 0.0 && IsFinite3D(qmaxNeighborhood) &&
+        qmaxNeighborhood > 0.0 && IsFinite3D(centerX) && IsFinite3D(centerY)) {
+      dist_err_vals.reserve(Xf.size());
+      bool anyFiniteSigma = false;
+      for (size_t k = 0; k < Xf.size(); ++k) {
+        double sigma = charge_uncert::DistancePowerSigma(
+            std::hypot(Xf[k] - centerX, Yf[k] - centerY), qmaxNeighborhood,
+            pixelSpacing, distScalePx, distExponent, distFloorPct, distCapPct);
+        if (std::isfinite(sigma) && sigma > 0.0) {
+          anyFiniteSigma = true;
+          dist_err_vals.push_back(sigma);
+        } else {
+          dist_err_vals.push_back(std::numeric_limits<double>::quiet_NaN());
+        }
+      }
+      if (anyFiniteSigma) {
+        distanceErrorApplied = true;
+      } else {
+        dist_err_vals.clear();
+      }
+    }
+
     // Build range
     double xMinR =  1e300, xMaxR = -1e300; double yMinR =  1e300, yMaxR = -1e300;
     for (int k = 0; k < g2d.GetN(); ++k) { xMinR = std::min(xMinR, g2d.GetX()[k]); xMaxR = std::max(xMaxR, g2d.GetX()[k]); yMinR = std::min(yMinR, g2d.GetY()[k]); yMaxR = std::max(yMaxR, g2d.GetY()[k]); }
@@ -527,7 +607,12 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     std::vector<double> sigmaVals;
     sigmaVals.reserve(nPts);
     for (int k = 0; k < nPts; ++k) {
-      const double candidate = (errValsPtr && k < static_cast<int>(errValsPtr->size())) ? (*errValsPtr)[k] : std::numeric_limits<double>::quiet_NaN();
+      double candidate = std::numeric_limits<double>::quiet_NaN();
+      if (distanceErrorApplied && static_cast<size_t>(k) < dist_err_vals.size()) {
+        candidate = dist_err_vals[k];
+      } else if (errValsPtr && static_cast<size_t>(k) < errValsPtr->size()) {
+        candidate = (*errValsPtr)[k];
+      }
       double xy[2] = {Xf[k], Yf[k]};
       const double sigmaUsed = charge_uncert::SelectVerticalSigma(candidate, uniformSigma);
       data2D.Add(xy, Zf[k], sigmaUsed);

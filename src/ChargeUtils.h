@@ -82,6 +82,64 @@ inline double SelectVerticalSigma(double candidate,
   return fallback;
 }
 
+inline double ApplySigmaBounds(double sigma,
+                               double maxCharge,
+                               double floorPercent,
+                               double capPercent) {
+  if (!std::isfinite(sigma) || sigma <= 0.0) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  double floorAbs = 0.0;
+  if (std::isfinite(maxCharge) && maxCharge > 0.0 && std::isfinite(floorPercent) &&
+      floorPercent > 0.0) {
+    floorAbs = floorPercent * 0.01 * maxCharge;
+  }
+  double capAbs = std::numeric_limits<double>::infinity();
+  if (std::isfinite(maxCharge) && maxCharge > 0.0 && std::isfinite(capPercent) &&
+      capPercent > 0.0) {
+    capAbs = capPercent * 0.01 * maxCharge;
+  }
+  if (floorAbs > 0.0 && sigma < floorAbs) {
+    sigma = floorAbs;
+  }
+  if (sigma > capAbs) {
+    sigma = capAbs;
+  }
+  if (!std::isfinite(sigma) || sigma <= 0.0) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  return sigma;
+}
+
+inline double DistancePowerSigma(double distance,
+                                 double maxCharge,
+                                 double pixelSpacing,
+                                 double distanceScalePixels,
+                                 double exponent,
+                                 double floorPercent,
+                                 double capPercent) {
+  if (!std::isfinite(distance) || distance < 0.0) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  if (!std::isfinite(maxCharge) || maxCharge <= 0.0) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  if (!std::isfinite(pixelSpacing) || pixelSpacing <= 0.0) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  if (!std::isfinite(distanceScalePixels) || distanceScalePixels <= 0.0) {
+    distanceScalePixels = 1.0;
+  }
+  if (!std::isfinite(exponent)) {
+    exponent = 1.0;
+  }
+  const double distanceScale = std::max(distanceScalePixels * pixelSpacing, 1e-12);
+  const double ratio = distance / distanceScale;
+  const double baseSigma = std::max(0.0, floorPercent) * 0.01 * maxCharge *
+                           std::pow(1.0 + ratio, std::max(0.0, exponent));
+  return ApplySigmaBounds(baseSigma, maxCharge, floorPercent, capPercent);
+}
+
 }  // namespace charge_uncert
 
 inline double ComputeQnQiPercent(double qi, double qn, double maxQi) {
