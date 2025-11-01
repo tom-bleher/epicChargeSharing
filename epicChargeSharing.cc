@@ -18,7 +18,6 @@
 #include "PhysicsList.hh"
 
 #include <filesystem>
-#include <iostream>
 
 namespace
 {
@@ -161,24 +160,18 @@ G4RunManager* CreateRunManager(const ProgramOptions& opts)
 
         const G4int maxThreads = G4Threading::G4GetNumberOfCores();
         if (nThreads > maxThreads) {
-            G4cout << "Warning: Requested " << nThreads << " threads, but only " << maxThreads
-                   << " cores available. Using " << maxThreads << " threads." << G4endl;
             nThreads = maxThreads;
         }
 
         mtRunManager->SetNumberOfThreads(nThreads);
-
-        G4cout << "=== MULTITHREADING ENABLED ===\n"
-               << "Mode: " << (opts.isBatch ? "Batch" : "Interactive") << "\n"
-               << "Threads: " << nThreads << " (of " << maxThreads << " available cores)\n"
-               << "===============================" << G4endl;
+        G4cout << "[Main] Multithreaded mode with " << nThreads << " / " << maxThreads
+               << " cores (" << (opts.isBatch ? "batch" : "interactive") << ")" << G4endl;
 
         return mtRunManager;
     }
 #endif
-    G4cout << "=== SINGLE-THREADED MODE ===\n"
-           << "Mode: " << (opts.isBatch ? "Batch" : "Interactive") << "\n"
-           << "=============================" << G4endl;
+    G4cout << "[Main] Single-threaded mode (" << (opts.isBatch ? "batch" : "interactive")
+           << ")" << G4endl;
     return new G4RunManager;
 }
 
@@ -192,11 +185,11 @@ void ConfigureInitialization(G4RunManager* runManager, DetectorConstruction* det
 bool ExecuteBatchMode(G4RunManager* runManager, const ProgramOptions& opts)
 {
     G4UImanager* uiManager = G4UImanager::GetUIpointer();
-    G4cout << "Executing macro file: " << opts.macroFile << G4endl;
+    G4cout << "[Batch] Executing macro '" << opts.macroFile << "'" << G4endl;
     G4String command = "/control/execute " + opts.macroFile;
     G4int status = uiManager->ApplyCommand(command);
     if (status != 0) {
-        G4cerr << "Error executing macro file: " << opts.macroFile << G4endl;
+        G4cerr << "[Batch] Macro execution failed: " << opts.macroFile << G4endl;
         return false;
     }
     return true;
@@ -229,6 +222,8 @@ int main(int argc, char** argv)
 {
     try {
         const ProgramOptions opts = ParseArguments(argc, argv);
+        G4cout << "[Main] Starting " << (opts.isBatch ? "batch" : "interactive")
+               << " session" << G4endl;
 
         EnvironmentGuard qtGuard;
         EnvironmentGuard uiGuard;
@@ -255,7 +250,7 @@ int main(int argc, char** argv)
 
         return 0;
     } catch (const std::exception& ex) {
-        G4cerr << ex.what() << G4endl;
+        G4cerr << "[Main] Unhandled exception: " << ex.what() << G4endl;
         return 1;
     }
 }
