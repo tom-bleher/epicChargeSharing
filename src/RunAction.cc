@@ -6,6 +6,7 @@
 
 #include "Constants.hh"
 #include "DetectorConstruction.hh"
+#include "internal/RunActionSupport.hh"
 
 #include "G4RunManager.hh"
 #include "G4Exception.hh"
@@ -24,8 +25,7 @@
 #include "TSystem.h"
 
 #include <algorithm>
-#include <atomic>
-#include <condition_variable>
+#include <cmath>
 #include <filesystem>
 #include <limits>
 #include <mutex>
@@ -35,212 +35,39 @@
 
 namespace
 {
-class WorkerSyncHelper
-{
-public:
-    static WorkerSyncHelper& Instance()
-    {
-        static WorkerSyncHelper instance;
-        return instance;
-    }
-
-    void Reset(G4int totalWorkers)
-    {
-        std::lock_guard<std::mutex> lock(fMutex);
-        fWorkersCompleted.store(0);
-        fTotalWorkers = std::max(0, totalWorkers);
-        fAllWorkersCompleted = (fTotalWorkers == 0);
-    }
-
-    void SignalWorkerCompletion()
-    {
-        std::unique_lock<std::mutex> lock(fMutex);
-        const int completed = ++fWorkersCompleted;
-        if (completed >= fTotalWorkers && !fAllWorkersCompleted) {
-            fAllWorkersCompleted = true;
-            lock.unlock();
-            fCv.notify_all();
-        }
-    }
-
-    void WaitForAllWorkers()
-    {
-        std::unique_lock<std::mutex> lock(fMutex);
-        if (fTotalWorkers == 0) {
-            return;
-        }
-        fCv.wait(lock, [this]() { return fAllWorkersCompleted; });
-    }
-
-private:
-    WorkerSyncHelper() = default;
-
-    std::mutex fMutex;
-    std::condition_variable fCv;
-    std::atomic<int> fWorkersCompleted{0};
-    int fTotalWorkers{0};
-    bool fAllWorkersCompleted{false};
-};
-
-static std::once_flag gRootInitFlag;
-static std::mutex gRootIOMutex;
-
-void InitializeROOTThreading()
-{
-    // Keep ROOT in batch mode; avoid enabling ROOT implicit MT or TThread here
-    // to reduce chances of interpreter/merger thread-safety issues.
-    gROOT->SetBatch(true);
-}
-
-G4String WorkerFileName(G4int threadId)
-{
-    std::ostringstream oss;
-    oss << "epicChargeSharing_t" << threadId << ".root";
-    return oss.str();
-}
-
+std::once_flag gRootInitFlag;
 } // namespace
 
-// Move RootFileWriterHelper to global scope so it matches the forward
-// declaration in include/RunAction.hh and is a complete type in this TU.
-class RootFileWriterHelper
+using runaction::RootFileWriterHelper;
+namespace support = runaction::support;
+
+namespace
 {
-public:
-    RootFileWriterHelper() = default;
-    ~RootFileWriterHelper() { Cleanup(); }
+using MetadataEntries = std::vector<std::pair<std::string, std::string>>;
 
-    void Attach(TFile* file, TTree* tree, bool ownsObjects)
-    {
-        std::lock_guard<std::mutex> lock(fMutex);
-        fRootFile = file;
-        fTree = tree;
-        fOwnsObjects = ownsObjects;
+std::string BoolToString(bool value)
+{
+    return value ? "true" : "false";
+}
+
+void WriteMetadataEntriesUnlocked(TFile* file, const MetadataEntries& entries)
+{
+    if (!file || file->IsZombie()) {
+        G4Exception("RunAction::WriteMetadataEntriesUnlocked",
+                    "InvalidRootFile",
+                    FatalException,
+                    "Unable to write metadata because the ROOT file handle is invalid.");
+        return;
     }
 
-    TFile* File() const { return fRootFile; }
-    TTree* Tree() const { return fTree; }
-
-    bool SafeWrite(bool /*isMultithreaded*/, bool isWorker)
-    {
-        std::lock_guard<std::mutex> globalLock(gRootIOMutex);
-        std::unique_lock<std::mutex> lock(fMutex, std::defer_lock);
-        if (!isWorker) {
-            lock.lock();
-        }
-
-        if (!fRootFile || !fTree || fRootFile->IsZombie()) {
-            G4cerr << "RunAction: Cannot write - invalid ROOT file or tree" << G4endl;
-            return false;
-        }
-
-        try {
-            fTree->FlushBaskets();
-            fRootFile->cd();
-            fTree->Write("", TObject::kOverwrite);
-            fRootFile->Flush();
-            return true;
-        } catch (const std::exception& e) {
-            G4cerr << "RunAction: Exception writing ROOT file: " << e.what() << G4endl;
-            return false;
-        }
+    file->cd();
+    for (const auto& entry : entries) {
+        TNamed meta(entry.first.c_str(), entry.second.c_str());
+        meta.Write("", TObject::kOverwrite);
     }
-
-    bool Validate(const G4String& filename, bool* hasEntries)
-    {
-        std::lock_guard<std::mutex> globalLock(gRootIOMutex);
-        if (filename.empty()) {
-            G4cerr << "RunAction: Error - Empty filename provided for validation" << G4endl;
-            return false;
-        }
-
-        TFile* testFile = nullptr;
-        try {
-            testFile = TFile::Open(filename.c_str(), "READ");
-            if (!testFile || testFile->IsZombie()) {
-                G4cerr << "RunAction: Error - Cannot open or corrupted file: " << filename << G4endl;
-                delete testFile;
-                return false;
-            }
-
-            auto* testTree = dynamic_cast<TTree*>(testFile->Get("Hits"));
-            if (!testTree) {
-                G4cerr << "RunAction: Error - No 'Hits' tree found in file: " << filename << G4endl;
-                testFile->Close();
-                delete testFile;
-                return false;
-            }
-
-            const Long64_t entryCount = testTree->GetEntries();
-            if (hasEntries) {
-                *hasEntries = (entryCount > 0);
-            }
-            if (entryCount <= 0) {
-                G4cerr << "RunAction: Warning - Empty tree in file: " << filename << G4endl;
-            }
-            testFile->Close();
-            delete testFile;
-            return true;
-        } catch (const std::exception& e) {
-            G4cerr << "RunAction: Exception during file validation: " << e.what() << G4endl;
-            if (testFile) {
-                testFile->Close();
-                delete testFile;
-            }
-            return false;
-        }
-    }
-
-    void Cleanup()
-    {
-        std::lock_guard<std::mutex> globalLock(gRootIOMutex);
-        std::lock_guard<std::mutex> lock(fMutex);
-        if (fRootFile) {
-            if (fRootFile->IsOpen()) {
-                fRootFile->Close();
-            }
-            if (fOwnsObjects) {
-                delete fRootFile;
-            }
-        }
-        fRootFile = nullptr;
-        fTree = nullptr;
-        fOwnsObjects = false;
-    }
-
-    void WriteMetadataSingleThread(G4double pixelSize,
-                                   G4double pixelSpacing,
-                                   G4double pixelCornerOffset,
-                                   G4double detSize,
-                                   G4int numBlocksPerSide,
-                                   G4int neighborhoodRadius)
-    {
-        std::lock_guard<std::mutex> globalLock(gRootIOMutex);
-        std::lock_guard<std::mutex> lock(fMutex);
-        if (!fRootFile || fRootFile->IsZombie()) {
-            return;
-        }
-        fRootFile->cd();
-        TNamed pixelSizeMeta("GridPixelSize_mm", Form("%.6f", pixelSize));
-        TNamed pixelSpacingMeta("GridPixelSpacing_mm", Form("%.6f", pixelSpacing));
-        TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm", Form("%.6f", pixelCornerOffset));
-        TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", detSize));
-        TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", numBlocksPerSide));
-        TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", neighborhoodRadius));
-
-        pixelSizeMeta.Write("", TObject::kOverwrite);
-        pixelSpacingMeta.Write("", TObject::kOverwrite);
-        pixelCornerOffsetMeta.Write("", TObject::kOverwrite);
-        detSizeMeta.Write("", TObject::kOverwrite);
-        numBlocksMeta.Write("", TObject::kOverwrite);
-        neighborhoodRadiusMeta.Write("", TObject::kOverwrite);
-    }
-
-private:
-    mutable std::mutex fMutex;
-    TFile* fRootFile{nullptr};
-    TTree* fTree{nullptr};
-    bool fOwnsObjects{false};
-};
+    file->Flush();
+}
+} // namespace
 
 RunAction::RunAction()
     : G4UserRunAction(),
@@ -256,13 +83,28 @@ RunAction::RunAction()
       fGridPixelSpacing(0.0),
       fGridPixelCornerOffset(0.0),
       fGridDetSize(0.0),
-      fGridNumBlocksPerSide(0)
+      fGridNumBlocksPerSide(0),
+      fGridNeighborhoodRadius(0),
+      fChargeSharingModel(Constants::CHARGE_SHARING_MODEL),
+      fChargeSharingBeta(std::numeric_limits<G4double>::quiet_NaN()),
+      fChargeSharingPitch(0.0),
+      fEmitDistanceAlphaMeta(false)
 {
 }
 
 RunAction::~RunAction()
 {
     CleanupRootObjects();
+}
+
+std::unique_lock<std::mutex> RunAction::MakeTreeLock()
+{
+#ifdef G4MULTITHREADED
+    if (G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread()) {
+        return std::unique_lock<std::mutex>(fTreeMutex);
+    }
+#endif
+    return std::unique_lock<std::mutex>();
 }
 
 TFile* RunAction::GetRootFile() const
@@ -329,7 +171,7 @@ void RunAction::EnsureBranchBuffersInitialized()
 
 void RunAction::BeginOfRunAction(const G4Run* run)
 {
-    std::call_once(gRootInitFlag, InitializeROOTThreading);
+    std::call_once(gRootInitFlag, support::InitializeROOTThreading);
 
     EnsureBranchBuffersInitialized();
 
@@ -337,19 +179,35 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     const bool isWorker = G4Threading::IsWorkerThread();
 
     if (!run) {
-        G4cerr << "RunAction: Error - Invalid run object in BeginOfRunAction" << G4endl;
+        G4Exception("RunAction::BeginOfRunAction",
+                    "InvalidRunObject",
+                    FatalException,
+                    "Received null run object in BeginOfRunAction.");
         return;
     }
 
+    const G4int runId = run->GetRunID();
+    if (isMT) {
+        if (isWorker) {
+            const G4int threadId = G4Threading::G4GetThreadId();
+            G4cout << "[RunAction] Worker " << threadId << " beginning run " << runId << G4endl;
+        } else {
+            G4cout << "[RunAction] Master beginning run " << runId << " with "
+                   << G4Threading::GetNumberOfRunningWorkerThreads() << " workers" << G4endl;
+        }
+    } else {
+        G4cout << "[RunAction] Beginning run " << runId << " (single-threaded)" << G4endl;
+    }
+
     if (isMT && !isWorker) {
-        WorkerSyncHelper::Instance().Reset(G4Threading::GetNumberOfRunningWorkerThreads());
+        support::WorkerSyncHelper::Instance().Reset(G4Threading::GetNumberOfRunningWorkerThreads());
     }
 
     G4String fileName;
     if (isMT) {
         if (isWorker) {
             const G4int threadId = G4Threading::G4GetThreadId();
-            fileName = WorkerFileName(threadId);
+            fileName = support::WorkerFileName(threadId);
         } else {
             fileName = "epicChargeSharing.root";
         }
@@ -358,7 +216,7 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     }
 
     if (!isMT || isWorker) {
-        std::unique_lock<std::mutex> rootInitLock(gRootIOMutex);
+        std::unique_lock<std::mutex> rootInitLock(support::RootIOMutex());
         auto* rootFile = new TFile(fileName.c_str(), "RECREATE");
         if (!rootFile || rootFile->IsZombie()) {
             G4Exception("RunAction::BeginOfRunAction",
@@ -399,7 +257,10 @@ void RunAction::BeginOfRunAction(const G4Run* run)
 void RunAction::EndOfRunAction(const G4Run* run)
 {
     if (!run) {
-        G4cerr << "RunAction: Error - Invalid run object in EndOfRunAction" << G4endl;
+        G4Exception("RunAction::EndOfRunAction",
+                    "InvalidRunObject",
+                    FatalException,
+                    "Received null run object in EndOfRunAction.");
         return;
     }
 
@@ -413,20 +274,21 @@ void RunAction::EndOfRunAction(const G4Run* run)
         if (nofEvents > 0) {
             if (SafeWriteRootFile()) {
                 wroteOutput = true;
-                G4cout << "RunAction: Successfully wrote ROOT file with " << nofEvents << " events"
-                       << G4endl;
+                if (isMT) {
+                    const G4int threadId = G4Threading::G4GetThreadId();
+                    G4cout << "[RunAction] Worker " << threadId << " stored " << nofEvents
+                           << " events" << G4endl;
+                } else {
+                    G4cout << "[RunAction] Stored " << nofEvents << " events" << G4endl;
+                }
                 if (!isMT) {
-                    fRootWriter->WriteMetadataSingleThread(fGridPixelSize,
-                                                           fGridPixelSpacing,
-                                                           fGridPixelCornerOffset,
-                                                           fGridDetSize,
-                                                           fGridNumBlocksPerSide,
-                                                           fGridNeighborhoodRadius > 0
-                                                               ? fGridNeighborhoodRadius
-                                                               : Constants::NEIGHBORHOOD_RADIUS);
+                    WriteMetadataToFile(fRootWriter ? fRootWriter->File() : nullptr);
                 }
             } else {
-                G4cerr << "RunAction: Failed to write ROOT file" << G4endl;
+                G4Exception("RunAction::EndOfRunAction",
+                            "RootFileWriteFailure",
+                            FatalException,
+                            "SafeWriteRootFile() reported failure.");
             }
         }
 
@@ -448,7 +310,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
     std::vector<G4String> workerFiles;
     workerFiles.reserve(totalWorkers);
     for (G4int tid = 0; tid < totalWorkers; ++tid) {
-        workerFiles.push_back(WorkerFileName(tid));
+        workerFiles.push_back(support::WorkerFileName(tid));
     }
 
     std::vector<G4String> existingFiles;
@@ -460,7 +322,7 @@ void RunAction::EndOfRunAction(const G4Run* run)
     }
 
     if (existingFiles.empty()) {
-        G4cout << "RunAction: No worker ROOT files found after MT run; skipping merge" << G4endl;
+        G4cout << "[RunAction] No worker ROOT files found to merge" << G4endl;
         return;
     }
 
@@ -474,7 +336,10 @@ void RunAction::EndOfRunAction(const G4Run* run)
         merger.SetFastMethod(kFALSE);
         merger.SetNotrees(kFALSE);
         if (!merger.OutputFile(output.c_str(), "RECREATE")) {
-            G4cerr << "RunAction: Unable to set output file " << output << " for merger" << G4endl;
+            G4Exception("RunAction::mergeFiles",
+                        "OutputFileFailure",
+                        FatalException,
+                        "Unable to open output file for ROOT merge.");
             return false;
         }
 
@@ -483,14 +348,11 @@ void RunAction::EndOfRunAction(const G4Run* run)
             if (std::filesystem::exists(file.c_str())) {
                 if (merger.AddFile(file.c_str())) {
                     added = true;
-                } else {
-                    G4cerr << "RunAction: Failed to queue " << file << " for merge" << G4endl;
                 }
             }
         }
 
         if (!added) {
-            G4cerr << "RunAction: No readable worker files were added to the merger" << G4endl;
             return false;
         }
 
@@ -499,63 +361,46 @@ void RunAction::EndOfRunAction(const G4Run* run)
 
     bool mergeOk = false;
     {
-        std::lock_guard<std::mutex> ioLock(gRootIOMutex);
+        std::lock_guard<std::mutex> ioLock(support::RootIOMutex());
         mergeOk = mergeFiles(existingFiles, "epicChargeSharing.root");
-        if (mergeOk && fGridPixelSize > 0) {
+        if (mergeOk) {
             std::unique_ptr<TFile> mergedFile(TFile::Open("epicChargeSharing.root", "UPDATE"));
             if (mergedFile && !mergedFile->IsZombie()) {
-                mergedFile->cd();
-                TNamed pixelSizeMeta("GridPixelSize_mm", Form("%.6f", fGridPixelSize));
-                TNamed pixelSpacingMeta("GridPixelSpacing_mm", Form("%.6f", fGridPixelSpacing));
-                TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm",
-                                             Form("%.6f", fGridPixelCornerOffset));
-                TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", fGridDetSize));
-                TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", fGridNumBlocksPerSide));
-                const G4int radiusValue =
-                    fGridNeighborhoodRadius > 0 ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS;
-                TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", radiusValue));
-
-                pixelSizeMeta.Write("", TObject::kOverwrite);
-                pixelSpacingMeta.Write("", TObject::kOverwrite);
-                pixelCornerOffsetMeta.Write("", TObject::kOverwrite);
-                detSizeMeta.Write("", TObject::kOverwrite);
-                numBlocksMeta.Write("", TObject::kOverwrite);
-                neighborhoodRadiusMeta.Write("", TObject::kOverwrite);
-
-                mergedFile->Flush();
+                MetadataEntries entries = CollectMetadataEntries();
+                if (!entries.empty()) {
+                    WriteMetadataEntriesUnlocked(mergedFile.get(), entries);
+                }
                 mergedFile->Close();
             } else {
-                G4cerr << "RunAction: Failed to open merged ROOT file for metadata update" << G4endl;
+                G4Exception("RunAction::EndOfRunAction",
+                            "MergedFileOpenFailure",
+                            FatalException,
+                            "Failed to open merged ROOT file for metadata update.");
             }
         }
     }
 
     if (!mergeOk) {
-        G4cerr << "RunAction: ROOT file merge failed" << G4endl;
         return;
     }
 
     bool mergedHasEntries = false;
     if (!ValidateRootFile("epicChargeSharing.root", &mergedHasEntries)) {
-        G4cerr << "RunAction: Merged ROOT file validation failed" << G4endl;
         return;
     }
 
-    G4cout << "RunAction: Merged ROOT file written successfully" << G4endl;
-
     for (const auto& file : existingFiles) {
         std::error_code ec;
-        if (std::filesystem::remove(file.c_str(), ec)) {
-            G4cout << "RunAction: Removed worker file " << file << G4endl;
-        } else if (ec) {
-            G4cerr << "RunAction: Could not remove worker file " << file << " (" << ec.message()
-                   << ")" << G4endl;
+        if (!std::filesystem::remove(file.c_str(), ec) && ec) {
+            continue;
         }
     }
 
+    G4cout << "[RunAction] Merged " << existingFiles.size()
+           << " worker files into epicChargeSharing.root" << G4endl;
+
     if (!mergedHasEntries) {
-        G4cout << "RunAction: Merged ROOT file has no entries; skipping post-processing fits"
-               << G4endl;
+        G4cout << "[RunAction] Merged ROOT file has no entries; skipping post-processing" << G4endl;
         return;
     }
 
@@ -580,15 +425,15 @@ void RunAction::RunPostProcessingFits()
     const TString macro2D = sourceDir + "/src/FitGaus2D.C";
     const TString rootFile = "epicChargeSharing.root"; // produced in current working directory
 
+    bool executed = false;
     auto runMacro = [&](const TString& macroPath, const char* entryPoint) {
         // Load the macro (interpreted). Using interpreted mode avoids platform-specific ACLiC complications.
+        G4cout << "[RunAction] Running post-processing macro " << entryPoint << "..." << G4endl;
         gROOT->ProcessLine(TString::Format(".L %s", macroPath.Data()));
         // Call the entry point with just the filename, relying on macro defaults for other parameters.
         const TString call = TString::Format("%s(\"%s\")", entryPoint, rootFile.Data());
-        const Long_t status = gROOT->ProcessLine(call);
-        if (status != 0) {
-            G4cout << "Post-processing: call '" << entryPoint << "' returned status " << status << G4endl;
-        }
+        gROOT->ProcessLine(call);
+        executed = true;
     };
 
     // 1D row/column fits
@@ -599,26 +444,30 @@ void RunAction::RunPostProcessingFits()
     if (Constants::FIT_GAUS_2D) {
         runMacro(macro2D, "FitGaus2D");
     }
+
+    if (executed) {
+        G4cout << "[RunAction] Post-processing fits finished" << G4endl;
+    }
 }
 
 void RunAction::ResetSynchronization()
 {
     if (G4Threading::IsMultithreadedApplication()) {
-        WorkerSyncHelper::Instance().Reset(G4Threading::GetNumberOfRunningWorkerThreads());
+        support::WorkerSyncHelper::Instance().Reset(G4Threading::GetNumberOfRunningWorkerThreads());
     }
 }
 
 void RunAction::SignalWorkerCompletion()
 {
     if (G4Threading::IsMultithreadedApplication()) {
-        WorkerSyncHelper::Instance().SignalWorkerCompletion();
+        support::WorkerSyncHelper::Instance().SignalWorkerCompletion();
     }
 }
 
 void RunAction::WaitForAllWorkersToComplete()
 {
     if (G4Threading::IsMultithreadedApplication()) {
-        WorkerSyncHelper::Instance().WaitForAllWorkers();
+        support::WorkerSyncHelper::Instance().WaitForAllWorkers();
     }
 }
 
@@ -639,154 +488,6 @@ void RunAction::CleanupRootObjects()
     fRootWriter->Cleanup();
 }
 
-void RunAction::SetEventData(G4double edep, G4double x, G4double y, G4double z)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    fEdep = edep;
-    fTrueX = x;
-    fTrueY = y;
-    (void)z;
-}
-
-void RunAction::UpdateEventSummary(const EventSummaryData& summary)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    fEdep = summary.edep;
-    fTrueX = summary.hitX;
-    fTrueY = summary.hitY;
-    (void)summary.hitZ;
-    fPixelX = summary.nearestPixelX;
-    fPixelY = summary.nearestPixelY;
-    fPixelTrueDeltaX = summary.pixelTrueDeltaX;
-    fPixelTrueDeltaY = summary.pixelTrueDeltaY;
-    fFirstContactIsPixel = summary.firstContactIsPixel;
-    fGeometricIsPixel = summary.geometricIsPixel;
-    fIsPixelHit = summary.isPixelHitCombined;
-}
-
-void RunAction::SetNearestPixelPos(G4double x, G4double y)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    fPixelX = x;
-    fPixelY = y;
-}
-
-void RunAction::SetFirstContactIsPixel(G4bool v)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    fFirstContactIsPixel = v;
-}
-
-void RunAction::SetGeometricIsPixel(G4bool v)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    fGeometricIsPixel = v;
-}
-
-void RunAction::SetIsPixelHitCombined(G4bool v)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    fIsPixelHit = v;
-}
-
-void RunAction::SetPixelClassification(G4bool isPixelHit,
-                                       G4double pixelTrueDeltaX,
-                                       G4double pixelTrueDeltaY)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    fIsPixelHit = isPixelHit;
-    fPixelTrueDeltaX = pixelTrueDeltaX;
-    fPixelTrueDeltaY = pixelTrueDeltaY;
-}
-
-void RunAction::SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
-                                          const std::vector<G4double>& chargeCoulombs)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodCapacity <= 0) {
-        return;
-    }
-
-    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
-    if (chargeFractions.size() > capacity || chargeCoulombs.size() > capacity) {
-        static std::once_flag warnFlag;
-        std::call_once(warnFlag, []() {
-            G4cerr << "RunAction: Neighborhood data exceeds fixed branch capacity; truncating to configured radius." << G4endl;
-        });
-    }
-
-    const std::size_t copyCount = std::min({chargeFractions.size(), chargeCoulombs.size(), capacity});
-    std::fill(fNeighborhoodChargeFractions.begin(), fNeighborhoodChargeFractions.end(),
-              Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
-    std::fill(fNeighborhoodCharge.begin(), fNeighborhoodCharge.end(), 0.0);
-
-    if (copyCount > 0) {
-        std::copy_n(chargeFractions.begin(), copyCount, fNeighborhoodChargeFractions.begin());
-        std::copy_n(chargeCoulombs.begin(), copyCount, fNeighborhoodCharge.begin());
-    }
-
-    fNeighborhoodActiveCells = static_cast<G4int>(copyCount);
-}
-
-void RunAction::SetNeighborhoodChargeNewData(const std::vector<G4double>& chargeCoulombsNew)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodCapacity <= 0) {
-        return;
-    }
-
-    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
-    const std::size_t copyCount = std::min<std::size_t>(chargeCoulombsNew.size(), capacity);
-
-    std::fill(fNeighborhoodChargeNew.begin(), fNeighborhoodChargeNew.end(), 0.0);
-    if (copyCount > 0) {
-        std::copy_n(chargeCoulombsNew.begin(), copyCount, fNeighborhoodChargeNew.begin());
-    }
-}
-
-void RunAction::SetNeighborhoodChargeFinalData(const std::vector<G4double>& chargeCoulombsFinal)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodCapacity <= 0) {
-        return;
-    }
-
-    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
-    const std::size_t copyCount = std::min<std::size_t>(chargeCoulombsFinal.size(), capacity);
-
-    std::fill(fNeighborhoodChargeFinal.begin(), fNeighborhoodChargeFinal.end(), 0.0);
-    if (copyCount > 0) {
-        std::copy_n(chargeCoulombsFinal.begin(), copyCount, fNeighborhoodChargeFinal.begin());
-    }
-}
-
-void RunAction::SetNeighborhoodDistanceAlphaData(const std::vector<G4double>& distances,
-                                                 const std::vector<G4double>& alphas)
-{
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodCapacity <= 0) {
-        return;
-    }
-
-    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
-    const std::size_t distCopy = std::min<std::size_t>(distances.size(), capacity);
-    const std::size_t alphaCopy = std::min<std::size_t>(alphas.size(), capacity);
-
-    if (distCopy == 0 && alphaCopy == 0) {
-        return;
-    }
-
-    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
-    std::fill(fNeighborhoodDistance.begin(), fNeighborhoodDistance.end(), nan);
-    std::fill(fNeighborhoodAlpha.begin(), fNeighborhoodAlpha.end(), nan);
-    if (distCopy > 0) {
-        std::copy_n(distances.begin(), distCopy, fNeighborhoodDistance.begin());
-    }
-    if (alphaCopy > 0) {
-        std::copy_n(alphas.begin(), alphaCopy, fNeighborhoodAlpha.begin());
-    }
-}
-
 void RunAction::SetDetectorGridParameters(G4double pixelSize,
                                           G4double pixelSpacing,
                                           G4double pixelCornerOffset,
@@ -798,6 +499,7 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize,
     fGridPixelCornerOffset = pixelCornerOffset;
     fGridDetSize = detSize;
     fGridNumBlocksPerSide = numBlocksPerSide;
+    fChargeSharingPitch = pixelSpacing;
 }
 
 void RunAction::SetNeighborhoodRadiusMeta(G4int radius)
@@ -805,10 +507,6 @@ void RunAction::SetNeighborhoodRadiusMeta(G4int radius)
     fGridNeighborhoodRadius = radius;
 
     if (GetTree()) {
-        static std::once_flag warnFlag;
-        std::call_once(warnFlag, []() {
-            G4cerr << "RunAction: Neighborhood radius changed after tree creation; fixed-size branches retain original capacity." << G4endl;
-        });
         return;
     }
 
@@ -825,38 +523,187 @@ void RunAction::SetNeighborhoodRadiusMeta(G4int radius)
     fNeighborhoodActiveCells = 0;
 }
 
-void RunAction::SetNeighborhoodPixelData(const std::vector<G4double>& xs,
-                                         const std::vector<G4double>& ys,
-                                         const std::vector<G4int>& ids)
+void RunAction::SetChargeSharingMetadata(Constants::ChargeSharingModel model,
+                                         G4double betaPerMicron,
+                                         G4double pitch)
 {
-    std::lock_guard<std::mutex> lock(fTreeMutex);
-    if (fNeighborhoodCapacity <= 0) {
-        return;
+    fChargeSharingModel = model;
+    if (model == Constants::ChargeSharingModel::Linear && std::isfinite(betaPerMicron)) {
+        fChargeSharingBeta = betaPerMicron;
+    } else {
+        fChargeSharingBeta = std::numeric_limits<G4double>::quiet_NaN();
     }
 
-    const std::size_t capacity = static_cast<std::size_t>(fNeighborhoodCapacity);
-    const std::size_t copyCount = std::min({xs.size(), ys.size(), static_cast<std::size_t>(ids.size()), capacity});
-    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
-
-    std::fill(fNeighborhoodPixelX.begin(), fNeighborhoodPixelX.end(), nan);
-    std::fill(fNeighborhoodPixelY.begin(), fNeighborhoodPixelY.end(), nan);
-    std::fill(fNeighborhoodPixelID.begin(), fNeighborhoodPixelID.end(), -1);
-
-    if (copyCount > 0) {
-        std::copy_n(xs.begin(), copyCount, fNeighborhoodPixelX.begin());
-        std::copy_n(ys.begin(), copyCount, fNeighborhoodPixelY.begin());
-        std::copy_n(ids.begin(), copyCount, fNeighborhoodPixelID.begin());
+    if (pitch > 0.0) {
+        fChargeSharingPitch = pitch;
     }
 }
 
-void RunAction::FillTree()
+void RunAction::SetChargeSharingDistanceAlphaMeta(G4bool enabled)
 {
-    std::lock_guard<std::mutex> lock(fTreeMutex);
+    fEmitDistanceAlphaMeta = enabled;
+}
+
+void RunAction::WriteMetadataToFile(TFile* file) const
+{
+    if (!file) {
+        return;
+    }
+
+    MetadataEntries entries = CollectMetadataEntries();
+    if (entries.empty()) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> ioLock(support::RootIOMutex());
+    WriteMetadataEntriesUnlocked(file, entries);
+}
+
+std::vector<std::pair<std::string, std::string>> RunAction::CollectMetadataEntries() const
+{
+    MetadataEntries entries;
+    entries.reserve(20);
+
+    auto addPair = [&](const std::string& key, const std::string& value) {
+        entries.emplace_back(key, value);
+    };
+    auto addDouble = [&](const std::string& key, G4double value, const char* fmt = "%.6f") {
+        addPair(key, std::string(Form(fmt, value)));
+    };
+    auto addInt = [&](const std::string& key, G4int value) {
+        addPair(key, std::string(Form("%d", value)));
+    };
+
+    addPair("MetadataSchemaVersion", "2");
+
+    if (fGridPixelSize > 0.0) {
+        addDouble("GridPixelSize_mm", fGridPixelSize);
+    }
+    if (fGridPixelSpacing > 0.0) {
+        addDouble("GridPixelSpacing_mm", fGridPixelSpacing);
+    }
+    if (fGridPixelCornerOffset >= 0.0) {
+        addDouble("GridPixelCornerOffset_mm", fGridPixelCornerOffset);
+    }
+    if (fGridDetSize > 0.0) {
+        addDouble("GridDetectorSize_mm", fGridDetSize);
+    }
+    if (fGridNumBlocksPerSide > 0) {
+        addInt("GridNumBlocksPerSide", fGridNumBlocksPerSide);
+    }
+    if (fGridNeighborhoodRadius >= 0) {
+        addInt("NeighborhoodRadius", fGridNeighborhoodRadius);
+    }
+
+    const std::string modelStr =
+        (fChargeSharingModel == Constants::ChargeSharingModel::Linear) ? "Linear" : "Log";
+    addPair("ChargeSharingModel", modelStr);
+
+    if (fChargeSharingModel == Constants::ChargeSharingModel::Linear &&
+        std::isfinite(fChargeSharingBeta)) {
+        addDouble("ChargeSharingLinearBeta_per_um", fChargeSharingBeta);
+    }
+
+    if (fChargeSharingPitch > 0.0) {
+        addDouble("ChargeSharingPitch_mm", fChargeSharingPitch);
+    }
+
+    addDouble("ChargeSharingReferenceD0_microns", Constants::D0_CHARGE_SHARING);
+    addDouble("IonizationEnergy_eV", Constants::IONIZATION_ENERGY);
+    addDouble("AmplificationFactor", Constants::AMPLIFICATION_FACTOR);
+    addPair("ElementaryCharge_C", std::string(Form("%.9e", Constants::ELEMENTARY_CHARGE)));
+    addDouble("NoisePixelGainSigmaMin", Constants::PIXEL_GAIN_SIGMA_MIN);
+    addDouble("NoisePixelGainSigmaMax", Constants::PIXEL_GAIN_SIGMA_MAX);
+    addDouble("NoiseElectronCount", Constants::NOISE_ELECTRON_COUNT);
+    addPair("ChargeSharingEmitDistanceAlpha", BoolToString(fEmitDistanceAlphaMeta));
+    addPair("PostProcessFitGaus1DEnabled", BoolToString(Constants::FIT_GAUS_1D));
+    addPair("PostProcessFitGaus2DEnabled", BoolToString(Constants::FIT_GAUS_2D));
+
+    return entries;
+}
+
+void RunAction::FillTree(const EventRecord& record)
+{
+    auto treeLock = MakeTreeLock();
     auto* tree = GetTree();
     if (!tree) {
         return;
     }
+
+    fEdep = record.summary.edep;
+    fTrueX = record.summary.hitX;
+    fTrueY = record.summary.hitY;
+    (void)record.summary.hitZ;
+    fPixelX = record.summary.nearestPixelX;
+    fPixelY = record.summary.nearestPixelY;
+    fPixelTrueDeltaX = record.summary.pixelTrueDeltaX;
+    fPixelTrueDeltaY = record.summary.pixelTrueDeltaY;
+    fFirstContactIsPixel = record.summary.firstContactIsPixel;
+    fGeometricIsPixel = record.summary.geometricIsPixel;
+    fIsPixelHit = record.summary.isPixelHitCombined;
+
+    const std::size_t capacity = fNeighborhoodCapacity > 0 ? static_cast<std::size_t>(fNeighborhoodCapacity) : 0;
+    if (capacity > 0U) {
+        const std::size_t fractionCount = std::min({capacity,
+                                                    record.neighborFractions.size(),
+                                                    record.neighborCharges.size()});
+
+        EnsureVectorSized(fNeighborhoodChargeFractions, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
+        EnsureVectorSized(fNeighborhoodCharge, 0.0);
+        EnsureVectorSized(fNeighborhoodChargeNew, 0.0);
+        EnsureVectorSized(fNeighborhoodChargeFinal, 0.0);
+        const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
+        EnsureVectorSized(fNeighborhoodDistance, nan);
+        EnsureVectorSized(fNeighborhoodAlpha, nan);
+        EnsureVectorSized(fNeighborhoodPixelX, nan);
+        EnsureVectorSized(fNeighborhoodPixelY, nan);
+        EnsureVectorSized(fNeighborhoodPixelID, -1);
+
+        if (fractionCount > 0) {
+            std::copy_n(record.neighborFractions.begin(), fractionCount, fNeighborhoodChargeFractions.begin());
+            std::copy_n(record.neighborCharges.begin(), fractionCount, fNeighborhoodCharge.begin());
+        }
+
+        const std::size_t newCount = std::min(capacity, record.neighborChargesNew.size());
+        if (newCount > 0) {
+            std::copy_n(record.neighborChargesNew.begin(), newCount, fNeighborhoodChargeNew.begin());
+        }
+
+        const std::size_t finalCount = std::min(capacity, record.neighborChargesFinal.size());
+        if (finalCount > 0) {
+            std::copy_n(record.neighborChargesFinal.begin(), finalCount, fNeighborhoodChargeFinal.begin());
+        }
+
+        if (record.includeDistanceAlpha) {
+            const std::size_t distCount = std::min(capacity, record.neighborDistances.size());
+            const std::size_t alphaCount = std::min(capacity, record.neighborAlphas.size());
+            if (distCount > 0) {
+                std::copy_n(record.neighborDistances.begin(), distCount, fNeighborhoodDistance.begin());
+            }
+            if (alphaCount > 0) {
+                std::copy_n(record.neighborAlphas.begin(), alphaCount, fNeighborhoodAlpha.begin());
+            }
+        }
+
+        const std::size_t pixelCount = std::min({capacity,
+                                                 record.neighborPixelX.size(),
+                                                 record.neighborPixelY.size(),
+                                                 record.neighborPixelIds.size()});
+        if (pixelCount > 0) {
+            std::copy_n(record.neighborPixelX.begin(), pixelCount, fNeighborhoodPixelX.begin());
+            std::copy_n(record.neighborPixelY.begin(), pixelCount, fNeighborhoodPixelY.begin());
+            std::copy_n(record.neighborPixelIds.begin(), pixelCount, fNeighborhoodPixelID.begin());
+        }
+
+        fNeighborhoodActiveCells = static_cast<G4int>(fractionCount);
+    } else {
+        fNeighborhoodActiveCells = 0;
+    }
+
     if (tree->Fill() < 0) {
-        G4cerr << "RunAction: Tree Fill() returned error" << G4endl;
+        G4Exception("RunAction::FillTree",
+                    "TreeFillFailure",
+                    FatalException,
+                    "TTree::Fill() reported an error.");
     }
 }

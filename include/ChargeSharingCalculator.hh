@@ -63,7 +63,7 @@ private:
     G4int fNeighborhoodRadius;
     Result fResult;
     std::vector<G4double> fWeightGrid;
-    std::vector<G4bool> fInBoundsGrid;
+    std::vector<G4int> fActiveIndices;
     struct Offset { int di; int dj; int idx; };
     std::vector<Offset> fOffsets;
     int fGridDim{0};

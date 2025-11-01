@@ -91,7 +91,7 @@ namespace Constants {
     // ========================
     // Control whether to run ROOT post-processing macros automatically after the run finishes
     const G4bool FIT_GAUS_1D = true;   // Calls src/fitGaus1D.C
-    const G4bool FIT_GAUS_2D = false;   // Calls src/fitGaus2D.C
+    const G4bool FIT_GAUS_2D = false;   // Calls src/fitGaus2D.C (fix cbi2 and Pp here)
 
 } // namespace Constants
 

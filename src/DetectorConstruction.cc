@@ -24,11 +24,9 @@
 
 #include "Randomize.hh"
 
-#include <fstream>
 #include <cmath>
-#include <ctime>
 #include <string>
-#include <filesystem>
+#include <limits>
 #include <mutex>
 #include <sstream>
 
@@ -42,6 +40,7 @@ DetectorConstruction::DetectorConstruction()
       fDetWidth(Constants::DETECTOR_WIDTH),
       fNumBlocksPerSide(0),
       fEventAction(nullptr),
+      fRunAction(nullptr),
       fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),
       fLogicSilicon(nullptr)
 {
@@ -49,15 +48,20 @@ DetectorConstruction::DetectorConstruction()
 
 DetectorConstruction::~DetectorConstruction() = default;
 
+void DetectorConstruction::SetRunAction(RunAction* runAction)
+{
+    fRunAction = runAction;
+    if (fRunAction) {
+        SyncRunMetadata();
+    }
+}
+
 void DetectorConstruction::SetPixelCornerOffset(G4double cornerOffset)
 {
-    G4cout << "Setting pixel corner offset to: " << cornerOffset / um << " um" << G4endl;
-    G4cout << "Note: This is now a fixed parameter - detector size will be adjusted if needed."
-           << G4endl;
+    G4cout << "[Detector] Pixel corner offset set to " << cornerOffset / mm << " mm" << G4endl;
     fPixelCornerOffset = cornerOffset;
 
     if (G4RunManager* runManager = G4RunManager::GetRunManager()) {
-        G4cout << "Requesting geometry update..." << G4endl;
         runManager->GeometryHasBeenModified();
     }
 }
@@ -78,11 +82,15 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     const PixelGridStats gridStats =
         ConfigurePixels(logicWorld, siliconLogical, materials, checkOverlaps);
 
-    WriteGeometryLog(gridStats, originalDetSize);
-    SaveSimulationParameters(gridStats.totalPixelArea,
-                             gridStats.detectorArea,
-                             gridStats.coverage);
     SyncRunMetadata();
+
+    static std::once_flag summaryFlag;
+    std::call_once(summaryFlag, [&]() {
+        const G4double coveragePercent = gridStats.coverage * 100.0;
+        G4cout << "[Detector] Geometry prepared: size " << fDetSize / mm << " mm, pixels "
+               << fNumBlocksPerSide << "x" << fNumBlocksPerSide << ", spacing "
+               << fPixelSpacing / mm << " mm, coverage " << coveragePercent << "%" << G4endl;
+    });
 
     return physWorld;
 }
@@ -142,18 +150,7 @@ G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* log
         2 * fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide - 1) * fPixelSpacing;
 
     if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
-        G4cout << "\n=== AUTOMATIC DETECTOR SIZE ADJUSTMENT ===\n"
-               << "Original detector size: " << originalDetSize / mm << " mm\n"
-               << "Calculated pixel grid requires: " << fNumBlocksPerSide << " x "
-               << fNumBlocksPerSide << " pixels\n"
-               << "Required detector size: " << requiredDetSize / mm << " mm\n"
-               << "Pixel corner offset (fixed): " << fPixelCornerOffset / mm << " mm\n";
-
         fDetSize = requiredDetSize;
-
-        G4cout << "-> Detector size adjusted to: " << fDetSize / mm << " mm\n"
-               << "===========================================\n"
-               << G4endl;
 
         delete detCube;
         detCube = new G4Box("detCube", fDetSize / 2, fDetSize / 2, fDetWidth / 2);
@@ -166,9 +163,13 @@ G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* log
     const G4double actualCornerOffset =
         (fDetSize - (fNumBlocksPerSide - 1) * fPixelSpacing - fPixelSize) / 2;
     if (std::abs(actualCornerOffset - fPixelCornerOffset) > Constants::PRECISION_TOLERANCE) {
-        G4cerr << "ERROR: Corner offset calculation failed!" << G4endl;
-        G4cerr << "Expected: " << fPixelCornerOffset / mm << " mm, "
-               << "Got: " << actualCornerOffset / mm << " mm" << G4endl;
+        std::ostringstream oss;
+        oss << "Corner offset calculation failed. Expected " << fPixelCornerOffset / mm
+            << " mm but got " << actualCornerOffset / mm << " mm.";
+        G4Exception("DetectorConstruction::BuildSiliconDetector",
+                    "CornerOffsetMismatch",
+                    FatalException,
+                    oss.str().c_str());
     }
 
     new G4PVPlacement(
@@ -201,8 +202,6 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
 
     auto* stepLimit = new G4UserLimits(Constants::MAX_STEP_SIZE);
     siliconLogical->SetUserLimits(stepLimit);
-    G4cout << "Step limiting: max step " << Constants::MAX_STEP_SIZE / um << " um" << G4endl;
-
     InitializePixelGainSigmas();
 
     const G4ThreeVector detectorPos = GetDetectorPos();
@@ -228,14 +227,15 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
     }
 
     if (G4VSensitiveDetector* pixelSensitiveDetector = logicBlock->GetSensitiveDetector()) {
-        G4cerr << "ERROR: Aluminum pixels have sensitive detector attached!" << G4endl;
-        G4cerr << "This violates the selective sensitivity requirement!" << G4endl;
-        G4cerr << "Attached detector: " << pixelSensitiveDetector->GetName() << G4endl;
-    } else {
-        G4cout << "Aluminum pixel pads passive (no sensitive detector attached)" << G4endl;
-        G4cout << "Pixel pad count: " << copyNo << " (" << fNumBlocksPerSide << " x "
-               << fNumBlocksPerSide << ")" << G4endl;
+        std::string message = "Aluminum pixels unexpectedly have sensitive detector '" +
+                              pixelSensitiveDetector->GetName() + "' attached.";
+        G4Exception("DetectorConstruction::ConfigurePixels",
+                    "PixelSensitivityViolation",
+                    FatalException,
+                    message.c_str());
     }
+
+    G4cout << "[Detector] Configured " << copyNo << " aluminum pixel pads" << G4endl;
 
     stats.totalPixelArea =
         static_cast<G4double>(fNumBlocksPerSide) * fNumBlocksPerSide * fPixelSize * fPixelSize;
@@ -260,48 +260,28 @@ void DetectorConstruction::InitializePixelGainSigmas()
         fPixelGainSigmas.push_back(sigma);
     }
 
-    G4cout << "Initialized per-pixel gain sigmas in [" << minSigma << ", " << maxSigma << "] with "
-           << total << " entries" << G4endl;
-}
-
-void DetectorConstruction::WriteGeometryLog(const PixelGridStats& stats,
-                                            G4double originalDetSize) const
-{
-    G4cout << "\nDetector configuration" << G4endl
-           << "  size: " << fDetSize / mm << " mm x " << fDetSize / mm << " mm" << G4endl;
-    if (std::abs(fDetSize - originalDetSize) > Constants::GEOMETRY_TOLERANCE) {
-        G4cout << "  (adjusted from original " << originalDetSize / mm << " mm)" << G4endl;
-    }
-    G4cout << "  pixel corner offset (fixed): " << fPixelCornerOffset / mm << " mm" << G4endl
-           << "  pixels: " << fNumBlocksPerSide << " x " << fNumBlocksPerSide << " ("
-           << fNumBlocksPerSide * fNumBlocksPerSide << ")" << G4endl
-           << "  pixel area (single): " << fPixelSize * fPixelSize / (mm * mm) << " mm^2"
-           << G4endl
-           << "  pixel area (total):  " << stats.totalPixelArea / (mm * mm) << " mm^2" << G4endl
-           << "  detector area:       " << stats.detectorArea / (mm * mm) << " mm^2" << G4endl
-           << "  coverage:            " << stats.coverage << G4endl;
 }
 
 void DetectorConstruction::SyncRunMetadata()
 {
-    if (auto* runManager = G4RunManager::GetRunManager()) {
-        if (const auto* userRunAction = runManager->GetUserRunAction()) {
-            if (auto* runAction = const_cast<RunAction*>(dynamic_cast<const RunAction*>(userRunAction))) {
-                runAction->SetDetectorGridParameters(
-                    fPixelSize,
-                    fPixelSpacing,
-                    fPixelCornerOffset,
-                    fDetSize,
-                    fNumBlocksPerSide);
-                runAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
-
-                G4cout << "Updated RunAction with final grid parameters:" << G4endl
-                       << "  Final detector size: " << fDetSize / mm << " mm" << G4endl
-                       << "  Fixed pixel corner offset: " << fPixelCornerOffset / mm << " mm" << G4endl
-                       << "  Final number of blocks per side: " << fNumBlocksPerSide << G4endl;
-            }
-        }
+    if (!fRunAction) {
+        return;
     }
+
+    fRunAction->SetDetectorGridParameters(
+        fPixelSize,
+        fPixelSpacing,
+        fPixelCornerOffset,
+        fDetSize,
+        fNumBlocksPerSide);
+    fRunAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
+
+    const auto chargeModel = Constants::CHARGE_SHARING_MODEL;
+    G4double linearBeta = std::numeric_limits<G4double>::quiet_NaN();
+    if (chargeModel == Constants::ChargeSharingModel::Linear) {
+        linearBeta = GetLinearChargeModelBeta(fPixelSpacing);
+    }
+    fRunAction->SetChargeSharingMetadata(chargeModel, linearBeta, fPixelSpacing);
 }
 
 G4ThreeVector DetectorConstruction::GetDetectorPos() const
@@ -350,16 +330,12 @@ void DetectorConstruction::ConstructSDandField()
 
     G4VSensitiveDetector* attachedDetector =
         fLogicSilicon ? fLogicSilicon->GetSensitiveDetector() : nullptr;
-    if (attachedDetector == mfd) {
-        G4cout << "Multi-Functional Detector 'SiliconDetector' successfully attached to silicon "
-                  "volume"
-               << G4endl;
-    } else {
-        G4cerr << "ERROR: Failed to attach Multi-Functional Detector to silicon volume" << G4endl;
+    if (attachedDetector != mfd) {
+        G4Exception("DetectorConstruction::ConstructSDandField",
+                    "SensitiveDetectorAttachmentFailed",
+                    FatalException,
+                    "Failed to attach Multi-Functional Detector to silicon volume.");
     }
-
-    G4cout << "MFD: created, attached to silicon, primitives: " << mfd->GetNumberOfPrimitives()
-           << G4endl;
 }
 
 G4double DetectorConstruction::GetLinearChargeModelBeta(G4double pitch) const
@@ -393,82 +369,17 @@ G4double DetectorConstruction::GetLinearChargeModelBeta(G4double pitch) const
     return Constants::LINEAR_CHARGE_MODEL_BETA_NARROW;
 }
 
-void DetectorConstruction::SaveSimulationParameters(G4double totalPixelArea,
-                                                    G4double detectorArea,
-                                                    G4double pixelAreaRatio) const
-{
-    std::time_t now = std::time(nullptr);
-    char timestamp[20];
-    std::strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", std::localtime(&now));
-
-    std::filesystem::path logsDir = std::filesystem::current_path() / "logs";
-    std::error_code ec;
-    if (!std::filesystem::create_directories(logsDir, ec) && ec) {
-        G4cerr << "Warning: Could not create logs directory: " << ec.message() << G4endl;
-    }
-
-    std::filesystem::path filename =
-        logsDir / ("simulation_params_" + std::string(timestamp) + ".log");
-
-    std::ofstream paramFile(filename);
-    if (!paramFile.is_open()) {
-        G4cerr << "ERROR: Could not open file for saving simulation parameters: " << filename
-               << G4endl;
-        return;
-    }
-
-    char dateStr[100];
-    std::strftime(dateStr, sizeof(dateStr), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
-
-    paramFile << "=========================================================" << std::endl;
-    paramFile << "SIMULATION PARAMETERS" << std::endl;
-    paramFile << "Generated on: " << dateStr << std::endl;
-    paramFile << "=========================================================" << std::endl
-              << std::endl;
-
-    paramFile << "DETECTOR PARAMETERS" << std::endl;
-    paramFile << "-----------------" << std::endl;
-    paramFile << "Detector Size: " << fDetSize / mm << " mm" << std::endl;
-    paramFile << "Detector Width/Thickness: " << fDetWidth / mm << " mm" << std::endl;
-    paramFile << "Detector Area: " << detectorArea / (mm * mm) << " mm^2" << std::endl << std::endl;
-
-    paramFile << "PIXEL PARAMETERS" << std::endl;
-    paramFile << "---------------" << std::endl;
-    paramFile << "Pixel Size: " << fPixelSize / mm << " mm" << std::endl;
-    paramFile << "Pixel Width/Thickness: " << fPixelWidth / mm << " mm" << std::endl;
-    paramFile << "Pixel Spacing (center-to-center): " << fPixelSpacing / mm << " mm" << std::endl;
-    paramFile << "Pixel Corner Offset: " << fPixelCornerOffset / mm << " mm" << std::endl;
-    paramFile << "Number of Pixels per Side: " << fNumBlocksPerSide << std::endl;
-    paramFile << "Total Number of Pixels: " << fNumBlocksPerSide * fNumBlocksPerSide << std::endl;
-    paramFile << "Single Pixel Area: " << (fPixelSize * fPixelSize) / (mm * mm) << " mm^2"
-              << std::endl;
-    paramFile << "Total Pixel Area: " << totalPixelArea / (mm * mm) << " mm^2" << std::endl
-              << std::endl;
-
-    paramFile << "DETECTOR STATISTICS" << std::endl;
-    paramFile << "------------------" << std::endl;
-    paramFile << "Pixel Area / Detector Area Ratio: " << pixelAreaRatio << std::endl;
-    paramFile << "Pixel Coverage Percentage: " << pixelAreaRatio * 100.0 << " %" << std::endl;
-    paramFile << "Pixel Area Fraction: " << pixelAreaRatio << std::endl;
-    paramFile << std::endl;
-    paramFile << "=========================================================" << std::endl;
-
-    G4cout << "Simulation parameters saved to: " << filename << G4endl;
-}
-
 void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
 {
-    G4cout << "Setting neighborhood radius to: " << radius << G4endl;
-    G4cout << "This corresponds to a " << (2 * radius + 1) << "x" << (2 * radius + 1) << " grid"
-           << G4endl;
-
+    G4cout << "[Detector] Neighborhood radius set to " << radius << " ("
+           << (2 * radius + 1) << "x" << (2 * radius + 1) << ")" << G4endl;
     fNeighborhoodRadius = radius;
 
     if (fEventAction) {
         fEventAction->SetNeighborhoodRadius(radius);
-        G4cout << "Updated EventAction with new neighborhood radius: " << radius << G4endl;
-    } else {
-        G4cout << "EventAction not yet available - radius will be set when EventAction is connected"
-               << G4endl;
+    }
+
+    if (fRunAction) {
+        fRunAction->SetNeighborhoodRadiusMeta(radius);
     }
 }

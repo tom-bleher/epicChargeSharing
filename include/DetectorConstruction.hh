@@ -13,6 +13,7 @@
 #include <mutex>
 
 class EventAction;
+class RunAction;
 class G4LogicalVolume;
 class G4Box;
 class G4NistManager;
@@ -39,6 +40,7 @@ public:
     void ConstructSDandField() override;
     
     void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
+    void SetRunAction(RunAction* runAction);
     
     void SetPixelCornerOffset(G4double cornerOffset);
     
@@ -59,7 +61,6 @@ public:
     G4double GetPixelGainSigma(G4int globalPixelId) const { return (globalPixelId >= 0 && globalPixelId < (G4int)fPixelGainSigmas.size()) ? fPixelGainSigmas[globalPixelId] : 0.0; }
     const std::vector<G4double>& GetPixelGainSigmas() const { return fPixelGainSigmas; }
     
-    void SaveSimulationParameters(G4double totalPixelArea, G4double detectorArea, G4double pixelAreaRatio) const;
     
 private:
     struct MaterialSet {
@@ -79,7 +80,6 @@ private:
     G4LogicalVolume* BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats, G4bool checkOverlaps, G4double originalDetSize);
     PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical, const MaterialSet& mats, G4bool checkOverlaps);
     void InitializePixelGainSigmas();
-    void WriteGeometryLog(const PixelGridStats& stats, G4double originalDetSize) const;
     void SyncRunMetadata();
 
     G4double fPixelSize;
@@ -94,6 +94,7 @@ private:
     mutable std::once_flag fLinearModelWarningFlag;
 
     EventAction* fEventAction;
+    RunAction* fRunAction{nullptr};
     
     G4int fNeighborhoodRadius;
 

@@ -40,8 +40,7 @@ void ChargeSharingCalculator::SetNeighborhoodRadius(G4int radius)
 void ChargeSharingCalculator::ResetForEvent()
 {
     // Keep buffers sized; just reset contents to defaults
-    std::fill(fWeightGrid.begin(), fWeightGrid.end(), 0.0);
-    std::fill(fInBoundsGrid.begin(), fInBoundsGrid.end(), false);
+    fActiveIndices.clear();
 
     const std::size_t n = fResult.fractions.size();
     if (n == 0) return;
@@ -127,8 +126,9 @@ void ChargeSharingCalculator::ReserveBuffers()
     if (fWeightGrid.size() != newSize) {
         fWeightGrid.assign(newSize, 0.0);
     }
-    if (fInBoundsGrid.size() != newSize) {
-        fInBoundsGrid.assign(newSize, false);
+
+    if (fActiveIndices.capacity() < newSize) {
+        fActiveIndices.reserve(newSize);
     }
 
     if (fOffsets.empty() || fOffsetsDim != fGridDim) {
@@ -166,6 +166,8 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
                                                      G4double d0,
                                                      G4double elementaryCharge)
 {
+    fActiveIndices.clear();
+
     const G4double edepInEV = energyDeposit / eV;
     const G4double numElectrons = ionizationEnergy > 0.0 ? edepInEV / ionizationEnergy : 0.0;
     const G4double totalCharge = numElectrons * amplificationFactor;
@@ -192,12 +194,10 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const G4double hitX = hitPos.x();
     const G4double hitY = hitPos.y();
 
-    const G4int gridDim = fGridDim;
-    const G4int totalCells = gridDim * gridDim;
-
     constexpr G4double guardFactor = 1.0 + 1e-6;
     const G4double minSafeDistance = d0Length * guardFactor;
     const G4double invD0Length = 1.0 / d0Length;
+    const G4double invMicrometer = 1.0 / micrometer;
 
     const G4double nearestX = fResult.nearestPixelCenter.x();
     const G4double nearestY = fResult.nearestPixelCenter.y();
@@ -241,11 +241,11 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
         G4double weight = logWeight;
         if (useLinearModel) {
-            const G4double attenuation = std::max(0.0, 1.0 - beta * distance / micrometer);
+            const G4double attenuation = std::max(0.0, 1.0 - beta * distance * invMicrometer);
             weight = attenuation * alpha;
         }
 
-        fInBoundsGrid[idx] = true;
+        fActiveIndices.push_back(idx);
         fWeightGrid[idx] = weight;
         if (recordDistanceAlpha) {
             fResult.distances[idx] = distance;
@@ -257,12 +257,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
         totalWeight += weight;
     }
 
-    for (G4int idx = 0; idx < totalCells; ++idx) {
-        if (!fInBoundsGrid[idx]) {
-            // Keep defaults from ResetForEvent
-            continue;
-        }
-
+    for (G4int idx : fActiveIndices) {
         const G4double fraction = (totalWeight > 0.0) ? (fWeightGrid[idx] / totalWeight) : 0.0;
         const G4double chargeCoulombs = fraction * totalCharge * elementaryCharge;
         fResult.fractions[idx] = fraction;

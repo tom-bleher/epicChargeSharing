@@ -58,8 +58,20 @@ private:
                                          G4bool& firstContactIsPixel,
                                          G4bool& geometricIsPixel,
                                          G4bool& isPixelHitCombined);
-    void ComputeChargeSharingForEvent(const G4ThreeVector& hitPos, G4double energyDeposit);
+    const ChargeSharingCalculator::Result& ComputeChargeSharingForEvent(const G4ThreeVector& hitPos,
+                                                                        G4double energyDeposit);
     void EnsureNeighborhoodBuffers(std::size_t targetSize);
+    void UpdatePixelIndices(const ChargeSharingCalculator::Result& result,
+                            const G4ThreeVector& hitPos);
+
+    struct NeighborContext
+    {
+        G4double sigmaNoise{0.0};
+    };
+
+    NeighborContext MakeNeighborContext() const;
+    void PopulateNeighborCharges(const ChargeSharingCalculator::Result& result,
+                                 const NeighborContext& context);
 
     RunAction* fRunAction;
     DetectorConstruction* fDetector;

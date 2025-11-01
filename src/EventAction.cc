@@ -22,17 +22,20 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <span>
 
 namespace
 {
 const std::vector<G4double> kEmptyDoubleVector;
-const std::vector<G4int> kEmptyIntVector;
 }
 
 void EventAction::SetEmitDistanceAlpha(G4bool enabled)
 {
     fEmitDistanceAlphaOutputs = enabled;
     fChargeSharing.SetEmitDistanceAlpha(enabled);
+    if (fRunAction) {
+        fRunAction->SetChargeSharingDistanceAlphaMeta(enabled);
+    }
 }
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
@@ -57,6 +60,9 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
         fChargeSharing.SetNeighborhoodRadius(detector->GetNeighborhoodRadius());
     }
     fChargeSharing.SetEmitDistanceAlpha(fEmitDistanceAlphaOutputs);
+    if (fRunAction) {
+        fRunAction->SetChargeSharingDistanceAlphaMeta(fEmitDistanceAlphaOutputs);
+    }
 
     fMessenger = std::make_unique<G4GenericMessenger>(this,
                                                       "/epic/chargeSharing/",
@@ -106,17 +112,14 @@ void EventAction::EndOfEventAction(const G4Event* event)
                                     isPixelHitCombined);
 
     const G4bool computeChargeSharing = (!isPixelHitCombined) && (finalEdep > 0.0);
+    const ChargeSharingCalculator::Result* chargeResult = nullptr;
     if (computeChargeSharing) {
-        ComputeChargeSharingForEvent(hitPos, finalEdep);
+        chargeResult = &ComputeChargeSharingForEvent(hitPos, finalEdep);
     } else {
         fChargeSharing.ResetForEvent();
+        EnsureNeighborhoodBuffers(0);
         fNeighborhoodChargeNew.clear();
         fNeighborhoodChargeFinal.clear();
-        fRunAction->SetNeighborhoodChargeData(kEmptyDoubleVector, kEmptyDoubleVector);
-        fRunAction->SetNeighborhoodChargeNewData(kEmptyDoubleVector);
-        fRunAction->SetNeighborhoodChargeFinalData(kEmptyDoubleVector);
-        fRunAction->SetNeighborhoodDistanceAlphaData(kEmptyDoubleVector, kEmptyDoubleVector);
-        fRunAction->SetNeighborhoodPixelData(kEmptyDoubleVector, kEmptyDoubleVector, kEmptyIntVector);
     }
 
     RunAction::EventSummaryData summary{};
@@ -131,9 +134,35 @@ void EventAction::EndOfEventAction(const G4Event* event)
     summary.firstContactIsPixel = firstContactIsPixel;
     summary.geometricIsPixel = geometricIsPixel;
     summary.isPixelHitCombined = isPixelHitCombined;
-    fRunAction->UpdateEventSummary(summary);
 
-    fRunAction->FillTree();
+    RunAction::EventRecord record{};
+    record.summary = summary;
+
+    if (chargeResult) {
+        record.neighborFractions = std::span<const G4double>(chargeResult->fractions.data(),
+                                                            chargeResult->fractions.size());
+        record.neighborCharges = std::span<const G4double>(chargeResult->charges.data(),
+                                                           chargeResult->charges.size());
+        record.neighborChargesNew = std::span<const G4double>(fNeighborhoodChargeNew.data(),
+                                                              fNeighborhoodChargeNew.size());
+        record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
+                                                                fNeighborhoodChargeFinal.size());
+        if (fEmitDistanceAlphaOutputs) {
+            record.includeDistanceAlpha = true;
+            record.neighborDistances = std::span<const G4double>(chargeResult->distances.data(),
+                                                                 chargeResult->distances.size());
+            record.neighborAlphas = std::span<const G4double>(chargeResult->alphas.data(),
+                                                              chargeResult->alphas.size());
+        }
+        record.neighborPixelX = std::span<const G4double>(chargeResult->pixelX.data(),
+                                                          chargeResult->pixelX.size());
+        record.neighborPixelY = std::span<const G4double>(chargeResult->pixelY.data(),
+                                                          chargeResult->pixelY.size());
+        record.neighborPixelIds = std::span<const G4int>(chargeResult->pixelIds.data(),
+                                                         chargeResult->pixelIds.size());
+    }
+
+    fRunAction->FillTree(record);
 }
 
 G4ThreeVector EventAction::DetermineHitPosition() const
@@ -183,7 +212,8 @@ void EventAction::UpdatePixelAndHitClassification(const G4ThreeVector& hitPos,
     isPixelHitCombined = firstContactIsPixel || geometricIsPixel;
 }
 
-void EventAction::ComputeChargeSharingForEvent(const G4ThreeVector& hitPos, G4double energyDeposit)
+const ChargeSharingCalculator::Result& EventAction::ComputeChargeSharingForEvent(const G4ThreeVector& hitPos,
+                                                                                G4double energyDeposit)
 {
     const ChargeSharingCalculator::Result& result = fChargeSharing.Compute(hitPos,
                                                                            energyDeposit,
@@ -192,50 +222,12 @@ void EventAction::ComputeChargeSharingForEvent(const G4ThreeVector& hitPos, G4do
                                                                            fD0,
                                                                            fElementaryCharge);
 
-    fPixelIndexI = result.pixelIndexI;
-    fPixelIndexJ = result.pixelIndexJ;
-    fPixelTrueDeltaX = std::abs(result.nearestPixelCenter.x() - hitPos.x());
-    fPixelTrueDeltaY = std::abs(result.nearestPixelCenter.y() - hitPos.y());
-
+    UpdatePixelIndices(result, hitPos);
     EnsureNeighborhoodBuffers(result.charges.size());
-    const G4int gridRadius = fChargeSharing.GetNeighborhoodRadius();
-    const G4int gridDim = 2 * gridRadius + 1;
-    const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
-    const G4double sigmaNoise = Constants::NOISE_ELECTRON_COUNT * fElementaryCharge;
 
-    for (std::size_t idx = 0; idx < result.charges.size(); ++idx) {
-        const G4int di = static_cast<G4int>(idx) / gridDim - gridRadius;
-        const G4int dj = static_cast<G4int>(idx) % gridDim - gridRadius;
-        const G4int gi = fPixelIndexI + di;
-        const G4int gj = fPixelIndexJ + dj;
-
-        G4double noisyCharge = 0.0;
-        G4double finalCharge = 0.0;
-
-        if (gi >= 0 && gi < numBlocksPerSide && gj >= 0 && gj < numBlocksPerSide) {
-            const G4int globalId = gi * numBlocksPerSide + gj;
-            const G4double sigmaGain = fDetector->GetPixelGainSigma(globalId);
-            const G4double gainFactor =
-                (sigmaGain > 0.0) ? G4RandGauss::shoot(1.0, sigmaGain) : 1.0;
-            noisyCharge = result.charges[idx] * gainFactor;
-            const G4double additiveNoise =
-                (sigmaNoise > 0.0) ? G4RandGauss::shoot(0.0, sigmaNoise) : 0.0;
-            finalCharge = std::max(0.0, noisyCharge + additiveNoise);
-        }
-
-        fNeighborhoodChargeNew[idx] = noisyCharge;
-        fNeighborhoodChargeFinal[idx] = finalCharge;
-    }
-
-    fRunAction->SetNeighborhoodChargeData(result.fractions, result.charges);
-    fRunAction->SetNeighborhoodChargeNewData(fNeighborhoodChargeNew);
-    fRunAction->SetNeighborhoodChargeFinalData(fNeighborhoodChargeFinal);
-    if (fEmitDistanceAlphaOutputs) {
-        fRunAction->SetNeighborhoodDistanceAlphaData(result.distances, result.alphas);
-    } else {
-        fRunAction->SetNeighborhoodDistanceAlphaData(kEmptyDoubleVector, kEmptyDoubleVector);
-    }
-    fRunAction->SetNeighborhoodPixelData(result.pixelX, result.pixelY, result.pixelIds);
+    const NeighborContext context = MakeNeighborContext();
+    PopulateNeighborCharges(result, context);
+    return result;
 }
 
 void EventAction::EnsureNeighborhoodBuffers(std::size_t targetSize)
@@ -246,8 +238,66 @@ void EventAction::EnsureNeighborhoodBuffers(std::size_t targetSize)
     if (fNeighborhoodChargeFinal.capacity() < targetSize) {
         fNeighborhoodChargeFinal.reserve(targetSize);
     }
-    fNeighborhoodChargeNew.resize(targetSize, 0.0);
-    fNeighborhoodChargeFinal.resize(targetSize, 0.0);
+
+    fNeighborhoodChargeNew.resize(targetSize);
+    fNeighborhoodChargeFinal.resize(targetSize);
+
+    std::fill(fNeighborhoodChargeNew.begin(), fNeighborhoodChargeNew.end(), 0.0);
+    std::fill(fNeighborhoodChargeFinal.begin(), fNeighborhoodChargeFinal.end(), 0.0);
+}
+
+void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& result,
+                                     const G4ThreeVector& hitPos)
+{
+    fPixelIndexI = result.pixelIndexI;
+    fPixelIndexJ = result.pixelIndexJ;
+    fPixelTrueDeltaX = std::abs(result.nearestPixelCenter.x() - hitPos.x());
+    fPixelTrueDeltaY = std::abs(result.nearestPixelCenter.y() - hitPos.y());
+}
+
+EventAction::NeighborContext EventAction::MakeNeighborContext() const
+{
+    NeighborContext context{};
+    context.sigmaNoise = Constants::NOISE_ELECTRON_COUNT * fElementaryCharge;
+    return context;
+}
+
+void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result& result,
+                                          const NeighborContext& context)
+{
+    const auto totalCells = static_cast<G4int>(result.charges.size());
+    const auto& pixelIds = result.pixelIds;
+    const auto& gainSigmas = fDetector ? fDetector->GetPixelGainSigmas() : kEmptyDoubleVector;
+    const G4int gainCount = static_cast<G4int>(gainSigmas.size());
+    const bool hasGainNoise = gainCount > 0;
+    const bool hasAdditiveNoise = context.sigmaNoise > 0.0;
+
+    for (G4int idx = 0; idx < totalCells; ++idx) {
+        const G4int globalId = (idx < static_cast<G4int>(pixelIds.size())) ? pixelIds[idx] : -1;
+
+        if (globalId < 0) {
+            fNeighborhoodChargeNew[idx] = 0.0;
+            fNeighborhoodChargeFinal[idx] = 0.0;
+            continue;
+        }
+
+        G4double noisyCharge = result.charges[idx];
+        if (hasGainNoise && globalId < gainCount) {
+            const G4double sigmaGain = gainSigmas[static_cast<std::size_t>(globalId)];
+            if (sigmaGain > 0.0) {
+                noisyCharge *= G4RandGauss::shoot(1.0, sigmaGain);
+            }
+        }
+
+        G4double finalCharge = noisyCharge;
+        if (hasAdditiveNoise) {
+            finalCharge += G4RandGauss::shoot(0.0, context.sigmaNoise);
+        }
+        finalCharge = std::max(0.0, finalCharge);
+
+        fNeighborhoodChargeNew[idx] = noisyCharge;
+        fNeighborhoodChargeFinal[idx] = finalCharge;
+    }
 }
 
 void EventAction::CollectScorerData(const G4Event* event)

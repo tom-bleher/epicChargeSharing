@@ -4,15 +4,21 @@
 #include "G4UserRunAction.hh"
 #include "G4Run.hh"
 #include "globals.hh"
+#include "Constants.hh"
 
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 class TFile;
 class TTree;
+namespace runaction
+{
 class RootFileWriterHelper;
+}
 
 /**
  * @file RunAction.hh
@@ -38,8 +44,6 @@ public:
     bool ValidateRootFile(const G4String& filename, bool* hasEntries = nullptr);
     void CleanupRootObjects();
 
-    void SetEventData(G4double edep, G4double x, G4double y, G4double z);
-
     struct EventSummaryData
     {
         G4double edep{0.0};
@@ -55,21 +59,20 @@ public:
         G4bool isPixelHitCombined{false};
     };
 
-    void UpdateEventSummary(const EventSummaryData& summary);
-
-    void SetNearestPixelPos(G4double x, G4double y);
-    void SetFirstContactIsPixel(G4bool v);
-    void SetGeometricIsPixel(G4bool v);
-    void SetIsPixelHitCombined(G4bool v);
-
-    void SetPixelClassification(G4bool isPixelHit, G4double pixelTrueDeltaX, G4double pixelTrueDeltaY);
-
-    void SetNeighborhoodChargeData(const std::vector<G4double>& chargeFractions,
-                                   const std::vector<G4double>& chargeCoulombs);
-    void SetNeighborhoodChargeNewData(const std::vector<G4double>& chargeCoulombsNew);
-    void SetNeighborhoodChargeFinalData(const std::vector<G4double>& chargeCoulombsFinal);
-    void SetNeighborhoodDistanceAlphaData(const std::vector<G4double>& distances,
-                                          const std::vector<G4double>& alphas);
+    struct EventRecord
+    {
+        EventSummaryData summary;
+        std::span<const G4double> neighborFractions;
+        std::span<const G4double> neighborCharges;
+        std::span<const G4double> neighborChargesNew;
+        std::span<const G4double> neighborChargesFinal;
+        std::span<const G4double> neighborDistances;
+        std::span<const G4double> neighborAlphas;
+        std::span<const G4double> neighborPixelX;
+        std::span<const G4double> neighborPixelY;
+        std::span<const G4int> neighborPixelIds;
+        G4bool includeDistanceAlpha{false};
+    };
 
     void SetDetectorGridParameters(G4double pixelSize,
                                    G4double pixelSpacing,
@@ -77,20 +80,23 @@ public:
                                    G4double detSize,
                                    G4int numBlocksPerSide);
     void SetNeighborhoodRadiusMeta(G4int radius);
+    void SetChargeSharingMetadata(Constants::ChargeSharingModel model,
+                                  G4double betaPerMicron,
+                                  G4double pitch);
+    void SetChargeSharingDistanceAlphaMeta(G4bool enabled);
 
-    void SetNeighborhoodPixelData(const std::vector<G4double>& xs,
-                                  const std::vector<G4double>& ys,
-                                  const std::vector<G4int>& ids);
-
-    void FillTree();
+    void FillTree(const EventRecord& record);
 
 private:
     void RunPostProcessingFits();
     void EnsureBranchBuffersInitialized();
     void EnsureVectorSized(std::vector<G4double>& vec, G4double initValue) const;
     void EnsureVectorSized(std::vector<G4int>& vec, G4int initValue) const;
+    std::unique_lock<std::mutex> MakeTreeLock();
+    void WriteMetadataToFile(TFile* file) const;
+    std::vector<std::pair<std::string, std::string>> CollectMetadataEntries() const;
 
-    std::unique_ptr<RootFileWriterHelper> fRootWriter;
+    std::unique_ptr<runaction::RootFileWriterHelper> fRootWriter;
     std::mutex fTreeMutex;
 
     G4double fTrueX;
@@ -125,6 +131,11 @@ private:
     G4double fGridDetSize;
     G4int fGridNumBlocksPerSide;
     G4int fGridNeighborhoodRadius{0};
+
+    Constants::ChargeSharingModel fChargeSharingModel;
+    G4double fChargeSharingBeta;
+    G4double fChargeSharingPitch;
+    G4bool fEmitDistanceAlphaMeta{false};
 
     std::vector<G4int> fGridPixelID;
     std::vector<G4double> fGridPixelX;

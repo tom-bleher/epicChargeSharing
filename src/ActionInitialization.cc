@@ -19,6 +19,10 @@ void ActionInitialization::BuildForMaster() const
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
 
+    if (fDetector) {
+        fDetector->SetRunAction(runAction);
+    }
+
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
         fDetector->GetPixelSpacing(), 
@@ -36,6 +40,10 @@ void ActionInitialization::Build() const
     
     RunAction* runAction = new RunAction();
     SetUserAction(runAction);
+
+    if (fDetector) {
+        fDetector->SetRunAction(runAction);
+    }
     
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
