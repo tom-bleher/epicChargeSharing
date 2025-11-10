@@ -33,9 +33,11 @@
 #include <limits>
 #include <numeric>
 #include <atomic>
+#include <memory>
 #include <ROOT/TThreadExecutor.hxx>
 
 #include "ChargeUtils.h"
+#include "internal/RootBranchHelpers.hh"
 
 namespace {
   // 2D Gaussian with constant offset:
@@ -103,7 +105,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   }
 
   // Open file for update
-  TFile* file = TFile::Open(filename, "UPDATE");
+  auto file = std::unique_ptr<TFile>(TFile::Open(filename, "UPDATE"));
   if (!file || file->IsZombie()) {
     ::Error("FitGaus2D", "Cannot open file: %s", filename);
     return 1;
@@ -114,7 +116,6 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   if (!tree) {
     ::Error("FitGaus2D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
     file->Close();
-    delete file;
     return 3;
   }
 
@@ -198,7 +199,6 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   if (!IsFinite3D(pixelSpacing) || pixelSpacing <= 0) {
     ::Error("FitGaus2D", "Pixel spacing not available (metadata missing and inference failed). Aborting.");
     file->Close();
-    delete file;
     return 2;
   }
   if (!IsFinite3D(pixelSize) || pixelSize <= 0) {
@@ -216,7 +216,6 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     else {
       ::Error("FitGaus2D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
       file->Close();
-      delete file;
       return 4;
     }
   }
@@ -287,47 +286,42 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   double gauss3d_chi2 = INVALID_VALUE;
   double gauss3d_ndf = INVALID_VALUE;
   double gauss3d_prob = INVALID_VALUE;
-  
-  auto ensureAndResetBranch = [&](const char* name, double* addr) -> TBranch* {
-    TBranch* br = tree->GetBranch(name);
-    if (!br) {
-      // Explicit leaflist to force double type and avoid ROOT guessing issues
-      std::string leaf = std::string(name) + "/D";
-      br = tree->Branch(name, addr, leaf.c_str());
-    } else {
-      // Rebind address and clear any previous content
-      tree->SetBranchAddress(name, addr);
-      br = tree->GetBranch(name);
-      if (br) {
-        br->Reset();
-        br->DropBaskets();
-      }
-    }
-    // Ensure branch is enabled for I/O
-    tree->SetBranchStatus(name, 1);
-    return br;
-  };
 
-  TBranch* br_x_rec = ensureAndResetBranch("ReconX_2D", &x_rec_3d);
-  TBranch* br_y_rec = ensureAndResetBranch("ReconY_2D", &y_rec_3d);
-  TBranch* br_dx_signed = ensureAndResetBranch("ReconTrueDeltaX_2D", &rec_hit_delta_x_3d_signed);
-  TBranch* br_dy_signed = ensureAndResetBranch("ReconTrueDeltaY_2D", &rec_hit_delta_y_3d_signed);
-  // Parameter branches
+  using rootutils::BranchInfo;
+  TBranch* br_x_rec = nullptr;
+  TBranch* br_y_rec = nullptr;
+  TBranch* br_dx_signed = nullptr;
+  TBranch* br_dy_signed = nullptr;
   TBranch* br_A = nullptr;
   TBranch* br_mux = nullptr;
   TBranch* br_muy = nullptr;
   TBranch* br_sigx = nullptr;
   TBranch* br_sigy = nullptr;
   TBranch* br_B = nullptr;
-  if (saveParamA)   br_A   = ensureAndResetBranch("Gauss2D_A", &gauss3d_A);
-  if (saveParamMux) br_mux = ensureAndResetBranch("Gauss2D_mux", &gauss3d_mux);
-  if (saveParamMuy) br_muy = ensureAndResetBranch("Gauss2D_muy", &gauss3d_muy);
-  if (saveParamSigx) br_sigx = ensureAndResetBranch("Gauss2D_sigx", &gauss3d_sigx);
-  if (saveParamSigy) br_sigy = ensureAndResetBranch("Gauss2D_sigy", &gauss3d_sigy);
-  if (saveParamB)   br_B   = ensureAndResetBranch("Gauss2D_B", &gauss3d_B);
-  TBranch* br_chi2 = ensureAndResetBranch("Gauss2D_Chi2", &gauss3d_chi2);
-  TBranch* br_ndf  = ensureAndResetBranch("Gauss2D_Ndf", &gauss3d_ndf);
-  TBranch* br_prob = ensureAndResetBranch("Gauss2D_Prob", &gauss3d_prob);
+  TBranch* br_chi2 = nullptr;
+  TBranch* br_ndf = nullptr;
+  TBranch* br_prob = nullptr;
+
+  std::vector<BranchInfo> coreBranches{
+      {"ReconX_2D", &x_rec_3d, true, &br_x_rec, "ReconX_2D/D"},
+      {"ReconY_2D", &y_rec_3d, true, &br_y_rec, "ReconY_2D/D"},
+      {"ReconTrueDeltaX_2D", &rec_hit_delta_x_3d_signed, true, &br_dx_signed, "ReconTrueDeltaX_2D/D"},
+      {"ReconTrueDeltaY_2D", &rec_hit_delta_y_3d_signed, true, &br_dy_signed, "ReconTrueDeltaY_2D/D"},
+  };
+  std::vector<BranchInfo> paramBranches{
+      {"Gauss2D_A", &gauss3d_A, saveParamA, &br_A, "Gauss2D_A/D"},
+      {"Gauss2D_mux", &gauss3d_mux, saveParamMux, &br_mux, "Gauss2D_mux/D"},
+      {"Gauss2D_muy", &gauss3d_muy, saveParamMuy, &br_muy, "Gauss2D_muy/D"},
+      {"Gauss2D_sigx", &gauss3d_sigx, saveParamSigx, &br_sigx, "Gauss2D_sigx/D"},
+      {"Gauss2D_sigy", &gauss3d_sigy, saveParamSigy, &br_sigy, "Gauss2D_sigy/D"},
+      {"Gauss2D_B", &gauss3d_B, saveParamB, &br_B, "Gauss2D_B/D"},
+      {"Gauss2D_Chi2", &gauss3d_chi2, true, &br_chi2, "Gauss2D_Chi2/D"},
+      {"Gauss2D_Ndf", &gauss3d_ndf, true, &br_ndf, "Gauss2D_Ndf/D"},
+      {"Gauss2D_Prob", &gauss3d_prob, true, &br_prob, "Gauss2D_Prob/D"},
+  };
+
+  rootutils::RegisterBranches(tree, coreBranches);
+  rootutils::RegisterBranches(tree, paramBranches);
 
   // 2D fit function kept for reference. We use Minuit2 on a compact window.
   TF2 f2D("f2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
@@ -743,22 +737,17 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     y_rec_3d = out_y_rec[i];
     rec_hit_delta_x_3d_signed = out_dx_s[i];
     rec_hit_delta_y_3d_signed = out_dy_s[i];
-    if (br_A)   gauss3d_A   = out_A[i];
-    if (br_mux) gauss3d_mux = out_mux[i];
-    if (br_muy) gauss3d_muy = out_muy[i];
-    if (br_sigx) gauss3d_sigx = out_sigx[i];
-    if (br_sigy) gauss3d_sigy = out_sigy[i];
-    if (br_B)   gauss3d_B   = out_B[i];
-    br_x_rec->Fill();
-    br_y_rec->Fill();
-    br_dx_signed->Fill();
-    br_dy_signed->Fill();
-    if (br_A) br_A->Fill();
-    if (br_mux) br_mux->Fill();
-    if (br_muy) br_muy->Fill();
-    if (br_sigx) br_sigx->Fill();
-    if (br_sigy) br_sigy->Fill();
-    if (br_B) br_B->Fill();
+    gauss3d_A   = out_A[i];
+    gauss3d_mux = out_mux[i];
+    gauss3d_muy = out_muy[i];
+    gauss3d_sigx = out_sigx[i];
+    gauss3d_sigy = out_sigy[i];
+    gauss3d_B   = out_B[i];
+    gauss3d_chi2 = out_chi2[i];
+    gauss3d_ndf  = out_ndf[i];
+    gauss3d_prob = out_prob[i];
+    rootutils::FillBranches(coreBranches);
+    rootutils::FillBranches(paramBranches);
     nProcessed++;
   }
 
@@ -770,7 +759,6 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   tree->Write("", TObject::kOverwrite);
   file->Flush();
   file->Close();
-  delete file;
 
   ::Info("FitGaus2D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
   return 0;

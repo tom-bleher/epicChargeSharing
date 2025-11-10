@@ -35,11 +35,123 @@
 #include <atomic>
 #include <span>
 #include <utility>
+#include <optional>
 #include <ROOT/TThreadExecutor.hxx>
 
 #include "ChargeUtils.h"
 
-namespace {
+namespace fitgaus1d
+{
+namespace detail
+{
+double InferPixelSpacingFromTree(TTree* tree);
+int InferRadiusFromTree(TTree* tree, const std::string& preferredBranch);
+}
+
+struct Metadata
+{
+    double pixelSpacing{std::numeric_limits<double>::quiet_NaN()};
+    double pixelSize{std::numeric_limits<double>::quiet_NaN()};
+    int neighborhoodRadius{-1};
+};
+
+std::unique_ptr<TFile> OpenRootFile(const std::string& filename)
+{
+    auto file = std::unique_ptr<TFile>(TFile::Open(filename.c_str(), "UPDATE"));
+    if (!file || file->IsZombie()) {
+        ::Error("FitGaus1D", "Cannot open file: %s", filename.c_str());
+        return nullptr;
+    }
+    return file;
+}
+
+TTree* LoadHitsTree(TFile& file, const std::string& filename)
+{
+    auto* tree = dynamic_cast<TTree*>(file.Get("Hits"));
+    if (!tree) {
+        ::Error("FitGaus1D",
+                "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)",
+                filename.c_str());
+    }
+    return tree;
+}
+
+std::optional<Metadata> ExtractMetadata(TFile& file,
+                                        TTree& tree,
+                                        const std::string& preferredBranch)
+{
+    Metadata meta;
+
+    if (auto* spacingObj = dynamic_cast<TNamed*>(file.Get("GridPixelSpacing_mm"))) {
+        try {
+            meta.pixelSpacing = std::stod(spacingObj->GetTitle());
+        } catch (...) {
+        }
+    }
+    if (auto* sizeObj = dynamic_cast<TNamed*>(file.Get("GridPixelSize_mm"))) {
+        try {
+            meta.pixelSize = std::stod(sizeObj->GetTitle());
+        } catch (...) {
+        }
+    }
+    if (auto* radiusObj = dynamic_cast<TNamed*>(file.Get("NeighborhoodRadius"))) {
+        try {
+            meta.neighborhoodRadius = std::stoi(radiusObj->GetTitle());
+        } catch (...) {
+            try {
+                meta.neighborhoodRadius =
+                    static_cast<int>(std::lround(std::stod(radiusObj->GetTitle())));
+            } catch (...) {
+            }
+        }
+    }
+
+    if (!std::isfinite(meta.pixelSpacing) || meta.pixelSpacing <= 0.0) {
+        meta.pixelSpacing = detail::InferPixelSpacingFromTree(&tree);
+    }
+    if (!std::isfinite(meta.pixelSpacing) || meta.pixelSpacing <= 0.0) {
+        ::Error("FitGaus1D",
+                "Pixel spacing not available (metadata missing and inference failed). Aborting.");
+        return std::nullopt;
+    }
+    if (!std::isfinite(meta.pixelSize) || meta.pixelSize <= 0.0) {
+        meta.pixelSize = 0.5 * meta.pixelSpacing;
+    }
+    if (meta.neighborhoodRadius <= 0) {
+        meta.neighborhoodRadius = detail::InferRadiusFromTree(&tree, preferredBranch);
+    }
+
+    return meta;
+}
+
+std::string ResolveChargeBranch(TTree& tree, const std::string& requestedBranch)
+{
+    auto hasBranch = [&](const std::string& name) {
+        return !name.empty() && tree.GetBranch(name.c_str()) != nullptr;
+    };
+
+    if (hasBranch(requestedBranch)) {
+        return requestedBranch;
+    }
+    if (hasBranch("Q_f")) {
+        return "Q_f";
+    }
+    if (hasBranch("F_i")) {
+        return "F_i";
+    }
+    if (hasBranch("Q_i")) {
+        return "Q_i";
+    }
+
+    ::Error("FitGaus1D",
+            "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.",
+            requestedBranch.c_str());
+    return {};
+}
+
+} // namespace fitgaus1d
+
+namespace fitgaus1d::detail {
   // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
   double GaussPlusB(double* x, double* p) {
     const double A     = p[0];
@@ -447,75 +559,63 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                                 : 0.0;
   const bool distPreferTruthCenter = distanceErrorPreferTruthCenter;
 
+  using fitgaus1d::detail::FlatVectorStore;
+  using fitgaus1d::detail::FitWorkBuffers;
+  using fitgaus1d::detail::IsFinite;
+
   if (distanceErrorsEnabled && useQnQiPercentErrors) {
     ::Warning("FitGaus1D",
               "Distance-weighted uncertainties requested; ignoring Q_n/Q_i"
               " vertical uncertainty model.");
   }
 
-  // Open file for update
-  TFile* file = TFile::Open(filename, "UPDATE");
-  if (!file || file->IsZombie()) {
-    ::Error("FitGaus1D", "Cannot open file: %s", filename);
+  const std::string fileNameStr = filename ? std::string(filename) : std::string("../build/epicChargeSharing.root");
+  auto fileHandle = fitgaus1d::OpenRootFile(fileNameStr);
+  if (!fileHandle) {
     return 1;
   }
 
-  // Get tree (check first to provide clearer error when wrong file is passed)
-  TTree* tree = dynamic_cast<TTree*>(file->Get("Hits"));
+  TTree* tree = fitgaus1d::LoadHitsTree(*fileHandle, fileNameStr);
   if (!tree) {
-    ::Error("FitGaus1D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
-    file->Close();
-    delete file;
+    fileHandle->Close();
     return 3;
   }
 
-  // Fetch metadata (pixel spacing, pixel size, neighborhood radius) with fallbacks
-  double pixelSpacing = NAN;
-  if (auto* spacingObj = dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
-    try { pixelSpacing = std::stod(spacingObj->GetTitle()); } catch (...) {}
+  const std::string requestedBranch =
+      (chargeBranch && chargeBranch[0] != '\0') ? std::string(chargeBranch) : std::string("Q_f");
+
+  const auto metadataOpt = fitgaus1d::ExtractMetadata(*fileHandle, *tree, requestedBranch);
+  if (!metadataOpt) {
+    fileHandle->Close();
+    return 2;
   }
-  double pixelSize = NAN;
-  if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
-    try { pixelSize = std::stod(sizeObj->GetTitle()); } catch (...) {}
-  }
-  int neighborhoodRadiusMeta = -1;
-  if (auto* rObj = dynamic_cast<TNamed*>(file->Get("NeighborhoodRadius"))) {
-    try { neighborhoodRadiusMeta = std::stoi(rObj->GetTitle()); }
-    catch (...) {
-      try { neighborhoodRadiusMeta = static_cast<int>(std::lround(std::stod(rObj->GetTitle()))); } catch (...) {}
-    }
+  fitgaus1d::Metadata metadata = *metadataOpt;
+
+  const std::string chosenCharge = fitgaus1d::ResolveChargeBranch(*tree, requestedBranch);
+  if (chosenCharge.empty()) {
+    fileHandle->Close();
+    return 4;
   }
 
+  double pixelSpacing = metadata.pixelSpacing;
+  double pixelSize = metadata.pixelSize;
+  int neighborhoodRadiusMeta = metadata.neighborhoodRadius;
+
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
-    pixelSpacing = InferPixelSpacingFromTree(tree);
+    pixelSpacing = fitgaus1d::detail::InferPixelSpacingFromTree(tree);
   }
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
     ::Error("FitGaus1D", "Pixel spacing not available (metadata missing and inference failed). Aborting.");
-    file->Close();
-    delete file;
+    fileHandle->Close();
     return 2;
   }
   if (!IsFinite(pixelSize) || pixelSize <= 0) {
     // Fallback: if pixel size metadata is missing, use half of pitch as a conservative lower bound
     pixelSize = 0.5 * pixelSpacing;
   }
-  
-  // Decide which charge branch to use
-  std::string chosenCharge = (chargeBranch && chargeBranch[0] != '\0') ? std::string(chargeBranch) : std::string("Q_f");
-  auto hasBranch = [&](const char* b){ return tree->GetBranch(b) != nullptr; };
-  if (!hasBranch(chosenCharge.c_str())) {
-    if (hasBranch("Q_f")) chosenCharge = "Q_f";
-    else if (hasBranch("F_i")) chosenCharge = "F_i";
-    else if (hasBranch("Q_i")) chosenCharge = "Q_i";
-    else {
-      ::Error("FitGaus1D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
-      file->Close();
-      delete file;
-      return 4;
-    }
-  }
+
   if (neighborhoodRadiusMeta <= 0) {
-    neighborhoodRadiusMeta = InferRadiusFromTree(tree, chosenCharge);
+    neighborhoodRadiusMeta = fitgaus1d::detail::InferRadiusFromTree(tree, chosenCharge);
   }
 
   // Existing branches (inputs)
@@ -986,7 +1086,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       return;
     }
 
-    const double uniformSigma = ComputeUniformSigma(errorPercentOfMax, qmaxNeighborhood);
+    const double uniformSigma = fitgaus1d::detail::ComputeUniformSigma(errorPercentOfMax, qmaxNeighborhood);
 
     auto minmaxRow = std::minmax_element(q_row.begin(), q_row.end());
     auto minmaxCol = std::minmax_element(q_col.begin(), q_col.end());
@@ -996,8 +1096,8 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     double A0_col = std::max(1e-18, *minmaxCol.second - *minmaxCol.first);
     double B0_col = *minmaxCol.first;
 
-    const auto [rowCentroid, rowCentroidOk] = WeightedCentroid(x_row, q_row, B0_row);
-    const auto [colCentroid, colCentroidOk] = WeightedCentroid(y_col, q_col, B0_col);
+    const auto [rowCentroid, rowCentroidOk] = fitgaus1d::detail::WeightedCentroid(x_row, q_row, B0_row);
+    const auto [colCentroid, colCentroidOk] = fitgaus1d::detail::WeightedCentroid(y_col, q_col, B0_col);
 
     // Low-contrast: fast centroid (relative to neighborhood max charge)
     const double contrastEps = (qmaxNeighborhood > 0.0) ? (1e-3 * qmaxNeighborhood) : 0.0;
@@ -1129,8 +1229,8 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     // Constrain sigma to be within [pixel size, radius * pitch]
     const double sigLoBound = pixelSize;
     const double sigHiBound = std::max(sigLoBound, static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
-    const double sigInitRow = SeedSigma(x_row, q_row, B0_row, pixelSpacing, sigLoBound, sigHiBound);
-    const double sigInitCol = SeedSigma(y_col, q_col, B0_col, pixelSpacing, sigLoBound, sigHiBound);
+    const double sigInitRow = fitgaus1d::detail::SeedSigma(x_row, q_row, B0_row, pixelSpacing, sigLoBound, sigHiBound);
+    const double sigInitCol = fitgaus1d::detail::SeedSigma(y_col, q_col, B0_col, pixelSpacing, sigLoBound, sigHiBound);
 
     const double muXLo = x_px_loc - 1.0 * pixelSpacing;
     const double muXHi = x_px_loc + 1.0 * pixelSpacing;
@@ -1150,16 +1250,16 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       colSigmaCandidates = &err_col;
     }
 
-    GaussFitConfig rowConfig{muXLo, muXHi, sigLoBound, sigHiBound,
+    fitgaus1d::detail::GaussFitConfig rowConfig{muXLo, muXHi, sigLoBound, sigHiBound,
                              qmaxNeighborhood, pixelSpacing, A0_row,
                              mu0_row, sigInitRow, B0_row};
-    GaussFitConfig colConfig{muYLo, muYHi, sigLoBound, sigHiBound,
+    fitgaus1d::detail::GaussFitConfig colConfig{muYLo, muYHi, sigLoBound, sigHiBound,
                              qmaxNeighborhood, pixelSpacing, A0_col,
                              mu0_col, sigInitCol, B0_col};
 
-    GaussFitResult rowFit = RunGaussianFit(x_row, q_row, rowSigmaCandidates,
+    fitgaus1d::detail::GaussFitResult rowFit = fitgaus1d::detail::RunGaussianFit(x_row, q_row, rowSigmaCandidates,
                                            uniformSigma, rowConfig);
-    GaussFitResult colFit = RunGaussianFit(y_col, q_col, colSigmaCandidates,
+    fitgaus1d::detail::GaussFitResult colFit = fitgaus1d::detail::RunGaussianFit(y_col, q_col, colSigmaCandidates,
                                            uniformSigma, colConfig);
 
     if (rowFit.converged) {
@@ -1227,8 +1327,8 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
       bool ok2 = false;
       double mu1 = INVALID_VALUE;
       double mu2 = INVALID_VALUE;
-      GaussFitResult diagMainFit;
-      GaussFitResult diagSecFit;
+      fitgaus1d::detail::GaussFitResult diagMainFit;
+      fitgaus1d::detail::GaussFitResult diagSecFit;
 
       if (s_d1_vec.size() >= 3) {
         auto mm = std::minmax_element(q_d1_vec.begin(), q_d1_vec.end());
@@ -1236,12 +1336,12 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         double B0 = *mm.first;
         int idxMax = std::distance(q_d1_vec.begin(), std::max_element(q_d1_vec.begin(), q_d1_vec.end()));
         double mu0 = s_d1_vec[idxMax];
-        const double sigInit = SeedSigma(s_d1_vec, q_d1_vec, B0, pixelSpacing, sigLoBound, sigHiBound);
-        GaussFitConfig cfgDiag{muLo, muHi, sigLoBound, sigHiBound,
+        const double sigInit = fitgaus1d::detail::SeedSigma(s_d1_vec, q_d1_vec, B0, pixelSpacing, sigLoBound, sigHiBound);
+        fitgaus1d::detail::GaussFitConfig cfgDiag{muLo, muHi, sigLoBound, sigHiBound,
                                qmaxNeighborhood, pixelSpacing, A0,
                                mu0, sigInit, B0};
-        const auto centroid = WeightedCentroid(s_d1_vec, q_d1_vec, B0);
-        diagMainFit = RunGaussianFit(s_d1_vec, q_d1_vec, err_d1_fit, uniformSigma, cfgDiag);
+        const auto centroid = fitgaus1d::detail::WeightedCentroid(s_d1_vec, q_d1_vec, B0);
+        diagMainFit = fitgaus1d::detail::RunGaussianFit(s_d1_vec, q_d1_vec, err_d1_fit, uniformSigma, cfgDiag);
         if (diagMainFit.converged) {
           ok1 = true;
           mu1 = diagMainFit.mu;
@@ -1264,12 +1364,12 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         double B0 = *mm.first;
         int idxMax = std::distance(q_d2_vec.begin(), std::max_element(q_d2_vec.begin(), q_d2_vec.end()));
         double mu0 = s_d2_vec[idxMax];
-        const double sigInit = SeedSigma(s_d2_vec, q_d2_vec, B0, pixelSpacing, sigLoBound, sigHiBound);
-        GaussFitConfig cfgDiag{muLo, muHi, sigLoBound, sigHiBound,
+        const double sigInit = fitgaus1d::detail::SeedSigma(s_d2_vec, q_d2_vec, B0, pixelSpacing, sigLoBound, sigHiBound);
+        fitgaus1d::detail::GaussFitConfig cfgDiag{muLo, muHi, sigLoBound, sigHiBound,
                                qmaxNeighborhood, pixelSpacing, A0,
                                mu0, sigInit, B0};
-        const auto centroid = WeightedCentroid(s_d2_vec, q_d2_vec, B0);
-        diagSecFit = RunGaussianFit(s_d2_vec, q_d2_vec, err_d2_fit, uniformSigma, cfgDiag);
+        const auto centroid = fitgaus1d::detail::WeightedCentroid(s_d2_vec, q_d2_vec, B0);
+        diagSecFit = fitgaus1d::detail::RunGaussianFit(s_d2_vec, q_d2_vec, err_d2_fit, uniformSigma, cfgDiag);
         if (diagSecFit.converged) {
           ok2 = true;
           mu2 = diagSecFit.mu;
@@ -1445,11 +1545,10 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchStatus("*", 1);
 
   // Overwrite tree in file
-  file->cd();
+  fileHandle->cd();
   tree->Write("", TObject::kOverwrite);
-  file->Flush();
-  file->Close();
-  delete file;
+  fileHandle->Flush();
+  fileHandle->Close();
 
   ::Info("FitGaus1D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
   return 0;
