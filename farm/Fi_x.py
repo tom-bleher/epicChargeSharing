@@ -51,7 +51,7 @@ import uproot
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_DIR = Path("/home/tomble/epicChargeSharing/sweep_x_runs/20251101-071304")
+DEFAULT_INPUT_DIR = Path("/home/tomble/epicChargeSharing/sweep_x_runs/20251101-072458")
 DEFAULT_OUTPUT_BASE = REPO_ROOT / "proc" / "fit" / "fi_vs_x"
 SENTINEL_INVALID_FRACTION = -999.0
 
@@ -167,8 +167,21 @@ def infer_pixel_of_interest(
     if requested_pixel_id is not None:
         return PixelSelection(pixel_id=int(requested_pixel_id))
 
+    use_full_grid = False
+    if root_files:
+        try:
+            with uproot.open(root_files[0]) as first_file:
+                if "Hits" in first_file:
+                    key_set = {key.split(";")[0] for key in first_file["Hits"].keys()}
+                    use_full_grid = {"F_all", "F_all_pixel_id"}.issubset(key_set)
+        except Exception:
+            use_full_grid = False
+
     accum_sum: Dict[int, float] = {}
     accum_count: Dict[int, int] = {}
+    full_sum: Optional[np.ndarray] = None
+    full_count: Optional[np.ndarray] = None
+    full_pixel_ids: Optional[np.ndarray] = None
 
     prioritized = sorted(
         root_files,
@@ -187,68 +200,111 @@ def infer_pixel_of_interest(
                 if "Hits" not in f:
                     continue
                 tree = f["Hits"]
-                for arrays in iterate_tree_arrays(
-                    tree,
-                    ["F_i", "NeighborhoodPixelID"],
-                    step_size=step_size,
-                ):
-                    fi = ak.Array(arrays["F_i"])
-                    ids = ak.Array(arrays["NeighborhoodPixelID"])
-
-                    # Truncate chunk if we exceed desired sample size
-                    if remaining < len(fi):
-                        fi = fi[:remaining]
-                        ids = ids[:remaining]
-                    remaining -= len(fi)
-
-                    fi = ak.fill_none(fi, np.nan)
-                    ids = ak.fill_none(ids, -1)
-
-                    mask_pixel = ids >= 0
-                    if not ak.any(mask_pixel, axis=None):
+                if use_full_grid:
+                    branches = ["F_all", "F_all_pixel_id"]
+                    for arrays in iterate_tree_arrays(tree, branches, step_size=step_size):
+                        fractions = ak.Array(arrays["F_all"])
+                        n_events = len(fractions)
+                        if n_events == 0:
+                            continue
+                        if remaining < n_events:
+                            fractions = fractions[:remaining]
+                            n_events = len(fractions)
+                        remaining -= n_events
+                        if n_events == 0:
+                            break
+                        np_fractions = ak.to_numpy(fractions)
+                        if np_fractions.ndim == 1:
+                            np_fractions = np_fractions[np.newaxis, :]
+                        if full_pixel_ids is None:
+                            raw_ids = ak.to_numpy(arrays["F_all_pixel_id"][0])
+                            full_pixel_ids = np.asarray(raw_ids, dtype=int)
+                            full_sum = np.zeros_like(full_pixel_ids, dtype=float)
+                            full_count = np.zeros_like(full_pixel_ids, dtype=int)
+                        assert full_sum is not None and full_count is not None and full_pixel_ids is not None
+                        cols = min(np_fractions.shape[1], full_pixel_ids.size)
+                        if cols == 0:
+                            continue
+                        np_fractions = np.asarray(np_fractions[:, :cols], dtype=float)
+                        np.nan_to_num(np_fractions, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+                        full_sum[:cols] += np.sum(np_fractions, axis=0)
+                        full_count[:cols] += n_events
                         if remaining <= 0:
                             break
-                        continue
+                else:
+                    for arrays in iterate_tree_arrays(
+                        tree,
+                        ["F_i", "NeighborhoodPixelID"],
+                        step_size=step_size,
+                    ):
+                        fi = ak.Array(arrays["F_i"])
+                        ids = ak.Array(arrays["NeighborhoodPixelID"])
 
-                    fi_pixel = fi[mask_pixel]
-                    ids_pixel = ids[mask_pixel]
+                        # Truncate chunk if we exceed desired sample size
+                        if remaining < len(fi):
+                            fi = fi[:remaining]
+                            ids = ids[:remaining]
+                        remaining -= len(fi)
 
-                    fi_flat = ak.to_numpy(ak.flatten(fi_pixel, axis=None))
-                    ids_flat = ak.to_numpy(ak.flatten(ids_pixel, axis=None)).astype(int)
+                        fi = ak.fill_none(fi, np.nan)
+                        ids = ak.fill_none(ids, -1)
 
-                    if fi_flat.size == 0:
+                        mask_pixel = ids >= 0
+                        if not ak.any(mask_pixel, axis=None):
+                            if remaining <= 0:
+                                break
+                            continue
+
+                        fi_pixel = fi[mask_pixel]
+                        ids_pixel = ids[mask_pixel]
+
+                        fi_flat = ak.to_numpy(ak.flatten(fi_pixel, axis=None))
+                        ids_flat = ak.to_numpy(ak.flatten(ids_pixel, axis=None)).astype(int)
+
+                        if fi_flat.size == 0:
+                            if remaining <= 0:
+                                break
+                            continue
+
+                        finite_mask = np.isfinite(fi_flat)
+                        if not finite_mask.any():
+                            if remaining <= 0:
+                                break
+                            continue
+
+                        fi_flat = fi_flat[finite_mask]
+                        ids_flat = ids_flat[finite_mask]
+
+                        valid_mask = (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
+                        if not valid_mask.any():
+                            if remaining <= 0:
+                                break
+                            continue
+
+                        fi_flat = fi_flat[valid_mask]
+                        ids_flat = ids_flat[valid_mask]
+
+                        for pid, val in zip(ids_flat, fi_flat):
+                            accum_sum[pid] = accum_sum.get(pid, 0.0) + float(val)
+                            accum_count[pid] = accum_count.get(pid, 0) + 1
+
                         if remaining <= 0:
                             break
-                        continue
-
-                    finite_mask = np.isfinite(fi_flat)
-                    if not finite_mask.any():
-                        if remaining <= 0:
-                            break
-                        continue
-
-                    fi_flat = fi_flat[finite_mask]
-                    ids_flat = ids_flat[finite_mask]
-
-                    valid_mask = (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
-                    if not valid_mask.any():
-                        if remaining <= 0:
-                            break
-                        continue
-
-                    fi_flat = fi_flat[valid_mask]
-                    ids_flat = ids_flat[valid_mask]
-
-                    for pid, val in zip(ids_flat, fi_flat):
-                        accum_sum[pid] = accum_sum.get(pid, 0.0) + float(val)
-                        accum_count[pid] = accum_count.get(pid, 0) + 1
-
-                    if remaining <= 0:
-                        break
         except FileNotFoundError:
             continue
         except Exception as exc:  # pragma: no cover - diagnostic output only
             print(f"[WARN] Failed to inspect '{path}': {exc}")
+
+    if use_full_grid:
+        if full_pixel_ids is None or full_sum is None or full_count is None:
+            raise RuntimeError("Unable to infer pixel of interest from full-grid fractions.")
+        valid_mask = full_count > 0
+        if not np.any(valid_mask):
+            raise RuntimeError("No valid full-grid samples encountered while inferring pixel.")
+        means = np.full_like(full_sum, fill_value=-np.inf, dtype=float)
+        means[valid_mask] = full_sum[valid_mask] / full_count[valid_mask]
+        best_index = int(np.argmax(means))
+        return PixelSelection(pixel_id=int(full_pixel_ids[best_index]))
 
     if not accum_count:
         raise RuntimeError(
@@ -308,6 +364,9 @@ def collect_file_stats(
         if "Hits" not in f:
             raise RuntimeError(f"Tree 'Hits' not found in {path}")
         tree = f["Hits"]
+        tree_keys = {key.split(";")[0] for key in tree.keys()}
+        use_full_grid = {"F_all", "F_all_pixel_id"}.issubset(tree_keys)
+        have_full_coords = {"F_all_pixel_x", "F_all_pixel_y"}.issubset(tree_keys)
 
         total_events = int(tree.num_entries)
         event_has_pixel = 0
@@ -317,61 +376,113 @@ def collect_file_stats(
         values_count = 0
         values_chunks: List[np.ndarray] = [] if capture_values else []
 
-        for arrays in iterate_tree_arrays(
-            tree,
-            [
-                "F_i",
-                "NeighborhoodPixelID",
-                "NeighborhoodPixelX",
-                "NeighborhoodPixelY",
-            ],
-            step_size=step_size,
-        ):
-            fi = ak.fill_none(ak.Array(arrays["F_i"]), np.nan)
-            ids = ak.fill_none(ak.Array(arrays["NeighborhoodPixelID"]), -1)
-            px = ak.Array(arrays["NeighborhoodPixelX"]) if "NeighborhoodPixelX" in arrays.fields else None
-            py = ak.Array(arrays["NeighborhoodPixelY"]) if "NeighborhoodPixelY" in arrays.fields else None
+        if use_full_grid:
+            branch_names = ["F_all", "F_all_pixel_id"]
+            if have_full_coords:
+                branch_names.extend(["F_all_pixel_x", "F_all_pixel_y"])
 
-            mask_pixel = ids == pixel_id
+            mapping_idx: Optional[int] = None
+            full_ids: Optional[np.ndarray] = None
 
-            try:
-                per_event = ak.to_numpy(ak.any(mask_pixel, axis=1))
-            except Exception:
-                per_event = np.zeros(len(ids), dtype=bool)
-            event_has_pixel += int(np.count_nonzero(per_event))
+            for arrays in iterate_tree_arrays(tree, branch_names, step_size=step_size):
+                fractions = ak.Array(arrays["F_all"])
+                n_events = len(fractions)
+                if n_events == 0:
+                    continue
+                np_fractions = ak.to_numpy(fractions)
+                if np_fractions.ndim == 1:
+                    np_fractions = np_fractions[np.newaxis, :]
+                if full_ids is None:
+                    raw_ids = ak.to_numpy(arrays["F_all_pixel_id"][0])
+                    full_ids = np.asarray(raw_ids, dtype=int)
+                    matches = np.where(full_ids == pixel_id)[0]
+                    if matches.size == 0:
+                        continue
+                    mapping_idx = int(matches[0])
+                    if have_full_coords and coord_mm is None:
+                        px_vals = ak.to_numpy(arrays["F_all_pixel_x"][0])
+                        py_vals = ak.to_numpy(arrays["F_all_pixel_y"][0])
+                        if mapping_idx < len(px_vals) and mapping_idx < len(py_vals):
+                            coord_mm = (float(px_vals[mapping_idx]), float(py_vals[mapping_idx]))
+                if mapping_idx is None:
+                    continue
+                pixel_vals = np.asarray(np_fractions[:, mapping_idx], dtype=float)
+                event_has_pixel += pixel_vals.shape[0]
+                finite_mask = np.isfinite(pixel_vals)
+                if not finite_mask.any():
+                    continue
+                pixel_vals = pixel_vals[finite_mask]
+                valid_mask = pixel_vals >= 0.0
+                if not valid_mask.any():
+                    continue
+                pixel_vals = pixel_vals[valid_mask]
+                if pixel_vals.size == 0:
+                    continue
+                values_sum += float(np.sum(pixel_vals))
+                values_sumsq += float(np.sum(pixel_vals * pixel_vals))
+                values_count += int(pixel_vals.size)
+                if capture_values:
+                    values_chunks.append(pixel_vals.astype(float, copy=False))
 
-            if coord_mm is None and px is not None and py is not None:
-                coord_mm = _first_pixel_coordinates(fi, ids, px, py, pixel_id)
+            if mapping_idx is None:
+                raise RuntimeError(f"Pixel ID {pixel_id} not present in full-grid fractions for {path}")
+            event_has_pixel = total_events
+        else:
+            for arrays in iterate_tree_arrays(
+                tree,
+                [
+                    "F_i",
+                    "NeighborhoodPixelID",
+                    "NeighborhoodPixelX",
+                    "NeighborhoodPixelY",
+                ],
+                step_size=step_size,
+            ):
+                fi = ak.fill_none(ak.Array(arrays["F_i"]), np.nan)
+                ids = ak.fill_none(ak.Array(arrays["NeighborhoodPixelID"]), -1)
+                px = ak.Array(arrays["NeighborhoodPixelX"]) if "NeighborhoodPixelX" in arrays.fields else None
+                py = ak.Array(arrays["NeighborhoodPixelY"]) if "NeighborhoodPixelY" in arrays.fields else None
 
-            if not ak.any(mask_pixel, axis=None):
-                continue
+                mask_pixel = ids == pixel_id
 
-            fi_selected = fi[mask_pixel]
-            fi_flat = ak.to_numpy(ak.flatten(fi_selected, axis=None)).astype(float)
-            if fi_flat.size == 0:
-                continue
+                try:
+                    per_event = ak.to_numpy(ak.any(mask_pixel, axis=1))
+                except Exception:
+                    per_event = np.zeros(len(ids), dtype=bool)
+                event_has_pixel += int(np.count_nonzero(per_event))
 
-            finite_mask = np.isfinite(fi_flat)
-            if not finite_mask.any():
-                continue
+                if coord_mm is None and px is not None and py is not None:
+                    coord_mm = _first_pixel_coordinates(fi, ids, px, py, pixel_id)
 
-            fi_flat = fi_flat[finite_mask]
-            if fi_flat.size == 0:
-                continue
+                if not ak.any(mask_pixel, axis=None):
+                    continue
 
-            valid_mask = (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
-            if not valid_mask.any():
-                continue
+                fi_selected = fi[mask_pixel]
+                fi_flat = ak.to_numpy(ak.flatten(fi_selected, axis=None)).astype(float)
+                if fi_flat.size == 0:
+                    continue
 
-            fi_flat = fi_flat[valid_mask]
-            if fi_flat.size == 0:
-                continue
+                finite_mask = np.isfinite(fi_flat)
+                if not finite_mask.any():
+                    continue
 
-            values_sum += float(np.sum(fi_flat))
-            values_sumsq += float(np.sum(fi_flat * fi_flat))
-            values_count += int(fi_flat.size)
-            if capture_values:
-                values_chunks.append(fi_flat)
+                fi_flat = fi_flat[finite_mask]
+                if fi_flat.size == 0:
+                    continue
+
+                valid_mask = (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
+                if not valid_mask.any():
+                    continue
+
+                fi_flat = fi_flat[valid_mask]
+                if fi_flat.size == 0:
+                    continue
+
+                values_sum += float(np.sum(fi_flat))
+                values_sumsq += float(np.sum(fi_flat * fi_flat))
+                values_count += int(fi_flat.size)
+                if capture_values:
+                    values_chunks.append(fi_flat)
 
         if capture_values and values_chunks:
             stored_values = np.concatenate(values_chunks)

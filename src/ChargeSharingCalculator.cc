@@ -3,8 +3,8 @@
  */
 #include "ChargeSharingCalculator.hh"
 
-#include "DetectorConstruction.hh"
 #include "Constants.hh"
+#include "DetectorConstruction.hh"
 
 #include "G4Exception.hh"
 #include "G4SystemOfUnits.hh"
@@ -13,6 +13,11 @@
 #include <cmath>
 #include <limits>
 #include <mutex>
+
+namespace
+{
+std::once_flag gInvalidD0WarningFlag;
+}
 
 ChargeSharingCalculator::ChargeSharingCalculator(const DetectorConstruction* detector)
     : fDetector(detector),
@@ -37,23 +42,37 @@ void ChargeSharingCalculator::SetNeighborhoodRadius(G4int radius)
     ReserveBuffers();
 }
 
+void ChargeSharingCalculator::SetComputeFullGridFractions(G4bool enabled)
+{
+    fComputeFullGridFractions = enabled;
+    if (enabled) {
+        EnsureFullGridBuffer();
+    }
+}
+
 void ChargeSharingCalculator::ResetForEvent()
 {
     // Keep buffers sized; just reset contents to defaults
-    fActiveIndices.clear();
-
-    const std::size_t n = fResult.fractions.size();
-    if (n == 0) return;
-
-    std::fill(fResult.fractions.begin(), fResult.fractions.end(), Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
-    std::fill(fResult.charges.begin(),   fResult.charges.end(),   0.0);
-
-    const auto nan = std::numeric_limits<G4double>::quiet_NaN();
-    std::fill(fResult.distances.begin(), fResult.distances.end(), nan);
-    std::fill(fResult.alphas.begin(),    fResult.alphas.end(),    nan);
-    std::fill(fResult.pixelX.begin(),    fResult.pixelX.end(),    nan);
-    std::fill(fResult.pixelY.begin(),    fResult.pixelY.end(),    nan);
-    std::fill(fResult.pixelIds.begin(),  fResult.pixelIds.end(),  -1);
+    fResult.cells.clear();
+    fWeightScratch.clear();
+    if (!fResult.fullFractions.empty()) {
+        std::fill(fResult.fullFractions.begin(), fResult.fullFractions.end(), 0.0);
+    }
+    if (!fResult.fullPixelIds.empty()) {
+        std::fill(fResult.fullPixelIds.begin(), fResult.fullPixelIds.end(), -1);
+    }
+    if (!fResult.fullPixelX.empty()) {
+        std::fill(fResult.fullPixelX.begin(),
+                  fResult.fullPixelX.end(),
+                  std::numeric_limits<G4double>::quiet_NaN());
+    }
+    if (!fResult.fullPixelY.empty()) {
+        std::fill(fResult.fullPixelY.begin(),
+                  fResult.fullPixelY.end(),
+                  std::numeric_limits<G4double>::quiet_NaN());
+    }
+    fResult.fullGridSide = 0;
+    fResult.fullTotalCells = 0;
     fNeedsReset = false;
 }
 
@@ -78,6 +97,11 @@ const ChargeSharingCalculator::Result& ChargeSharingCalculator::Compute(
     }
     fNeedsReset = true;
 
+    fResult.gridRadius = fNeighborhoodRadius;
+    fResult.gridSide = fGridDim;
+    fResult.totalCells = static_cast<std::size_t>(fGridDim) * static_cast<std::size_t>(fGridDim);
+    fResult.cells.clear();
+    fWeightScratch.clear();
     fResult.nearestPixelCenter = CalcNearestPixel(hitPos);
     ComputeChargeFractions(hitPos,
                            energyDeposit,
@@ -86,8 +110,26 @@ const ChargeSharingCalculator::Result& ChargeSharingCalculator::Compute(
                            d0,
                            elementaryCharge);
 
+    if (fComputeFullGridFractions) {
+        ComputeFullGridFractions(hitPos,
+                                 d0,
+                                 fDetector->GetPixelSize(),
+                                 fDetector->GetPixelSpacing(),
+                                 fDetector->GetNumBlocksPerSide());
+    } else {
+        fResult.fullFractions.clear();
+        fResult.fullPixelIds.clear();
+        fResult.fullPixelX.clear();
+        fResult.fullPixelY.clear();
+        fResult.fullGridSide = 0;
+        fResult.fullTotalCells = 0;
+        fFullGridWeights.clear();
+    }
+
     return fResult;
 }
+
+using Cell = ChargeSharingCalculator::Result::NeighborCell;
 
 void ChargeSharingCalculator::ReserveBuffers()
 {
@@ -100,35 +142,11 @@ void ChargeSharingCalculator::ReserveBuffers()
         fGridDim = newGridDim;
     }
 
-    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
-
-    if (fResult.fractions.size() != newSize) {
-        fResult.fractions.assign(newSize, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
+    if (fResult.cells.capacity() < newSize) {
+        fResult.cells.reserve(newSize);
     }
-    if (fResult.charges.size() != newSize) {
-        fResult.charges.assign(newSize, 0.0);
-    }
-    if (fResult.distances.size() != newSize) {
-        fResult.distances.assign(newSize, nan);
-    }
-    if (fResult.alphas.size() != newSize) {
-        fResult.alphas.assign(newSize, nan);
-    }
-    if (fResult.pixelX.size() != newSize) {
-        fResult.pixelX.assign(newSize, nan);
-    }
-    if (fResult.pixelY.size() != newSize) {
-        fResult.pixelY.assign(newSize, nan);
-    }
-    if (fResult.pixelIds.size() != newSize) {
-        fResult.pixelIds.assign(newSize, -1);
-    }
-    if (fWeightGrid.size() != newSize) {
-        fWeightGrid.assign(newSize, 0.0);
-    }
-
-    if (fActiveIndices.capacity() < newSize) {
-        fActiveIndices.reserve(newSize);
+    if (fWeightScratch.capacity() < newSize) {
+        fWeightScratch.reserve(newSize);
     }
 
     if (fOffsets.empty() || fOffsetsDim != fGridDim) {
@@ -166,8 +184,6 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
                                                      G4double d0,
                                                      G4double elementaryCharge)
 {
-    fActiveIndices.clear();
-
     const G4double edepInEV = energyDeposit / eV;
     const G4double numElectrons = ionizationEnergy > 0.0 ? edepInEV / ionizationEnergy : 0.0;
     const G4double totalCharge = numElectrons * amplificationFactor;
@@ -178,10 +194,9 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
     const G4double rawD0Length = d0 * micrometer;
     constexpr G4double minD0Length = 1e-6 * micrometer;
-    static std::once_flag invalidD0WarningFlag;
     G4double d0Length = rawD0Length;
     if (!std::isfinite(d0Length) || d0Length <= 0.0) {
-        std::call_once(invalidD0WarningFlag,
+        std::call_once(gInvalidD0WarningFlag,
                        []() {
                            G4Exception("ChargeSharingCalculator::ComputeChargeFractions",
                                        "InvalidD0",
@@ -210,6 +225,9 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const G4double beta = useLinearModel ? fDetector->GetLinearChargeModelBeta(pixelSpacing) : 0.0;
 
     G4double totalWeight = 0.0;
+
+    fResult.cells.clear();
+    fWeightScratch.clear();
 
     for (const auto& off : fOffsets) {
         const G4int di = off.di;
@@ -245,23 +263,26 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
             weight = attenuation * alpha;
         }
 
-        fActiveIndices.push_back(idx);
-        fWeightGrid[idx] = weight;
+        Cell cell;
+        cell.gridIndex = idx;
+        cell.globalPixelId = globalId;
+        cell.center = {pixelCenterX, pixelCenterY, fResult.nearestPixelCenter.z()};
         if (recordDistanceAlpha) {
-            fResult.distances[idx] = distance;
-            fResult.alphas[idx] = alpha;
+            cell.distance = distance;
+            cell.alpha = alpha;
         }
-        fResult.pixelX[idx] = pixelCenterX;
-        fResult.pixelY[idx] = pixelCenterY;
-        fResult.pixelIds[idx] = globalId;
+        fResult.cells.push_back(cell);
+        fWeightScratch.push_back(weight);
         totalWeight += weight;
     }
 
-    for (G4int idx : fActiveIndices) {
-        const G4double fraction = (totalWeight > 0.0) ? (fWeightGrid[idx] / totalWeight) : 0.0;
-        const G4double chargeCoulombs = fraction * totalCharge * elementaryCharge;
-        fResult.fractions[idx] = fraction;
-        fResult.charges[idx] = chargeCoulombs;
+    for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
+        auto& cell = fResult.cells[i];
+        const G4double weight = fWeightScratch[i];
+        const G4double fraction =
+            (totalWeight > 0.0) ? (weight / totalWeight) : 0.0;
+        cell.fraction = fraction;
+        cell.charge = fraction * totalCharge * elementaryCharge;
     }
 }
 
@@ -280,4 +301,177 @@ void ChargeSharingCalculator::BuildOffsets()
         }
     }
     fOffsetsDim = gridDimLocal;
+}
+
+void ChargeSharingCalculator::EnsureFullGridBuffer()
+{
+    if (!fDetector) {
+        fResult.fullFractions.clear();
+        fResult.fullPixelIds.clear();
+        fResult.fullPixelX.clear();
+        fResult.fullPixelY.clear();
+        fFullGridWeights.clear();
+        fResult.fullGridSide = 0;
+        fResult.fullTotalCells = 0;
+        return;
+    }
+    const G4int numBlocksPerSide = std::max(0, fDetector->GetNumBlocksPerSide());
+    const std::size_t totalCells =
+        static_cast<std::size_t>(numBlocksPerSide) * static_cast<std::size_t>(numBlocksPerSide);
+    if (totalCells == 0U) {
+        fResult.fullFractions.clear();
+        fResult.fullPixelIds.clear();
+        fResult.fullPixelX.clear();
+        fResult.fullPixelY.clear();
+        fFullGridWeights.clear();
+        fResult.fullGridSide = 0;
+        fResult.fullTotalCells = 0;
+        return;
+    }
+    fResult.fullGridSide = numBlocksPerSide;
+    fResult.fullTotalCells = totalCells;
+
+    if (fResult.fullFractions.size() != totalCells) {
+        fResult.fullFractions.assign(totalCells, 0.0);
+    } else {
+        std::fill(fResult.fullFractions.begin(), fResult.fullFractions.end(), 0.0);
+    }
+    if (fFullGridWeights.size() != totalCells) {
+        fFullGridWeights.assign(totalCells, 0.0);
+    } else {
+        std::fill(fFullGridWeights.begin(), fFullGridWeights.end(), 0.0);
+    }
+    if (fResult.fullPixelIds.size() != totalCells) {
+        fResult.fullPixelIds.assign(totalCells, -1);
+    } else {
+        std::fill(fResult.fullPixelIds.begin(), fResult.fullPixelIds.end(), -1);
+    }
+    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
+    if (fResult.fullPixelX.size() != totalCells) {
+        fResult.fullPixelX.assign(totalCells, nan);
+    } else {
+        std::fill(fResult.fullPixelX.begin(), fResult.fullPixelX.end(), nan);
+    }
+    if (fResult.fullPixelY.size() != totalCells) {
+        fResult.fullPixelY.assign(totalCells, nan);
+    } else {
+        std::fill(fResult.fullPixelY.begin(), fResult.fullPixelY.end(), nan);
+    }
+}
+
+void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitPos,
+                                                       G4double d0,
+                                                       G4double pixelSize,
+                                                       G4double pixelSpacing,
+                                                       G4int numBlocksPerSide)
+{
+    if (!fDetector) {
+        fResult.fullFractions.clear();
+        fFullGridWeights.clear();
+        return;
+    }
+
+    const G4int gridSide = std::max(0, numBlocksPerSide);
+    if (gridSide <= 0) {
+        fResult.fullFractions.clear();
+        fFullGridWeights.clear();
+        return;
+    }
+
+    EnsureFullGridBuffer();
+    if (fResult.fullFractions.empty()) {
+        return;
+    }
+
+    const std::size_t totalCells =
+        static_cast<std::size_t>(gridSide) * static_cast<std::size_t>(gridSide);
+    fResult.fullGridSide = gridSide;
+    fResult.fullTotalCells = totalCells;
+
+    const G4double rawD0Length = d0 * micrometer;
+    constexpr G4double minD0Length = 1e-6 * micrometer;
+    G4double d0Length = rawD0Length;
+    if (!std::isfinite(d0Length) || d0Length <= 0.0) {
+        std::call_once(gInvalidD0WarningFlag,
+                       []() {
+                           G4Exception("ChargeSharingCalculator::ComputeFullGridFractions",
+                                       "InvalidD0",
+                                       JustWarning,
+                                       "d0 parameter is non-positive; clamping to minimum value to avoid instability.");
+                       });
+        d0Length = minD0Length;
+    }
+    d0Length = std::max(d0Length, minD0Length);
+
+    constexpr G4double guardFactor = 1.0 + 1e-6;
+    const G4double minSafeDistance = d0Length * guardFactor;
+    const G4double invD0Length = 1.0 / d0Length;
+    const G4double invMicrometer = 1.0 / micrometer;
+
+    const auto chargeModel = Constants::CHARGE_SHARING_MODEL;
+    const bool useLinearModel = (chargeModel == Constants::ChargeSharingModel::Linear);
+    const G4double beta = useLinearModel ? fDetector->GetLinearChargeModelBeta(pixelSpacing) : 0.0;
+
+    const G4double hitX = hitPos.x();
+    const G4double hitY = hitPos.y();
+    const G4double nearestX = fResult.nearestPixelCenter.x();
+    const G4double nearestY = fResult.nearestPixelCenter.y();
+    const G4double baseDx = hitX - nearestX;
+    const G4double baseDy = hitY - nearestY;
+
+    const G4ThreeVector detectorPos = fDetector->GetDetectorPos();
+    const G4double detSize = fDetector->GetDetSize();
+    const G4double cornerOffset = fDetector->GetPixelCornerOffset();
+    const G4double firstPixelPos = -detSize / 2.0 + cornerOffset + pixelSize / 2.0;
+
+    G4double totalWeight = 0.0;
+
+    for (G4int i = 0; i < gridSide; ++i) {
+        const G4int di = i - fResult.pixelIndexI;
+        for (G4int j = 0; j < gridSide; ++j) {
+            const G4int dj = j - fResult.pixelIndexJ;
+            const std::size_t idx =
+                static_cast<std::size_t>(i) * static_cast<std::size_t>(gridSide) +
+                static_cast<std::size_t>(j);
+
+            const G4double dx = baseDx - di * pixelSpacing;
+            const G4double dy = baseDy - dj * pixelSpacing;
+            const G4double distanceSquared = dx * dx + dy * dy;
+            const G4double distance = std::sqrt(distanceSquared);
+            const G4double alpha = CalcPixelAlphaSubtended(distance, pixelSize, pixelSize);
+
+            const G4double safeDistance = std::max(distance, minSafeDistance);
+            const G4double logValue = std::log(safeDistance * invD0Length);
+            G4double weight = (logValue > 0.0 && std::isfinite(logValue)) ? (alpha / logValue) : 0.0;
+            if (useLinearModel) {
+                const G4double attenuation = std::max(0.0, 1.0 - beta * distance * invMicrometer);
+                weight = attenuation * alpha;
+            }
+
+            const G4double pixelCenterX = detectorPos.x() + firstPixelPos + i * pixelSpacing;
+            const G4double pixelCenterY = detectorPos.y() + firstPixelPos + j * pixelSpacing;
+            const G4int globalId = i * gridSide + j;
+
+            fFullGridWeights[idx] = weight;
+            if (idx < fResult.fullPixelIds.size()) {
+                fResult.fullPixelIds[idx] = globalId;
+            }
+            if (idx < fResult.fullPixelX.size()) {
+                fResult.fullPixelX[idx] = pixelCenterX;
+            }
+            if (idx < fResult.fullPixelY.size()) {
+                fResult.fullPixelY[idx] = pixelCenterY;
+            }
+            totalWeight += weight;
+        }
+    }
+
+    if (totalWeight > 0.0) {
+        const G4double invTotalWeight = 1.0 / totalWeight;
+        for (std::size_t idx = 0; idx < totalCells; ++idx) {
+            fResult.fullFractions[idx] = fFullGridWeights[idx] * invTotalWeight;
+        }
+    } else {
+        std::fill(fResult.fullFractions.begin(), fResult.fullFractions.end(), 0.0);
+    }
 }

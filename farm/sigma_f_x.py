@@ -43,7 +43,7 @@ import uproot
 # ---------------------------- Configuration ---------------------------------
 
 REPO_ROOT = "/home/tomble/epicChargeSharing"
-INPUT_DIR = f"{REPO_ROOT}/0.00MaxQfLog"
+INPUT_DIR = f"/home/tomble/epicChargeSharing/sweep_x_runs/20251101-072458"
 OUTPUT_BASE = f"{REPO_ROOT}/proc/fit/uproot_gaussian_out"
 TREE_NAME = "Hits"
 

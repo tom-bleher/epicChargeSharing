@@ -132,6 +132,8 @@ G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* log
                                                             G4bool checkOverlaps,
                                                             G4double originalDetSize)
 {
+    (void)originalDetSize;
+
     const G4ThreeVector detectorPos = GetDetectorPos();
 
     auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7));

@@ -6,6 +6,7 @@
 #include "G4ThreeVector.hh"
 
 #include "ChargeSharingCalculator.hh"
+#include "internal/NeighborhoodBuffer.hh"
 
 #include <memory>
 #include <vector>
@@ -44,12 +45,15 @@ public:
     {
         fNeighborhoodRadius = radius;
         fChargeSharing.SetNeighborhoodRadius(radius);
+        fNeighborhoodLayout.SetRadius(radius);
+        EnsureNeighborhoodBuffers(fNeighborhoodLayout.TotalCells());
     }
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
 
     void CollectScorerData(const G4Event* event);
 
     void SetEmitDistanceAlpha(G4bool enabled);
+    void SetComputeFullFractions(G4bool enabled);
 
 private:
     G4ThreeVector DetermineHitPosition() const;
@@ -60,7 +64,7 @@ private:
                                          G4bool& isPixelHitCombined);
     const ChargeSharingCalculator::Result& ComputeChargeSharingForEvent(const G4ThreeVector& hitPos,
                                                                         G4double energyDeposit);
-    void EnsureNeighborhoodBuffers(std::size_t targetSize);
+    void EnsureNeighborhoodBuffers(std::size_t totalCells);
     void UpdatePixelIndices(const ChargeSharingCalculator::Result& result,
                             const G4ThreeVector& hitPos);
 
@@ -95,9 +99,12 @@ private:
     G4double fScorerEnergyDeposit;
 
     ChargeSharingCalculator fChargeSharing;
+    G4int fNearestPixelGlobalId{-1};
+    neighbor::Layout fNeighborhoodLayout;
     std::vector<G4double> fNeighborhoodChargeNew;
     std::vector<G4double> fNeighborhoodChargeFinal;
     G4bool fEmitDistanceAlphaOutputs{false};
+    G4bool fComputeFullFractions{false};
     std::unique_ptr<G4GenericMessenger> fMessenger;
 };
 

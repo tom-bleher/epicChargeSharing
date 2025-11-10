@@ -38,6 +38,15 @@ void EventAction::SetEmitDistanceAlpha(G4bool enabled)
     }
 }
 
+void EventAction::SetComputeFullFractions(G4bool enabled)
+{
+    fComputeFullFractions = enabled;
+    fChargeSharing.SetComputeFullGridFractions(enabled);
+    if (fRunAction) {
+        fRunAction->ConfigureFullFractionBranch(enabled);
+    }
+}
+
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
     : G4UserEventAction(),
       fRunAction(runAction),
@@ -54,14 +63,19 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
       fD0(Constants::D0_CHARGE_SHARING),
       fElementaryCharge(Constants::ELEMENTARY_CHARGE),
       fScorerEnergyDeposit(0.0),
-      fChargeSharing(detector)
+      fChargeSharing(detector),
+      fNearestPixelGlobalId(-1),
+      fNeighborhoodLayout(detector ? detector->GetNeighborhoodRadius()
+                                   : Constants::NEIGHBORHOOD_RADIUS)
 {
     if (detector) {
         fChargeSharing.SetNeighborhoodRadius(detector->GetNeighborhoodRadius());
     }
     fChargeSharing.SetEmitDistanceAlpha(fEmitDistanceAlphaOutputs);
+    fChargeSharing.SetComputeFullGridFractions(fComputeFullFractions);
     if (fRunAction) {
         fRunAction->SetChargeSharingDistanceAlphaMeta(fEmitDistanceAlphaOutputs);
+        fRunAction->ConfigureFullFractionBranch(fComputeFullFractions);
     }
 
     fMessenger = std::make_unique<G4GenericMessenger>(this,
@@ -72,11 +86,20 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
                                             "Enable per-neighbor distance and alpha outputs");
     cmd.SetStates(G4State_PreInit, G4State_Idle);
     cmd.SetToBeBroadcasted(true);
+    auto& fullCmd = fMessenger->DeclareProperty("computeFullFractions",
+                                                fComputeFullFractions,
+                                                "Enable per-event full-detector charge fractions (F_i)");
+    fullCmd.SetStates(G4State_PreInit, G4State_Idle);
+    fullCmd.SetToBeBroadcasted(true);
 }
 
 void EventAction::BeginOfEventAction(const G4Event* /*event*/)
 {
     fChargeSharing.SetEmitDistanceAlpha(fEmitDistanceAlphaOutputs);
+    fChargeSharing.SetComputeFullGridFractions(fComputeFullFractions);
+    if (fRunAction) {
+        fRunAction->ConfigureFullFractionBranch(fComputeFullFractions);
+    }
 
     if (fSteppingAction) {
         fSteppingAction->Reset();
@@ -89,9 +112,10 @@ void EventAction::BeginOfEventAction(const G4Event* /*event*/)
     fScorerEnergyDeposit = 0.0;
     fFirstContactPos = G4ThreeVector(0., 0., 0.);
     fHasFirstContactPos = false;
+    fNearestPixelGlobalId = -1;
 
     fChargeSharing.ResetForEvent();
-    EnsureNeighborhoodBuffers(0);
+    EnsureNeighborhoodBuffers(fNeighborhoodLayout.TotalCells());
 }
 
 void EventAction::EndOfEventAction(const G4Event* event)
@@ -117,9 +141,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
         chargeResult = &ComputeChargeSharingForEvent(hitPos, finalEdep);
     } else {
         fChargeSharing.ResetForEvent();
-        EnsureNeighborhoodBuffers(0);
-        fNeighborhoodChargeNew.clear();
-        fNeighborhoodChargeFinal.clear();
+        EnsureNeighborhoodBuffers(fNeighborhoodLayout.TotalCells());
     }
 
     RunAction::EventSummaryData summary{};
@@ -137,29 +159,36 @@ void EventAction::EndOfEventAction(const G4Event* event)
 
     RunAction::EventRecord record{};
     record.summary = summary;
+    record.nearestPixelI = fPixelIndexI;
+    record.nearestPixelJ = fPixelIndexJ;
+    record.nearestPixelGlobalId = fNearestPixelGlobalId;
 
     if (chargeResult) {
-        record.neighborFractions = std::span<const G4double>(chargeResult->fractions.data(),
-                                                            chargeResult->fractions.size());
-        record.neighborCharges = std::span<const G4double>(chargeResult->charges.data(),
-                                                           chargeResult->charges.size());
+        record.totalGridCells = static_cast<G4int>(chargeResult->totalCells);
+        record.neighborCells = std::span<const ChargeSharingCalculator::Result::NeighborCell>(
+            chargeResult->cells.data(), chargeResult->cells.size());
         record.neighborChargesNew = std::span<const G4double>(fNeighborhoodChargeNew.data(),
                                                               fNeighborhoodChargeNew.size());
         record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
                                                                 fNeighborhoodChargeFinal.size());
-        if (fEmitDistanceAlphaOutputs) {
-            record.includeDistanceAlpha = true;
-            record.neighborDistances = std::span<const G4double>(chargeResult->distances.data(),
-                                                                 chargeResult->distances.size());
-            record.neighborAlphas = std::span<const G4double>(chargeResult->alphas.data(),
-                                                              chargeResult->alphas.size());
-        }
-        record.neighborPixelX = std::span<const G4double>(chargeResult->pixelX.data(),
-                                                          chargeResult->pixelX.size());
-        record.neighborPixelY = std::span<const G4double>(chargeResult->pixelY.data(),
-                                                          chargeResult->pixelY.size());
-        record.neighborPixelIds = std::span<const G4int>(chargeResult->pixelIds.data(),
-                                                         chargeResult->pixelIds.size());
+        record.includeDistanceAlpha = fEmitDistanceAlphaOutputs;
+        record.fullGridSide = chargeResult->fullGridSide;
+        record.fullFractions = std::span<const G4double>(chargeResult->fullFractions.data(),
+                                                         chargeResult->fullFractions.size());
+        record.fullPixelIds = std::span<const G4int>(chargeResult->fullPixelIds.data(),
+                                                     chargeResult->fullPixelIds.size());
+        record.fullPixelX = std::span<const G4double>(chargeResult->fullPixelX.data(),
+                                                      chargeResult->fullPixelX.size());
+        record.fullPixelY = std::span<const G4double>(chargeResult->fullPixelY.data(),
+                                                      chargeResult->fullPixelY.size());
+    } else {
+        record.totalGridCells = static_cast<G4int>(fNeighborhoodLayout.TotalCells());
+        record.neighborChargesNew = std::span<const G4double>(fNeighborhoodChargeNew.data(),
+                                                              fNeighborhoodChargeNew.size());
+        record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
+                                                                fNeighborhoodChargeFinal.size());
+        record.includeDistanceAlpha = false;
+        record.fullGridSide = fDetector ? fDetector->GetNumBlocksPerSide() : 0;
     }
 
     fRunAction->FillTree(record);
@@ -223,27 +252,18 @@ const ChargeSharingCalculator::Result& EventAction::ComputeChargeSharingForEvent
                                                                            fElementaryCharge);
 
     UpdatePixelIndices(result, hitPos);
-    EnsureNeighborhoodBuffers(result.charges.size());
+    fNeighborhoodLayout.SetRadius(result.gridRadius);
+    EnsureNeighborhoodBuffers(result.totalCells);
 
     const NeighborContext context = MakeNeighborContext();
     PopulateNeighborCharges(result, context);
     return result;
 }
 
-void EventAction::EnsureNeighborhoodBuffers(std::size_t targetSize)
+void EventAction::EnsureNeighborhoodBuffers(std::size_t totalCells)
 {
-    if (fNeighborhoodChargeNew.capacity() < targetSize) {
-        fNeighborhoodChargeNew.reserve(targetSize);
-    }
-    if (fNeighborhoodChargeFinal.capacity() < targetSize) {
-        fNeighborhoodChargeFinal.reserve(targetSize);
-    }
-
-    fNeighborhoodChargeNew.resize(targetSize);
-    fNeighborhoodChargeFinal.resize(targetSize);
-
-    std::fill(fNeighborhoodChargeNew.begin(), fNeighborhoodChargeNew.end(), 0.0);
-    std::fill(fNeighborhoodChargeFinal.begin(), fNeighborhoodChargeFinal.end(), 0.0);
+    neighbor::ResizeAndFill(fNeighborhoodChargeNew, totalCells, 0.0);
+    neighbor::ResizeAndFill(fNeighborhoodChargeFinal, totalCells, 0.0);
 }
 
 void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& result,
@@ -253,6 +273,12 @@ void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& resu
     fPixelIndexJ = result.pixelIndexJ;
     fPixelTrueDeltaX = std::abs(result.nearestPixelCenter.x() - hitPos.x());
     fPixelTrueDeltaY = std::abs(result.nearestPixelCenter.y() - hitPos.y());
+    const G4int numBlocks = fDetector ? fDetector->GetNumBlocksPerSide() : 0;
+    if (numBlocks > 0 && fPixelIndexI >= 0 && fPixelIndexJ >= 0) {
+        fNearestPixelGlobalId = fPixelIndexI * numBlocks + fPixelIndexJ;
+    } else {
+        fNearestPixelGlobalId = -1;
+    }
 }
 
 EventAction::NeighborContext EventAction::MakeNeighborContext() const
@@ -265,27 +291,41 @@ EventAction::NeighborContext EventAction::MakeNeighborContext() const
 void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result& result,
                                           const NeighborContext& context)
 {
-    const auto totalCells = static_cast<G4int>(result.charges.size());
-    const auto& pixelIds = result.pixelIds;
+    const auto targetCells = std::max<std::size_t>(1, result.totalCells);
+    if (fNeighborhoodChargeNew.size() != targetCells) {
+        EnsureNeighborhoodBuffers(targetCells);
+    } else {
+        neighbor::Fill(fNeighborhoodChargeNew, 0.0);
+        neighbor::Fill(fNeighborhoodChargeFinal, 0.0);
+    }
+
     const auto& gainSigmas = fDetector ? fDetector->GetPixelGainSigmas() : kEmptyDoubleVector;
-    const G4int gainCount = static_cast<G4int>(gainSigmas.size());
+    const auto gainCount = gainSigmas.size();
     const bool hasGainNoise = gainCount > 0;
     const bool hasAdditiveNoise = context.sigmaNoise > 0.0;
 
-    for (G4int idx = 0; idx < totalCells; ++idx) {
-        const G4int globalId = (idx < static_cast<G4int>(pixelIds.size())) ? pixelIds[idx] : -1;
-
-        if (globalId < 0) {
-            fNeighborhoodChargeNew[idx] = 0.0;
-            fNeighborhoodChargeFinal[idx] = 0.0;
+    for (const auto& cell : result.cells) {
+        if (cell.gridIndex < 0) {
+            continue;
+        }
+        const auto gridIndex = static_cast<std::size_t>(cell.gridIndex);
+        if (gridIndex >= targetCells) {
             continue;
         }
 
-        G4double noisyCharge = result.charges[idx];
-        if (hasGainNoise && globalId < gainCount) {
-            const G4double sigmaGain = gainSigmas[static_cast<std::size_t>(globalId)];
-            if (sigmaGain > 0.0) {
-                noisyCharge *= G4RandGauss::shoot(1.0, sigmaGain);
+        const G4int globalId = cell.globalPixelId;
+        if (globalId < 0) {
+            continue;
+        }
+
+        G4double noisyCharge = cell.charge;
+        if (hasGainNoise) {
+            const auto gid = static_cast<std::size_t>(globalId);
+            if (gid < gainCount) {
+                const G4double sigmaGain = gainSigmas[gid];
+                if (sigmaGain > 0.0) {
+                    noisyCharge *= G4RandGauss::shoot(1.0, sigmaGain);
+                }
             }
         }
 
@@ -295,8 +335,8 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
         }
         finalCharge = std::max(0.0, finalCharge);
 
-        fNeighborhoodChargeNew[idx] = noisyCharge;
-        fNeighborhoodChargeFinal[idx] = finalCharge;
+        fNeighborhoodChargeNew[gridIndex] = noisyCharge;
+        fNeighborhoodChargeFinal[gridIndex] = finalCharge;
     }
 }
 

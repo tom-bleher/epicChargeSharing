@@ -45,12 +45,6 @@ G4ParticleDefinition* ResolveDefaultParticle()
     }
     return particle;
 }
-
-G4double ScriptedDefaultX()
-{
-    const G4double x = 25.0*um;
-    return x;
-}
 } // namespace
 
 PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
@@ -60,14 +54,19 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     ConfigureParticleGun();
     ConfigureMessenger();
 
+    fFixedX = 125.0*um;
     if (fDetector) {
-        fFixedX = ScriptedDefaultX();
         fFixedY = 0.5 * fDetector->GetPixelSpacing();
-        const G4double margin = ComputeSafeMargin();
-        const G4double halfExtent = fDetector->GetDetSize() / 2.0 - margin;
+    }
+
+    const auto& window = EnsureSamplingWindow();
+    if (fDetector) {
         G4cout << "[PrimaryGenerator] Default fixed XY position (" << fFixedX / mm << ", "
-               << fFixedY / mm << ") mm; random sampling confined to +/-" << halfExtent / mm
+               << fFixedY / mm << ") mm; random sampling confined to +/-" << window.halfExtent / mm
                << " mm" << G4endl;
+    } else {
+        G4cout << "[PrimaryGenerator] No detector available; primaries generated at origin"
+               << G4endl;
     }
 
     GenerateRandomPos();
@@ -129,13 +128,9 @@ void PrimaryGenerator::ConfigureMessenger()
     fixedYCmd.SetToBeBroadcasted(true);
 }
 
-G4double PrimaryGenerator::ComputeSafeMargin() const
+G4double PrimaryGenerator::CalculateSafeMargin() const
 {
     if (!fDetector) {
-        G4Exception("PrimaryGenerator::ComputeSafeMargin",
-                    "MissingDetector",
-                    FatalException,
-                    "DetectorConstruction pointer is null.");
         return 0.0;
     }
 
@@ -144,9 +139,9 @@ G4double PrimaryGenerator::ComputeSafeMargin() const
                             0.5 * fDetector->GetPixelSize() +
                             radius * fDetector->GetPixelSpacing();
 
-    const G4double detSize = fDetector->GetDetSize();
-    if (margin >= detSize / 2.0) {
-        G4Exception("PrimaryGenerator::ComputeSafeMargin",
+    const G4double detHalfSize = fDetector->GetDetSize() / 2.0;
+    if (margin >= detHalfSize) {
+        G4Exception("PrimaryGenerator::CalculateSafeMargin",
                     "MarginTooLarge",
                     FatalException,
                     "Neighborhood radius larger than detector allows.");
@@ -155,42 +150,84 @@ G4double PrimaryGenerator::ComputeSafeMargin() const
     return margin;
 }
 
+void PrimaryGenerator::RecalculateSamplingWindow() const
+{
+    SamplingWindow window{};
+    if (fDetector) {
+        const G4double margin = CalculateSafeMargin();
+        const G4double halfExtent = fDetector->GetDetSize() / 2.0 - margin;
+        window.margin = margin;
+        window.halfExtent = std::max(0.0, halfExtent);
+    }
+    fSamplingWindow = window;
+    fSamplingWindowValid = true;
+}
+
+const PrimaryGenerator::SamplingWindow& PrimaryGenerator::EnsureSamplingWindow() const
+{
+    if (!fSamplingWindowValid) {
+        RecalculateSamplingWindow();
+    }
+    return fSamplingWindow;
+}
+
+G4double PrimaryGenerator::ClampToWindow(G4double value, const SamplingWindow& window) const
+{
+    if (window.halfExtent <= 0.0) {
+        return 0.0;
+    }
+    return std::clamp(value, -window.halfExtent, window.halfExtent);
+}
+
+G4ThreeVector PrimaryGenerator::MakeFixedPosition(const SamplingWindow& window) const
+{
+    const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
+    if (window.halfExtent <= 0.0) {
+        return {0.0, 0.0, z};
+    }
+
+    const G4double targetX = ClampToWindow(fFixedX, window);
+    const G4double targetY = ClampToWindow(fFixedY, window);
+
+    if (targetX != fFixedX || targetY != fFixedY) {
+        std::call_once(fFixedPositionWarningFlag, [&]() {
+            std::ostringstream oss;
+            oss << "Fixed primary position outside safe margin. Clamping to +/-"
+                << window.halfExtent / mm << " mm.";
+            G4Exception("PrimaryGenerator::MakeFixedPosition",
+                        "FixedPositionOutOfBounds",
+                        JustWarning,
+                        oss.str().c_str());
+        });
+    }
+
+    return {targetX, targetY, z};
+}
+
+G4ThreeVector PrimaryGenerator::MakeRandomPosition(const SamplingWindow& window) const
+{
+    const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
+    if (window.halfExtent <= 0.0) {
+        return {0.0, 0.0, z};
+    }
+
+    const G4double halfExtent = window.halfExtent;
+    const G4double randomX = (2.0 * G4UniformRand() - 1.0) * halfExtent;
+    const G4double randomY = (2.0 * G4UniformRand() - 1.0) * halfExtent;
+
+    return {randomX, randomY, z};
+}
+
 G4ThreeVector PrimaryGenerator::SamplePrimaryVertex() const
 {
     const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
 
     if (!fDetector) {
-        return {ScriptedDefaultX(), 0.0, z};
+        return {0.0, 0.0, z};
     }
 
-    const G4double margin = ComputeSafeMargin();
-    const G4double detSize = fDetector->GetDetSize();
-    const G4double halfExtent = detSize / 2.0 - margin;
-
-    if (fUseFixedPosition) {
-        G4double targetX = std::clamp(fFixedX, -halfExtent, halfExtent);
-        G4double targetY = std::clamp(fFixedY, -halfExtent, halfExtent);
-
-        if (targetX != fFixedX || targetY != fFixedY) {
-            std::call_once(fFixedPositionWarningFlag, [&]() {
-                std::ostringstream oss;
-                oss << "Fixed primary position outside safe margin. Clamping to +/-"
-                    << halfExtent / mm << " mm.";
-                G4Exception("PrimaryGenerator::SamplePrimaryVertex",
-                            "FixedPositionOutOfBounds",
-                            JustWarning,
-                            oss.str().c_str());
-            });
-        }
-
-        return {targetX, targetY, z};
-    }
-
-    const G4double span = detSize - 2.0 * margin;
-    const G4double randomX = G4UniformRand() * span - (detSize / 2.0 - margin);
-    const G4double randomY = G4UniformRand() * span - (detSize / 2.0 - margin);
-
-    return {randomX, randomY, z};
+    const auto& window = EnsureSamplingWindow();
+    return fUseFixedPosition ? MakeFixedPosition(window) : MakeRandomPosition(window);
 }
 
 void PrimaryGenerator::ApplyParticlePosition(const G4ThreeVector& position)
@@ -200,6 +237,7 @@ void PrimaryGenerator::ApplyParticlePosition(const G4ThreeVector& position)
 
 void PrimaryGenerator::GenerateRandomPos()
 {
+    fSamplingWindowValid = false;
     ApplyParticlePosition(SamplePrimaryVertex());
 }
 

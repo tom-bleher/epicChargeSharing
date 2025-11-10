@@ -30,9 +30,11 @@ for p in GROUP1:
 for p in GROUP2:
     POSITIONS.extend([p, -p])
 
-# Regex pattern to locate the x position line in PrimaryGenerator.cc
-# We expect a line like:     const G4double x = -25.0*um;
-X_LINE_REGEX = re.compile(r"^(\s*)const\s+G4double\s+x\s*=\s*([-+]?\d+(?:\.\d+)?)\s*\*\s*um\s*;\s*$")
+# Regex pattern to locate the fixed X assignment in PrimaryGenerator.cc
+# We expect a line like:     fFixedX = -25.0*um; (the default code uses fFixedX = 0.0;)
+FIXED_X_LINE_REGEX = re.compile(
+    r"^(\s*)fFixedX\s*=\s*([-+]?\d+(?:\.\d+)?)\s*(?:\*\s*um)?\s*;\s*$"
+)
 
 
 def determine_output_dir(output_dir_arg: Optional[str]) -> Path:
@@ -65,17 +67,19 @@ def update_primary_generator_x_um(source_text: str, x_um: float) -> str:
     replaced = False
     new_lines = []
     for line in lines:
-        m = X_LINE_REGEX.match(line)
+        m = FIXED_X_LINE_REGEX.match(line)
         if m:
             indent = m.group(1)
             value_str = f"{x_um:.1f}"
-            newline = f"{indent}const G4double x = {value_str}*um;"
+            newline = f"{indent}fFixedX = {value_str}*um;"
             new_lines.append(newline)
             replaced = True
         else:
             new_lines.append(line)
     if not replaced:
-        raise RuntimeError("Could not find x position assignment line in PrimaryGenerator.cc")
+        raise RuntimeError(
+            "Could not find fixed X assignment in PrimaryGenerator.cc (expected fFixedX = ...;)"
+        )
     # Preserve trailing newline presence
     return "\n".join(new_lines) + ("\n" if source_text.endswith("\n") else "")
 

@@ -184,6 +184,8 @@ void ConfigureInitialization(G4RunManager* runManager, DetectorConstruction* det
 
 bool ExecuteBatchMode(G4RunManager* runManager, const ProgramOptions& opts)
 {
+    (void)runManager;
+
     G4UImanager* uiManager = G4UImanager::GetUIpointer();
     G4cout << "[Batch] Executing macro '" << opts.macroFile << "'" << G4endl;
     G4String command = "/control/execute " + opts.macroFile;
@@ -197,6 +199,8 @@ bool ExecuteBatchMode(G4RunManager* runManager, const ProgramOptions& opts)
 
 void ExecuteInteractiveMode(G4RunManager* runManager, int argc, char** argv)
 {
+    (void)runManager;
+
     auto ui = std::make_unique<G4UIExecutive>(argc, argv);
     auto visManager = std::make_unique<G4VisExecutive>();
     visManager->Initialize();

@@ -29,7 +29,17 @@ public:
 private:
     void ConfigureParticleGun();
     void ConfigureMessenger();
-    G4double ComputeSafeMargin() const;
+    G4double CalculateSafeMargin() const;
+    void RecalculateSamplingWindow() const;
+    struct SamplingWindow
+    {
+        G4double margin{0.0};
+        G4double halfExtent{0.0};
+    };
+    const SamplingWindow& EnsureSamplingWindow() const;
+    G4double ClampToWindow(G4double value, const SamplingWindow& window) const;
+    G4ThreeVector MakeFixedPosition(const SamplingWindow& window) const;
+    G4ThreeVector MakeRandomPosition(const SamplingWindow& window) const;
     G4ThreeVector SamplePrimaryVertex() const;
     void ApplyParticlePosition(const G4ThreeVector& position);
     void GenerateRandomPos();
@@ -42,6 +52,8 @@ private:
     G4double fFixedX{0.0};
     G4double fFixedY{0.0};
     mutable std::once_flag fFixedPositionWarningFlag;
+    mutable SamplingWindow fSamplingWindow;
+    mutable G4bool fSamplingWindowValid{false};
 };
 
 #endif // PRIMARYGENERATOR_HH

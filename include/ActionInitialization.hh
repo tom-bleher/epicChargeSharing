@@ -23,6 +23,7 @@ public:
 
 private:
     DetectorConstruction* fDetector;
+    RunAction* CreateRunAction() const;
 };
 
 #endif

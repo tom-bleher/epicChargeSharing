@@ -1,10 +1,12 @@
 #ifndef RUNACTION_HH
 #define RUNACTION_HH
 
-#include "G4UserRunAction.hh"
-#include "G4Run.hh"
-#include "globals.hh"
+#include "ChargeSharingCalculator.hh"
 #include "Constants.hh"
+#include "G4Run.hh"
+#include "G4UserRunAction.hh"
+#include "globals.hh"
+#include "internal/NeighborhoodBuffer.hh"
 
 #include <memory>
 #include <mutex>
@@ -62,15 +64,18 @@ public:
     struct EventRecord
     {
         EventSummaryData summary;
-        std::span<const G4double> neighborFractions;
-        std::span<const G4double> neighborCharges;
+        std::span<const ChargeSharingCalculator::Result::NeighborCell> neighborCells;
         std::span<const G4double> neighborChargesNew;
         std::span<const G4double> neighborChargesFinal;
-        std::span<const G4double> neighborDistances;
-        std::span<const G4double> neighborAlphas;
-        std::span<const G4double> neighborPixelX;
-        std::span<const G4double> neighborPixelY;
-        std::span<const G4int> neighborPixelIds;
+        std::span<const G4double> fullFractions;
+        std::span<const G4int> fullPixelIds;
+        std::span<const G4double> fullPixelX;
+        std::span<const G4double> fullPixelY;
+        G4int fullGridSide{0};
+        G4int nearestPixelI{-1};
+        G4int nearestPixelJ{-1};
+        G4int nearestPixelGlobalId{-1};
+        G4int totalGridCells{0};
         G4bool includeDistanceAlpha{false};
     };
 
@@ -84,14 +89,45 @@ public:
                                   G4double betaPerMicron,
                                   G4double pitch);
     void SetChargeSharingDistanceAlphaMeta(G4bool enabled);
+    void ConfigureFullFractionBranch(G4bool enable);
 
     void FillTree(const EventRecord& record);
 
 private:
+    struct ThreadContext
+    {
+        G4bool multithreaded{false};
+        G4bool worker{false};
+        G4bool master{false};
+        G4int runId{-1};
+        G4int threadId{-1};
+        G4int totalWorkers{0};
+    };
+
+    ThreadContext BuildThreadContext(const G4Run* run) const;
+    void LogBeginRun(const ThreadContext& context) const;
+    G4String DetermineOutputFileName(const ThreadContext& context) const;
+    void InitializeRootOutputs(const ThreadContext& context, const G4String& fileName);
+    void ConfigureCoreBranches(TTree* tree);
+    void ConfigureScalarBranches(TTree* tree);
+    void ConfigureVectorBranches(TTree* tree);
+    void ConfigureClassificationBranches(TTree* tree);
+    void ConfigureNeighborhoodBranches(TTree* tree);
+
+    void HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run);
+    void HandleMasterEndOfRun(const ThreadContext& context, const G4Run* run);
+    std::vector<G4String> CollectWorkerFileNames(G4int totalWorkers) const;
+    std::vector<G4String> FilterExistingWorkerFiles(const std::vector<G4String>& workerFiles) const;
+    bool MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& existingFiles);
+
+    void UpdateSummaryScalars(const EventRecord& record);
+    void PrepareNeighborhoodStorage(std::size_t requestedCells);
+    void PopulateNeighborhoodFromRecord(const EventRecord& record);
+    void PopulateFullFractionsFromRecord(const EventRecord& record);
+
     void RunPostProcessingFits();
     void EnsureBranchBuffersInitialized();
-    void EnsureVectorSized(std::vector<G4double>& vec, G4double initValue) const;
-    void EnsureVectorSized(std::vector<G4int>& vec, G4int initValue) const;
+    bool EnsureFullFractionBuffer(G4int gridSide = -1);
     std::unique_lock<std::mutex> MakeTreeLock();
     void WriteMetadataToFile(TFile* file) const;
     std::vector<std::pair<std::string, std::string>> CollectMetadataEntries() const;
@@ -122,7 +158,8 @@ private:
     std::vector<G4double> fNeighborhoodPixelY;
     std::vector<G4int> fNeighborhoodPixelID;
 
-    G4int fNeighborhoodCapacity{0};
+    neighbor::Layout fNeighborhoodLayout;
+    std::size_t fNeighborhoodCapacity{0};
     G4int fNeighborhoodActiveCells{0};
 
     G4double fGridPixelSize;
@@ -136,10 +173,20 @@ private:
     G4double fChargeSharingBeta;
     G4double fChargeSharingPitch;
     G4bool fEmitDistanceAlphaMeta{false};
+    G4bool fStoreFullFractions{false};
+    G4bool fFullFractionsBranchInitialized{false};
 
     std::vector<G4int> fGridPixelID;
     std::vector<G4double> fGridPixelX;
     std::vector<G4double> fGridPixelY;
+    std::vector<G4double> fFullPixelFractions;
+    std::vector<G4int> fFullPixelIds;
+    std::vector<G4double> fFullPixelXAll;
+    std::vector<G4double> fFullPixelYAll;
+    G4int fNearestPixelI{-1};
+    G4int fNearestPixelJ{-1};
+    G4int fNearestPixelGlobalId{-1};
+    G4int fFullGridSide{0};
 };
 
 #endif // RUNACTION_HH

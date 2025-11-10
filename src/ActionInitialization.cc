@@ -14,55 +14,46 @@ ActionInitialization::ActionInitialization(DetectorConstruction* detector)
 {
 }
 
-void ActionInitialization::BuildForMaster() const 
+void ActionInitialization::BuildForMaster() const
 {
-    RunAction* runAction = new RunAction();
-    SetUserAction(runAction);
-
-    if (fDetector) {
-        fDetector->SetRunAction(runAction);
-    }
-
-    runAction->SetDetectorGridParameters(
-        fDetector->GetPixelSize(),
-        fDetector->GetPixelSpacing(), 
-        fDetector->GetPixelCornerOffset(),
-        fDetector->GetDetSize(),
-        fDetector->GetNumBlocksPerSide()
-    );
-    runAction->SetNeighborhoodRadiusMeta(fDetector->GetNeighborhoodRadius());
+    SetUserAction(CreateRunAction());
 }
 
 void ActionInitialization::Build() const
 {
-    PrimaryGenerator *generator = new PrimaryGenerator(fDetector);
-    SetUserAction(generator);
-    
-    RunAction* runAction = new RunAction();
+    SetUserAction(new PrimaryGenerator(fDetector));
+
+    RunAction* runAction = CreateRunAction();
     SetUserAction(runAction);
 
+    EventAction* eventAction = new EventAction(runAction, fDetector);
+    SetUserAction(eventAction);
+
     if (fDetector) {
-        fDetector->SetRunAction(runAction);
+        fDetector->SetEventAction(eventAction);
+        eventAction->SetNeighborhoodRadius(fDetector->GetNeighborhoodRadius());
     }
-    
+
+    SteppingAction* steppingAction = new SteppingAction(eventAction);
+    SetUserAction(steppingAction);
+
+    eventAction->SetSteppingAction(steppingAction);
+}
+
+RunAction* ActionInitialization::CreateRunAction() const
+{
+    RunAction* runAction = new RunAction();
+    if (!fDetector) {
+        return runAction;
+    }
+
+    fDetector->SetRunAction(runAction);
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
         fDetector->GetPixelSpacing(),
         fDetector->GetPixelCornerOffset(),
         fDetector->GetDetSize(),
-        fDetector->GetNumBlocksPerSide()
-    );
+        fDetector->GetNumBlocksPerSide());
     runAction->SetNeighborhoodRadiusMeta(fDetector->GetNeighborhoodRadius());
-    
-    EventAction* eventAction = new EventAction(runAction, fDetector);
-    SetUserAction(eventAction);
-    
-    fDetector->SetEventAction(eventAction);
-    
-    eventAction->SetNeighborhoodRadius(fDetector->GetNeighborhoodRadius());
-    
-    SteppingAction* steppingAction = new SteppingAction(eventAction);
-    SetUserAction(steppingAction);
-    
-    eventAction->SetSteppingAction(steppingAction);
+    return runAction;
 }
