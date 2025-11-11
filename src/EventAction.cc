@@ -63,6 +63,8 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
       fD0(Constants::D0_CHARGE_SHARING),
       fElementaryCharge(Constants::ELEMENTARY_CHARGE),
       fScorerEnergyDeposit(0.0),
+      fEmitDistanceAlphaOutputs(false),
+      fComputeFullFractions(Constants::STORE_FULL_GRID),
       fChargeSharing(detector),
       fNearestPixelGlobalId(-1),
       fNeighborhoodLayout(detector ? detector->GetNeighborhoodRadius()
@@ -172,15 +174,42 @@ void EventAction::EndOfEventAction(const G4Event* event)
         record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
                                                                 fNeighborhoodChargeFinal.size());
         record.includeDistanceAlpha = fEmitDistanceAlphaOutputs;
-        record.fullGridSide = chargeResult->fullGridSide;
-        record.fullFractions = std::span<const G4double>(chargeResult->fullFractions.data(),
-                                                         chargeResult->fullFractions.size());
-        record.fullPixelIds = std::span<const G4int>(chargeResult->fullPixelIds.data(),
-                                                     chargeResult->fullPixelIds.size());
-        record.fullPixelX = std::span<const G4double>(chargeResult->fullPixelX.data(),
-                                                      chargeResult->fullPixelX.size());
-        record.fullPixelY = std::span<const G4double>(chargeResult->fullPixelY.data(),
-                                                      chargeResult->fullPixelY.size());
+        record.mode = chargeResult->mode;
+        record.geometry = chargeResult->geometry;
+        record.hit = chargeResult->hit;
+        record.patchInfo = chargeResult->patch.patch;
+
+        const auto& fullCharges = chargeResult->full;
+        record.fullGridRows = fullCharges.Rows();
+        record.fullGridCols = fullCharges.Cols();
+        if (!fullCharges.Fi.Empty()) {
+            record.fullFi = std::span<const G4double>(fullCharges.Fi.Data(), fullCharges.Fi.Size());
+        }
+        if (!fullCharges.Qi.Empty()) {
+            record.fullQi = std::span<const G4double>(fullCharges.Qi.Data(), fullCharges.Qi.Size());
+        }
+        if (!fullCharges.Qn.Empty()) {
+            record.fullQn = std::span<const G4double>(fullCharges.Qn.Data(), fullCharges.Qn.Size());
+        }
+        if (!fullCharges.Qf.Empty()) {
+            record.fullQf = std::span<const G4double>(fullCharges.Qf.Data(), fullCharges.Qf.Size());
+        }
+        if (!fullCharges.distance.Empty()) {
+            record.fullDistance =
+                std::span<const G4double>(fullCharges.distance.Data(), fullCharges.distance.Size());
+        }
+        if (!fullCharges.alpha.Empty()) {
+            record.fullAlpha =
+                std::span<const G4double>(fullCharges.alpha.Data(), fullCharges.alpha.Size());
+        }
+        if (!fullCharges.pixelX.Empty()) {
+            record.fullPixelX =
+                std::span<const G4double>(fullCharges.pixelX.Data(), fullCharges.pixelX.Size());
+        }
+        if (!fullCharges.pixelY.Empty()) {
+            record.fullPixelY =
+                std::span<const G4double>(fullCharges.pixelY.Data(), fullCharges.pixelY.Size());
+        }
     } else {
         record.totalGridCells = static_cast<G4int>(fNeighborhoodLayout.TotalCells());
         record.neighborChargesNew = std::span<const G4double>(fNeighborhoodChargeNew.data(),
@@ -188,7 +217,30 @@ void EventAction::EndOfEventAction(const G4Event* event)
         record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
                                                                 fNeighborhoodChargeFinal.size());
         record.includeDistanceAlpha = false;
-        record.fullGridSide = fDetector ? fDetector->GetNumBlocksPerSide() : 0;
+        record.mode = ChargeSharingCalculator::ChargeMode::Patch;
+        if (fDetector) {
+            ChargeSharingCalculator::GridGeom geom{};
+            const G4int numBlocks = std::max(0, fDetector->GetNumBlocksPerSide());
+            const G4double spacing = fDetector->GetPixelSpacing();
+            const G4ThreeVector detPos = fDetector->GetDetectorPos();
+            const G4double detSize = fDetector->GetDetSize();
+            const G4double cornerOffset = fDetector->GetPixelCornerOffset();
+            const G4double pixelSize = fDetector->GetPixelSize();
+            const G4double firstPixelCenter = -detSize / 2.0 + cornerOffset + pixelSize / 2.0;
+            geom.nRows = numBlocks;
+            geom.nCols = numBlocks;
+            geom.pitchX = spacing;
+            geom.pitchY = spacing;
+            geom.x0 = detPos.x() + firstPixelCenter - 0.5 * spacing;
+            geom.y0 = detPos.y() + firstPixelCenter - 0.5 * spacing;
+            record.geometry = geom;
+            record.fullGridRows = numBlocks;
+            record.fullGridCols = numBlocks;
+        } else {
+            record.geometry = ChargeSharingCalculator::GridGeom{};
+            record.fullGridRows = 0;
+            record.fullGridCols = 0;
+        }
     }
 
     fRunAction->FillTree(record);

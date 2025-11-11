@@ -8,6 +8,7 @@
 
 #include "G4Exception.hh"
 #include "G4SystemOfUnits.hh"
+#include "Randomize.hh"
 
 #include <algorithm>
 #include <cmath>
@@ -50,29 +51,77 @@ void ChargeSharingCalculator::SetComputeFullGridFractions(G4bool enabled)
     }
 }
 
+ChargeSharingCalculator::GridGeom ChargeSharingCalculator::BuildGridGeometry() const
+{
+    GridGeom geom{};
+    if (!fDetector) {
+        return geom;
+    }
+
+    const G4int numBlocks = std::max(0, fDetector->GetNumBlocksPerSide());
+    const G4double spacing = fDetector->GetPixelSpacing();
+    const G4ThreeVector detectorPos = fDetector->GetDetectorPos();
+    const G4double detSize = fDetector->GetDetSize();
+    const G4double cornerOffset = fDetector->GetPixelCornerOffset();
+    const G4double pixelSize = fDetector->GetPixelSize();
+    const G4double firstPixelCenter = -detSize / 2.0 + cornerOffset + pixelSize / 2.0;
+
+    geom.nRows = numBlocks;
+    geom.nCols = numBlocks;
+    geom.pitchX = spacing;
+    geom.pitchY = spacing;
+    geom.x0 = detectorPos.x() + firstPixelCenter - 0.5 * spacing;
+    geom.y0 = detectorPos.y() + firstPixelCenter - 0.5 * spacing;
+    return geom;
+}
+
+void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
+{
+    fResult.patch.Reset();
+    if (numBlocksPerSide <= 0) {
+        return;
+    }
+
+    const G4int radius = std::max(0, fNeighborhoodRadius);
+    const G4int row0 = std::max(0, fResult.pixelIndexI - radius);
+    const G4int col0 = std::max(0, fResult.pixelIndexJ - radius);
+    const G4int row1 = std::min(numBlocksPerSide, fResult.pixelIndexI + radius + 1);
+    const G4int col1 = std::min(numBlocksPerSide, fResult.pixelIndexJ + radius + 1);
+    const G4int nRows = std::max(0, row1 - row0);
+    const G4int nCols = std::max(0, col1 - col0);
+    if (nRows <= 0 || nCols <= 0) {
+        return;
+    }
+
+    PatchInfo info{row0, col0, nRows, nCols};
+    fResult.patch.Resize(info);
+    fResult.patch.charges.Zero();
+
+    for (const auto& cell : fResult.cells) {
+        if (cell.globalPixelId < 0) {
+            continue;
+        }
+        const G4int globalRow = cell.globalPixelId / numBlocksPerSide;
+        const G4int globalCol = cell.globalPixelId % numBlocksPerSide;
+        if (globalRow < row0 || globalRow >= row1 || globalCol < col0 || globalCol >= col1) {
+            continue;
+        }
+        const G4int localRow = globalRow - row0;
+        const G4int localCol = globalCol - col0;
+        fResult.patch.charges.Fi(localRow, localCol) = cell.fraction;
+        fResult.patch.charges.Qi(localRow, localCol) = cell.charge;
+        fResult.patch.charges.Qn(localRow, localCol) = cell.charge;
+        fResult.patch.charges.Qf(localRow, localCol) = cell.charge;
+    }
+}
+
 void ChargeSharingCalculator::ResetForEvent()
 {
-    // Keep buffers sized; just reset contents to defaults
-    fResult.cells.clear();
+    fResult.Reset();
     fWeightScratch.clear();
-    if (!fResult.fullFractions.empty()) {
-        std::fill(fResult.fullFractions.begin(), fResult.fullFractions.end(), 0.0);
+    if (!fFullGridWeights.Empty()) {
+        fFullGridWeights.Fill(0.0);
     }
-    if (!fResult.fullPixelIds.empty()) {
-        std::fill(fResult.fullPixelIds.begin(), fResult.fullPixelIds.end(), -1);
-    }
-    if (!fResult.fullPixelX.empty()) {
-        std::fill(fResult.fullPixelX.begin(),
-                  fResult.fullPixelX.end(),
-                  std::numeric_limits<G4double>::quiet_NaN());
-    }
-    if (!fResult.fullPixelY.empty()) {
-        std::fill(fResult.fullPixelY.begin(),
-                  fResult.fullPixelY.end(),
-                  std::numeric_limits<G4double>::quiet_NaN());
-    }
-    fResult.fullGridSide = 0;
-    fResult.fullTotalCells = 0;
     fNeedsReset = false;
 }
 
@@ -97,33 +146,43 @@ const ChargeSharingCalculator::Result& ChargeSharingCalculator::Compute(
     }
     fNeedsReset = true;
 
+    fResult.mode = fComputeFullGridFractions ? ChargeMode::FullGrid : ChargeMode::Patch;
     fResult.gridRadius = fNeighborhoodRadius;
     fResult.gridSide = fGridDim;
     fResult.totalCells = static_cast<std::size_t>(fGridDim) * static_cast<std::size_t>(fGridDim);
     fResult.cells.clear();
     fWeightScratch.clear();
     fResult.nearestPixelCenter = CalcNearestPixel(hitPos);
-    ComputeChargeFractions(hitPos,
-                           energyDeposit,
-                           ionizationEnergy,
-                           amplificationFactor,
-                           d0,
-                           elementaryCharge);
+    fResult.hit.trueX = hitPos.x();
+    fResult.hit.trueY = hitPos.y();
+    fResult.hit.trueZ = hitPos.z();
+    fResult.hit.pixRow = fResult.pixelIndexI;
+    fResult.hit.pixCol = fResult.pixelIndexJ;
+    fResult.hit.pixCenterX = fResult.nearestPixelCenter.x();
+    fResult.hit.pixCenterY = fResult.nearestPixelCenter.y();
+    fResult.geometry = BuildGridGeometry();
+
+    const G4double edepInEV = energyDeposit / eV;
+    const G4double primaryElectrons = ionizationEnergy > 0.0 ? (edepInEV / ionizationEnergy) : 0.0;
+    const G4double totalChargeElectrons =
+        std::max(0.0, primaryElectrons * amplificationFactor);
+
+    ComputeChargeFractions(hitPos, totalChargeElectrons, d0, elementaryCharge);
+
+    const G4int numBlocksPerSide = fDetector ? fDetector->GetNumBlocksPerSide() : 0;
+    PopulatePatchFromNeighbors(numBlocksPerSide);
 
     if (fComputeFullGridFractions) {
         ComputeFullGridFractions(hitPos,
                                  d0,
                                  fDetector->GetPixelSize(),
                                  fDetector->GetPixelSpacing(),
-                                 fDetector->GetNumBlocksPerSide());
+                                 numBlocksPerSide,
+                                 totalChargeElectrons,
+                                 elementaryCharge);
     } else {
-        fResult.fullFractions.clear();
-        fResult.fullPixelIds.clear();
-        fResult.fullPixelX.clear();
-        fResult.fullPixelY.clear();
-        fResult.fullGridSide = 0;
-        fResult.fullTotalCells = 0;
-        fFullGridWeights.clear();
+        fResult.full.Clear();
+        fFullGridWeights.Clear();
     }
 
     return fResult;
@@ -178,16 +237,10 @@ G4double ChargeSharingCalculator::CalcPixelAlphaSubtended(G4double distance,
 }
 
 void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos,
-                                                     G4double energyDeposit,
-                                                     G4double ionizationEnergy,
-                                                     G4double amplificationFactor,
+                                                     G4double totalChargeElectrons,
                                                      G4double d0,
                                                      G4double elementaryCharge)
 {
-    const G4double edepInEV = energyDeposit / eV;
-    const G4double numElectrons = ionizationEnergy > 0.0 ? edepInEV / ionizationEnergy : 0.0;
-    const G4double totalCharge = numElectrons * amplificationFactor;
-
     const G4double pixelSize = fDetector->GetPixelSize();
     const G4double pixelSpacing = fDetector->GetPixelSpacing();
     const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
@@ -282,7 +335,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
         const G4double fraction =
             (totalWeight > 0.0) ? (weight / totalWeight) : 0.0;
         cell.fraction = fraction;
-        cell.charge = fraction * totalCharge * elementaryCharge;
+        cell.charge = fraction * totalChargeElectrons * elementaryCharge;
     }
 }
 
@@ -306,56 +359,26 @@ void ChargeSharingCalculator::BuildOffsets()
 void ChargeSharingCalculator::EnsureFullGridBuffer()
 {
     if (!fDetector) {
-        fResult.fullFractions.clear();
-        fResult.fullPixelIds.clear();
-        fResult.fullPixelX.clear();
-        fResult.fullPixelY.clear();
-        fFullGridWeights.clear();
-        fResult.fullGridSide = 0;
-        fResult.fullTotalCells = 0;
+        fResult.full.Clear();
+        fFullGridWeights.Clear();
         return;
     }
     const G4int numBlocksPerSide = std::max(0, fDetector->GetNumBlocksPerSide());
-    const std::size_t totalCells =
-        static_cast<std::size_t>(numBlocksPerSide) * static_cast<std::size_t>(numBlocksPerSide);
-    if (totalCells == 0U) {
-        fResult.fullFractions.clear();
-        fResult.fullPixelIds.clear();
-        fResult.fullPixelX.clear();
-        fResult.fullPixelY.clear();
-        fFullGridWeights.clear();
-        fResult.fullGridSide = 0;
-        fResult.fullTotalCells = 0;
+    if (numBlocksPerSide <= 0) {
+        fResult.full.Clear();
+        fFullGridWeights.Clear();
         return;
     }
-    fResult.fullGridSide = numBlocksPerSide;
-    fResult.fullTotalCells = totalCells;
+    if (fResult.full.Rows() != numBlocksPerSide || fResult.full.Cols() != numBlocksPerSide) {
+        fResult.full.Resize(numBlocksPerSide, numBlocksPerSide);
+    } else {
+        fResult.full.Zero();
+    }
 
-    if (fResult.fullFractions.size() != totalCells) {
-        fResult.fullFractions.assign(totalCells, 0.0);
-    } else {
-        std::fill(fResult.fullFractions.begin(), fResult.fullFractions.end(), 0.0);
-    }
-    if (fFullGridWeights.size() != totalCells) {
-        fFullGridWeights.assign(totalCells, 0.0);
-    } else {
-        std::fill(fFullGridWeights.begin(), fFullGridWeights.end(), 0.0);
-    }
-    if (fResult.fullPixelIds.size() != totalCells) {
-        fResult.fullPixelIds.assign(totalCells, -1);
-    } else {
-        std::fill(fResult.fullPixelIds.begin(), fResult.fullPixelIds.end(), -1);
-    }
-    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
-    if (fResult.fullPixelX.size() != totalCells) {
-        fResult.fullPixelX.assign(totalCells, nan);
-    } else {
-        std::fill(fResult.fullPixelX.begin(), fResult.fullPixelX.end(), nan);
-    }
-    if (fResult.fullPixelY.size() != totalCells) {
-        fResult.fullPixelY.assign(totalCells, nan);
-    } else {
-        std::fill(fResult.fullPixelY.begin(), fResult.fullPixelY.end(), nan);
+    if (fFullGridWeights.Rows() != numBlocksPerSide || fFullGridWeights.Cols() != numBlocksPerSide) {
+        fFullGridWeights.Resize(numBlocksPerSide, numBlocksPerSide, 0.0);
+    } else if (!fFullGridWeights.Empty()) {
+        fFullGridWeights.Fill(0.0);
     }
 }
 
@@ -363,30 +386,36 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
                                                        G4double d0,
                                                        G4double pixelSize,
                                                        G4double pixelSpacing,
-                                                       G4int numBlocksPerSide)
+                                                       G4int numBlocksPerSide,
+                                                       G4double totalChargeElectrons,
+                                                       G4double elementaryCharge)
 {
     if (!fDetector) {
-        fResult.fullFractions.clear();
-        fFullGridWeights.clear();
+        fResult.full.Clear();
+        fFullGridWeights.Clear();
         return;
     }
 
     const G4int gridSide = std::max(0, numBlocksPerSide);
     if (gridSide <= 0) {
-        fResult.fullFractions.clear();
-        fFullGridWeights.clear();
+        fResult.full.Clear();
+        fFullGridWeights.Clear();
         return;
     }
 
     EnsureFullGridBuffer();
-    if (fResult.fullFractions.empty()) {
+    const G4int rows = fResult.full.Rows();
+    const G4int cols = fResult.full.Cols();
+    if (rows <= 0 || cols <= 0) {
         return;
     }
-
-    const std::size_t totalCells =
-        static_cast<std::size_t>(gridSide) * static_cast<std::size_t>(gridSide);
-    fResult.fullGridSide = gridSide;
-    fResult.fullTotalCells = totalCells;
+    fResult.full.Zero();
+    if (!fFullGridWeights.Empty()) {
+        fFullGridWeights.Fill(0.0);
+    }
+    fResult.geometry = BuildGridGeometry();
+    fResult.geometry.pitchX = pixelSpacing;
+    fResult.geometry.pitchY = pixelSpacing;
 
     const G4double rawD0Length = d0 * micrometer;
     constexpr G4double minD0Length = 1e-6 * micrometer;
@@ -419,21 +448,24 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
     const G4double baseDx = hitX - nearestX;
     const G4double baseDy = hitY - nearestY;
 
+    G4double totalWeight = 0.0;
+
+    const auto& gainSigmas = fDetector->GetPixelGainSigmas();
+    const std::size_t gainCount = gainSigmas.size();
+    const bool hasGainNoise = gainCount > 0;
+    const G4double sigmaNoise = Constants::NOISE_ELECTRON_COUNT * elementaryCharge;
+    const bool hasAdditiveNoise = sigmaNoise > 0.0;
+    const G4double totalChargeCoulomb = totalChargeElectrons * elementaryCharge;
+
     const G4ThreeVector detectorPos = fDetector->GetDetectorPos();
     const G4double detSize = fDetector->GetDetSize();
     const G4double cornerOffset = fDetector->GetPixelCornerOffset();
     const G4double firstPixelPos = -detSize / 2.0 + cornerOffset + pixelSize / 2.0;
 
-    G4double totalWeight = 0.0;
-
-    for (G4int i = 0; i < gridSide; ++i) {
+    for (G4int i = 0; i < rows; ++i) {
         const G4int di = i - fResult.pixelIndexI;
-        for (G4int j = 0; j < gridSide; ++j) {
+        for (G4int j = 0; j < cols; ++j) {
             const G4int dj = j - fResult.pixelIndexJ;
-            const std::size_t idx =
-                static_cast<std::size_t>(i) * static_cast<std::size_t>(gridSide) +
-                static_cast<std::size_t>(j);
-
             const G4double dx = baseDx - di * pixelSpacing;
             const G4double dy = baseDy - dj * pixelSpacing;
             const G4double distanceSquared = dx * dx + dy * dy;
@@ -450,28 +482,44 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
             const G4double pixelCenterX = detectorPos.x() + firstPixelPos + i * pixelSpacing;
             const G4double pixelCenterY = detectorPos.y() + firstPixelPos + j * pixelSpacing;
-            const G4int globalId = i * gridSide + j;
 
-            fFullGridWeights[idx] = weight;
-            if (idx < fResult.fullPixelIds.size()) {
-                fResult.fullPixelIds[idx] = globalId;
-            }
-            if (idx < fResult.fullPixelX.size()) {
-                fResult.fullPixelX[idx] = pixelCenterX;
-            }
-            if (idx < fResult.fullPixelY.size()) {
-                fResult.fullPixelY[idx] = pixelCenterY;
-            }
+            fFullGridWeights(i, j) = weight;
+            fResult.full.distance(i, j) = distance;
+            fResult.full.alpha(i, j) = alpha;
+            fResult.full.pixelX(i, j) = pixelCenterX;
+            fResult.full.pixelY(i, j) = pixelCenterY;
             totalWeight += weight;
         }
     }
 
-    if (totalWeight > 0.0) {
-        const G4double invTotalWeight = 1.0 / totalWeight;
-        for (std::size_t idx = 0; idx < totalCells; ++idx) {
-            fResult.fullFractions[idx] = fFullGridWeights[idx] * invTotalWeight;
+    const G4double invTotalWeight = (totalWeight > 0.0) ? (1.0 / totalWeight) : 0.0;
+    for (G4int i = 0; i < rows; ++i) {
+        for (G4int j = 0; j < cols; ++j) {
+            const auto idx = static_cast<std::size_t>(i) * static_cast<std::size_t>(cols) +
+                             static_cast<std::size_t>(j);
+            const G4double weight = fFullGridWeights(i, j);
+            const G4double fraction = weight * invTotalWeight;
+            const G4double baseCharge = fraction * totalChargeCoulomb;
+            G4double noisyCharge = baseCharge;
+            if (hasGainNoise) {
+                if (idx < gainCount) {
+                    const G4double sigmaGain = gainSigmas[idx];
+                    if (sigmaGain > 0.0) {
+                        noisyCharge *= G4RandGauss::shoot(1.0, sigmaGain);
+                    }
+                }
+            }
+            G4double finalCharge = noisyCharge;
+            if (hasAdditiveNoise) {
+                finalCharge += G4RandGauss::shoot(0.0, sigmaNoise);
+            }
+            finalCharge = std::max(0.0, finalCharge);
+
+            fResult.full.Fi(i, j) = fraction;
+            fResult.full.Qi(i, j) = baseCharge;
+            fResult.full.Qn(i, j) = noisyCharge;
+            fResult.full.Qf(i, j) = finalCharge;
         }
-    } else {
-        std::fill(fResult.fullFractions.begin(), fResult.fullFractions.end(), 0.0);
     }
 }
+

@@ -1,7 +1,7 @@
 // ROOT macro: FitGaus1D.C
 // Performs 1D Gaussian fits on central row and column of the charge neighborhood
-// using Q_f (noisy charge per pixel) to reconstruct (x_rec_2d, y_rec_2d) and
-// deltas, and appends them as new branches. Falls back to Q_i if Q_f is absent.
+// using Qf (noisy charge per pixel) to reconstruct (x_rec_2d, y_rec_2d) and
+// deltas, and appends them as new branches. Falls back to Qi if Qf is absent.
 
 #include <TFile.h>
 #include <TTree.h>
@@ -133,18 +133,18 @@ std::string ResolveChargeBranch(TTree& tree, const std::string& requestedBranch)
     if (hasBranch(requestedBranch)) {
         return requestedBranch;
     }
-    if (hasBranch("Q_f")) {
-        return "Q_f";
+    if (hasBranch("Qf")) {
+        return "Qf";
     }
-    if (hasBranch("F_i")) {
-        return "F_i";
+    if (hasBranch("Fi")) {
+        return "Fi";
     }
-    if (hasBranch("Q_i")) {
-        return "Q_i";
+    if (hasBranch("Qi")) {
+        return "Qi";
     }
 
     ::Error("FitGaus1D",
-            "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.",
+            "No charge branch found (requested '%s'). Tried Qf, Fi, Qi.",
             requestedBranch.c_str());
     return {};
 }
@@ -323,11 +323,11 @@ namespace fitgaus1d::detail {
     bool bound = false;
     if (!preferredBranch.empty() && bind(preferredBranch.c_str())) {
       bound = true;
-    } else if (bind("Q_f")) {
+    } else if (bind("Qf")) {
       bound = true;
-    } else if (bind("F_i")) {
+    } else if (bind("Fi")) {
       bound = true;
-    } else if (bind("Q_i")) {
+    } else if (bind("Qi")) {
       bound = true;
     }
     if (!bound) {
@@ -523,7 +523,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveParamMu = true,
                  bool saveParamSigma = true,
                  bool saveParamB = true,
-                 const char* chargeBranch = "Q_f",
+                 const char* chargeBranch = "Qf",
                  bool fitDiagonals = false,
                  bool saveDiagParamA = true,
                  bool saveDiagParamMu = true,
@@ -565,7 +565,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
 
   if (distanceErrorsEnabled && useQnQiPercentErrors) {
     ::Warning("FitGaus1D",
-              "Distance-weighted uncertainties requested; ignoring Q_n/Q_i"
+              "Distance-weighted uncertainties requested; ignoring Qn/Qi"
               " vertical uncertainty model.");
   }
 
@@ -582,7 +582,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   }
 
   const std::string requestedBranch =
-      (chargeBranch && chargeBranch[0] != '\0') ? std::string(chargeBranch) : std::string("Q_f");
+      (chargeBranch && chargeBranch[0] != '\0') ? std::string(chargeBranch) : std::string("Qf");
 
   const auto metadataOpt = fitgaus1d::ExtractMetadata(*fileHandle, *tree, requestedBranch);
   if (!metadataOpt) {
@@ -622,7 +622,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   double x_hit = 0.0, y_hit = 0.0;
   double x_px  = 0.0, y_px  = 0.0;
   Bool_t is_pixel_hit = kFALSE;
-  // Use Q_f (noisy) for fits; fall back to Q_i if Q_f absent
+  // Use Qf (noisy) for fits; fall back to Qi if Qf absent
   std::vector<double>* Q = nullptr; // used for fits (charges in Coulombs)
   std::vector<double>* Qi = nullptr; // initial charge (for error model)
   std::vector<double>* Qn = nullptr; // noiseless charge (for error model)
@@ -640,13 +640,13 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   // Enable only the chosen charge branch
   tree->SetBranchStatus(chosenCharge.c_str(), 1);
   if (enableQiQnErrors) {
-    haveQiBranchForErrors = tree->GetBranch("Q_i") != nullptr;
-    haveQnBranchForErrors = tree->GetBranch("Q_n") != nullptr;
+    haveQiBranchForErrors = tree->GetBranch("Qi") != nullptr;
+    haveQnBranchForErrors = tree->GetBranch("Qn") != nullptr;
     if (haveQiBranchForErrors && haveQnBranchForErrors) {
-      tree->SetBranchStatus("Q_i", 1);
-      tree->SetBranchStatus("Q_n", 1);
+      tree->SetBranchStatus("Qi", 1);
+      tree->SetBranchStatus("Qn", 1);
     } else {
-      ::Warning("FitGaus1D", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
+      ::Warning("FitGaus1D", "Requested Qi/Qn vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
       enableQiQnErrors = false;
     }
   }
@@ -658,10 +658,10 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
   if (enableQiQnErrors && haveQiBranchForErrors) {
-    tree->SetBranchAddress("Q_i", &Qi);
+    tree->SetBranchAddress("Qi", &Qi);
   }
   if (enableQiQnErrors && haveQnBranchForErrors) {
-    tree->SetBranchAddress("Q_n", &Qn);
+    tree->SetBranchAddress("Qn", &Qn);
   }
 
   // New branches (outputs).

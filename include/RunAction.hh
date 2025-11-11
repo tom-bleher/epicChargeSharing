@@ -67,11 +67,20 @@ public:
         std::span<const ChargeSharingCalculator::Result::NeighborCell> neighborCells;
         std::span<const G4double> neighborChargesNew;
         std::span<const G4double> neighborChargesFinal;
-        std::span<const G4double> fullFractions;
-        std::span<const G4int> fullPixelIds;
+        std::span<const G4double> fullFi;
+        std::span<const G4double> fullQi;
+        std::span<const G4double> fullQn;
+        std::span<const G4double> fullQf;
+        std::span<const G4double> fullDistance;
+        std::span<const G4double> fullAlpha;
         std::span<const G4double> fullPixelX;
         std::span<const G4double> fullPixelY;
-        G4int fullGridSide{0};
+        ChargeSharingCalculator::GridGeom geometry;
+        ChargeSharingCalculator::HitInfo hit;
+        ChargeSharingCalculator::ChargeMode mode{ChargeSharingCalculator::ChargeMode::Patch};
+        ChargeSharingCalculator::PatchInfo patchInfo;
+        G4int fullGridRows{0};
+        G4int fullGridCols{0};
         G4int nearestPixelI{-1};
         G4int nearestPixelJ{-1};
         G4int nearestPixelGlobalId{-1};
@@ -89,6 +98,7 @@ public:
                                   G4double betaPerMicron,
                                   G4double pitch);
     void SetChargeSharingDistanceAlphaMeta(G4bool enabled);
+    void SetGridPixelCenters(const std::vector<G4ThreeVector>& centers);
     void ConfigureFullFractionBranch(G4bool enable);
 
     void FillTree(const EventRecord& record);
@@ -179,10 +189,14 @@ private:
     std::vector<G4int> fGridPixelID;
     std::vector<G4double> fGridPixelX;
     std::vector<G4double> fGridPixelY;
-    std::vector<G4double> fFullPixelFractions;
-    std::vector<G4int> fFullPixelIds;
-    std::vector<G4double> fFullPixelXAll;
-    std::vector<G4double> fFullPixelYAll;
+    std::vector<G4double> fFullFi;
+    std::vector<G4double> fFullQi;
+    std::vector<G4double> fFullQn;
+    std::vector<G4double> fFullQf;
+    std::vector<G4double> fFullDistance;
+    std::vector<G4double> fFullAlpha;
+    std::vector<G4double> fFullPixelXGrid;
+    std::vector<G4double> fFullPixelYGrid;
     G4int fNearestPixelI{-1};
     G4int fNearestPixelJ{-1};
     G4int fNearestPixelGlobalId{-1};

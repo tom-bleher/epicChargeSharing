@@ -24,6 +24,7 @@
 
 #include "Randomize.hh"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <limits>
@@ -210,11 +211,16 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
     const G4double pixelZ = detectorPos.z() + fDetWidth / 2 + fPixelWidth / 2;
     const G4double firstPixelPos = -fDetSize / 2 + fPixelCornerOffset + fPixelSize / 2;
 
+    const G4int totalPixels = fNumBlocksPerSide * fNumBlocksPerSide;
+    fPixelCenters.assign(static_cast<std::size_t>(std::max(0, totalPixels)),
+                         G4ThreeVector(0., 0., 0.));
+
     G4int copyNo = 0;
     for (G4int i = 0; i < fNumBlocksPerSide; ++i) {
         for (G4int j = 0; j < fNumBlocksPerSide; ++j) {
             const G4double pixelX = firstPixelPos + i * fPixelSpacing;
             const G4double pixelY = firstPixelPos + j * fPixelSpacing;
+            const G4int globalId = i * fNumBlocksPerSide + j;
 
             new G4PVPlacement(
                 nullptr,
@@ -225,6 +231,13 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
                 false,
                 copyNo++,
                 checkOverlaps);
+
+            if (globalId >= 0 && globalId < totalPixels) {
+                const auto idx = static_cast<std::size_t>(globalId);
+                if (idx < fPixelCenters.size()) {
+                    fPixelCenters[idx] = G4ThreeVector(pixelX, pixelY, pixelZ);
+                }
+            }
         }
     }
 
@@ -276,6 +289,7 @@ void DetectorConstruction::SyncRunMetadata()
         fPixelCornerOffset,
         fDetSize,
         fNumBlocksPerSide);
+    fRunAction->SetGridPixelCenters(fPixelCenters);
     fRunAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
 
     const auto chargeModel = Constants::CHARGE_SHARING_MODEL;
@@ -316,6 +330,18 @@ DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const
     result.indexI = i;
     result.indexJ = j;
     return result;
+}
+
+G4ThreeVector DetectorConstruction::GetPixelCenter(G4int globalPixelId) const
+{
+    if (globalPixelId < 0) {
+        return G4ThreeVector(0., 0., 0.);
+    }
+    const auto idx = static_cast<std::size_t>(globalPixelId);
+    if (idx >= fPixelCenters.size()) {
+        return G4ThreeVector(0., 0., 0.);
+    }
+    return fPixelCenters[idx];
 }
 
 void DetectorConstruction::ConstructSDandField()

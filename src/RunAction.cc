@@ -25,6 +25,7 @@
 #include "TSystem.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <array>
 #include <cmath>
 #include <filesystem>
@@ -80,9 +81,6 @@ RunAction::RunAction()
       fEdep(0.0),
       fPixelTrueDeltaX(0.0),
       fPixelTrueDeltaY(0.0),
-      fNearestPixelI(-1),
-      fNearestPixelJ(-1),
-      fNearestPixelGlobalId(-1),
       fNeighborhoodLayout(Constants::NEIGHBORHOOD_RADIUS),
       fGridPixelSize(0.0),
       fGridPixelSpacing(0.0),
@@ -93,7 +91,11 @@ RunAction::RunAction()
       fChargeSharingModel(Constants::CHARGE_SHARING_MODEL),
       fChargeSharingBeta(std::numeric_limits<G4double>::quiet_NaN()),
       fChargeSharingPitch(0.0),
-      fEmitDistanceAlphaMeta(false)
+      fEmitDistanceAlphaMeta(false),
+      fStoreFullFractions(Constants::STORE_FULL_GRID),
+      fNearestPixelI(-1),
+      fNearestPixelJ(-1),
+      fNearestPixelGlobalId(-1)
 {
 }
 
@@ -165,10 +167,14 @@ void RunAction::EnsureBranchBuffersInitialized()
     if (fStoreFullFractions) {
         EnsureFullFractionBuffer(fGridNumBlocksPerSide);
     } else {
-        fFullPixelFractions.clear();
-        fFullPixelIds.clear();
-        fFullPixelXAll.clear();
-        fFullPixelYAll.clear();
+        fFullFi.clear();
+        fFullQi.clear();
+        fFullQn.clear();
+        fFullQf.clear();
+        fFullDistance.clear();
+        fFullAlpha.clear();
+        fFullPixelXGrid.clear();
+        fFullPixelYGrid.clear();
         fFullGridSide = 0;
     }
     fFullFractionsBranchInitialized = false;
@@ -184,34 +190,34 @@ bool RunAction::EnsureFullFractionBuffer(G4int gridSide)
     const std::size_t totalPixels =
         static_cast<std::size_t>(numBlocks) * static_cast<std::size_t>(numBlocks);
     if (totalPixels == 0U) {
-        fFullPixelFractions.clear();
-        fFullPixelIds.clear();
-        fFullPixelXAll.clear();
-        fFullPixelYAll.clear();
+        fFullFi.clear();
+        fFullQi.clear();
+        fFullQn.clear();
+        fFullQf.clear();
+        fFullDistance.clear();
+        fFullAlpha.clear();
+        fFullPixelXGrid.clear();
+        fFullPixelYGrid.clear();
         fFullGridSide = 0;
         return false;
     }
-    if (fFullPixelFractions.size() != totalPixels) {
-        fFullPixelFractions.assign(totalPixels, 0.0);
-    } else {
-        std::fill(fFullPixelFractions.begin(), fFullPixelFractions.end(), 0.0);
-    }
-    if (fFullPixelIds.size() != totalPixels) {
-        fFullPixelIds.assign(totalPixels, -1);
-    } else {
-        std::fill(fFullPixelIds.begin(), fFullPixelIds.end(), -1);
-    }
-    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
-    if (fFullPixelXAll.size() != totalPixels) {
-        fFullPixelXAll.assign(totalPixels, nan);
-    } else {
-        std::fill(fFullPixelXAll.begin(), fFullPixelXAll.end(), nan);
-    }
-    if (fFullPixelYAll.size() != totalPixels) {
-        fFullPixelYAll.assign(totalPixels, nan);
-    } else {
-        std::fill(fFullPixelYAll.begin(), fFullPixelYAll.end(), nan);
-    }
+    fFullGridSide = numBlocks;
+    const auto ensure = [totalPixels](auto& vec) {
+        if (vec.size() != totalPixels) {
+            vec.assign(totalPixels, 0.0);
+        } else {
+            std::fill(vec.begin(), vec.end(), 0.0);
+        }
+    };
+
+    ensure(fFullFi);
+    ensure(fFullQi);
+    ensure(fFullQn);
+    ensure(fFullQf);
+    ensure(fFullDistance);
+    ensure(fFullAlpha);
+    ensure(fFullPixelXGrid);
+    ensure(fFullPixelYGrid);
     return true;
 }
 
@@ -331,8 +337,13 @@ void RunAction::InitializeRootOutputs(const ThreadContext& context, const G4Stri
                     ("Unable to open ROOT file " + std::string(fileName)).c_str());
     }
     rootFile->SetCompressionLevel(0);
+    rootFile->cd();
 
     auto* tree = new TTree("Hits", "AC-LGAD charge sharing hits");
+    tree->SetDirectory(rootFile);
+    tree->SetAutoSave(0);
+    tree->SetAutoFlush(0);
+    tree->SetMaxTreeSize(static_cast<Long64_t>(10LL) * 1024LL * 1024LL * 1024LL);
     ConfigureCoreBranches(tree);
 
     fRootWriter->Attach(rootFile, tree, true);
@@ -387,24 +398,28 @@ void RunAction::ConfigureClassificationBranches(TTree* tree)
 
 void RunAction::ConfigureVectorBranches(TTree* tree)
 {
+    constexpr Int_t bufsize = 256000;
+    const Int_t splitLevel = 0;
     const std::array<std::pair<const char*, std::vector<G4double>*>, 8> vectorDoubleBranches{{
-        {"F_i", &fNeighborhoodChargeFractions},
-        {"Q_i", &fNeighborhoodCharge},
-        {"Q_n", &fNeighborhoodChargeNew},
-        {"Q_f", &fNeighborhoodChargeFinal},
+        {"Fi", &fNeighborhoodChargeFractions},
+        {"Qi", &fNeighborhoodCharge},
+        {"Qn", &fNeighborhoodChargeNew},
+        {"Qf", &fNeighborhoodChargeFinal},
         {"NeighborhoodPixelX", &fNeighborhoodPixelX},
         {"NeighborhoodPixelY", &fNeighborhoodPixelY},
         {"NeighborhoodDistance", &fNeighborhoodDistance},
         {"NeighborhoodAlpha", &fNeighborhoodAlpha},
     }};
     for (const auto& entry : vectorDoubleBranches) {
-        tree->Branch(entry.first, entry.second);
+        tree->Branch(entry.first, entry.second, bufsize, splitLevel);
     }
 }
 
 void RunAction::ConfigureNeighborhoodBranches(TTree* tree)
 {
-    tree->Branch("NeighborhoodPixelID", &fNeighborhoodPixelID);
+    constexpr Int_t bufsize = 256000;
+    const Int_t splitLevel = 0;
+    tree->Branch("NeighborhoodPixelID", &fNeighborhoodPixelID, bufsize, splitLevel);
 }
 
 void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run)
@@ -651,38 +666,40 @@ void RunAction::PopulateFullFractionsFromRecord(const EventRecord& record)
         return;
     }
 
-    const G4int gridSide = (record.fullGridSide > 0) ? record.fullGridSide : fGridNumBlocksPerSide;
+    const G4int gridSide =
+        (record.fullGridCols > 0) ? record.fullGridCols : fGridNumBlocksPerSide;
     if (!EnsureFullFractionBuffer(gridSide)) {
         return;
     }
 
-    if (record.fullGridSide > 0) {
-        fFullGridSide = record.fullGridSide;
+    if (record.fullGridCols > 0) {
+        fFullGridSide = record.fullGridCols;
     }
 
-    const std::size_t copyFractions =
-        std::min<std::size_t>(fFullPixelFractions.size(), record.fullFractions.size());
-    if (copyFractions > 0) {
-        std::copy_n(record.fullFractions.begin(), copyFractions, fFullPixelFractions.begin());
-    }
+    const auto copyOrZero = [](const std::span<const G4double>& source,
+                               std::vector<G4double>& target) {
+        if (target.empty()) {
+            return;
+        }
+        if (source.empty()) {
+            std::fill(target.begin(), target.end(), 0.0);
+            return;
+        }
+        const std::size_t n = std::min<std::size_t>(target.size(), source.size());
+        std::copy_n(source.begin(), n, target.begin());
+        if (n < target.size()) {
+            std::fill(target.begin() + static_cast<std::ptrdiff_t>(n), target.end(), 0.0);
+        }
+    };
 
-    const std::size_t copyIds =
-        std::min<std::size_t>(fFullPixelIds.size(), record.fullPixelIds.size());
-    if (copyIds > 0) {
-        std::copy_n(record.fullPixelIds.begin(), copyIds, fFullPixelIds.begin());
-    }
-
-    const std::size_t copyX =
-        std::min<std::size_t>(fFullPixelXAll.size(), record.fullPixelX.size());
-    if (copyX > 0) {
-        std::copy_n(record.fullPixelX.begin(), copyX, fFullPixelXAll.begin());
-    }
-
-    const std::size_t copyY =
-        std::min<std::size_t>(fFullPixelYAll.size(), record.fullPixelY.size());
-    if (copyY > 0) {
-        std::copy_n(record.fullPixelY.begin(), copyY, fFullPixelYAll.begin());
-    }
+    copyOrZero(record.fullFi, fFullFi);
+    copyOrZero(record.fullQi, fFullQi);
+    copyOrZero(record.fullQn, fFullQn);
+    copyOrZero(record.fullQf, fFullQf);
+    copyOrZero(record.fullDistance, fFullDistance);
+    copyOrZero(record.fullAlpha, fFullAlpha);
+    copyOrZero(record.fullPixelX, fFullPixelXGrid);
+    copyOrZero(record.fullPixelY, fFullPixelYGrid);
 }
 
 void RunAction::RunPostProcessingFits()
@@ -823,6 +840,20 @@ void RunAction::SetChargeSharingDistanceAlphaMeta(G4bool enabled)
     fEmitDistanceAlphaMeta = enabled;
 }
 
+void RunAction::SetGridPixelCenters(const std::vector<G4ThreeVector>& centers)
+{
+    const std::size_t count = centers.size();
+    fGridPixelID.resize(count);
+    fGridPixelX.resize(count);
+    fGridPixelY.resize(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        const auto& center = centers[i];
+        fGridPixelID[i] = static_cast<G4int>(i);
+        fGridPixelX[i] = center.x();
+        fGridPixelY[i] = center.y();
+    }
+}
+
 void RunAction::ConfigureFullFractionBranch(G4bool enable)
 {
     fStoreFullFractions = enable;
@@ -844,10 +875,16 @@ void RunAction::ConfigureFullFractionBranch(G4bool enable)
         return;
     }
 
-    tree->Branch("F_all", &fFullPixelFractions);
-    tree->Branch("F_all_pixel_id", &fFullPixelIds);
-    tree->Branch("F_all_pixel_x", &fFullPixelXAll);
-    tree->Branch("F_all_pixel_y", &fFullPixelYAll);
+    constexpr Int_t bufsize = 256000; // accommodate full-grid payload comfortably
+    const Int_t splitLevel = 0;       // disable splitting for large std::vector payloads
+    tree->Branch("FiGrid", &fFullFi, bufsize, splitLevel);
+    tree->Branch("QiGrid", &fFullQi, bufsize, splitLevel);
+    tree->Branch("QnGrid", &fFullQn, bufsize, splitLevel);
+    tree->Branch("QfGrid", &fFullQf, bufsize, splitLevel);
+    tree->Branch("DistanceGrid", &fFullDistance, bufsize, splitLevel);
+    tree->Branch("AlphaGrid", &fFullAlpha, bufsize, splitLevel);
+    tree->Branch("PixelXGrid", &fFullPixelXGrid, bufsize, splitLevel);
+    tree->Branch("PixelYGrid", &fFullPixelYGrid, bufsize, splitLevel);
     tree->Branch("FullGridSide", &fFullGridSide, "FullGridSide/I");
     fFullFractionsBranchInitialized = true;
 }

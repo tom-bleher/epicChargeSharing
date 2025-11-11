@@ -54,7 +54,7 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     ConfigureParticleGun();
     ConfigureMessenger();
 
-    fFixedX = 125.0*um;
+    fFixedX = 0.0;
     if (fDetector) {
         fFixedY = 0.5 * fDetector->GetPixelSpacing();
     }

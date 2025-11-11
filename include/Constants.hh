@@ -17,11 +17,11 @@ namespace Constants {
 
     // CHARGE_SHARING_MODEL controls the charge sharing formulation used.
     // Log: legacy logarithmic model; Linear: new linear attenuation model.
-    const ChargeSharingModel CHARGE_SHARING_MODEL = ChargeSharingModel::Log;
+    const ChargeSharingModel CHARGE_SHARING_MODEL = ChargeSharingModel::Linear;
 
     // Linear model beta parameters based on pixel pitch window (in microns).
-    const G4double LINEAR_CHARGE_MODEL_BETA_NARROW = 0.003;      // for 100 - 200 um pitch
-    const G4double LINEAR_CHARGE_MODEL_BETA_WIDE = 0.001;        // for 200 - 500 um pitch
+    const G4double LINEAR_CHARGE_MODEL_BETA_NARROW = 0.003;      // for 100 - 200 um pitch (value from paper)
+    const G4double LINEAR_CHARGE_MODEL_BETA_WIDE = 0.001;        // for 200 - 500 um pitch (value adjusted)
     const G4double LINEAR_CHARGE_MODEL_MIN_PITCH = 100.0 * micrometer;
     const G4double LINEAR_CHARGE_MODEL_BOUNDARY_PITCH = 200.0 * micrometer;
     const G4double LINEAR_CHARGE_MODEL_MAX_PITCH = 500.0 * micrometer;
@@ -53,6 +53,7 @@ namespace Constants {
     
     // Grid and neighborhood configuration
     const G4int NEIGHBORHOOD_RADIUS = 2;                 // Neighborhood radius r (grid size (2r+1)x(2r+1); r=2 -> 5x5)
+    const G4bool STORE_FULL_GRID = true;                // Whether to persist full detector grid by default
     
     // ========================
     // SIMULATION CONSTANTS

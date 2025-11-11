@@ -57,6 +57,8 @@ public:
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
     G4ThreeVector GetDetectorPos() const;
     PixelLocation FindNearestPixel(const G4ThreeVector& pos) const;
+    const std::vector<G4ThreeVector>& GetPixelCenters() const { return fPixelCenters; }
+    G4ThreeVector GetPixelCenter(G4int globalPixelId) const;
     // Noise sigma accessors (row-major global pixel id = i*N + j)
     G4double GetPixelGainSigma(G4int globalPixelId) const { return (globalPixelId >= 0 && globalPixelId < (G4int)fPixelGainSigmas.size()) ? fPixelGainSigmas[globalPixelId] : 0.0; }
     const std::vector<G4double>& GetPixelGainSigmas() const { return fPixelGainSigmas; }
@@ -102,6 +104,7 @@ private:
 
     // Per-pixel multiplicative noise sigma table (initialized once during construction)
     std::vector<G4double> fPixelGainSigmas;
+    std::vector<G4ThreeVector> fPixelCenters;
 };
 
 #endif // DETECTORCONSTRUCTION_HH
