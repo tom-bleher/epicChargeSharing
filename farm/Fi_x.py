@@ -21,6 +21,8 @@ Key features
   pixel coordinate drifts and event coverage, a consolidated PNG plotting mean
   fraction vs. x with error bars, and optional per-file histograms of the
   event-level distributions.
+- Comparison mode: optionally process two directories (--input-dir2) to generate
+  individual plots for each plus an overlay comparison plot.
 
 Requirements
 ------------
@@ -51,7 +53,7 @@ import uproot
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_DIR = Path("/home/tomble/epicChargeSharing/sweep_x_runs/20251101-072458")
+DEFAULT_INPUT_DIR = Path("/home/tomble/epicChargeSharing/sweep_x_runs/20251111-011246")
 DEFAULT_OUTPUT_BASE = REPO_ROOT / "proc" / "fit" / "fi_vs_x"
 SENTINEL_INVALID_FRACTION = -999.0
 
@@ -131,6 +133,17 @@ class FileStats:
     offset_um: Optional[Tuple[float, float]] = None
     distance_um: Optional[float] = None
     values: Optional[np.ndarray] = None
+
+
+@dataclass
+class RunResults:
+    """Results from processing a single run directory."""
+    input_dir: Path
+    output_dir: Path
+    pixel: PixelSelection
+    stats: List[FileStats]
+    excel_path: Path
+    plot_path: Path
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +551,13 @@ def save_histogram(values: Optional[np.ndarray], stats: FileStats, pixel_id: int
     plt.close(fig)
 
 
-def save_summary_plot(results: Sequence[FileStats], pixel: PixelSelection, out_dir: Path) -> Path:
+def save_summary_plot(
+    results: Sequence[FileStats],
+    pixel: PixelSelection,
+    out_dir: Path,
+    *,
+    label: Optional[str] = None,
+) -> Path:
     ensure_dir(out_dir)
     xs = np.array([
         r.distance_um if (r.distance_um is not None and math.isfinite(r.distance_um)) else abs(r.x_um)
@@ -555,11 +574,72 @@ def save_summary_plot(results: Sequence[FileStats], pixel: PixelSelection, out_d
     if pixel.coord_mm is not None:
         cx, cy = pixel.coord_mm
         coord_note = f" (pixel {pixel.pixel_id}, x={cx:.3f} mm, y={cy:.3f} mm)"
-    ax.set_title(f"F_i vs. distance{coord_note}")
+    title = f"F_i vs. distance{coord_note}"
+    if label:
+        title = f"{title}\n{label}"
+    ax.set_title(title)
     ax.grid(True, linestyle="--", alpha=0.35)
     fig.tight_layout()
 
-    out_path = out_dir / f"fi_vs_x_pixel{pixel.pixel_id}.png"
+    suffix = f"_{label.replace(' ', '_')}" if label else ""
+    out_path = out_dir / f"fi_vs_x_pixel{pixel.pixel_id}{suffix}.png"
+    fig.savefig(out_path)
+    plt.close(fig)
+    return out_path
+
+
+def save_overlay_plot(
+    run1: RunResults,
+    run2: RunResults,
+    out_dir: Path,
+) -> Path:
+    """Create an overlay plot comparing two runs."""
+    ensure_dir(out_dir)
+
+    # Extract data for run 1
+    xs1 = np.array([
+        r.distance_um if (r.distance_um is not None and math.isfinite(r.distance_um)) else abs(r.x_um)
+        for r in run1.stats
+    ], dtype=float)
+    ys1 = np.array([r.mean for r in run1.stats], dtype=float)
+    yerr1 = np.array([r.std if math.isfinite(r.std) else 0.0 for r in run1.stats], dtype=float)
+
+    # Extract data for run 2
+    xs2 = np.array([
+        r.distance_um if (r.distance_um is not None and math.isfinite(r.distance_um)) else abs(r.x_um)
+        for r in run2.stats
+    ], dtype=float)
+    ys2 = np.array([r.mean for r in run2.stats], dtype=float)
+    yerr2 = np.array([r.std if math.isfinite(r.std) else 0.0 for r in run2.stats], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=120)
+
+    # Plot run 1
+    label1 = run1.input_dir.name
+    ax.errorbar(xs1, ys1, yerr=yerr1, fmt="o-", color="#d62728", ecolor="#ff9896",
+                capsize=5, lw=2, label=label1, alpha=0.8)
+
+    # Plot run 2
+    label2 = run2.input_dir.name
+    ax.errorbar(xs2, ys2, yerr=yerr2, fmt="s-", color="#1f77b4", ecolor="#aec7e8",
+                capsize=5, lw=2, label=label2, alpha=0.8)
+
+    ax.set_xlabel("Distance from pixel center |Δx| [µm]")
+    ax.set_ylabel("Mean F_i (dimensionless)")
+
+    coord_note = ""
+    if run1.pixel.coord_mm is not None:
+        cx, cy = run1.pixel.coord_mm
+        coord_note = f" (pixel {run1.pixel.pixel_id}, x={cx:.3f} mm, y={cy:.3f} mm)"
+    ax.set_title(f"F_i vs. distance comparison{coord_note}")
+    ax.legend(loc="best")
+    ax.grid(True, linestyle="--", alpha=0.35)
+    fig.tight_layout()
+
+    # Create filename from both directory names
+    name1 = run1.input_dir.name.replace("-", "").replace("_", "")[:12]
+    name2 = run2.input_dir.name.replace("-", "").replace("_", "")[:12]
+    out_path = out_dir / f"overlay_{name1}_vs_{name2}.png"
     fig.savefig(out_path)
     plt.close(fig)
     return out_path
@@ -630,6 +710,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Directory containing ROOT files named by x position",
     )
     parser.add_argument(
+        "--input-dir2",
+        dest="input_dir2",
+        type=str,
+        default=None,
+        help="Second directory for comparison (optional)",
+    )
+    parser.add_argument(
         "--output-dir",
         dest="output_dir",
         type=str,
@@ -665,14 +752,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    parser = build_arg_parser()
-    args = parser.parse_args(argv)
+def process_single_run(
+    input_dir: Path,
+    output_dir: Path,
+    *,
+    pixel_id: Optional[int],
+    sample_events: int,
+    skip_histograms: bool,
+    step_size: str,
+    label: Optional[str] = None,
+) -> RunResults:
+    """Process a single run directory and return results."""
 
-    input_dir = resolve_path(args.input_dir, default=DEFAULT_INPUT_DIR)
-    output_dir = resolve_path(args.output_dir, default=DEFAULT_OUTPUT_BASE / datetime.now().strftime("%Y%m%d-%H%M%S"))
-
-    print(f"[INFO] Using input directory: {input_dir}")
+    print(f"[INFO] Processing run: {input_dir}")
     ensure_dir(output_dir)
 
     root_files = list_root_files(input_dir)
@@ -680,9 +772,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     pixel = infer_pixel_of_interest(
         root_files,
-        requested_pixel_id=args.pixel_id,
-        sample_events=max(1, int(args.sample_events)),
-        step_size=args.step_size,
+        requested_pixel_id=pixel_id,
+        sample_events=max(1, int(sample_events)),
+        step_size=step_size,
     )
     print(f"[INFO] Tracking pixel ID: {pixel.pixel_id}")
 
@@ -695,8 +787,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         file_stats = collect_file_stats(
             path,
             pixel.pixel_id,
-            step_size=args.step_size,
-            capture_values=not args.skip_histograms,
+            step_size=step_size,
+            capture_values=not skip_histograms,
         )
         stats.append(file_stats)
         if file_stats.coord_mm is not None:
@@ -726,7 +818,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 f"\n[WARN] Pixel ID {pixel.pixel_id} present in only {coverage*100:.2f}% of events in {path.name}",
                 end="",
             )
-        if not args.skip_histograms:
+        if not skip_histograms:
             save_histogram(file_stats.values, file_stats, pixel.pixel_id, histogram_dir)
         dist_note = (
             f", |Δx|={file_stats.distance_um:.3f} µm"
@@ -750,7 +842,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     stats_sorted = sorted(stats, key=lambda s: s.x_um)
 
     excel_path = write_excel(stats_sorted, pixel, output_dir)
-    plot_path = save_summary_plot(stats_sorted, pixel, output_dir)
+    plot_path = save_summary_plot(stats_sorted, pixel, output_dir, label=label)
 
     print(f"[INFO] Excel summary written to: {excel_path}")
     print(f"[INFO] Summary plot written to: {plot_path}")
@@ -758,6 +850,78 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if pixel.coord_mm is not None:
         cx, cy = pixel.coord_mm
         print(f"[INFO] Pixel coordinates: x={cx:.6f} mm, y={cy:.6f} mm")
+
+    return RunResults(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        pixel=pixel,
+        stats=stats_sorted,
+        excel_path=excel_path,
+        plot_path=plot_path,
+    )
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+
+    input_dir = resolve_path(args.input_dir, default=DEFAULT_INPUT_DIR)
+    input_dir2: Optional[Path] = None
+    if args.input_dir2:
+        # For second input dir, use relative resolution without default
+        p = Path(args.input_dir2)
+        if not p.is_absolute():
+            input_dir2 = (REPO_ROOT / p).resolve()
+        else:
+            input_dir2 = p.resolve()
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    base_output_dir = resolve_path(args.output_dir, default=DEFAULT_OUTPUT_BASE / timestamp)
+
+    # Process first run
+    print("=" * 80)
+    print("PROCESSING RUN 1")
+    print("=" * 80)
+    output_dir1 = base_output_dir / "run1" if input_dir2 else base_output_dir
+    run1 = process_single_run(
+        input_dir,
+        output_dir1,
+        pixel_id=args.pixel_id,
+        sample_events=args.sample_events,
+        skip_histograms=args.skip_histograms,
+        step_size=args.step_size,
+        label=input_dir.name if input_dir2 else None,
+    )
+
+    # Process second run if provided
+    if input_dir2:
+        print()
+        print("=" * 80)
+        print("PROCESSING RUN 2")
+        print("=" * 80)
+        output_dir2 = base_output_dir / "run2"
+        run2 = process_single_run(
+            input_dir2,
+            output_dir2,
+            pixel_id=args.pixel_id,
+            sample_events=args.sample_events,
+            skip_histograms=args.skip_histograms,
+            step_size=args.step_size,
+            label=input_dir2.name,
+        )
+
+        # Create overlay plot
+        print()
+        print("=" * 80)
+        print("CREATING OVERLAY PLOT")
+        print("=" * 80)
+        overlay_path = save_overlay_plot(run1, run2, base_output_dir)
+        print(f"[INFO] Overlay plot written to: {overlay_path}")
+
+    print()
+    print("=" * 80)
+    print("PROCESSING COMPLETE")
+    print("=" * 80)
 
     return 0
 
