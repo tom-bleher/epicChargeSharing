@@ -532,11 +532,12 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveLineMeans = true,
                  bool useQnQiPercentErrors = false,
                  bool useDistanceWeightedErrors = true,
-                 double distanceErrorScalePixels = 0.5,
+                 double distanceErrorScalePixels = 1.5,
                  double distanceErrorExponent = 1.5,
-                 double distanceErrorFloorPercent = 2.0,
+                 double distanceErrorFloorPercent = 4.0,
                  double distanceErrorCapPercent = 10.0,
-                 bool distanceErrorPreferTruthCenter = true) {
+                 bool distanceErrorPreferTruthCenter = true,
+                 bool distanceErrorPowerInverse = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
@@ -547,10 +548,10 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   const double distScalePx = (std::isfinite(distanceErrorScalePixels) &&
                               distanceErrorScalePixels > 0.0)
                                  ? distanceErrorScalePixels
-                                 : 1.0;
+                                 : 1.5;
   const double distExponent = std::isfinite(distanceErrorExponent)
-                                  ? std::max(0.0, distanceErrorExponent)
-                                  : 1.0;
+                                  ? std::max(1.0001, distanceErrorExponent)
+                                  : 1.5;
   const double distFloorPct = std::isfinite(distanceErrorFloorPercent)
                                   ? std::max(0.0, distanceErrorFloorPercent)
                                   : 0.0;
@@ -558,6 +559,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                                 ? std::max(0.0, distanceErrorCapPercent)
                                 : 0.0;
   const bool distPreferTruthCenter = distanceErrorPreferTruthCenter;
+  const bool distPowerInverse = distanceErrorPowerInverse;
 
   using fitgaus1d::detail::FlatVectorStore;
   using fitgaus1d::detail::FitWorkBuffers;
@@ -618,6 +620,24 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
     neighborhoodRadiusMeta = fitgaus1d::detail::InferRadiusFromTree(tree, chosenCharge);
   }
 
+  auto distanceSigma = [&](double distance, double qmax) -> double {
+    if (distPowerInverse) {
+      return charge_uncert::DistancePowerSigmaInverse(distance,
+                                                      qmax,
+                                                      pixelSpacing,
+                                                      distScalePx,
+                                                      distExponent,
+                                                      distFloorPct,
+                                                      distCapPct);
+    }
+    return charge_uncert::DistancePowerSigma(distance,
+                                             qmax,
+                                             pixelSpacing,
+                                             distScalePx,
+                                             distExponent,
+                                             distFloorPct,
+                                             distCapPct);
+  };
   // Existing branches (inputs)
   double x_hit = 0.0, y_hit = 0.0;
   double x_px  = 0.0, y_px  = 0.0;
@@ -1158,9 +1178,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         dist_err_row.reserve(x_row.size());
         bool anyFinite = false;
         for (size_t k = 0; k < x_row.size(); ++k) {
-          double sigma = charge_uncert::DistancePowerSigma(
-              std::abs(x_row[k] - centerX), qmaxNeighborhood, pixelSpacing,
-              distScalePx, distExponent, distFloorPct, distCapPct);
+          double sigma = distanceSigma(std::abs(x_row[k] - centerX), qmaxNeighborhood);
           if (std::isfinite(sigma) && sigma > 0.0) {
             anyFinite = true;
             dist_err_row.push_back(sigma);
@@ -1178,9 +1196,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
         dist_err_col.reserve(y_col.size());
         bool anyFinite = false;
         for (size_t k = 0; k < y_col.size(); ++k) {
-          double sigma = charge_uncert::DistancePowerSigma(
-              std::abs(y_col[k] - centerY), qmaxNeighborhood, pixelSpacing,
-              distScalePx, distExponent, distFloorPct, distCapPct);
+          double sigma = distanceSigma(std::abs(y_col[k] - centerY), qmaxNeighborhood);
           if (std::isfinite(sigma) && sigma > 0.0) {
             anyFinite = true;
             dist_err_col.push_back(sigma);
@@ -1204,9 +1220,7 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
           dest.reserve(coords.size());
           bool anyFiniteDiag = false;
           for (double c : coords) {
-            double sigma = charge_uncert::DistancePowerSigma(
-                std::abs(c - centerX), qmaxNeighborhood, pixelSpacing,
-                distScalePx, distExponent, distFloorPct, distCapPct);
+            double sigma = distanceSigma(std::abs(c - centerX), qmaxNeighborhood);
             if (std::isfinite(sigma) && sigma > 0.0) {
               anyFiniteDiag = true;
               dest.push_back(sigma);

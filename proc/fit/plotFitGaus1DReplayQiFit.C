@@ -34,6 +34,9 @@
 #include <random>
 #include <utility>
 #include <limits>
+#include <functional>
+#include <sstream>
+#include <iomanip>
 
 #include "../../src/ChargeUtils.h"
 
@@ -51,13 +54,54 @@ namespace {
   inline bool IsFinite(double v) {
     return std::isfinite(v);
   }
+
+  using DistanceSigmaFn = std::function<double(double /*distance*/,
+                                               double /*maxCharge*/,
+                                               double /*pixelSpacing*/,
+                                               double /*distanceScalePixels*/,
+                                               double /*floorPercent*/,
+                                               double /*capPercent*/)>;
+
+  struct DistanceSigmaModel {
+    std::string name;
+    std::string pdfTag;
+    DistanceSigmaFn fn;
+  };
+
+  inline std::string FormatTagValue(double value, int precision = 2) {
+    if (!std::isfinite(value)) {
+      return "nan";
+    }
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(precision) << value;
+    std::string s = oss.str();
+    while (!s.empty() && s.back() == '0') {
+      s.pop_back();
+    }
+    if (!s.empty() && s.back() == '.') {
+      s.pop_back();
+    }
+    if (s.empty()) {
+      s = "0";
+    }
+    for (char& c : s) {
+      if (c == '-') {
+        c = 'm';
+      } else if (c == '+') {
+        c = 'p';
+      } else if (c == '.') {
+        c = 'p';
+      }
+    }
+    return s;
+  }
 }
 
 // Replay Q_f/F_i fits (from saved parameters) and additionally fit Q_i points
 // exactly like diagnostic/fit/plotProcessing1D.C does, drawing dashed green
 // Gaussian curves and vertical recon lines for Q_i with legend deltas.
 int processing1D_replay_qifit(const char* filename =
-                              "/home/tomble/epicChargeSharing/build/epicChargeSharing.root",
+                              "/home/tomble/epicChargeSharing/sweep_x_runs/log/175um.root",
                               double errorPercentOfMax = 5.0,
                               Long64_t nRandomEvents = 100,
                               bool plotQiOverlayPts = true,
@@ -65,11 +109,12 @@ int processing1D_replay_qifit(const char* filename =
                               bool useQiQnPercentErrors = false,
                               const char* outputPdfPath = nullptr,
                               bool useDistanceWeightedErrors = true,
-                              double distanceErrorScalePixels = 0.5,
+                              double distanceErrorScalePixels = 1.5,
                               double distanceErrorExponent = 1.5,
-                              double distanceErrorFloorPercent = 2.0,
+                              double distanceErrorFloorPercent = 4.0,
                               double distanceErrorCapPercent = 10.0,
-                              bool distanceErrorPreferTruthCenter = true) {
+                              bool distanceErrorPreferTruthCenter = true,
+                              bool distanceErrorPowerInverse = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
@@ -82,8 +127,8 @@ int processing1D_replay_qifit(const char* filename =
                                  ? distanceErrorScalePixels
                                  : 1.0;
   const double distExponent = std::isfinite(distanceErrorExponent)
-                                  ? std::max(0.0, distanceErrorExponent)
-                                  : 1.0;
+                                  ? std::max(1.0001, distanceErrorExponent)
+                                  : 1.5000;
   const double distFloorPct = std::isfinite(distanceErrorFloorPercent)
                                   ? std::max(0.0, distanceErrorFloorPercent)
                                   : 0.0;
@@ -91,6 +136,7 @@ int processing1D_replay_qifit(const char* filename =
                                 ? std::max(0.0, distanceErrorCapPercent)
                                 : 0.0;
   const bool distPreferTruthCenter = distanceErrorPreferTruthCenter;
+  const bool distPowerInverse = distanceErrorPowerInverse;
 
   if (distanceErrorsEnabled && useQiQnPercentErrors) {
     ::Warning("processing1D_replay_qifit",
@@ -184,16 +230,48 @@ int processing1D_replay_qifit(const char* filename =
     pixelSize = 0.5 * pixelSpacing; // mm
   }
 
+  auto distanceSigma = [&](double distance, double qmax) -> double {
+    if (distPowerInverse) {
+      return charge_uncert::DistancePowerSigmaInverse(
+          distance, qmax, pixelSpacing, distScalePx, distExponent,
+          distFloorPct, distCapPct);
+    }
+    return charge_uncert::DistancePowerSigma(
+        distance, qmax, pixelSpacing, distScalePx, distExponent,
+        distFloorPct, distCapPct);
+  };
+
   // Decide which charge branch to use for plotting points
+  auto hasBranch = [&](const char* name) -> bool {
+    return name != nullptr && tree->GetBranch(name) != nullptr;
+  };
+
   std::string chosenCharge;
-  if (tree->GetBranch("Q_f")) chosenCharge = "Q_f";
-  else if (tree->GetBranch("F_i")) chosenCharge = "F_i";
-  else if (tree->GetBranch("Q_i")) chosenCharge = "Q_i";
+  if (hasBranch("Q_f")) chosenCharge = "Q_f";
+  else if (hasBranch("Qf")) chosenCharge = "Qf";
+  else if (hasBranch("F_i")) chosenCharge = "F_i";
+  else if (hasBranch("Fi")) chosenCharge = "Fi";
+  else if (hasBranch("Q_i")) chosenCharge = "Q_i";
+  else if (hasBranch("Qi")) chosenCharge = "Qi";
   else {
-    ::Error("processing1D_replay_qifit", "No charge branch found (tried Q_f, F_i, Q_i)");
+    ::Error("processing1D_replay_qifit",
+            "No charge branch found (tried Q_f, Qf, F_i, Fi, Q_i, Qi)");
     file->Close();
     delete file;
     return 4;
+  }
+
+  const char* qiBranchName = nullptr;
+  if (hasBranch("Q_i")) {
+    qiBranchName = "Q_i";
+  } else if (hasBranch("Qi")) {
+    qiBranchName = "Qi";
+  }
+  const char* qnBranchName = nullptr;
+  if (hasBranch("Q_n")) {
+    qnBranchName = "Q_n";
+  } else if (hasBranch("Qn")) {
+    qnBranchName = "Qn";
   }
 
   // Set up branches
@@ -219,13 +297,13 @@ int processing1D_replay_qifit(const char* filename =
   tree->SetBranchAddress("PixelY",  &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
-  const bool haveQiBranch = (tree->GetBranch("Q_i") != nullptr);
+  const bool haveQiBranch = (qiBranchName != nullptr);
   if (haveQiBranch) {
-    tree->SetBranchAddress("Q_i", &QiVec);
+    tree->SetBranchAddress(qiBranchName, &QiVec);
   }
-  const bool haveQnBranch = (tree->GetBranch("Q_n") != nullptr);
+  const bool haveQnBranch = (qnBranchName != nullptr);
   if (haveQnBranch) {
-    tree->SetBranchAddress("Q_n", &QnVec);
+    tree->SetBranchAddress(qnBranchName, &QnVec);
   }
   if (enableQiQnErrors && (!haveQiBranch || !haveQnBranch)) {
     ::Warning("processing1D_replay_qifit", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
@@ -445,9 +523,8 @@ int processing1D_replay_qifit(const char* filename =
         distRowErrors.reserve(x_row_fit.size());
         bool anyFinite = false;
         for (double xr : x_row_fit) {
-          double sigma = charge_uncert::DistancePowerSigma(
-              std::abs(xr - centerX), qmaxNeighborhood, pixelSpacing,
-              distScalePx, distExponent, distFloorPct, distCapPct);
+          double sigma = distanceSigma(std::abs(xr - centerX),
+                                       qmaxNeighborhood);
           if (std::isfinite(sigma) && sigma > 0.0) {
             anyFinite = true;
             distRowErrors.push_back(sigma);
@@ -465,9 +542,8 @@ int processing1D_replay_qifit(const char* filename =
         distColErrors.reserve(y_col_fit.size());
         bool anyFinite = false;
         for (double yc : y_col_fit) {
-          double sigma = charge_uncert::DistancePowerSigma(
-              std::abs(yc - centerY), qmaxNeighborhood, pixelSpacing,
-              distScalePx, distExponent, distFloorPct, distCapPct);
+          double sigma = distanceSigma(std::abs(yc - centerY),
+                                       qmaxNeighborhood);
           if (std::isfinite(sigma) && sigma > 0.0) {
             anyFinite = true;
             distColErrors.push_back(sigma);
@@ -491,9 +567,7 @@ int processing1D_replay_qifit(const char* filename =
                               ? relErr * qmaxNeighborhood
                               : 0.0;
     auto selectError = [&](double candidate) -> double {
-      if (std::isfinite(candidate) && candidate > 0.0) return candidate;
-      if (uniformSigma > 0.0) return uniformSigma;
-      return 1.0;
+      return charge_uncert::SelectVerticalSigma(candidate, uniformSigma, 1.0);
     };
     auto hasFinitePositive = [](const std::vector<double>& vals) {
       for (double v : vals) {
@@ -642,9 +716,8 @@ int processing1D_replay_qifit(const char* filename =
           rowDistErrorsQi.reserve(x_row_qi.size());
           bool anyFinite = false;
           for (double xr : x_row_qi) {
-            double sigma = charge_uncert::DistancePowerSigma(
-                std::abs(xr - centerX), qmaxNeighborhoodQi, pixelSpacing,
-                distScalePx, distExponent, distFloorPct, distCapPct);
+            double sigma = distanceSigma(std::abs(xr - centerX),
+                                         qmaxNeighborhoodQi);
             if (std::isfinite(sigma) && sigma > 0.0) {
               anyFinite = true;
               rowDistErrorsQi.push_back(sigma);
@@ -662,9 +735,8 @@ int processing1D_replay_qifit(const char* filename =
           colDistErrorsQi.reserve(y_col_qi.size());
           bool anyFinite = false;
           for (double yc : y_col_qi) {
-            double sigma = charge_uncert::DistancePowerSigma(
-                std::abs(yc - centerY), qmaxNeighborhoodQi, pixelSpacing,
-                distScalePx, distExponent, distFloorPct, distCapPct);
+            double sigma = distanceSigma(std::abs(yc - centerY),
+                                         qmaxNeighborhoodQi);
             if (std::isfinite(sigma) && sigma > 0.0) {
               anyFinite = true;
               colDistErrorsQi.push_back(sigma);
@@ -717,9 +789,7 @@ int processing1D_replay_qifit(const char* filename =
         ROOT::Math::WrappedMultiTF1 wModel(fLoc, 1);
         ROOT::Fit::BinData data(static_cast<int>(xs.size()), 1);
         auto selectErrorQi = [&](double candidate)->double {
-          if (std::isfinite(candidate) && candidate > 0.0) return candidate;
-          if (uniformSigmaQi > 0.0) return uniformSigmaQi;
-          return 1.0;
+          return charge_uncert::SelectVerticalSigma(candidate, uniformSigmaQi, 1.0);
         };
         for (size_t i=0;i<xs.size();++i) {
           const double candidate = (errVals && i < errVals->size()) ? (*errVals)[i] : std::numeric_limits<double>::quiet_NaN();
@@ -906,7 +976,8 @@ int processing1D_replay_qifit(const char* filename =
     // Optional overlay of Q_i points (kept subset)
     bool drewColQiPts = false;
     TGraph gColQiPts;
-    const bool canOverlayQi = plotQiOverlayPts && haveQiBranch && (chosenCharge != "Q_i");
+    const bool baseChargeIsQi = (chosenCharge == "Q_i") || (chosenCharge == "Qi");
+    const bool canOverlayQi = plotQiOverlayPts && haveQiBranch && !baseChargeIsQi;
     if (canOverlayQi && QiVec) {
       std::vector<std::pair<double,double>> colPoints;
       colPoints.reserve(colIdx_fit.size());
@@ -1188,6 +1259,499 @@ int processing1D_replay_qifit(const char* filename =
 }
 
 
+int processing1D_distance_sigma_gallery(
+    const char* filename =
+        "/home/tomble/epicChargeSharing/build/epicChargeSharing.root",
+    Long64_t nRandomEvents = 100,
+    double distanceErrorScalePixels = 0.5,
+    double distanceErrorFloorPercent = 2.0,
+    double distanceErrorCapPercent = 10.0,
+    bool distanceErrorPreferTruthCenter = true,
+    double uniformFallbackPercentOfMax = 5.0,
+    double linearAlpha = 0.75,
+    double powerExponent = 1.5,
+    double quadraticBeta = 1.0,
+    double expSaturatingP = 1.25,
+    double expSaturatingB = 0.75,
+    double piecewiseCoreRadius = 0.75,
+    double piecewiseBeta = 1.0,
+    double piecewiseExponent = 1.25,
+    double logisticR0 = 0.75,
+    double logisticK = 6.0) {
+  gROOT->SetBatch(true);
+  gStyle->SetOptFit(0);
+  gStyle->SetOptStat(0);
+
+  const double distScalePx =
+      (std::isfinite(distanceErrorScalePixels) && distanceErrorScalePixels > 0.0)
+          ? distanceErrorScalePixels
+          : 1.0;
+  const double distFloorPct =
+      std::isfinite(distanceErrorFloorPercent)
+          ? std::max(0.0, distanceErrorFloorPercent)
+          : 0.0;
+  const double distCapPct =
+      std::isfinite(distanceErrorCapPercent)
+          ? std::max(0.0, distanceErrorCapPercent)
+          : 0.0;
+
+  const double fallbackPercent =
+      std::isfinite(uniformFallbackPercentOfMax)
+          ? std::max(0.0, uniformFallbackPercentOfMax)
+          : 0.0;
+  const double alphaLinear =
+      std::isfinite(linearAlpha) ? std::max(0.0, linearAlpha) : 0.0;
+  const double powExponent =
+      std::isfinite(powerExponent) ? std::max(0.0, powerExponent) : 1.0;
+  const double quadBeta =
+      std::isfinite(quadraticBeta) ? std::max(0.0, quadraticBeta) : 0.0;
+  const double expP =
+      (std::isfinite(expSaturatingP) && expSaturatingP > 0.0) ? expSaturatingP
+                                                              : 1.0;
+  const double expB =
+      (std::isfinite(expSaturatingB) && expSaturatingB > 0.0) ? expSaturatingB
+                                                              : 1.0;
+  const double coreR0 =
+      std::isfinite(piecewiseCoreRadius) ? std::max(0.0, piecewiseCoreRadius)
+                                         : 0.0;
+  const double coreBeta =
+      std::isfinite(piecewiseBeta) ? std::max(0.0, piecewiseBeta) : 0.0;
+  const double coreExponent =
+      (std::isfinite(piecewiseExponent) && piecewiseExponent > 0.0)
+          ? piecewiseExponent
+          : 1.0;
+  const double logR0 =
+      std::isfinite(logisticR0) ? logisticR0 : 0.0;
+  const double logK =
+      std::isfinite(logisticK) ? logisticK : 0.0;
+
+  const std::string distancePowerName =
+      Form("DistancePower (p=%.2f)", powExponent);
+  const std::string sigmaLinearName =
+      Form("Linear (alpha=%.2f)", alphaLinear);
+  const std::string sigmaPowerName =
+      Form("SigmaPower (p=%.2f)", powExponent);
+  const std::string sigmaQuadraticName =
+      Form("Quadratic (beta=%.2f)", quadBeta);
+  const std::string sigmaExpName =
+      Form("Exp saturating (p=%.2f, b=%.2f)", expP, expB);
+  const std::string sigmaPiecewiseName =
+      Form("Piecewise core/tail (r0=%.2f, beta=%.2f, p=%.2f)", coreR0,
+           coreBeta, coreExponent);
+  const std::string sigmaLogisticName =
+      Form("Logistic (r0=%.2f, k=%.2f)", logR0, logK);
+
+  const std::string distancePowerTag =
+      "distancepower_p" + FormatTagValue(powExponent);
+  const std::string sigmaLinearTag =
+      "linear_alpha_" + FormatTagValue(alphaLinear);
+  const std::string sigmaPowerTag =
+      "sigmapower_p" + FormatTagValue(powExponent);
+  const std::string sigmaQuadraticTag =
+      "quadratic_beta_" + FormatTagValue(quadBeta);
+  const std::string sigmaExpTag =
+      "exp_p_" + FormatTagValue(expP) + "_b_" + FormatTagValue(expB);
+  const std::string sigmaPiecewiseTag =
+      "piecewise_r0_" + FormatTagValue(coreR0) + "_beta_" +
+      FormatTagValue(coreBeta) + "_p_" + FormatTagValue(coreExponent);
+  const std::string sigmaLogisticTag =
+      "logistic_r0_" + FormatTagValue(logR0) + "_k_" + FormatTagValue(logK);
+
+  std::vector<DistanceSigmaModel> models = {
+      {distancePowerName, distancePowerTag,
+       [powExponent](double distance, double maxCharge, double pixelSpacing,
+                     double distanceScalePixels, double floorPercent,
+                     double capPercent) {
+         return charge_uncert::DistancePowerSigma(
+             distance, maxCharge, pixelSpacing, distanceScalePixels,
+             powExponent, floorPercent, capPercent);
+       }},
+      {sigmaLinearName, sigmaLinearTag,
+       [alphaLinear](double distance, double maxCharge, double pixelSpacing,
+                     double distanceScalePixels, double floorPercent,
+                     double capPercent) {
+         return charge_uncert::SigmaLinear(distance, maxCharge, pixelSpacing,
+                                           distanceScalePixels, alphaLinear,
+                                           floorPercent, capPercent);
+       }},
+      {sigmaPowerName, sigmaPowerTag,
+       [powExponent](double distance, double maxCharge, double pixelSpacing,
+                     double distanceScalePixels, double floorPercent,
+                     double capPercent) {
+         return charge_uncert::SigmaPower(distance, maxCharge, pixelSpacing,
+                                          distanceScalePixels, powExponent,
+                                          floorPercent, capPercent);
+       }},
+      {sigmaQuadraticName, sigmaQuadraticTag,
+       [quadBeta](double distance, double maxCharge, double pixelSpacing,
+                  double distanceScalePixels, double floorPercent,
+                  double capPercent) {
+         return charge_uncert::SigmaQuadratic(distance, maxCharge,
+                                              pixelSpacing, distanceScalePixels,
+                                              quadBeta, floorPercent,
+                                              capPercent);
+       }},
+      {sigmaExpName, sigmaExpTag,
+       [expP, expB](double distance, double maxCharge, double pixelSpacing,
+                    double distanceScalePixels, double floorPercent,
+                    double capPercent) {
+         return charge_uncert::SigmaExpSaturating(
+             distance, maxCharge, pixelSpacing, distanceScalePixels, expP,
+             expB, floorPercent, capPercent);
+       }},
+      {sigmaPiecewiseName, sigmaPiecewiseTag,
+       [coreR0, coreBeta, coreExponent](double distance, double maxCharge,
+                                        double pixelSpacing,
+                                        double distanceScalePixels,
+                                        double floorPercent,
+                                        double capPercent) {
+         return charge_uncert::SigmaPiecewiseCoreTail(
+             distance, maxCharge, pixelSpacing, distanceScalePixels, coreR0,
+             coreBeta, coreExponent, floorPercent, capPercent);
+       }},
+      {sigmaLogisticName, sigmaLogisticTag,
+       [logR0, logK](double distance, double maxCharge, double pixelSpacing,
+                     double distanceScalePixels, double floorPercent,
+                     double capPercent) {
+         return charge_uncert::SigmaLogistic(distance, maxCharge, pixelSpacing,
+                                             distanceScalePixels, logR0, logK,
+                                             floorPercent, capPercent);
+       }}};
+
+  TFile* file = TFile::Open(filename, "READ");
+  if (!file || file->IsZombie()) {
+    if (file) {
+      file->Close();
+      delete file;
+      file = nullptr;
+    }
+    TString fallback =
+        "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root";
+    file = TFile::Open(fallback, "READ");
+    if (!file || file->IsZombie()) {
+      ::Error("processing1D_distance_sigma_gallery",
+              "Cannot open file: %s or fallback: %s", filename,
+              fallback.Data());
+      if (file) {
+        file->Close();
+        delete file;
+      }
+      return 1;
+    }
+  }
+
+  TTree* tree = dynamic_cast<TTree*>(file->Get("Hits"));
+  if (!tree) {
+    ::Error("processing1D_distance_sigma_gallery",
+            "Hits tree not found in file: %s", filename);
+    file->Close();
+    delete file;
+    return 2;
+  }
+
+  double pixelSpacing = NAN;
+  double pixelSize = NAN;
+  if (auto* spacingObj =
+          dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
+    try {
+      pixelSpacing = std::stod(spacingObj->GetTitle());
+    } catch (...) {
+    }
+  }
+  if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
+    try {
+      pixelSize = std::stod(sizeObj->GetTitle());
+    } catch (...) {
+    }
+  }
+
+  auto inferSpacingFromTree = [&](TTree* t) -> double {
+    std::vector<double> xs;
+    xs.reserve(5000);
+    std::vector<double> ys;
+    ys.reserve(5000);
+    double x_px_tmp = 0.0, y_px_tmp = 0.0;
+    t->SetBranchAddress("PixelX", &x_px_tmp);
+    t->SetBranchAddress("PixelY", &y_px_tmp);
+    Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
+    for (Long64_t i = 0; i < nToScan; ++i) {
+      t->GetEntry(i);
+      if (IsFinite(x_px_tmp)) xs.push_back(x_px_tmp);
+      if (IsFinite(y_px_tmp)) ys.push_back(y_px_tmp);
+    }
+    auto computeGap = [](std::vector<double>& v) -> double {
+      if (v.size() < 2) return NAN;
+      std::sort(v.begin(), v.end());
+      v.erase(std::unique(v.begin(), v.end()), v.end());
+      if (v.size() < 2) return NAN;
+      std::vector<double> gaps;
+      gaps.reserve(v.size());
+      for (size_t i = 1; i < v.size(); ++i) {
+        double d = v[i] - v[i - 1];
+        if (d > 1e-9 && IsFinite(d)) gaps.push_back(d);
+      }
+      if (gaps.empty()) return NAN;
+      std::nth_element(gaps.begin(), gaps.begin() + gaps.size() / 2,
+                       gaps.end());
+      return gaps[gaps.size() / 2];
+    };
+    double gx = computeGap(xs);
+    double gy = computeGap(ys);
+    if (IsFinite(gx) && gx > 0 && IsFinite(gy) && gy > 0) return 0.5 * (gx + gy);
+    if (IsFinite(gx) && gx > 0) return gx;
+    if (IsFinite(gy) && gy > 0) return gy;
+    return NAN;
+  };
+
+  if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
+    pixelSpacing = inferSpacingFromTree(tree);
+  }
+  if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
+    ::Error("processing1D_distance_sigma_gallery",
+            "Pixel spacing unavailable (metadata missing and inference failed). "
+            "Aborting.");
+    file->Close();
+    delete file;
+    return 3;
+  }
+  if (!IsFinite(pixelSize) || pixelSize <= 0) {
+    pixelSize = 0.5 * pixelSpacing;
+  }
+
+  if (tree->GetBranch("Q_f") == nullptr) {
+    ::Error("processing1D_distance_sigma_gallery",
+            "Q_f branch not found; cannot plot Q_f data points.");
+    file->Close();
+    delete file;
+    return 4;
+  }
+
+  double x_true = 0.0, y_true = 0.0;
+  double x_px = 0.0, y_px = 0.0;
+  Bool_t is_pixel_true = kFALSE;
+  std::vector<double>* QfVec = nullptr;
+
+  tree->SetBranchAddress("TrueX", &x_true);
+  tree->SetBranchAddress("TrueY", &y_true);
+  tree->SetBranchAddress("PixelX", &x_px);
+  tree->SetBranchAddress("PixelY", &y_px);
+  tree->SetBranchAddress("isPixelHit", &is_pixel_true);
+  tree->SetBranchAddress("Q_f", &QfVec);
+
+  const Long64_t nEntries = tree->GetEntries();
+  std::vector<Long64_t> indices;
+  indices.reserve(nEntries);
+  for (Long64_t ii = 0; ii < nEntries; ++ii) indices.push_back(ii);
+  std::random_device rd;
+  std::mt19937_64 rng(rd());
+  std::shuffle(indices.begin(), indices.end(), rng);
+
+  const Long64_t targetPages =
+      (nRandomEvents < 0) ? nEntries : std::max<Long64_t>(0, nRandomEvents);
+
+  for (const auto& model : models) {
+    std::string pdfName =
+        "distance_sigma_" + model.pdfTag + ".pdf";
+    TCanvas canvas(Form("c_%s", model.pdfTag.c_str()),
+                   Form("Q_{f} distance uncertainties: %s",
+                        model.name.c_str()),
+                   1800, 700);
+    TPad pL("pL_sigma", "column-left", 0.0, 0.0, 0.5, 1.0);
+    TPad pR("pR_sigma", "row-right", 0.5, 0.0, 1.0, 1.0);
+    pL.SetTicks(1, 1);
+    pR.SetTicks(1, 1);
+    pL.Draw();
+    pR.Draw();
+
+    canvas.Print((pdfName + "[").c_str());
+
+    Long64_t nPages = 0;
+    Long64_t nConsidered = 0;
+
+    for (Long64_t sampleIdx = 0;
+         sampleIdx < nEntries && nPages < targetPages; ++sampleIdx) {
+      const Long64_t eventIndex = indices[sampleIdx];
+      tree->GetEntry(eventIndex);
+
+      if (is_pixel_true || !QfVec || QfVec->empty()) continue;
+
+      const size_t total = QfVec->size();
+      const int N = static_cast<int>(
+          std::lround(std::sqrt(static_cast<double>(total))));
+      if (N * N != static_cast<int>(total) || N < 3) continue;
+      const int R = (N - 1) / 2;
+
+      std::vector<double> x_row;
+      std::vector<double> q_row;
+      std::vector<double> y_col;
+      std::vector<double> q_col;
+      x_row.reserve(N);
+      q_row.reserve(N);
+      y_col.reserve(N);
+      q_col.reserve(N);
+
+      double qmaxNeighborhood = -std::numeric_limits<double>::infinity();
+
+      for (int di = -R; di <= R; ++di) {
+        for (int dj = -R; dj <= R; ++dj) {
+          const int idx = (di + R) * N + (dj + R);
+          if (idx < 0 || idx >= static_cast<int>(total)) continue;
+          const double q = (*QfVec)[idx];
+          if (!IsFinite(q) || q < 0.0) continue;
+          if (q > qmaxNeighborhood) qmaxNeighborhood = q;
+
+          if (dj == 0) {
+            const double x = x_px + di * pixelSpacing;
+            x_row.push_back(x);
+            q_row.push_back(q);
+          }
+          if (di == 0) {
+            const double y = y_px + dj * pixelSpacing;
+            y_col.push_back(y);
+            q_col.push_back(q);
+          }
+        }
+      }
+
+      if (x_row.size() < 3 || y_col.size() < 3) continue;
+      if (!(qmaxNeighborhood > 0.0)) continue;
+
+      const double uniformSigma =
+          charge_uncert::UniformPercentOfMax(fallbackPercent,
+                                             qmaxNeighborhood);
+
+      auto resolveCenter = [&](double truth, double pixel) -> double {
+        if (distanceErrorPreferTruthCenter && IsFinite(truth)) {
+          return truth;
+        }
+        if (IsFinite(pixel)) {
+          return pixel;
+        }
+        return 0.0;
+      };
+
+      const double centerX = resolveCenter(x_true, x_px);
+      const double centerY = resolveCenter(y_true, y_px);
+
+      auto buildGraph = [&](const std::vector<double>& axisVals,
+                            const std::vector<double>& charges,
+                            double centerCoordinate,
+                            bool isRow) -> TGraphErrors {
+        TGraphErrors g(static_cast<int>(axisVals.size()));
+        for (int k = 0; k < g.GetN(); ++k) {
+          g.SetPoint(k, axisVals[k], charges[k]);
+          const double distance = std::abs(axisVals[k] - centerCoordinate);
+          double sigmaCandidate = model.fn(distance, qmaxNeighborhood,
+                                           pixelSpacing, distScalePx,
+                                           distFloorPct, distCapPct);
+          double sigma = charge_uncert::SelectVerticalSigma(
+              sigmaCandidate, uniformSigma, 1.0);
+          if (!(std::isfinite(sigma) && sigma > 0.0)) {
+            sigma = 1.0;
+          }
+          g.SetPointError(k, 0.0, sigma);
+        }
+        g.SetMarkerStyle(isRow ? 21 : 20);
+        g.SetMarkerSize(0.9);
+        g.SetLineColor(isRow ? kBlue + 2 : kBlue + 1);
+        g.SetMarkerColor(g.GetLineColor());
+        return g;
+      };
+
+      TGraphErrors gRow = buildGraph(x_row, q_row, centerX, true);
+      TGraphErrors gCol = buildGraph(y_col, q_col, centerY, false);
+
+      auto setGraphTitle = [&](TGraphErrors& g, const char* axisLabel,
+                               const char* dirLabel) {
+        g.SetTitle(Form("Event %lld: %s; %s [mm]; Q_{f} [C]", eventIndex,
+                        dirLabel, axisLabel));
+      };
+      setGraphTitle(gRow, "x", "Central row");
+      setGraphTitle(gCol, "y", "Central column");
+
+      auto configureYAxis = [&](TGraphErrors& g,
+                                const std::vector<double>& charges) {
+        auto mm = std::minmax_element(charges.begin(), charges.end());
+        double yMin = *mm.first;
+        double yMax = *mm.second;
+        double pad = 0.10 * (yMax - yMin);
+        if (!(pad > 0.0)) {
+          pad = 0.10 * std::max(std::abs(yMax), 1.0);
+        }
+        g.SetMinimum(yMin - pad);
+        g.SetMaximum(yMax + pad);
+      };
+
+      configureYAxis(gRow, q_row);
+      configureYAxis(gCol, q_col);
+
+      auto configureXAxis = [&](TGraphErrors& g,
+                                const std::vector<double>& coords) {
+        auto mm = std::minmax_element(coords.begin(), coords.end());
+        const double xmin = *mm.first - 0.5 * pixelSpacing;
+        const double xmax = *mm.second + 0.5 * pixelSpacing;
+        g.GetXaxis()->SetLimits(xmin, xmax);
+      };
+
+      pL.cd();
+      pL.Clear();
+      gCol.Draw("AP");
+      configureXAxis(gCol, y_col);
+
+      TLegend legCol(0.58, 0.78, 0.95, 0.93);
+      legCol.SetBorderSize(0);
+      legCol.SetFillStyle(0);
+      legCol.SetTextSize(0.03);
+      legCol.AddEntry(&gCol, "Q_{f} points", "p");
+      legCol.AddEntry(
+          (TObject*)nullptr,
+          Form("%s", model.name.c_str()),
+          "");
+      legCol.AddEntry(
+          (TObject*)nullptr,
+          Form("center=%.4f mm", centerY),
+          "");
+      legCol.Draw();
+
+      pR.cd();
+      pR.Clear();
+      gRow.Draw("AP");
+      configureXAxis(gRow, x_row);
+
+      TLegend legRow(0.58, 0.78, 0.95, 0.93);
+      legRow.SetBorderSize(0);
+      legRow.SetFillStyle(0);
+      legRow.SetTextSize(0.03);
+      legRow.AddEntry(&gRow, "Q_{f} points", "p");
+      legRow.AddEntry(
+          (TObject*)nullptr,
+          Form("%s", model.name.c_str()),
+          "");
+      legRow.AddEntry(
+          (TObject*)nullptr,
+          Form("center=%.4f mm", centerX),
+          "");
+      legRow.Draw();
+
+      canvas.cd();
+      canvas.Print(pdfName.c_str());
+      ++nPages;
+      ++nConsidered;
+    }
+
+    canvas.Print((pdfName + "]").c_str());
+    ::Info("processing1D_distance_sigma_gallery",
+           "Model %s generated %lld pages (considered %lld events) -> %s",
+           model.name.c_str(), nPages, nConsidered, pdfName.c_str());
+  }
+
+  file->Close();
+  delete file;
+
+  return 0;
+}
+
+
 // ROOT auto-exec wrappers so `root -l -b -q plotFitGaus1DReplayQiFit.C` works
 int plotFitGaus1DReplayQiFit() {
   return processing1D_replay_qifit();
@@ -1216,12 +1780,13 @@ int plotFitGaus1DReplayQiFit(const char* filename,
                              bool doQiFit,
                              bool useQiQnPercentErrors,
                              const char* outputPdfPath,
-                             bool useDistanceWeightedErrors = false,
-                             double distanceErrorScalePixels = 1.0,
-                             double distanceErrorExponent = 1.0,
-                             double distanceErrorFloorPercent = 1.0,
-                             double distanceErrorCapPercent = 50.0,
-                             bool distanceErrorPreferTruthCenter = true) {
+                             bool useDistanceWeightedErrors = true,
+                             double distanceErrorScalePixels = 1.5,
+                             double distanceErrorExponent = 1.5,
+                             double distanceErrorFloorPercent = 4.0,
+                             double distanceErrorCapPercent = 10.0,
+                             bool distanceErrorPreferTruthCenter = true,
+                             bool distanceErrorPowerInverse = true) {
   return processing1D_replay_qifit(filename,
                                    errorPercentOfMax,
                                    nRandomEvents,
@@ -1234,5 +1799,52 @@ int plotFitGaus1DReplayQiFit(const char* filename,
                                    distanceErrorExponent,
                                    distanceErrorFloorPercent,
                                    distanceErrorCapPercent,
-                                   distanceErrorPreferTruthCenter);
+                                   distanceErrorPreferTruthCenter,
+                                   distanceErrorPowerInverse);
+}
+
+int plotDistanceSigmaGallery() {
+  return processing1D_distance_sigma_gallery();
+}
+
+int plotDistanceSigmaGallery(Long64_t nRandomEvents) {
+  return processing1D_distance_sigma_gallery(
+      "/home/tom/Desktop/Putza/epicChargeSharing/build/epicChargeSharing.root",
+      nRandomEvents);
+}
+
+int plotDistanceSigmaGallery(const char* filename,
+                             Long64_t nRandomEvents,
+                             double distanceErrorScalePixels,
+                             double distanceErrorFloorPercent,
+                             double distanceErrorCapPercent,
+                             bool distanceErrorPreferTruthCenter = true,
+                             double uniformFallbackPercentOfMax = 5.0,
+                             double linearAlpha = 0.75,
+                             double powerExponent = 1.5,
+                             double quadraticBeta = 1.0,
+                             double expSaturatingP = 1.25,
+                             double expSaturatingB = 0.75,
+                             double piecewiseCoreRadius = 0.75,
+                             double piecewiseBeta = 1.0,
+                             double piecewiseExponent = 1.25,
+                             double logisticR0 = 0.75,
+                             double logisticK = 6.0) {
+  return processing1D_distance_sigma_gallery(filename,
+                                             nRandomEvents,
+                                             distanceErrorScalePixels,
+                                             distanceErrorFloorPercent,
+                                             distanceErrorCapPercent,
+                                             distanceErrorPreferTruthCenter,
+                                             uniformFallbackPercentOfMax,
+                                             linearAlpha,
+                                             powerExponent,
+                                             quadraticBeta,
+                                             expSaturatingP,
+                                             expSaturatingB,
+                                             piecewiseCoreRadius,
+                                             piecewiseBeta,
+                                             piecewiseExponent,
+                                             logisticR0,
+                                             logisticK);
 }

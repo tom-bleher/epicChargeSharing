@@ -13,14 +13,46 @@ from pathlib import Path
 from typing import Dict, Iterable, List
 
 
+DEFAULT_DISTANCE_ARGS = {
+    "use_distance_weighted_errors": True,
+    "distance_error_scale_pixels": 1.5,
+    "distance_error_exponent": 1.5,
+    "distance_error_floor_percent": 4.0,
+    "distance_error_cap_percent": 10.0,
+    "distance_error_prefer_truth_center": True,
+    "distance_error_power_inverse": True,
+}
+
+
+def _dataset(distance_error_power_inverse: bool, **kwargs: object) -> Dict[str, object]:
+    cfg: Dict[str, object] = {**DEFAULT_DISTANCE_ARGS, **kwargs}
+    cfg["distance_error_power_inverse"] = distance_error_power_inverse
+    return cfg
+
+
 DATASET_CONFIG: Dict[str, Dict[str, object]] = {
-    #"0.00MaxQfLog":  {"error_percent": 0.0, "use_qiqn_errors": False},
-    "0.00MaxQfLinB0.001": {"error_percent": 0.0, "use_qiqn_errors": False},
-    "0.05MaxQfLinB0.001": {"error_percent": 5.0, "use_qiqn_errors": False},
-    "0.00MaxQfLinB0.001": {"error_percent": 0.0, "use_qiqn_errors": False},
-    "0.065QnQiMaxQiLinB0.001": {"error_percent": 0.0, "use_qiqn_errors": True},
-    "0.065QnQiMaxQiLinB0.002": {"error_percent": 0.0, "use_qiqn_errors": True},
-    "0.065QnQiMaxQiLog": {"error_percent": 0.0, "use_qiqn_errors": True},
+    "sweep_x_runs/log": _dataset(
+        distance_error_power_inverse=False,
+        error_percent=0.0,
+        use_qiqn_errors=False,
+    ),
+    "sweep_x_runs/logInv": _dataset(
+        distance_error_power_inverse=True,
+        error_percent=0.0,
+        use_qiqn_errors=False,
+    ),
+    "sweep_x_runs/linearB0.001": _dataset(
+        distance_error_power_inverse=False,
+        error_percent=0.0,
+        use_qiqn_errors=False,
+        distance_error_exponent=1.0,
+    ),
+    "sweep_x_runs/linearB0.001Inv": _dataset(
+        distance_error_power_inverse=True,
+        error_percent=0.0,
+        use_qiqn_errors=False,
+        distance_error_exponent=1.0,
+    ),
 }
 
 
@@ -52,12 +84,23 @@ def run_macro(
     n_events: int,
     plot_qi_overlay: bool,
     do_qi_fit: bool,
+    use_distance_weighted_errors: bool,
+    distance_error_scale_pixels: float,
+    distance_error_exponent: float,
+    distance_error_floor_percent: float,
+    distance_error_cap_percent: float,
+    distance_error_prefer_truth_center: bool,
+    distance_error_power_inverse: bool,
 ) -> None:
     output_pdf.parent.mkdir(parents=True, exist_ok=True)
     macro_call = (
         f"{macro_path.as_posix()}(\"{root_file.as_posix()}\", "
         f"{error_percent:.6f}, {n_events}, {_bool_str(plot_qi_overlay)}, {_bool_str(do_qi_fit)}, "
-        f"{_bool_str(use_qiqn_errors)}, \"{output_pdf.as_posix()}\")"
+        f"{_bool_str(use_qiqn_errors)}, \"{output_pdf.as_posix()}\", "
+        f"{_bool_str(use_distance_weighted_errors)}, {distance_error_scale_pixels:.6f}, "
+        f"{distance_error_exponent:.6f}, {distance_error_floor_percent:.6f}, "
+        f"{distance_error_cap_percent:.6f}, {_bool_str(distance_error_prefer_truth_center)}, "
+        f"{_bool_str(distance_error_power_inverse)})"
     )
     subprocess.run([root_executable, "-l", "-b", "-q", macro_call], check=True)
 
@@ -97,7 +140,7 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
 def main(argv: Iterable[str]) -> int:
     args = parse_args(argv)
     script_path = Path(__file__).resolve()
-    project_root = script_path.parents[2]
+    project_root = script_path.parents[1]
     macro_path = project_root / "proc" / "fit" / "plotFitGaus1DReplayQiFit.C"
     gaussian_fits_dir = project_root / "gaussian_fits"
 
@@ -115,6 +158,13 @@ def main(argv: Iterable[str]) -> int:
         cfg = DATASET_CONFIG[dataset_name]
         error_percent = float(cfg["error_percent"])
         use_qiqn_errors = bool(cfg["use_qiqn_errors"])
+        use_distance_weighted_errors = bool(cfg["use_distance_weighted_errors"])
+        distance_error_scale_pixels = float(cfg["distance_error_scale_pixels"])
+        distance_error_exponent = float(cfg["distance_error_exponent"])
+        distance_error_floor_percent = float(cfg["distance_error_floor_percent"])
+        distance_error_cap_percent = float(cfg["distance_error_cap_percent"])
+        distance_error_prefer_truth_center = bool(cfg["distance_error_prefer_truth_center"])
+        distance_error_power_inverse = bool(cfg["distance_error_power_inverse"])
 
         root_files = _find_root_files(dataset_dir)
         if not root_files:
@@ -137,6 +187,13 @@ def main(argv: Iterable[str]) -> int:
                     args.n_events,
                     not args.skip_qi_overlay,
                     not args.skip_qi_fit,
+                    use_distance_weighted_errors,
+                    distance_error_scale_pixels,
+                    distance_error_exponent,
+                    distance_error_floor_percent,
+                    distance_error_cap_percent,
+                    distance_error_prefer_truth_center,
+                    distance_error_power_inverse,
                 )
             except subprocess.CalledProcessError as exc:
                 print(
