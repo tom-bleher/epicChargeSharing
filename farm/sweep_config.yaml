@@ -1,0 +1,38 @@
+# Sweep Analysis Configuration
+# See sweep_analysis.py for usage. CLI arguments override these values.
+
+# Positions to sweep (micrometers from pixel center)
+positions:
+  - 0
+  - 25
+  - -25
+  - 50
+  - -50
+  - 75
+  - -75
+  - 100
+  - -100
+  - 125
+  - -125
+  - 150
+  - -150
+  - 175
+  - -175
+
+# Charge sharing model: LogA, LinA, or DPC
+# Set to null to use current Config.hh setting
+charge_model: LogA
+
+# Denominator mode: Neighborhood, ChargeBlock, or RowCol
+# Set to null to use current Config.hh setting
+denominator_mode: Neighborhood
+
+# Beta coefficient for linear model (only used with LinA/DPC)
+# Set to null to use current Config.hh setting
+beta: null
+
+# Number of events for Gaussian fit PDFs and neighborhood visualizations
+n_events: 100
+
+# Pixel ID to track for F_i extraction (null = auto-detect)
+pixel_id: null
