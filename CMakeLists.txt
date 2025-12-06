@@ -90,6 +90,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     endif()
 endif()
 
+# Find Eigen3 for optimized matrix operations (header-only library)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+message(STATUS "Eigen3 version: ${Eigen3_VERSION}")
+message(STATUS "Eigen3 include dir: ${EIGEN3_INCLUDE_DIR}")
+
 # Find Geant4 package with multithreading support
 find_package(Geant4 REQUIRED ui_all vis_all)
 
@@ -163,8 +168,10 @@ set(epicChargeSharing_sources
     ${PROJECT_SOURCE_DIR}/src/PhysicsList.cc
     ${PROJECT_SOURCE_DIR}/src/PrimaryGenerator.cc
     ${PROJECT_SOURCE_DIR}/src/RunAction.cc
-    ${PROJECT_SOURCE_DIR}/src/internal/RunActionSupport.cc
     ${PROJECT_SOURCE_DIR}/src/SteppingAction.cc
+    ${PROJECT_SOURCE_DIR}/src/RootHelpers.cc
+    ${PROJECT_SOURCE_DIR}/src/RootIO.cc
+    # ${PROJECT_SOURCE_DIR}/src/RNTupleIO.cc  # Disabled due to ROOT version incompatibility
 )
 
 # Create the executable with enhanced performance settings
@@ -179,12 +186,13 @@ target_include_directories(epicChargeSharing
         ${PROJECT_SOURCE_DIR}/include
 )
 
-# Link libraries including threading support
+# Link libraries including threading support and Eigen3
 target_link_libraries(epicChargeSharing
     PRIVATE
         ${Geant4_LIBRARIES}
         Threads::Threads
         ${ROOT_LIB_TARGETS}
+        Eigen3::Eigen
 )
 
 if(_project_compile_options)
@@ -250,3 +258,29 @@ else()
     message(STATUS "Performance optimizations: DISABLED (Debug build)")
 endif()
 message(STATUS "==============================")
+
+# ============================================================================
+# Testing Support (optional)
+# ============================================================================
+option(BUILD_TESTING "Build unit tests" OFF)
+
+if(BUILD_TESTING)
+    message(STATUS "Building with tests enabled")
+    add_subdirectory(tests)
+endif()
+
+# ============================================================================
+# Documentation Support
+# ============================================================================
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+    add_custom_target(docs
+        COMMAND ${DOXYGEN_EXECUTABLE} ${PROJECT_SOURCE_DIR}/docs/Doxyfile
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/docs
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM
+    )
+    message(STATUS "Doxygen found - 'make docs' available")
+else()
+    message(STATUS "Doxygen not found - documentation generation disabled")
+endif()
