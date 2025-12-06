@@ -1,57 +1,47 @@
 # chargeSharingRecon Plugin
 
-This directory contains an out-of-tree EICrecon plugin that adapts the
-charge-sharing model from this repository into the JANA2 reconstruction
-chain. The plugin reads `edm4hep::SimTrackerHit` collections, applies the local
-charge sharing model, and publishes reconstructed `edm4eic::TrackerHit`
-positions.
+EICrecon plugin that adapts the charge-sharing model for the JANA2 reconstruction chain. Reads `edm4hep::SimTrackerHit` collections, applies charge sharing, and outputs reconstructed `edm4eic::TrackerHit` positions.
 
 ## Build
 
-```
-cmake -S plugins/eicrecon -B build/eicrecon \
-      -DCMAKE_INSTALL_PREFIX=$(pwd)/plugins/eicrecon/install
+```bash
+cmake -S eicrecon -B build/eicrecon \
+      -DCMAKE_INSTALL_PREFIX=$(pwd)/eicrecon/install
 cmake --build build/eicrecon --target install
 ```
 
 ## Environment
 
-Expose the installed plugin to EICrecon via
-
-```
-export EICrecon_MY=$(pwd)/plugins/eicrecon/install
+```bash
+export EICrecon_MY=$(pwd)/eicrecon/install
 ```
 
-## Running inside EICrecon
+## Usage
 
-```
+```bash
 eicrecon -Pplugins=chargeSharingRecon \
          -PChargeSharingRecon:readout=YourReadoutName \
          -PChargeSharingRecon:neighborhoodRadius=2 \
-         your_input.edm4hep.root \
-         -Ppodio:output=charge_sharing_recon.edm4eic.root
+         input.edm4hep.root \
+         -Ppodio:output=output.edm4eic.root
 ```
 
-### Key Parameters
+## Parameters
 
-- `readout` — DD4hep readout used to look up the segmentation (string). The
-  factory queries `DD4hep_service` for this readout on configuration and
-  auto-populates the pixel pitch, size, offsets, and index bounds when a
-  `CartesianGridXY` segmentation is available.
-- `minEDep` — energy deposition threshold in GeV (float)
-- `neighborhoodRadius` — neighborhood half-width (2 ➔ 5×5 grid)
-- `pixelSpacingMM`, `pixelSizeMM`, `pixelCornerOffsetMM` — optional manual
-  overrides for the geometry (mm). Leave unset to use DD4hep-derived values.
-- `pixelsPerSide` — optional override for the inferred pixel count (int)
-- `ionizationEnergyEV`, `amplificationFactor`, `d0Micron` — physics knobs
-- `emitNeighborDiagnostics` — emit per-neighbor diagnostic payloads (bool)
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `readout` | string | DD4hep readout name for segmentation lookup |
+| `minEDep` | float | Energy deposition threshold (GeV) |
+| `neighborhoodRadius` | int | Neighborhood half-width (2 = 5×5 grid) |
+| `pixelSpacingMM` | float | Manual pixel pitch override (mm) |
+| `pixelSizeMM` | float | Manual pixel size override (mm) |
+| `ionizationEnergyEV` | float | Energy per e-h pair (eV) |
+| `amplificationFactor` | float | Gain factor |
+| `d0Micron` | float | Transverse hit size (µm) |
+| `emitNeighborDiagnostics` | bool | Output diagnostic data |
 
-Parameters may be supplied either on the command line (`-PChargeSharingRecon:*`) or via
-a JANA configuration file.
+Geometry values are auto-populated from DD4hep `CartesianGridXY` segmentation if available.
 
 ## Output
 
-The factory emits an `edm4eic::TrackerHit` collection whose positions are the
-charge-weighted centroid computed by the charge-sharing model. Additional
-neighbor information is retained internally for future diagnostic factories.
-
+The factory emits `edm4eic::TrackerHit` with positions computed as charge-weighted centroids.
