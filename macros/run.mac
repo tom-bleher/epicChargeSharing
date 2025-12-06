@@ -12,5 +12,4 @@
 /gun/energy 10 GeV
 
 # Run events to test fitting
-/run/beamOn 100000
-
+/run/beamOn 50000
