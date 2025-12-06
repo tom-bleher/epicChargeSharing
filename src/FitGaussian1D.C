@@ -7,6 +7,8 @@
 #include <TTree.h>
 #include <TBranch.h>
 #include <TNamed.h>
+#include <TParameter.h>
+#include <TList.h>
 #include <TGraph.h>
 #include <TGraphErrors.h>
 #include <TF1.h>
@@ -46,6 +48,59 @@ namespace detail
 {
 double InferPixelSpacingFromTree(TTree* tree);
 int InferRadiusFromTree(TTree* tree, const std::string& preferredBranch);
+
+// Helper functions to read metadata from tree UserInfo or file-level TNamed
+inline double GetDoubleMetadata(TFile* file, TTree* tree, const char* key) {
+    // First try file-level TNamed (legacy/explicit format)
+    if (file) {
+        if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
+            try { return std::stod(obj->GetTitle()); } catch (...) {}
+        }
+    }
+    // Then try tree UserInfo with TParameter<double>
+    if (tree) {
+        TList* info = tree->GetUserInfo();
+        if (info) {
+            if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
+                return param->GetVal();
+            }
+            // Also try TNamed in UserInfo (string representation)
+            if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
+                try { return std::stod(named->GetTitle()); } catch (...) {}
+            }
+        }
+    }
+    return std::numeric_limits<double>::quiet_NaN();
+}
+
+inline int GetIntMetadata(TFile* file, TTree* tree, const char* key) {
+    // First try file-level TNamed (legacy/explicit format)
+    if (file) {
+        if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
+            try { return std::stoi(obj->GetTitle()); }
+            catch (...) {
+                try { return static_cast<int>(std::lround(std::stod(obj->GetTitle()))); } catch (...) {}
+            }
+        }
+    }
+    // Then try tree UserInfo with TParameter<int>
+    if (tree) {
+        TList* info = tree->GetUserInfo();
+        if (info) {
+            if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(key))) {
+                return param->GetVal();
+            }
+            // Also try TNamed in UserInfo (string representation)
+            if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
+                try { return std::stoi(named->GetTitle()); }
+                catch (...) {
+                    try { return static_cast<int>(std::lround(std::stod(named->GetTitle()))); } catch (...) {}
+                }
+            }
+        }
+    }
+    return -1;
+}
 }
 
 struct Metadata
@@ -82,29 +137,10 @@ std::optional<Metadata> ExtractMetadata(TFile& file,
 {
     Metadata meta;
 
-    if (auto* spacingObj = dynamic_cast<TNamed*>(file.Get("GridPixelSpacing_mm"))) {
-        try {
-            meta.pixelSpacing = std::stod(spacingObj->GetTitle());
-        } catch (...) {
-        }
-    }
-    if (auto* sizeObj = dynamic_cast<TNamed*>(file.Get("GridPixelSize_mm"))) {
-        try {
-            meta.pixelSize = std::stod(sizeObj->GetTitle());
-        } catch (...) {
-        }
-    }
-    if (auto* radiusObj = dynamic_cast<TNamed*>(file.Get("NeighborhoodRadius"))) {
-        try {
-            meta.neighborhoodRadius = std::stoi(radiusObj->GetTitle());
-        } catch (...) {
-            try {
-                meta.neighborhoodRadius =
-                    static_cast<int>(std::lround(std::stod(radiusObj->GetTitle())));
-            } catch (...) {
-            }
-        }
-    }
+    // Read metadata from file-level TNamed or tree UserInfo (TParameter)
+    meta.pixelSpacing = detail::GetDoubleMetadata(&file, &tree, "GridPixelSpacing_mm");
+    meta.pixelSize = detail::GetDoubleMetadata(&file, &tree, "GridPixelSize_mm");
+    meta.neighborhoodRadius = detail::GetIntMetadata(&file, &tree, "NeighborhoodRadius");
 
     if (!std::isfinite(meta.pixelSpacing) || meta.pixelSpacing <= 0.0) {
         meta.pixelSpacing = detail::InferPixelSpacingFromTree(&tree);
@@ -539,8 +575,8 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                  bool distanceErrorPreferTruthCenter = true,
                  bool distanceErrorPowerInverse = true) {
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
-  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
-  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(250);
+  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-3);
+  ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(100);
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
   ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
@@ -1566,4 +1602,35 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
 
   ::Info("FitGaus1D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
   return 0;
+}
+
+// Compatibility wrapper so both FitGaus1D (historic name) and FitGaussian1D (file/docs)
+// entry points work when invoked from ROOT or PostProcessingRunner.
+int FitGaussian1D(const char* filename = "../build/epicChargeSharing.root",
+                  double errorPercentOfMax = 5.0,
+                  bool saveParamA = true,
+                  bool saveParamMu = true,
+                  bool saveParamSigma = true,
+                  bool saveParamB = true,
+                  const char* chargeBranch = "Qf",
+                  bool fitDiagonals = false,
+                  bool saveDiagParamA = true,
+                  bool saveDiagParamMu = true,
+                  bool saveDiagParamSigma = true,
+                  bool saveDiagParamB = true,
+                  bool saveLineMeans = true,
+                  bool useQnQiPercentErrors = false,
+                  bool useDistanceWeightedErrors = true,
+                  double distanceErrorScalePixels = 1.5,
+                  double distanceErrorExponent = 1.5,
+                  double distanceErrorFloorPercent = 4.0,
+                  double distanceErrorCapPercent = 10.0,
+                  bool distanceErrorPreferTruthCenter = true,
+                  bool distanceErrorPowerInverse = true) {
+  return FitGaus1D(filename, errorPercentOfMax, saveParamA, saveParamMu, saveParamSigma,
+                   saveParamB, chargeBranch, fitDiagonals, saveDiagParamA, saveDiagParamMu,
+                   saveDiagParamSigma, saveDiagParamB, saveLineMeans, useQnQiPercentErrors,
+                   useDistanceWeightedErrors, distanceErrorScalePixels, distanceErrorExponent,
+                   distanceErrorFloorPercent, distanceErrorCapPercent, distanceErrorPreferTruthCenter,
+                   distanceErrorPowerInverse);
 }

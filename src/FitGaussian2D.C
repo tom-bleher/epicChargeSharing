@@ -1,4 +1,4 @@
-// ROOT macro: FitGaus2D.C
+// ROOT macro: FitGaussian2D.C
 // Performs 2D Gaussian fit on the full charge neighborhood to reconstruct
 // deltas, and appends them as new branches.
 // Uses Q_f (noisy charge per pixel, Coulombs) when available; falls back to Q_i.
@@ -7,6 +7,7 @@
 #include <TTree.h>
 #include <TBranch.h>
 #include <TNamed.h>
+#include <TParameter.h>
 #include <TGraph2D.h>
 #include <TGraph2DErrors.h>
 #include <TF2.h>
@@ -35,9 +36,10 @@
 #include <atomic>
 #include <memory>
 #include <ROOT/TThreadExecutor.hxx>
+#include <ROOT/RNTupleImporter.hxx>
 
 #include "ChargeUtils.h"
-#include "internal/RootBranchHelpers.hh"
+#include "RootHelpers.hh"
 
 namespace {
   // 2D Gaussian with constant offset:
@@ -60,7 +62,7 @@ namespace {
 // errorPercentOfMax: vertical uncertainty as a percent (e.g. 5.0 means 5%)
 // of the event's maximum charge within the neighborhood. The same error is
 // applied to all data points used in the fit for that event.
-int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
+int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
                  double errorPercentOfMax = 5.0,
                  bool saveParamA = true,
                  bool saveParamMux = true,
@@ -75,14 +77,19 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
                  double distanceErrorExponent = 1.0,
                  double distanceErrorFloorPercent = 1.0,
                  double distanceErrorCapPercent = 50.0,
-                 bool distanceErrorPreferTruthCenter = true) {
+                 bool distanceErrorPreferTruthCenter = true,
+                 bool useVerticalUncertainties = true) {
+  // Enable ROOT Implicit Multithreading for automatic parallelization
+  ROOT::EnableImplicitMT();
+
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
-  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-4);
+  ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-6);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(400);
   ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
   ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
-  const bool distanceErrorsEnabled = useDistanceWeightedErrors;
+  const bool verticalErrorsEnabled = useVerticalUncertainties;
+  const bool distanceErrorsEnabled = verticalErrorsEnabled && useDistanceWeightedErrors;
   const double distScalePx = (std::isfinite(distanceErrorScalePixels) &&
                               distanceErrorScalePixels > 0.0)
                                  ? distanceErrorScalePixels
@@ -98,8 +105,21 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
                                 : 0.0;
   const bool distPreferTruthCenter = distanceErrorPreferTruthCenter;
 
+  if (!verticalErrorsEnabled) {
+    if (useDistanceWeightedErrors) {
+      ::Warning("FitGaussian2D",
+                "Vertical uncertainties disabled; ignoring distance-weighted "
+                "uncertainty model.");
+    }
+    if (useQnQiPercentErrors) {
+      ::Warning("FitGaussian2D",
+                "Vertical uncertainties disabled; ignoring Q_n/Q_i uncertainty "
+                "model.");
+    }
+  }
+
   if (distanceErrorsEnabled && useQnQiPercentErrors) {
-    ::Warning("FitGaus2D",
+    ::Warning("FitGaussian2D",
               "Distance-weighted uncertainties requested; ignoring Q_n/Q_i"
               " vertical uncertainty model.");
   }
@@ -107,103 +127,57 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   // Open file for update
   auto file = std::unique_ptr<TFile>(TFile::Open(filename, "UPDATE"));
   if (!file || file->IsZombie()) {
-    ::Error("FitGaus2D", "Cannot open file: %s", filename);
+    ::Error("FitGaussian2D", "Cannot open file: %s", filename);
     return 1;
   }
 
   // Get tree (check first for clearer diagnostics)
   TTree* tree = dynamic_cast<TTree*>(file->Get("Hits"));
   if (!tree) {
-    ::Error("FitGaus2D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
+    ::Error("FitGaussian2D", "Hits tree not found in file: %s (did you pass the correct path, e.g. build/epicChargeSharing.root?)", filename);
     file->Close();
     return 3;
   }
 
-  // Fetch metadata (pixel spacing, pixel size, neighborhood radius) with fallbacks
-  double pixelSpacing = NAN;
-  if (auto* spacingObj = dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
-    try { pixelSpacing = std::stod(spacingObj->GetTitle()); } catch (...) {}
-  }
-  double pixelSize = NAN;
-  if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
-    try { pixelSize = std::stod(sizeObj->GetTitle()); } catch (...) {}
-  }
-  int neighborhoodRadiusMeta = -1;
-  if (auto* rObj = dynamic_cast<TNamed*>(file->Get("NeighborhoodRadius"))) {
-    try { neighborhoodRadiusMeta = std::stoi(rObj->GetTitle()); }
-    catch (...) {
-      try { neighborhoodRadiusMeta = static_cast<int>(std::lround(std::stod(rObj->GetTitle()))); } catch (...) {}
+  // Helper to get TParameter<double> from tree's UserInfo
+  auto getDoubleParam = [&tree](const char* name) -> double {
+    TList* info = tree->GetUserInfo();
+    if (!info) return NAN;
+    if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(name))) {
+      return param->GetVal();
     }
-  }
-
-  auto inferSpacingFromTree = [&](TTree* t) -> double {
-    std::vector<double> xs; xs.reserve(5000);
-    std::vector<double> ys; ys.reserve(5000);
-    double x_px_tmp = 0.0, y_px_tmp = 0.0;
-    t->SetBranchAddress("PixelX", &x_px_tmp);
-    t->SetBranchAddress("PixelY", &y_px_tmp);
-    Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
-    for (Long64_t i=0;i<nToScan;++i) {
-      t->GetEntry(i);
-      if (IsFinite3D(x_px_tmp)) xs.push_back(x_px_tmp);
-      if (IsFinite3D(y_px_tmp)) ys.push_back(y_px_tmp);
-    }
-    auto computeGap = [](std::vector<double>& v)->double{
-      if (v.size() < 2) return NAN;
-      std::sort(v.begin(), v.end());
-      v.erase(std::unique(v.begin(), v.end()), v.end());
-      if (v.size() < 2) return NAN;
-      std::vector<double> gaps; gaps.reserve(v.size());
-      for (size_t i=1;i<v.size();++i) {
-        double d = v[i]-v[i-1];
-        if (d > 1e-9 && IsFinite3D(d)) gaps.push_back(d);
-      }
-      if (gaps.empty()) return NAN;
-      std::nth_element(gaps.begin(), gaps.begin()+gaps.size()/2, gaps.end());
-      return gaps[gaps.size()/2];
-    };
-    double gx = computeGap(xs);
-    double gy = computeGap(ys);
-    if (IsFinite3D(gx) && gx>0 && IsFinite3D(gy) && gy>0) return 0.5*(gx+gy);
-    if (IsFinite3D(gx) && gx>0) return gx;
-    if (IsFinite3D(gy) && gy>0) return gy;
     return NAN;
   };
 
-  auto inferRadiusFromTree = [&](TTree* t, const std::string& preferred) -> int {
-    // Prefer requested branch; fall back to Q_f, F_i, Q_i
-    std::vector<double>* Q_tmp = nullptr;
-    auto bind = [&](const char* b)->bool { if (t->GetBranch(b)) { t->SetBranchStatus(b, 1); t->SetBranchAddress(b, &Q_tmp); return true; } return false; };
-    if (!preferred.empty() && bind(preferred.c_str())) {}
-    else if (bind("Q_f")) {}
-    else if (bind("F_i")) {}
-    else if (bind("Q_i")) {}
-    else return -1;
-    Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
-    for (Long64_t i=0;i<nToScan;++i) {
-      t->GetEntry(i);
-      if (Q_tmp && !Q_tmp->empty()) {
-        const size_t total = Q_tmp->size();
-        const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
-        if (N >= 3 && N*N == static_cast<int>(total)) {
-          return (N - 1) / 2;
-        }
-      }
+  // Helper to get TParameter<int> from tree's UserInfo
+  auto getIntParam = [&tree](const char* name) -> int {
+    TList* info = tree->GetUserInfo();
+    if (!info) return -1;
+    if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(name))) {
+      return param->GetVal();
     }
     return -1;
   };
 
+  // Fetch metadata from tree's UserInfo
+  double pixelSpacing = getDoubleParam("GridPixelSpacing_mm");
+  double pixelSize = getDoubleParam("GridPixelSize_mm");
+  int neighborhoodRadiusMeta = getIntParam("NeighborhoodRadius");
+
   if (!IsFinite3D(pixelSpacing) || pixelSpacing <= 0) {
-    pixelSpacing = inferSpacingFromTree(tree);
-  }
-  if (!IsFinite3D(pixelSpacing) || pixelSpacing <= 0) {
-    ::Error("FitGaus2D", "Pixel spacing not available (metadata missing and inference failed). Aborting.");
+    ::Error("FitGaussian2D", "Pixel spacing not available in tree metadata. Aborting.");
     file->Close();
     return 2;
   }
   if (!IsFinite3D(pixelSize) || pixelSize <= 0) {
-    // Fallback: if pixel size metadata is missing, use half of pitch as a conservative lower bound
-    pixelSize = 0.5 * pixelSpacing;
+    ::Error("FitGaussian2D", "Pixel size not available in tree metadata. Aborting.");
+    file->Close();
+    return 2;
+  }
+  if (neighborhoodRadiusMeta <= 0) {
+    ::Error("FitGaussian2D", "Neighborhood radius not available in tree metadata. Aborting.");
+    file->Close();
+    return 2;
   }
   
   // Decide which charge branch to use
@@ -214,7 +188,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     else if (hasBranch("F_i")) chosenCharge = "F_i";
     else if (hasBranch("Q_i")) chosenCharge = "Q_i";
     else {
-      ::Error("FitGaus2D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
+      ::Error("FitGaussian2D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
       file->Close();
       return 4;
     }
@@ -231,7 +205,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   std::vector<double>* Q = nullptr;
   std::vector<double>* Qi = nullptr;
   std::vector<double>* Qn = nullptr;
-  bool enableQiQnErrors = useQnQiPercentErrors && !distanceErrorsEnabled;
+  bool enableQiQnErrors = verticalErrorsEnabled && useQnQiPercentErrors && !distanceErrorsEnabled;
   bool haveQiBranchForErrors = false;
   bool haveQnBranchForErrors = false;
 
@@ -251,7 +225,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       tree->SetBranchStatus("Q_i", 1);
       tree->SetBranchStatus("Q_n", 1);
     } else {
-      ::Warning("FitGaus2D", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
+      ::Warning("FitGaussian2D", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
       enableQiQnErrors = false;
     }
   }
@@ -376,7 +350,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   std::iota(indices.begin(), indices.end(), 0);
   ROOT::TThreadExecutor exec;
   // Suppress expected Minuit2 error spam during Fumili2 attempts; we'll fallback to MIGRAD if needed
-  const int prevErrorLevel_FitGaus2D = gErrorIgnoreLevel;
+  const int prevErrorLevel_FitGaussian2D = gErrorIgnoreLevel;
   gErrorIgnoreLevel = kFatal;
   exec.Foreach([&](int i){
     const bool isPix = v_is_pixel[i] != 0;
@@ -473,8 +447,11 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     }
 
     // Error model and sigma bounds
-    const double uniformSigma = charge_uncert::UniformPercentOfMax(
-        errorPercentOfMax, qmaxNeighborhood);
+    const double uniformSigma =
+        verticalErrorsEnabled
+            ? charge_uncert::UniformPercentOfMax(errorPercentOfMax,
+                                                 qmaxNeighborhood)
+            : 1.0;
     // Constrain sigma to be within [pixel size, radius * pitch]
     const double sigLoBound = pixelSize;
     const double sigHiBound = std::max(sigLoBound, static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
@@ -584,7 +561,9 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     const double muYLo = v_y_px[i] - 0.5 * pixelSpacing;
     const double muYHi = v_y_px[i] + 0.5 * pixelSpacing;
 
-    TF2 fModel("fModel", Gauss2DPlusB, xMinR, xMaxR, yMinR, yMaxR, 6);
+    // Thread-local TF2 reuse to avoid repeated allocations per fit
+    thread_local TF2 fModel("fModel", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
+    fModel.SetRange(xMinR, yMinR, xMaxR, yMaxR);
     // Bounds for Q fits: A in (0, ~2*qmax], B in [-~qmax, ~qmax]
     const double AHi = std::max(1e-18, 2.0 * std::max(qmaxNeighborhood, 0.0));
     const double BHi = std::max(1e-18, 1.0 * std::max(qmaxNeighborhood, 0.0));
@@ -686,13 +665,16 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
       out_sigx[i] = params[3];
       out_sigy[i] = params[4];
       out_B[i]    = params[5];
-      out_chi2[i] = chi2Calc;
-      if (ndfCalc > 0) {
-        out_ndf[i]  = static_cast<double>(ndfCalc);
-        out_prob[i] = TMath::Prob(chi2Calc, ndfCalc);
-      } else {
-        out_ndf[i]  = INVALID_VALUE;
-        out_prob[i] = INVALID_VALUE;
+      // Only store chi2/ndf/prob when vertical uncertainties are enabled
+      if (verticalErrorsEnabled) {
+        out_chi2[i] = chi2Calc;
+        if (ndfCalc > 0) {
+          out_ndf[i]  = static_cast<double>(ndfCalc);
+          out_prob[i] = TMath::Prob(chi2Calc, ndfCalc);
+        } else {
+          out_ndf[i]  = INVALID_VALUE;
+          out_prob[i] = INVALID_VALUE;
+        }
       }
       const double xr = out_mux[i];
       const double yr = out_muy[i];
@@ -728,7 +710,7 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
     }
   }, indices);
   // Restore previous error level
-  gErrorIgnoreLevel = prevErrorLevel_FitGaus2D;
+  gErrorIgnoreLevel = prevErrorLevel_FitGaussian2D;
 
   // Sequentially write outputs
   for (Long64_t i = 0; i < nEntries; ++i) {
@@ -760,18 +742,18 @@ int FitGaus2D(const char* filename = "../build/epicChargeSharing.root",
   file->Flush();
   file->Close();
 
-  ::Info("FitGaus2D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
+  ::Info("FitGaussian2D", "Processed %lld entries, fitted %lld.", nProcessed, (long long)nFitted.load());
   return 0;
 }
 
 
 // Backward-compatible wrapper matching the previous signature.
 // Maps saveFitParameters=true to saving all individual parameters.
-int FitGaus2D(const char* filename,
+int FitGaussian2D(const char* filename,
               double errorPercentOfMax,
               bool saveFitParameters,
               const char* chargeBranch) {
-  return FitGaus2D(filename,
+  return FitGaussian2D(filename,
                       errorPercentOfMax,
                       /*saveParamA*/   saveFitParameters,
                       /*saveParamMux*/ saveFitParameters,
