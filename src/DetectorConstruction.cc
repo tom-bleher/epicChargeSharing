@@ -3,9 +3,10 @@
  * @brief Builds world, silicon detector, and pixel pads; attaches MFD and scorers.
  */
 #include "DetectorConstruction.hh"
+
+#include "Config.hh"
 #include "EventAction.hh"
 #include "RunAction.hh"
-#include "Constants.hh"
 
 #include "G4RunManager.hh"
 #include "G4NistManager.hh"
@@ -20,6 +21,7 @@
 #include "G4MultiFunctionalDetector.hh"
 #include "G4PSEnergyDeposit.hh"
 #include "G4VSensitiveDetector.hh"
+#include "G4GenericMessenger.hh"
 #include <G4ScoringManager.hh>
 
 #include "Randomize.hh"
@@ -35,16 +37,18 @@ DetectorConstruction::DetectorConstruction()
     : G4VUserDetectorConstruction(),
       fPixelSize(Constants::PIXEL_SIZE),
       fPixelWidth(Constants::PIXEL_WIDTH),
-      fPixelSpacing(Constants::PIXEL_SPACING),
+      fPixelSpacing(Constants::PIXEL_PITCH),
       fPixelCornerOffset(Constants::PIXEL_CORNER_OFFSET),
       fDetSize(Constants::DETECTOR_SIZE),
       fDetWidth(Constants::DETECTOR_WIDTH),
       fNumBlocksPerSide(0),
+      fDetectorPos(0., 0., Constants::DETECTOR_Z_POSITION),
       fEventAction(nullptr),
       fRunAction(nullptr),
       fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),
       fLogicSilicon(nullptr)
 {
+    SetupMessenger();
 }
 
 DetectorConstruction::~DetectorConstruction() = default;
@@ -135,7 +139,7 @@ G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* log
 {
     (void)originalDetSize;
 
-    const G4ThreeVector detectorPos = GetDetectorPos();
+    const G4ThreeVector& detectorPos = GetDetectorPos();
 
     auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7));
     cubeVisAtt->SetForceSolid(true);
@@ -207,7 +211,7 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
     siliconLogical->SetUserLimits(stepLimit);
     InitializePixelGainSigmas();
 
-    const G4ThreeVector detectorPos = GetDetectorPos();
+    const G4ThreeVector& detectorPos = GetDetectorPos();
     const G4double pixelZ = detectorPos.z() + fDetWidth / 2 + fPixelWidth / 2;
     const G4double firstPixelPos = -fDetSize / 2 + fPixelCornerOffset + fPixelSize / 2;
 
@@ -292,24 +296,20 @@ void DetectorConstruction::SyncRunMetadata()
     fRunAction->SetGridPixelCenters(fPixelCenters);
     fRunAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
 
-    const auto chargeModel = Constants::CHARGE_SHARING_MODEL;
+    const auto reconMethod = Constants::RECON_METHOD;
     G4double linearBeta = std::numeric_limits<G4double>::quiet_NaN();
-    if (chargeModel == Constants::ChargeSharingModel::Linear) {
-        linearBeta = GetLinearChargeModelBeta(fPixelSpacing);
+    // Beta is only used when LinA signal model is active
+    if (Constants::USES_LINEAR_SIGNAL) {
+        linearBeta = GetLinearChargeModelBeta();
     }
-    fRunAction->SetChargeSharingMetadata(chargeModel, linearBeta, fPixelSpacing);
-}
-
-G4ThreeVector DetectorConstruction::GetDetectorPos() const
-{
-    return G4ThreeVector(0., 0., Constants::DETECTOR_Z_POSITION);
+    fRunAction->SetPosReconMetadata(reconMethod, linearBeta, fPixelSpacing);
 }
 
 DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const G4ThreeVector& pos) const
 {
     PixelLocation result{};
 
-    const G4ThreeVector detectorPos = GetDetectorPos();
+    const G4ThreeVector& detectorPos = GetDetectorPos();
     const G4ThreeVector relativePos = pos - detectorPos;
     const G4double firstPixelPos = -fDetSize / 2 + fPixelCornerOffset + fPixelSize / 2;
 
@@ -332,14 +332,15 @@ DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const
     return result;
 }
 
-G4ThreeVector DetectorConstruction::GetPixelCenter(G4int globalPixelId) const
+const G4ThreeVector& DetectorConstruction::GetPixelCenter(G4int globalPixelId) const
 {
+    static const G4ThreeVector zero(0., 0., 0.);
     if (globalPixelId < 0) {
-        return G4ThreeVector(0., 0., 0.);
+        return zero;
     }
     const auto idx = static_cast<std::size_t>(globalPixelId);
     if (idx >= fPixelCenters.size()) {
-        return G4ThreeVector(0., 0., 0.);
+        return zero;
     }
     return fPixelCenters[idx];
 }
@@ -366,37 +367,6 @@ void DetectorConstruction::ConstructSDandField()
     }
 }
 
-G4double DetectorConstruction::GetLinearChargeModelBeta(G4double pitch) const
-{
-    if (pitch >= Constants::LINEAR_CHARGE_MODEL_MIN_PITCH &&
-        pitch <= Constants::LINEAR_CHARGE_MODEL_BOUNDARY_PITCH) {
-        return Constants::LINEAR_CHARGE_MODEL_BETA_NARROW;
-    }
-
-    if (pitch > Constants::LINEAR_CHARGE_MODEL_BOUNDARY_PITCH &&
-        pitch <= Constants::LINEAR_CHARGE_MODEL_MAX_PITCH) {
-        return Constants::LINEAR_CHARGE_MODEL_BETA_WIDE;
-    }
-
-    std::call_once(fLinearModelWarningFlag,
-                   [pitch]() {
-                       std::ostringstream oss;
-                       oss << "Linear charge sharing model: pixel pitch " << pitch / micrometer
-                           << " um outside supported range ["
-                           << Constants::LINEAR_CHARGE_MODEL_MIN_PITCH / micrometer
-                           << ", "
-                           << Constants::LINEAR_CHARGE_MODEL_MAX_PITCH / micrometer
-                           << "]. Using narrow beta.";
-                       const std::string message = oss.str();
-                       G4Exception("DetectorConstruction::GetLinearChargeModelBeta",
-                                   "LinearModelOutOfRange",
-                                   JustWarning,
-                                   message.c_str());
-                   });
-
-    return Constants::LINEAR_CHARGE_MODEL_BETA_NARROW;
-}
-
 void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
 {
     G4cout << "[Detector] Neighborhood radius set to " << radius << " ("
@@ -410,4 +380,58 @@ void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
     if (fRunAction) {
         fRunAction->SetNeighborhoodRadiusMeta(radius);
     }
+}
+
+void DetectorConstruction::SetPixelSize(G4double size)
+{
+    G4cout << "[Detector] Pixel size set to " << size / mm << " mm" << G4endl;
+    fPixelSize = size;
+
+    if (G4RunManager* runManager = G4RunManager::GetRunManager()) {
+        runManager->GeometryHasBeenModified();
+    }
+}
+
+void DetectorConstruction::SetPixelSpacing(G4double spacing)
+{
+    G4cout << "[Detector] Pixel spacing (pitch) set to " << spacing / mm << " mm" << G4endl;
+    fPixelSpacing = spacing;
+
+    if (G4RunManager* runManager = G4RunManager::GetRunManager()) {
+        runManager->GeometryHasBeenModified();
+    }
+}
+
+void DetectorConstruction::SetupMessenger()
+{
+    fMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/detector/",
+                                                       "Detector geometry configuration");
+
+    fMessenger->DeclareMethodWithUnit("pixelSize", "mm",
+                                       &DetectorConstruction::SetPixelSize)
+        .SetGuidance("Set the pixel pad size")
+        .SetParameterName("size", false)
+        .SetRange("size > 0")
+        .SetStates(G4State_PreInit, G4State_Idle);
+
+    fMessenger->DeclareMethodWithUnit("pixelSpacing", "mm",
+                                       &DetectorConstruction::SetPixelSpacing)
+        .SetGuidance("Set pixel center-to-center spacing (pitch)")
+        .SetParameterName("spacing", false)
+        .SetRange("spacing > 0")
+        .SetStates(G4State_PreInit, G4State_Idle);
+
+    fMessenger->DeclareMethodWithUnit("pixelCornerOffset", "mm",
+                                       &DetectorConstruction::SetPixelCornerOffset)
+        .SetGuidance("Set offset from detector corner to first pixel center")
+        .SetParameterName("offset", false)
+        .SetRange("offset >= 0")
+        .SetStates(G4State_PreInit, G4State_Idle);
+
+    fMessenger->DeclareMethod("neighborhoodRadius",
+                               &DetectorConstruction::SetNeighborhoodRadius)
+        .SetGuidance("Set neighborhood radius for charge sharing (pixels)")
+        .SetParameterName("radius", false)
+        .SetRange("radius >= 0 && radius <= 10")
+        .SetStates(G4State_PreInit, G4State_Idle);
 }

@@ -1,20 +1,26 @@
-/**
- * @file DetectorConstruction.hh
- * @brief Declares `DetectorConstruction`, which builds the detector geometry and
- *        configures sensitive detectors and scoring for the silicon volume.
- */
-#ifndef DETECTORCONSTRUCTION_HH
-#define DETECTORCONSTRUCTION_HH
+/// \file DetectorConstruction.hh
+/// \brief Definition of the ECS::DetectorConstruction class.
+///
+/// This file declares the DetectorConstruction class which builds the
+/// AC-LGAD detector geometry including the silicon slab and aluminum
+/// pixel pad array.
+///
+/// \author Tom Bleher, Igor Korover
+/// \date 2025
+
+#ifndef ECS_DETECTOR_CONSTRUCTION_HH
+#define ECS_DETECTOR_CONSTRUCTION_HH
 
 #include "G4VUserDetectorConstruction.hh"
 #include "G4VPhysicalVolume.hh"
 #include "G4ThreeVector.hh"
+#include "Config.hh"
+#include <memory>
 #include <vector>
 #include <mutex>
 
-class EventAction;
-class RunAction;
 class G4LogicalVolume;
+class G4GenericMessenger;
 class G4Box;
 class G4NistManager;
 class G4PVPlacement;
@@ -23,6 +29,21 @@ class G4MultiFunctionalDetector;
 class G4VPrimitiveScorer;
 class G4Material;
 
+namespace ECS {
+
+// Forward declarations within namespace
+class EventAction;
+class RunAction;
+
+/// \brief Constructs the AC-LGAD detector geometry.
+///
+/// This class builds the complete detector geometry consisting of:
+/// - World volume (air)
+/// - Silicon detector slab with configurable dimensions
+/// - Grid of aluminum pixel pads with configurable size and pitch
+///
+/// The class also manages per-pixel gain noise parameters and provides
+/// methods for finding the nearest pixel to a given position.
 class DetectorConstruction : public G4VUserDetectorConstruction
 {
 public:
@@ -43,7 +64,8 @@ public:
     void SetRunAction(RunAction* runAction);
     
     void SetPixelCornerOffset(G4double cornerOffset);
-    
+    void SetPixelSize(G4double size);
+    void SetPixelSpacing(G4double spacing);
     void SetNeighborhoodRadius(G4int radius);
     
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
@@ -51,14 +73,14 @@ public:
     G4double GetPixelSize() const { return fPixelSize; }
     G4double GetPixelSpacing() const { return fPixelSpacing; }
     G4double GetPixelPitch() const { return fPixelSpacing; }
-    G4double GetLinearChargeModelBeta(G4double pitch) const;
+    G4double GetLinearChargeModelBeta() const { return Constants::LINEAR_CHARGE_MODEL_BETA; }
     G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
-    G4ThreeVector GetDetectorPos() const;
+    const G4ThreeVector& GetDetectorPos() const { return fDetectorPos; }
     PixelLocation FindNearestPixel(const G4ThreeVector& pos) const;
     const std::vector<G4ThreeVector>& GetPixelCenters() const { return fPixelCenters; }
-    G4ThreeVector GetPixelCenter(G4int globalPixelId) const;
+    const G4ThreeVector& GetPixelCenter(G4int globalPixelId) const;
     // Noise sigma accessors (row-major global pixel id = i*N + j)
     G4double GetPixelGainSigma(G4int globalPixelId) const { return (globalPixelId >= 0 && globalPixelId < (G4int)fPixelGainSigmas.size()) ? fPixelGainSigmas[globalPixelId] : 0.0; }
     const std::vector<G4double>& GetPixelGainSigmas() const { return fPixelGainSigmas; }
@@ -83,6 +105,7 @@ private:
     PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical, const MaterialSet& mats, G4bool checkOverlaps);
     void InitializePixelGainSigmas();
     void SyncRunMetadata();
+    void SetupMessenger();
 
     G4double fPixelSize;
     G4double fPixelWidth;
@@ -92,8 +115,7 @@ private:
     G4double fDetSize;
     G4double fDetWidth;
     G4int fNumBlocksPerSide;
-
-    mutable std::once_flag fLinearModelWarningFlag;
+    G4ThreeVector fDetectorPos;
 
     EventAction* fEventAction;
     RunAction* fRunAction{nullptr};
@@ -105,6 +127,14 @@ private:
     // Per-pixel multiplicative noise sigma table (initialized once during construction)
     std::vector<G4double> fPixelGainSigmas;
     std::vector<G4ThreeVector> fPixelCenters;
+
+    // UI messenger for runtime configuration
+    std::unique_ptr<G4GenericMessenger> fMessenger;
 };
 
-#endif // DETECTORCONSTRUCTION_HH
+} // namespace ECS
+
+// Backward compatibility alias
+using DetectorConstruction = ECS::DetectorConstruction;
+
+#endif // ECS_DETECTOR_CONSTRUCTION_HH

@@ -4,7 +4,7 @@
  */
 #include "PrimaryGenerator.hh"
 
-#include "Constants.hh"
+#include "Config.hh"
 #include "DetectorConstruction.hh"
 
 #include "G4Event.hh"
@@ -54,7 +54,7 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     ConfigureParticleGun();
     ConfigureMessenger();
 
-    fFixedX = 0.0;
+    fFixedX = -150.0*um;
     if (fDetector) {
         fFixedY = 0.5 * fDetector->GetPixelSpacing();
     }

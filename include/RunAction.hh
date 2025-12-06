@@ -1,12 +1,22 @@
-#ifndef RUNACTION_HH
-#define RUNACTION_HH
+/// \file RunAction.hh
+/// \brief Definition of the ECS::RunAction class.
+///
+/// This file declares the RunAction class which manages run-level
+/// operations including ROOT file I/O and metadata publication.
+///
+/// \author Tom Bleher, Igor Korover
+/// \date 2025
+
+#ifndef ECS_RUN_ACTION_HH
+#define ECS_RUN_ACTION_HH
 
 #include "ChargeSharingCalculator.hh"
-#include "Constants.hh"
+#include "Config.hh"
+#include "NeighborhoodUtils.hh"
+#include "RootIO.hh"
 #include "G4Run.hh"
 #include "G4UserRunAction.hh"
 #include "globals.hh"
-#include "internal/NeighborhoodBuffer.hh"
 
 #include <memory>
 #include <mutex>
@@ -17,15 +27,31 @@
 
 class TFile;
 class TTree;
-namespace runaction
-{
-class RootFileWriterHelper;
+
+// Forward declaration
+namespace ECS {
+class RootFileWriter;
 }
 
-/**
- * @file RunAction.hh
- * @brief Manages run lifecycle, ROOT I/O, and metadata publication using helper components.
- */
+namespace ECS {
+
+/// \brief Run-level action for managing simulation runs and ROOT I/O.
+///
+/// This class handles:
+/// - Run lifecycle management (begin/end actions)
+/// - ROOT file creation and configuration
+/// - Branch setup for all output data categories
+/// - Thread synchronization for multithreaded operation
+/// - Worker file merging after parallel execution
+/// - Metadata publication to ROOT files
+/// - Post-processing fit macro invocation
+///
+/// The class supports five categories of ROOT branches:
+/// 1. Core: True position, hit position, energy deposit
+/// 2. Scalar: Nearest pixel, reconstruction results
+/// 3. Vector: Neighborhood charge arrays
+/// 4. Classification: Pixel hit flags
+/// 5. Full grid: Complete detector charge map (optional)
 class RunAction : public G4UserRunAction
 {
 public:
@@ -46,47 +72,9 @@ public:
     bool ValidateRootFile(const G4String& filename, bool* hasEntries = nullptr);
     void CleanupRootObjects();
 
-    struct EventSummaryData
-    {
-        G4double edep{0.0};
-        G4double hitX{0.0};
-        G4double hitY{0.0};
-        G4double hitZ{0.0};
-        G4double nearestPixelX{0.0};
-        G4double nearestPixelY{0.0};
-        G4double pixelTrueDeltaX{0.0};
-        G4double pixelTrueDeltaY{0.0};
-        G4bool firstContactIsPixel{false};
-        G4bool geometricIsPixel{false};
-        G4bool isPixelHitCombined{false};
-    };
-
-    struct EventRecord
-    {
-        EventSummaryData summary;
-        std::span<const ChargeSharingCalculator::Result::NeighborCell> neighborCells;
-        std::span<const G4double> neighborChargesNew;
-        std::span<const G4double> neighborChargesFinal;
-        std::span<const G4double> fullFi;
-        std::span<const G4double> fullQi;
-        std::span<const G4double> fullQn;
-        std::span<const G4double> fullQf;
-        std::span<const G4double> fullDistance;
-        std::span<const G4double> fullAlpha;
-        std::span<const G4double> fullPixelX;
-        std::span<const G4double> fullPixelY;
-        ChargeSharingCalculator::GridGeom geometry;
-        ChargeSharingCalculator::HitInfo hit;
-        ChargeSharingCalculator::ChargeMode mode{ChargeSharingCalculator::ChargeMode::Patch};
-        ChargeSharingCalculator::PatchInfo patchInfo;
-        G4int fullGridRows{0};
-        G4int fullGridCols{0};
-        G4int nearestPixelI{-1};
-        G4int nearestPixelJ{-1};
-        G4int nearestPixelGlobalId{-1};
-        G4int totalGridCells{0};
-        G4bool includeDistanceAlpha{false};
-    };
+    /// Type aliases for event data - definitions in ECS/IO/EventDataTypes.hh
+    using EventSummaryData = IO::EventSummaryData;
+    using EventRecord = IO::EventRecord;
 
     void SetDetectorGridParameters(G4double pixelSize,
                                    G4double pixelSpacing,
@@ -94,7 +82,7 @@ public:
                                    G4double detSize,
                                    G4int numBlocksPerSide);
     void SetNeighborhoodRadiusMeta(G4int radius);
-    void SetChargeSharingMetadata(Constants::ChargeSharingModel model,
+    void SetPosReconMetadata(Constants::PosReconModel model,
                                   G4double betaPerMicron,
                                   G4double pitch);
     void SetChargeSharingDistanceAlphaMeta(G4bool enabled);
@@ -119,10 +107,6 @@ private:
     G4String DetermineOutputFileName(const ThreadContext& context) const;
     void InitializeRootOutputs(const ThreadContext& context, const G4String& fileName);
     void ConfigureCoreBranches(TTree* tree);
-    void ConfigureScalarBranches(TTree* tree);
-    void ConfigureVectorBranches(TTree* tree);
-    void ConfigureClassificationBranches(TTree* tree);
-    void ConfigureNeighborhoodBranches(TTree* tree);
 
     void HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run);
     void HandleMasterEndOfRun(const ThreadContext& context, const G4Run* run);
@@ -139,11 +123,17 @@ private:
     void EnsureBranchBuffersInitialized();
     bool EnsureFullFractionBuffer(G4int gridSide = -1);
     std::unique_lock<std::mutex> MakeTreeLock();
-    void WriteMetadataToFile(TFile* file) const;
-    std::vector<std::pair<std::string, std::string>> CollectMetadataEntries() const;
+    void WriteMetadataToTree(TTree* tree) const;
+    ECS::IO::MetadataPublisher::EntryList CollectMetadataEntries() const;
+    IO::MetadataPublisher BuildMetadataPublisher() const;
 
-    std::unique_ptr<runaction::RootFileWriterHelper> fRootWriter;
+    std::unique_ptr<RootFileWriter> fRootWriter;
     std::mutex fTreeMutex;
+
+    // Helper classes for decomposed functionality
+    IO::BranchConfigurator fBranchConfigurator;
+    IO::MetadataPublisher fMetadataPublisher;
+    IO::PostProcessingRunner fPostProcessingRunner;
 
     G4double fTrueX;
     G4double fTrueY;
@@ -152,15 +142,37 @@ private:
     G4double fEdep;
     G4double fPixelTrueDeltaX;
     G4double fPixelTrueDeltaY;
+    G4double fReconX{0.0};
+    G4double fReconY{0.0};
+    G4double fReconTrueDeltaX{0.0};
+    G4double fReconTrueDeltaY{0.0};
 
     G4bool fFirstContactIsPixel{false};
     G4bool fGeometricIsPixel{false};
     G4bool fIsPixelHit{false};
 
+    // Neighborhood fractions
     std::vector<G4double> fNeighborhoodChargeFractions;
+    std::vector<G4double> fNeighborhoodChargeFractionsRow;
+    std::vector<G4double> fNeighborhoodChargeFractionsCol;
+    std::vector<G4double> fNeighborhoodChargeFractionsBlock;
+    // Neighborhood charges
     std::vector<G4double> fNeighborhoodCharge;
     std::vector<G4double> fNeighborhoodChargeNew;
     std::vector<G4double> fNeighborhoodChargeFinal;
+    // Row-mode charges
+    std::vector<G4double> fNeighborhoodChargeRow;
+    std::vector<G4double> fNeighborhoodChargeNewRow;
+    std::vector<G4double> fNeighborhoodChargeFinalRow;
+    // Col-mode charges
+    std::vector<G4double> fNeighborhoodChargeCol;
+    std::vector<G4double> fNeighborhoodChargeNewCol;
+    std::vector<G4double> fNeighborhoodChargeFinalCol;
+    // Block-mode charges
+    std::vector<G4double> fNeighborhoodChargeBlock;
+    std::vector<G4double> fNeighborhoodChargeNewBlock;
+    std::vector<G4double> fNeighborhoodChargeFinalBlock;
+    // Common
     std::vector<G4double> fNeighborhoodDistance;
     std::vector<G4double> fNeighborhoodAlpha;
 
@@ -168,7 +180,7 @@ private:
     std::vector<G4double> fNeighborhoodPixelY;
     std::vector<G4int> fNeighborhoodPixelID;
 
-    neighbor::Layout fNeighborhoodLayout;
+    NeighborhoodLayout fNeighborhoodLayout;
     std::size_t fNeighborhoodCapacity{0};
     G4int fNeighborhoodActiveCells{0};
 
@@ -179,7 +191,8 @@ private:
     G4int fGridNumBlocksPerSide;
     G4int fGridNeighborhoodRadius{0};
 
-    Constants::ChargeSharingModel fChargeSharingModel;
+    Constants::PosReconModel fPosReconModel;
+    Constants::DenominatorMode fDenominatorMode{Constants::DENOMINATOR_MODE};
     G4double fChargeSharingBeta;
     G4double fChargeSharingPitch;
     G4bool fEmitDistanceAlphaMeta{false};
@@ -189,10 +202,28 @@ private:
     std::vector<G4int> fGridPixelID;
     std::vector<G4double> fGridPixelX;
     std::vector<G4double> fGridPixelY;
+    // Full grid fractions
     std::vector<G4double> fFullFi;
+    std::vector<G4double> fFullFiRow;
+    std::vector<G4double> fFullFiCol;
+    std::vector<G4double> fFullFiBlock;
+    // Full grid neighborhood charges
     std::vector<G4double> fFullQi;
     std::vector<G4double> fFullQn;
     std::vector<G4double> fFullQf;
+    // Full grid row-mode charges
+    std::vector<G4double> fFullQiRow;
+    std::vector<G4double> fFullQnRow;
+    std::vector<G4double> fFullQfRow;
+    // Full grid col-mode charges
+    std::vector<G4double> fFullQiCol;
+    std::vector<G4double> fFullQnCol;
+    std::vector<G4double> fFullQfCol;
+    // Full grid block-mode charges
+    std::vector<G4double> fFullQiBlock;
+    std::vector<G4double> fFullQnBlock;
+    std::vector<G4double> fFullQfBlock;
+    // Full grid geometry
     std::vector<G4double> fFullDistance;
     std::vector<G4double> fFullAlpha;
     std::vector<G4double> fFullPixelXGrid;
@@ -203,4 +234,9 @@ private:
     G4int fFullGridSide{0};
 };
 
-#endif // RUNACTION_HH
+} // namespace ECS
+
+// Backward compatibility alias
+using RunAction = ECS::RunAction;
+
+#endif // ECS_RUN_ACTION_HH
