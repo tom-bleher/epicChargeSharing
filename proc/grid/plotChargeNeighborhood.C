@@ -1,6 +1,8 @@
 #include <TFile.h>
 #include <TTree.h>
 #include <TNamed.h>
+#include <TParameter.h>
+#include <TList.h>
 #include <TCanvas.h>
 #include <TStyle.h>
 #include <TBox.h>
@@ -13,6 +15,8 @@
 #include <TPolyLine.h>
 #include <TLegend.h>
 #include <TLine.h>
+#include <TPaletteAxis.h>
+#include <TError.h>
 
 #include <vector>
 #include <string>
@@ -25,31 +29,74 @@
 #include <cstring>
 
 namespace {
+  // Helper to read double metadata from file-level TNamed OR tree UserInfo TParameter
+  double ReadDoubleNamed(TFile* file, TTree* tree, const char* key)
+  {
+    // First try file-level TNamed (legacy format)
+    if (file) {
+      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
+        const char* s = obj->GetTitle();
+        if (s && *s) return std::atof(s);
+      }
+    }
+    // Then try tree UserInfo with TParameter<double> (new format)
+    if (tree) {
+      TList* info = tree->GetUserInfo();
+      if (info) {
+        if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
+          return param->GetVal();
+        }
+        // Also try TNamed in UserInfo (string representation)
+        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
+          const char* s = named->GetTitle();
+          if (s && *s) return std::atof(s);
+        }
+      }
+    }
+    std::ostringstream oss; oss << "Missing metadata object: '" << key << "'";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Overload for backward compatibility (file-only)
   double ReadDoubleNamed(TFile* file, const char* key)
   {
-    if (!file) throw std::runtime_error("Null TFile in ReadDoubleNamed");
-    TObject* obj = file->Get(key);
-    if (!obj) {
-      std::ostringstream oss; oss << "Missing metadata object: '" << key << "'";
-      throw std::runtime_error(oss.str());
+    return ReadDoubleNamed(file, nullptr, key);
+  }
+
+  int ReadIntNamed(TFile* file, TTree* tree, const char* key)
+  {
+    // First try file-level TNamed
+    if (file) {
+      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
+        const char* s = obj->GetTitle();
+        if (s && *s) return static_cast<int>(std::lround(std::atof(s)));
+      }
     }
-    TNamed* named = dynamic_cast<TNamed*>(obj);
-    if (!named) {
-      std::ostringstream oss; oss << "Object '" << key << "' is not a TNamed";
-      throw std::runtime_error(oss.str());
+    // Then try tree UserInfo with TParameter<int>
+    if (tree) {
+      TList* info = tree->GetUserInfo();
+      if (info) {
+        if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(key))) {
+          return param->GetVal();
+        }
+        // Also try TParameter<double> and convert
+        if (auto* paramD = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
+          return static_cast<int>(std::lround(paramD->GetVal()));
+        }
+        // Also try TNamed in UserInfo
+        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
+          const char* s = named->GetTitle();
+          if (s && *s) return static_cast<int>(std::lround(std::atof(s)));
+        }
+      }
     }
-    const char* s = named->GetTitle();
-    if (!s) {
-      std::ostringstream oss; oss << "TNamed '" << key << "' has empty title";
-      throw std::runtime_error(oss.str());
-    }
-    return std::atof(s);
+    std::ostringstream oss; oss << "Missing metadata object: '" << key << "'";
+    throw std::runtime_error(oss.str());
   }
 
   int ReadIntNamed(TFile* file, const char* key)
   {
-    double v = ReadDoubleNamed(file, key);
-    return static_cast<int>(std::lround(v));
+    return ReadIntNamed(file, nullptr, key);
   }
 
   TFile* TryOpenWithFallbacks(const char* rootFilePath)
@@ -132,6 +179,12 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
     return;
   }
 
+  TTree* tree = dynamic_cast<TTree*>(f->Get("Hits"));
+  if (!tree) {
+    std::cerr << "ERROR: 'Hits' tree not found in ROOT file." << std::endl;
+    f->Close(); delete f; return;
+  }
+
   double pixelSizeMm         = 0.0; // pad side length
   double pixelSpacingMm      = 0.0; // center-to-center spacing
   double pixelCornerOffsetMm = 0.0; // gap from detector edge to first pad edge
@@ -139,22 +192,16 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   int    numPerSide          = 0;   // number of pixels per side
 
   try {
-    pixelSizeMm         = ReadDoubleNamed(f, "GridPixelSize_mm");
-    pixelSpacingMm      = ReadDoubleNamed(f, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(f, "GridPixelCornerOffset_mm");
-    detSizeMm           = ReadDoubleNamed(f, "GridDetectorSize_mm");
-    numPerSide          = ReadIntNamed  (f, "GridNumBlocksPerSide");
+    pixelSizeMm         = ReadDoubleNamed(f, tree, "GridPixelSize_mm");
+    pixelSpacingMm      = ReadDoubleNamed(f, tree, "GridPixelSpacing_mm");
+    pixelCornerOffsetMm = ReadDoubleNamed(f, tree, "GridPixelCornerOffset_mm");
+    detSizeMm           = ReadDoubleNamed(f, tree, "GridDetectorSize_mm");
+    numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl;
     f->Close();
     delete f;
     return;
-  }
-
-  TTree* tree = dynamic_cast<TTree*>(f->Get("Hits"));
-  if (!tree) {
-    std::cerr << "ERROR: 'Hits' tree not found in ROOT file." << std::endl;
-    f->Close(); delete f; return;
   }
 
   // Inputs
@@ -175,7 +222,9 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
   enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY");
   enableIf("Edep"); enableIf("isPixelHit");
+  // Try both old (F_i, Q_i, etc.) and new (Fi, Qi, etc.) branch naming conventions
   enableIf("Q_f"); enableIf("Q_n"); enableIf("Q_i"); enableIf("F_i");
+  enableIf("Qf"); enableIf("Qn"); enableIf("Qi"); enableIf("Fi");
 
   if (tree->GetBranch("TrueX")) tree->SetBranchAddress("TrueX", &trueX);
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
@@ -183,18 +232,28 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
   if (tree->GetBranch("Edep")) tree->SetBranchAddress("Edep", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
+  // Try both old and new naming conventions for charge branches
   if (tree->GetBranch("Q_f")) tree->SetBranchAddress("Q_f", &Qf);
+  else if (tree->GetBranch("Qf")) tree->SetBranchAddress("Qf", &Qf);
   if (tree->GetBranch("Q_n")) tree->SetBranchAddress("Q_n", &Qn);
+  else if (tree->GetBranch("Qn")) tree->SetBranchAddress("Qn", &Qn);
   if (tree->GetBranch("Q_i")) tree->SetBranchAddress("Q_i", &Qi);
+  else if (tree->GetBranch("Qi")) tree->SetBranchAddress("Qi", &Qi);
   if (tree->GetBranch("F_i")) tree->SetBranchAddress("F_i", &Fi);
+  else if (tree->GetBranch("Fi")) tree->SetBranchAddress("Fi", &Fi);
 
   // Select which neighborhood data we will use
   std::string kind = dataKind ? dataKind : "fraction";
   std::transform(kind.begin(), kind.end(), kind.begin(), [](unsigned char c){ return std::tolower(c); });
   std::string label = (kind == "coulomb") ? "Charge" : (kind == "distance" ? "Distance" : "Charge Fraction");
   std::string unit  = (kind == "coulomb") ? " C" : (kind == "distance" ? " mm" : "");
-  if (!tree->GetBranch("Q_i") && !tree->GetBranch("F_i") && !tree->GetBranch("Q_f") && !tree->GetBranch("Q_n")) {
-    std::cerr << "ERROR: Required neighborhood data branch 'Q_n', 'Q_i', 'Q_f', or 'F_i' not found in tree." << std::endl;
+  // Check both old and new naming conventions
+  const bool hasQi = tree->GetBranch("Q_i") || tree->GetBranch("Qi");
+  const bool hasFi = tree->GetBranch("F_i") || tree->GetBranch("Fi");
+  const bool hasQf = tree->GetBranch("Q_f") || tree->GetBranch("Qf");
+  const bool hasQn = tree->GetBranch("Q_n") || tree->GetBranch("Qn");
+  if (!hasQi && !hasFi && !hasQf && !hasQn) {
+    std::cerr << "ERROR: Required neighborhood data branch 'Qn', 'Qi', 'Qf', or 'Fi' not found in tree." << std::endl;
     f->Close(); delete f; return;
   }
 
@@ -575,6 +634,15 @@ void plotChargeNeighborhood(const char* rootFilePath, Long64_t nPages, const cha
   plotChargeNeighborhood5x5_pages(rootFilePath, nPages, kind, "charge_neighborhoods.pdf", "Q_n");
 }
 
+// Extended overload used by sweep_analysis.py to control PDF path and branch
+int plotChargeNeighborhood(const char* rootFilePath,
+                           Long64_t nPages,
+                           const char* dataKind,
+                           const char* outPdfPath,
+                           const char* chargeBranch) {
+  return plotChargeNeighborhood5x5_pages(rootFilePath, nPages, dataKind, outPdfPath, chargeBranch);
+}
+
 // Compute and draw mean neighborhood (5x5 ROI) across all non-inside-pixel events with energy deposition
 // dataKind: "fraction", "coulomb", or "distance"
 void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing.root",
@@ -588,19 +656,19 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
   TFile* f = TryOpenWithFallbacks(rootFilePath);
   if (!f) { std::cerr << "ERROR: Cannot open any ROOT file." << std::endl; return; }
 
+  TTree* tree = dynamic_cast<TTree*>(f->Get("Hits"));
+  if (!tree) { std::cerr << "ERROR: 'Hits' tree not found." << std::endl; f->Close(); delete f; return; }
+
   double pixelSizeMm = 0.0, pixelSpacingMm = 0.0, detSizeMm = 0.0, pixelCornerOffsetMm = 0.0; int numPerSide = 0;
   try {
-    pixelSizeMm         = ReadDoubleNamed(f, "GridPixelSize_mm");
-    pixelSpacingMm      = ReadDoubleNamed(f, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(f, "GridPixelCornerOffset_mm");
-    detSizeMm           = ReadDoubleNamed(f, "GridDetectorSize_mm");
-    numPerSide          = ReadIntNamed  (f, "GridNumBlocksPerSide");
+    pixelSizeMm         = ReadDoubleNamed(f, tree, "GridPixelSize_mm");
+    pixelSpacingMm      = ReadDoubleNamed(f, tree, "GridPixelSpacing_mm");
+    pixelCornerOffsetMm = ReadDoubleNamed(f, tree, "GridPixelCornerOffset_mm");
+    detSizeMm           = ReadDoubleNamed(f, tree, "GridDetectorSize_mm");
+    numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl; f->Close(); delete f; return;
   }
-
-  TTree* tree = dynamic_cast<TTree*>(f->Get("Hits"));
-  if (!tree) { std::cerr << "ERROR: 'Hits' tree not found." << std::endl; f->Close(); delete f; return; }
 
   // Branches
   double trueX = 0.0, trueY = 0.0, pixelX = 0.0, pixelY = 0.0, edep = 0.0;
@@ -611,18 +679,25 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
 
   tree->SetBranchStatus("*", 0);
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
-  enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY"); enableIf("Edep"); enableIf("isPixelHit"); enableIf("Q_i"); enableIf("Q_f"); enableIf("F_i");
+  enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY"); enableIf("Edep"); enableIf("isPixelHit");
+  // Try both old (F_i, Q_i, etc.) and new (Fi, Qi, etc.) branch naming conventions
+  enableIf("Q_i"); enableIf("Q_f"); enableIf("F_i");
+  enableIf("Qi"); enableIf("Qf"); enableIf("Fi");
   if (tree->GetBranch("TrueX")) tree->SetBranchAddress("TrueX", &trueX);
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
   if (tree->GetBranch("PixelX")) tree->SetBranchAddress("PixelX", &pixelX);
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
   if (tree->GetBranch("Edep"))  tree->SetBranchAddress("Edep", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
+  // Try both old and new naming conventions for charge branches
   if (tree->GetBranch("Q_i")) tree->SetBranchAddress("Q_i", &Qi);
+  else if (tree->GetBranch("Qi")) tree->SetBranchAddress("Qi", &Qi);
   if (tree->GetBranch("Q_f")) tree->SetBranchAddress("Q_f", &Qf);
+  else if (tree->GetBranch("Qf")) tree->SetBranchAddress("Qf", &Qf);
   if (tree->GetBranch("F_i")) tree->SetBranchAddress("F_i", &Fi);
+  else if (tree->GetBranch("Fi")) tree->SetBranchAddress("Fi", &Fi);
 
-  if (!Qi && !Qf && !Fi) { std::cerr << "ERROR: Missing 'Q_i', 'Q_f', or 'F_i' branch" << std::endl; f->Close(); delete f; return; }
+  if (!Qi && !Qf && !Fi) { std::cerr << "ERROR: Missing 'Qi', 'Qf', or 'Fi' branch" << std::endl; f->Close(); delete f; return; }
 
   const Long64_t nEntries = tree->GetEntries();
   if (nEntries <= 0) { std::cerr << "ERROR: Empty 'Hits' tree" << std::endl; f->Close(); delete f; return; }
@@ -889,24 +964,24 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
     return 1;
   }
 
+  TTree* tree = dynamic_cast<TTree*>(f->Get("Hits"));
+  if (!tree) { std::cerr << "ERROR: 'Hits' tree not found in ROOT file." << std::endl; f->Close(); delete f; return 3; }
+
   double pixelSizeMm         = 0.0;
   double pixelSpacingMm      = 0.0;
   double pixelCornerOffsetMm = 0.0;
   double detSizeMm           = 0.0;
   int    numPerSide          = 0;
   try {
-    pixelSizeMm         = ReadDoubleNamed(f, "GridPixelSize_mm");
-    pixelSpacingMm      = ReadDoubleNamed(f, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(f, "GridPixelCornerOffset_mm");
-    detSizeMm           = ReadDoubleNamed(f, "GridDetectorSize_mm");
-    numPerSide          = ReadIntNamed  (f, "GridNumBlocksPerSide");
+    pixelSizeMm         = ReadDoubleNamed(f, tree, "GridPixelSize_mm");
+    pixelSpacingMm      = ReadDoubleNamed(f, tree, "GridPixelSpacing_mm");
+    pixelCornerOffsetMm = ReadDoubleNamed(f, tree, "GridPixelCornerOffset_mm");
+    detSizeMm           = ReadDoubleNamed(f, tree, "GridDetectorSize_mm");
+    numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl;
     f->Close(); delete f; return 2;
   }
-
-  TTree* tree = dynamic_cast<TTree*>(f->Get("Hits"));
-  if (!tree) { std::cerr << "ERROR: 'Hits' tree not found in ROOT file." << std::endl; f->Close(); delete f; return 3; }
 
   // Inputs
   double trueX = std::numeric_limits<double>::quiet_NaN();
@@ -923,18 +998,26 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
   tree->SetBranchStatus("*", 0);
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
   enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY");
-  enableIf("Edep"); enableIf("isPixelHit"); enableIf("Q_i"); enableIf("Q_n"); enableIf("Q_f"); enableIf("F_i");
+  enableIf("Edep"); enableIf("isPixelHit");
+  // Try both old (F_i, Q_i, etc.) and new (Fi, Qi, etc.) branch naming conventions
+  enableIf("Q_i"); enableIf("Q_n"); enableIf("Q_f"); enableIf("F_i");
+  enableIf("Qi"); enableIf("Qn"); enableIf("Qf"); enableIf("Fi");
   if (tree->GetBranch("TrueX")) tree->SetBranchAddress("TrueX", &trueX);
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
   if (tree->GetBranch("PixelX")) tree->SetBranchAddress("PixelX", &pixelX);
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
   if (tree->GetBranch("Edep")) tree->SetBranchAddress("Edep", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
+  // Try both old and new naming conventions for charge branches
   if (tree->GetBranch("Q_i")) tree->SetBranchAddress("Q_i", &Qi);
-  if (tree->GetBranch("Q_n")) tree->SetBranchAddress("Q_n", &Qf); // temp reuse below, we'll correct shortly
+  else if (tree->GetBranch("Qi")) tree->SetBranchAddress("Qi", &Qi);
+  if (tree->GetBranch("Q_n")) tree->SetBranchAddress("Q_n", &Qf); // temp reuse for Qn
+  else if (tree->GetBranch("Qn")) tree->SetBranchAddress("Qn", &Qf);
   if (tree->GetBranch("Q_f")) tree->SetBranchAddress("Q_f", &Qf);
+  else if (tree->GetBranch("Qf")) tree->SetBranchAddress("Qf", &Qf);
   if (tree->GetBranch("F_i")) tree->SetBranchAddress("F_i", &Fi);
-  if (!Qi && !Qf && !Fi) { std::cerr << "ERROR: Required neighborhood data branch 'Q_i', 'Q_f', or 'F_i' not found in tree." << std::endl; f->Close(); delete f; return 4; }
+  else if (tree->GetBranch("Fi")) tree->SetBranchAddress("Fi", &Fi);
+  if (!Qi && !Qf && !Fi) { std::cerr << "ERROR: Required neighborhood data branch 'Qi', 'Qf', or 'Fi' not found in tree." << std::endl; f->Close(); delete f; return 4; }
 
   const Long64_t nEntries = tree->GetEntries();
   if (nEntries <= 0) { std::cerr << "ERROR: Hits tree is empty." << std::endl; f->Close(); delete f; return 5; }

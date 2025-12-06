@@ -2,6 +2,8 @@
 #include <TTree.h>
 #include <TBranch.h>
 #include <TNamed.h>
+#include <TParameter.h>
+#include <TList.h>
 #include <TGraph.h>
 #include <TGraphErrors.h>
 #include <TF1.h>
@@ -46,6 +48,59 @@ namespace {
   inline bool IsFinite(double v) {
     return std::isfinite(v);
   }
+
+  // Helper functions to read metadata from tree UserInfo or file-level TNamed
+  double GetDoubleMetadata(TFile* file, TTree* tree, const char* key) {
+    // First try file-level TNamed (legacy/explicit format)
+    if (file) {
+      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
+        try { return std::stod(obj->GetTitle()); } catch (...) {}
+      }
+    }
+    // Then try tree UserInfo with TParameter<double>
+    if (tree) {
+      TList* info = tree->GetUserInfo();
+      if (info) {
+        if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
+          return param->GetVal();
+        }
+        // Also try TNamed in UserInfo (string representation)
+        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
+          try { return std::stod(named->GetTitle()); } catch (...) {}
+        }
+      }
+    }
+    return NAN;
+  }
+
+  int GetIntMetadata(TFile* file, TTree* tree, const char* key) {
+    // First try file-level TNamed (legacy/explicit format)
+    if (file) {
+      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
+        try { return std::stoi(obj->GetTitle()); }
+        catch (...) {
+          try { return static_cast<int>(std::lround(std::stod(obj->GetTitle()))); } catch (...) {}
+        }
+      }
+    }
+    // Then try tree UserInfo with TParameter<int>
+    if (tree) {
+      TList* info = tree->GetUserInfo();
+      if (info) {
+        if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(key))) {
+          return param->GetVal();
+        }
+        // Also try TNamed in UserInfo (string representation)
+        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
+          try { return std::stoi(named->GetTitle()); }
+          catch (...) {
+            try { return static_cast<int>(std::lround(std::stod(named->GetTitle()))); } catch (...) {}
+          }
+        }
+      }
+    }
+    return -1;
+  }
 }
 
 // processing2D_plots: Same logic as processing2D_plots, but draws
@@ -84,22 +139,10 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     return 2;
   }
 
-  // Pixel spacing/size/radius: prefer metadata; fallback to inference/defaults as in processing2D
-  double pixelSpacing = NAN;
-  double pixelSize    = NAN;
-  int neighborhoodRadiusMeta = -1;
-  if (auto* spacingObj = dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
-    try { pixelSpacing = std::stod(spacingObj->GetTitle()); } catch (...) {}
-  }
-  if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
-    try { pixelSize = std::stod(sizeObj->GetTitle()); } catch (...) {}
-  }
-  if (auto* rObj = dynamic_cast<TNamed*>(file->Get("NeighborhoodRadius"))) {
-    try { neighborhoodRadiusMeta = std::stoi(rObj->GetTitle()); }
-    catch (...) {
-      try { neighborhoodRadiusMeta = static_cast<int>(std::lround(std::stod(rObj->GetTitle()))); } catch (...) {}
-    }
-  }
+  // Pixel spacing/size/radius: prefer metadata (file-level or tree UserInfo); fallback to inference/defaults
+  double pixelSpacing = GetDoubleMetadata(file, tree, "GridPixelSpacing_mm");
+  double pixelSize    = GetDoubleMetadata(file, tree, "GridPixelSize_mm");
+  int neighborhoodRadiusMeta = GetIntMetadata(file, tree, "NeighborhoodRadius");
 
   auto inferSpacingFromTree = [&](TTree* t) -> double {
     std::vector<double> xs; xs.reserve(5000);
@@ -137,7 +180,12 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
 
   auto inferRadiusFromTree = [&](TTree* t) -> int {
     std::vector<double>* Qi_tmp = nullptr;
-    t->SetBranchAddress("Q_i", &Qi_tmp);
+    // Try Q_i first, fall back to Qi
+    if (t->GetBranch("Q_i")) {
+      t->SetBranchAddress("Q_i", &Qi_tmp);
+    } else if (t->GetBranch("Qi")) {
+      t->SetBranchAddress("Qi", &Qi_tmp);
+    }
     Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
     for (Long64_t i=0;i<nToScan;++i) {
       t->GetEntry(i);
@@ -180,7 +228,12 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchAddress("PixelX",  &x_px);
   tree->SetBranchAddress("PixelY",  &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
-  tree->SetBranchAddress("Q_i", &Qi);
+  // Try Q_i first, fall back to Qi
+  if (tree->GetBranch("Q_i")) {
+    tree->SetBranchAddress("Q_i", &Qi);
+  } else if (tree->GetBranch("Qi")) {
+    tree->SetBranchAddress("Qi", &Qi);
+  }
 
   // Prepare plotting objects
   gROOT->SetBatch(true);

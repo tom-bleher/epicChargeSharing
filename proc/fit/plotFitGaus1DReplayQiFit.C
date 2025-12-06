@@ -2,6 +2,8 @@
 #include <TTree.h>
 #include <TBranch.h>
 #include <TNamed.h>
+#include <TParameter.h>
+#include <TList.h>
 #include <TGraph.h>
 #include <TGraphErrors.h>
 #include <TF1.h>
@@ -95,6 +97,171 @@ namespace {
     }
     return s;
   }
+
+  constexpr double kDefaultPixelSpacingMm = 0.5;
+  constexpr double kDefaultPixelSizeMm = 0.1;
+
+  // Helper functions to read metadata from tree UserInfo or file-level TNamed
+  double GetDoubleMetadata(TFile* file, TTree* tree, const char* key) {
+    // First try file-level TNamed (legacy/explicit format)
+    if (file) {
+      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
+        try { return std::stod(obj->GetTitle()); } catch (...) {}
+      }
+    }
+    // Then try tree UserInfo with TParameter<double>
+    if (tree) {
+      TList* info = tree->GetUserInfo();
+      if (info) {
+        if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
+          return param->GetVal();
+        }
+        // Also try TNamed in UserInfo (string representation)
+        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
+          try { return std::stod(named->GetTitle()); } catch (...) {}
+        }
+      }
+    }
+    return NAN;
+  }
+
+  int GetIntMetadata(TFile* file, TTree* tree, const char* key) {
+    // First try file-level TNamed (legacy/explicit format)
+    if (file) {
+      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
+        try { return std::stoi(obj->GetTitle()); }
+        catch (...) {
+          try { return static_cast<int>(std::lround(std::stod(obj->GetTitle()))); } catch (...) {}
+        }
+      }
+    }
+    // Then try tree UserInfo with TParameter<int>
+    if (tree) {
+      TList* info = tree->GetUserInfo();
+      if (info) {
+        if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(key))) {
+          return param->GetVal();
+        }
+        // Also try TNamed in UserInfo (string representation)
+        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
+          try { return std::stoi(named->GetTitle()); }
+          catch (...) {
+            try { return static_cast<int>(std::lround(std::stod(named->GetTitle()))); } catch (...) {}
+          }
+        }
+      }
+    }
+    return -1;
+  }
+
+  double MedianPositiveGap(std::vector<double> values) {
+    values.erase(std::remove_if(values.begin(), values.end(),
+                                [](double v) { return !IsFinite(v); }),
+                 values.end());
+    if (values.size() < 2) return NAN;
+    std::sort(values.begin(), values.end());
+    values.erase(std::unique(values.begin(), values.end()), values.end());
+    if (values.size() < 2) return NAN;
+    std::vector<double> gaps;
+    gaps.reserve(values.size());
+    for (size_t i = 1; i < values.size(); ++i) {
+      const double d = values[i] - values[i - 1];
+      if (d > 1e-9 && IsFinite(d)) gaps.push_back(d);
+    }
+    if (gaps.empty()) return NAN;
+    std::nth_element(gaps.begin(), gaps.begin() + gaps.size() / 2, gaps.end());
+    return gaps[gaps.size() / 2];
+  }
+
+  double GapFromVectorBranch(TTree* tree, const char* branchName) {
+    if (!tree || !branchName || !tree->GetBranch(branchName)) return NAN;
+    TBranch* br = tree->GetBranch(branchName);
+    if (br) br->SetStatus(1);
+    std::vector<double>* vec = nullptr;
+    tree->SetBranchAddress(branchName, &vec);
+    const Long64_t nToScan = std::min<Long64_t>(tree->GetEntries(), 3);
+    double result = NAN;
+    for (Long64_t i = 0; i < nToScan; ++i) {
+      tree->GetEntry(i);
+      if (!vec || vec->empty()) continue;
+      double gap = MedianPositiveGap(*vec);
+      if (IsFinite(gap) && gap > 0.0) { result = gap; break; }
+    }
+    // Prevent future GetEntry calls from touching a dangling stack pointer
+    if (br) {
+      br->ResetAddress();
+      br->SetStatus(0); // leave disabled to avoid null writes later
+    }
+    tree->SetBranchAddress(branchName, nullptr);
+    return result;
+  }
+
+  double InferPixelSpacingFromTree(TTree* t) {
+    if (!t) return NAN;
+    double gxVec = GapFromVectorBranch(t, "NeighborhoodPixelX");
+    double gyVec = GapFromVectorBranch(t, "NeighborhoodPixelY");
+    if (IsFinite(gxVec) && IsFinite(gyVec) && gxVec > 0.0 && gyVec > 0.0) {
+      return 0.5 * (gxVec + gyVec);
+    }
+    if (IsFinite(gxVec) && gxVec > 0.0) return gxVec;
+    if (IsFinite(gyVec) && gyVec > 0.0) return gyVec;
+
+    std::vector<double> xs;
+    xs.reserve(5000);
+    std::vector<double> ys;
+    ys.reserve(5000);
+    double x_px_tmp = 0.0, y_px_tmp = 0.0;
+    if (t->GetBranch("PixelX") && t->GetBranch("PixelY")) {
+      t->SetBranchAddress("PixelX", &x_px_tmp);
+      t->SetBranchAddress("PixelY", &y_px_tmp);
+      const Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
+      for (Long64_t i = 0; i < nToScan; ++i) {
+        t->GetEntry(i);
+        if (IsFinite(x_px_tmp)) xs.push_back(x_px_tmp);
+        if (IsFinite(y_px_tmp)) ys.push_back(y_px_tmp);
+      }
+    }
+    double gx = MedianPositiveGap(xs);
+    double gy = MedianPositiveGap(ys);
+    if (IsFinite(gx) && IsFinite(gy) && gx > 0.0 && gy > 0.0)
+      return 0.5 * (gx + gy);
+    if (IsFinite(gx) && gx > 0.0) return gx;
+    if (IsFinite(gy) && gy > 0.0) return gy;
+    return NAN;
+  }
+
+  double SpacingFromDetectorMeta(double detSize, double cornerOffset,
+                                 double pixelSize, int numPerSide) {
+    if (!IsFinite(detSize) || !IsFinite(cornerOffset) || !IsFinite(pixelSize) ||
+        numPerSide <= 1) {
+      return NAN;
+    }
+    const double span = detSize - 2.0 * cornerOffset - pixelSize;
+    if (!IsFinite(span) || span <= 0.0) return NAN;
+    const double pitch = span / static_cast<double>(numPerSide - 1);
+    return (IsFinite(pitch) && pitch > 0.0) ? pitch : NAN;
+  }
+
+  double ResolvePixelSpacing(TTree* tree,
+                             double spacingMeta,
+                             double pixelSizeMeta,
+                             double detSizeMeta,
+                             double cornerOffsetMeta,
+                             int numPerSideMeta,
+                             const char* context) {
+    if (IsFinite(spacingMeta) && spacingMeta > 0.0) return spacingMeta;
+    const double fromGeom =
+        SpacingFromDetectorMeta(detSizeMeta, cornerOffsetMeta, pixelSizeMeta,
+                                numPerSideMeta);
+    if (IsFinite(fromGeom) && fromGeom > 0.0) return fromGeom;
+    const double inferred = InferPixelSpacingFromTree(tree);
+    if (IsFinite(inferred) && inferred > 0.0) return inferred;
+    ::Warning(context,
+              "Pixel spacing unavailable (metadata missing and inference failed); "
+              "falling back to default %.3f mm.",
+              kDefaultPixelSpacingMm);
+    return kDefaultPixelSpacingMm;
+  }
 }
 
 // Replay Q_f/F_i fits (from saved parameters) and additionally fit Q_i points
@@ -166,60 +333,17 @@ int processing1D_replay_qifit(const char* filename =
     return 2;
   }
 
-  // Pixel spacing/size/radius: prefer metadata; fallback to inference
-  double pixelSpacing = NAN;
-  double pixelSize    = NAN;
-  int neighborhoodRadiusMeta = -1;
-  if (auto* spacingObj = dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
-    try { pixelSpacing = std::stod(spacingObj->GetTitle()); } catch (...) {}
-  }
-  if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
-    try { pixelSize = std::stod(sizeObj->GetTitle()); } catch (...) {}
-  }
-  if (auto* rObj = dynamic_cast<TNamed*>(file->Get("NeighborhoodRadius"))) {
-    try { neighborhoodRadiusMeta = std::stoi(rObj->GetTitle()); }
-    catch (...) {
-      try { neighborhoodRadiusMeta = static_cast<int>(std::lround(std::stod(rObj->GetTitle()))); } catch (...) {}
-    }
-  }
+  // Pixel spacing/size/radius: prefer metadata (file-level or tree UserInfo); fallback to inference
+  double pixelSpacing = GetDoubleMetadata(file, tree, "GridPixelSpacing_mm");
+  double pixelSize = GetDoubleMetadata(file, tree, "GridPixelSize_mm");
+  double detectorSize = GetDoubleMetadata(file, tree, "GridDetectorSize_mm");
+  double pixelCornerOffset = GetDoubleMetadata(file, tree, "GridPixelCornerOffset_mm");
+  int numBlocksPerSideMeta = GetIntMetadata(file, tree, "GridNumBlocksPerSide");
+  int neighborhoodRadiusMeta = GetIntMetadata(file, tree, "NeighborhoodRadius");
 
-  auto inferSpacingFromTree = [&](TTree* t) -> double {
-    std::vector<double> xs; xs.reserve(5000);
-    std::vector<double> ys; ys.reserve(5000);
-    double x_px_tmp = 0.0, y_px_tmp = 0.0;
-    t->SetBranchAddress("PixelX", &x_px_tmp);
-    t->SetBranchAddress("PixelY", &y_px_tmp);
-    Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
-    for (Long64_t i=0;i<nToScan;++i) {
-      t->GetEntry(i);
-      if (IsFinite(x_px_tmp)) xs.push_back(x_px_tmp);
-      if (IsFinite(y_px_tmp)) ys.push_back(y_px_tmp);
-    }
-    auto computeGap = [](std::vector<double>& v)->double{
-      if (v.size() < 2) return NAN;
-      std::sort(v.begin(), v.end());
-      v.erase(std::unique(v.begin(), v.end()), v.end());
-      if (v.size() < 2) return NAN;
-      std::vector<double> gaps; gaps.reserve(v.size());
-      for (size_t i=1;i<v.size();++i) {
-        double d = v[i]-v[i-1];
-        if (d > 1e-9 && IsFinite(d)) gaps.push_back(d);
-      }
-      if (gaps.empty()) return NAN;
-      std::nth_element(gaps.begin(), gaps.begin()+gaps.size()/2, gaps.end());
-      return gaps[gaps.size()/2];
-    };
-    double gx = computeGap(xs);
-    double gy = computeGap(ys);
-    if (IsFinite(gx) && gx>0 && IsFinite(gy) && gy>0) return 0.5*(gx+gy);
-    if (IsFinite(gx) && gx>0) return gx;
-    if (IsFinite(gy) && gy>0) return gy;
-    return NAN;
-  };
-
-  if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
-    pixelSpacing = inferSpacingFromTree(tree);
-  }
+  pixelSpacing = ResolvePixelSpacing(tree, pixelSpacing, pixelSize, detectorSize,
+                                     pixelCornerOffset, numBlocksPerSideMeta,
+                                     "processing1D_replay_qifit");
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
     ::Error("processing1D_replay_qifit", "Pixel spacing unavailable (metadata missing and inference failed). Aborting.");
     file->Close();
@@ -227,7 +351,10 @@ int processing1D_replay_qifit(const char* filename =
     return 3;
   }
   if (!IsFinite(pixelSize) || pixelSize <= 0) {
-    pixelSize = 0.5 * pixelSpacing; // mm
+    pixelSize = IsFinite(pixelSpacing) ? 0.5 * pixelSpacing : kDefaultPixelSizeMm; // mm
+    if (!IsFinite(pixelSize) || pixelSize <= 0) {
+      pixelSize = kDefaultPixelSizeMm;
+    }
   }
 
   auto distanceSigma = [&](double distance, double qmax) -> double {
@@ -1449,63 +1576,16 @@ int processing1D_distance_sigma_gallery(
     return 2;
   }
 
-  double pixelSpacing = NAN;
-  double pixelSize = NAN;
-  if (auto* spacingObj =
-          dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
-    try {
-      pixelSpacing = std::stod(spacingObj->GetTitle());
-    } catch (...) {
-    }
-  }
-  if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
-    try {
-      pixelSize = std::stod(sizeObj->GetTitle());
-    } catch (...) {
-    }
-  }
+  // Pixel spacing/size: prefer metadata (file-level or tree UserInfo); fallback to inference
+  double pixelSpacing = GetDoubleMetadata(file, tree, "GridPixelSpacing_mm");
+  double pixelSize = GetDoubleMetadata(file, tree, "GridPixelSize_mm");
+  double detectorSize = GetDoubleMetadata(file, tree, "GridDetectorSize_mm");
+  double pixelCornerOffset = GetDoubleMetadata(file, tree, "GridPixelCornerOffset_mm");
+  int numBlocksPerSideMeta = GetIntMetadata(file, tree, "GridNumBlocksPerSide");
 
-  auto inferSpacingFromTree = [&](TTree* t) -> double {
-    std::vector<double> xs;
-    xs.reserve(5000);
-    std::vector<double> ys;
-    ys.reserve(5000);
-    double x_px_tmp = 0.0, y_px_tmp = 0.0;
-    t->SetBranchAddress("PixelX", &x_px_tmp);
-    t->SetBranchAddress("PixelY", &y_px_tmp);
-    Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
-    for (Long64_t i = 0; i < nToScan; ++i) {
-      t->GetEntry(i);
-      if (IsFinite(x_px_tmp)) xs.push_back(x_px_tmp);
-      if (IsFinite(y_px_tmp)) ys.push_back(y_px_tmp);
-    }
-    auto computeGap = [](std::vector<double>& v) -> double {
-      if (v.size() < 2) return NAN;
-      std::sort(v.begin(), v.end());
-      v.erase(std::unique(v.begin(), v.end()), v.end());
-      if (v.size() < 2) return NAN;
-      std::vector<double> gaps;
-      gaps.reserve(v.size());
-      for (size_t i = 1; i < v.size(); ++i) {
-        double d = v[i] - v[i - 1];
-        if (d > 1e-9 && IsFinite(d)) gaps.push_back(d);
-      }
-      if (gaps.empty()) return NAN;
-      std::nth_element(gaps.begin(), gaps.begin() + gaps.size() / 2,
-                       gaps.end());
-      return gaps[gaps.size() / 2];
-    };
-    double gx = computeGap(xs);
-    double gy = computeGap(ys);
-    if (IsFinite(gx) && gx > 0 && IsFinite(gy) && gy > 0) return 0.5 * (gx + gy);
-    if (IsFinite(gx) && gx > 0) return gx;
-    if (IsFinite(gy) && gy > 0) return gy;
-    return NAN;
-  };
-
-  if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
-    pixelSpacing = inferSpacingFromTree(tree);
-  }
+  pixelSpacing = ResolvePixelSpacing(tree, pixelSpacing, pixelSize, detectorSize,
+                                     pixelCornerOffset, numBlocksPerSideMeta,
+                                     "processing1D_distance_sigma_gallery");
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
     ::Error("processing1D_distance_sigma_gallery",
             "Pixel spacing unavailable (metadata missing and inference failed). "
@@ -1515,7 +1595,10 @@ int processing1D_distance_sigma_gallery(
     return 3;
   }
   if (!IsFinite(pixelSize) || pixelSize <= 0) {
-    pixelSize = 0.5 * pixelSpacing;
+    pixelSize = IsFinite(pixelSpacing) ? 0.5 * pixelSpacing : kDefaultPixelSizeMm;
+    if (!IsFinite(pixelSize) || pixelSize <= 0) {
+      pixelSize = kDefaultPixelSizeMm;
+    }
   }
 
   if (tree->GetBranch("Q_f") == nullptr) {
