@@ -42,9 +42,9 @@ import uproot
 
 # ---------------------------- Configuration ---------------------------------
 
-REPO_ROOT = "/home/tomble/epicChargeSharing"
-INPUT_DIR = f"/home/tomble/epicChargeSharing/sweep_x_runs/20251101-072458"
-OUTPUT_BASE = f"{REPO_ROOT}/proc/fit/uproot_gaussian_out"
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+INPUT_DIR = REPO_ROOT / "sweep_x_runs" / "latest"  # Symlink or most recent run
+OUTPUT_BASE = REPO_ROOT / "proc" / "fit" / "uproot_gaussian_out"
 TREE_NAME = "Hits"
 
 BRANCHES = [
@@ -251,8 +251,8 @@ def process_root_file(root_path: str, results: Dict[str, List[Tuple[float, float
                 fit = fit_gaussian_to_values(arr, num_bins=NUM_BINS)
 
                 # Save plot
-                out_dir = os.path.join(OUTPUT_BASE, "plots", branch)
-                out_png = os.path.join(out_dir, os.path.basename(root_path).replace(".root", ".png"))
+                out_dir = OUTPUT_BASE / "plots" / branch
+                out_png = out_dir / pathlib.Path(root_path).with_suffix(".png").name
                 save_plot(
                     branch,
                     file_desc,
@@ -263,7 +263,7 @@ def process_root_file(root_path: str, results: Dict[str, List[Tuple[float, float
                     float(np.mean(arr)) if arr.size > 0 else float("nan"),
                     float(np.std(arr, ddof=0)) if arr.size > 0 else float("nan"),
                     fit.sigma,
-                    out_png,
+                    str(out_png),
                 )
 
                 # Convert mm -> um for export values
@@ -289,26 +289,23 @@ def write_excel(results: Dict[str, List[Tuple[float, float, float, float]]], out
 
 
 def main() -> None:
-    ensure_dir(OUTPUT_BASE)
+    ensure_dir(str(OUTPUT_BASE))
 
     # Gather ROOT files
-    root_files = [
-        os.path.join(INPUT_DIR, name)
-        for name in sorted(os.listdir(INPUT_DIR))
-        if name.lower().endswith(".root")
-    ]
+    input_dir = pathlib.Path(INPUT_DIR)
+    root_files = sorted(input_dir.glob("*.root"))
     if not root_files:
         print(f"[WARN] No ROOT files found in {INPUT_DIR}")
 
     results: Dict[str, List[Tuple[float, float, float, float]]] = {}
     for path in root_files:
-        print(f"[INFO] Processing {os.path.basename(path)}")
-        process_root_file(path, results)
+        print(f"[INFO] Processing {path.name}")
+        process_root_file(str(path), results)
 
-    out_excel = os.path.join(OUTPUT_BASE, "gaussian_sigma_summary.xlsx")
-    write_excel(results, out_excel)
+    out_excel = OUTPUT_BASE / "gaussian_sigma_summary.xlsx"
+    write_excel(results, str(out_excel))
     print(f"[OK] Wrote Excel: {out_excel}")
-    print(f"[OK] PNG plots rooted at: {os.path.join(OUTPUT_BASE, 'plots')}")
+    print(f"[OK] PNG plots rooted at: {OUTPUT_BASE / 'plots'}")
 
 
 if __name__ == "__main__":

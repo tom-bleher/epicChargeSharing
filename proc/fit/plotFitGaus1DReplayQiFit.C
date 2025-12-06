@@ -268,7 +268,7 @@ namespace {
 // exactly like diagnostic/fit/plotProcessing1D.C does, drawing dashed green
 // Gaussian curves and vertical recon lines for Q_i with legend deltas.
 int processing1D_replay_qifit(const char* filename =
-                              "/home/tomble/epicChargeSharing/sweep_x_runs/log/175um.root",
+                              "build/epicChargeSharing.root",
                               double errorPercentOfMax = 5.0,
                               Long64_t nRandomEvents = 100,
                               bool plotQiOverlayPts = true,
@@ -1388,7 +1388,7 @@ int processing1D_replay_qifit(const char* filename =
 
 int processing1D_distance_sigma_gallery(
     const char* filename =
-        "/home/tomble/epicChargeSharing/build/epicChargeSharing.root",
+        "build/epicChargeSharing.root",
     Long64_t nRandomEvents = 100,
     double distanceErrorScalePixels = 0.5,
     double distanceErrorFloorPercent = 2.0,

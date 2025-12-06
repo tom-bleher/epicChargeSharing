@@ -53,7 +53,7 @@ import uproot
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_DIR = Path("/home/tomble/epicChargeSharing/sweep_x_runs/20251111-011246")
+DEFAULT_INPUT_DIR = REPO_ROOT / "sweep_x_runs" / "latest"  # Symlink or most recent run
 DEFAULT_OUTPUT_BASE = REPO_ROOT / "proc" / "fit" / "fi_vs_x"
 SENTINEL_INVALID_FRACTION = -999.0
 
