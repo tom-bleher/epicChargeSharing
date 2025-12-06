@@ -14,7 +14,7 @@ from typing import Dict, Iterable, List
 
 
 DEFAULT_DISTANCE_ARGS = {
-    "use_distance_weighted_errors": True,
+    "use_distance_weighted_errors": False,
     "distance_error_scale_pixels": 1.5,
     "distance_error_exponent": 1.5,
     "distance_error_floor_percent": 4.0,
