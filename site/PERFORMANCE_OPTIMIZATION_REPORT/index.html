@@ -1,0 +1,2201 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="GEANT4-based Monte Carlo simulation for charge sharing in AC-LGAD pixel detectors">
+      
+      
+        <meta name="author" content="Tom Bleher, Igor Korover">
+      
+      
+        <link rel="canonical" href="https://tom-bleher.github.io/epicChargeSharing/PERFORMANCE_OPTIMIZATION_REPORT/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Performance Optimization Report for epicChargeSharing - epicChargeSharing</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#performance-optimization-report-for-epicchargesharing" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="epicChargeSharing" class="md-header__button md-logo" aria-label="epicChargeSharing" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            epicChargeSharing
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Performance Optimization Report for epicChargeSharing
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tom-bleher/epicChargeSharing" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tom-bleher/epicChargeSharing
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="epicChargeSharing" class="md-nav__button md-logo" aria-label="epicChargeSharing" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    epicChargeSharing
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tom-bleher/epicChargeSharing" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tom-bleher/epicChargeSharing
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ROOT_OUTPUT_BRANCHES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../physics-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Physics Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../NamingConventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Naming Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-build-system-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Build System Optimizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Build System Optimizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-current-strengths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Current Strengths ✓
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-profile-guided-optimization-pgo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Profile-Guided Optimization (PGO)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-additional-compiler-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Additional Compiler Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-architecture-specific-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 Architecture-Specific Tuning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-geant4-specific-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Geant4-Specific Optimizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Geant4-Specific Optimizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-physics-list-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Physics List Selection ✓
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-production-cut-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Production Cut Optimization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-steppingaction-optimization-high-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 SteppingAction Optimization ⚠️ HIGH PRIORITY
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-use-const-references-for-g4threevector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Use const References for G4ThreeVector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-scorer-vs-sensitive-detector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Scorer vs Sensitive Detector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-multithreading-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Multithreading Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-root-io-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. ROOT I/O Optimizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. ROOT I/O Optimizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-current-issue-no-compression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Current Issue: No Compression ⚠️
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-recommended-compression-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Recommended Compression Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-ttree-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 TTree Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-basket-size-for-vector-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Basket Size for Vector Branches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-future-migrate-to-rntuple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Future: Migrate to RNTuple
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-rdataframe-for-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 RDataFrame for Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-code-level-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Code-Level Optimizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Code-Level Optimizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-chargesharingcalculator-duplicate-weight-computation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 ChargeSharingCalculator: Duplicate Weight Computation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-precompute-loop-invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Precompute Loop Invariants
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-use-c20-likelyunlikely-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Use C++20 [[likely]]/[[unlikely]] Attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-avoid-stdvector-reallocations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Avoid std::vector Reallocations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-memory-cache-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Memory &amp; Cache Optimizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Memory &amp; Cache Optimizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-false-sharing-prevention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 False Sharing Prevention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-cache-friendly-access-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Cache-Friendly Access Patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-g4allocator-for-custom-hit-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 G4Allocator for Custom Hit Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-simd-vectorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. SIMD &amp; Vectorization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. SIMD &amp; Vectorization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-enable-auto-vectorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Enable Auto-Vectorization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-why-standard-math-is-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Why Standard Math is Slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-consider-eigen-for-matrix-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Consider Eigen for Matrix Operations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-distributed-cluster-computing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Distributed &amp; Cluster Computing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Distributed &amp; Cluster Computing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-mpi-for-multi-node-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 MPI for Multi-Node Scaling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-simple-multi-process-parallelization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Simple Multi-Process Parallelization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-job-arrays-on-hpc-clusters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Job Arrays on HPC Clusters
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-profiling-benchmarking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Profiling &amp; Benchmarking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Profiling &amp; Benchmarking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-linux-perf-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Linux perf (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-valgrind-cachegrind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Valgrind Cachegrind
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-intel-vtune-if-available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Intel VTune (if available)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-built-in-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Built-in Timing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-geant4-113-new-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Geant4 11.3 New Features
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Geant4 11.3 New Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-parallel-geometry-voxelization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Parallel Geometry Voxelization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-dynamic-particle-processing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Dynamic Particle Processing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-optimized-urbanmsc-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Optimized UrbanMsc Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-faster-cross-section-calculations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Faster Cross-Section Calculations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#95-improved-task-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.5 Improved Task Distribution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-implementation-priority-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Implementation Priority Matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Implementation Priority Matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-wins-implement-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Wins (Implement Today)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-term-this-week" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Medium-Term (This Week)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-term-future-releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-Term (Future Releases)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references-further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References &amp; Further Reading
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="References &amp; Further Reading">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#geant4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Geant4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROOT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C++ Optimization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#profiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="performance-optimization-report-for-epicchargesharing">Performance Optimization Report for epicChargeSharing<a class="headerlink" href="#performance-optimization-report-for-epicchargesharing" title="Permanent link">&para;</a></h1>
+<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
+<p>This report presents comprehensive optimization strategies for the epicChargeSharing Geant4/ROOT simulation. The recommendations are organized by impact level and implementation complexity, covering build configuration, Geant4-specific optimizations, ROOT I/O tuning, C++ code-level improvements, and advanced techniques for scaling.</p>
+<p><strong>Key Findings:</strong>
+- Your codebase is already well-optimized with LTO, C++20, and fast EM physics
+- The highest-impact quick win is fixing string comparisons in <code>SteppingAction.cc</code>
+- ROOT I/O currently uses no compression (<code>SetCompressionLevel(0)</code>) - enabling ZSTD can reduce file sizes by 50-70%
+- Several compute-intensive loops can benefit from SIMD vectorization and cache optimization</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#1-build-system-optimizations">Build System Optimizations</a></li>
+<li><a href="#2-geant4-specific-optimizations">Geant4-Specific Optimizations</a></li>
+<li><a href="#3-root-io-optimizations">ROOT I/O Optimizations</a></li>
+<li><a href="#4-code-level-optimizations">Code-Level Optimizations</a></li>
+<li><a href="#5-memory--cache-optimizations">Memory &amp; Cache Optimizations</a></li>
+<li><a href="#6-simd--vectorization">SIMD &amp; Vectorization</a></li>
+<li><a href="#7-distributed--cluster-computing">Distributed &amp; Cluster Computing</a></li>
+<li><a href="#8-profiling--benchmarking">Profiling &amp; Benchmarking</a></li>
+<li><a href="#9-geant4-113-new-features">Geant4 11.3 New Features</a></li>
+<li><a href="#10-implementation-priority-matrix">Implementation Priority Matrix</a></li>
+</ol>
+<hr />
+<h2 id="1-build-system-optimizations">1. Build System Optimizations<a class="headerlink" href="#1-build-system-optimizations" title="Permanent link">&para;</a></h2>
+<h3 id="11-current-strengths">1.1 Current Strengths ✓<a class="headerlink" href="#11-current-strengths" title="Permanent link">&para;</a></h3>
+<p>Your <code>CMakeLists.txt</code> already includes excellent optimizations:
+- LTO (Link-Time Optimization) enabled for Release builds
+- Release mode defaults with <code>-O3</code>
+- <code>-funroll-loops</code> for release builds
+- Optional <code>-ffast-math</code> and <code>-march=native</code> via <code>EC_FAST_MATH</code>
+- Profiling support via <code>EC_PROFILE</code></p>
+<h3 id="12-profile-guided-optimization-pgo">1.2 Profile-Guided Optimization (PGO)<a class="headerlink" href="#12-profile-guided-optimization-pgo" title="Permanent link">&para;</a></h3>
+<p>PGO provides 10-20% speedup by optimizing based on actual runtime behavior:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c"># Add to CMakeLists.txt</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">option</span><span class="p">(</span><span class="s">EC_PGO_GENERATE</span><span class="w"> </span><span class="s2">&quot;Generate PGO profile data&quot;</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">option</span><span class="p">(</span><span class="s">EC_PGO_USE</span><span class="w"> </span><span class="s2">&quot;Use PGO profile data for optimization&quot;</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nb">if</span><span class="p">(</span><span class="s">EC_PGO_GENERATE</span><span class="w"> </span><span class="s">AND</span><span class="w"> </span><span class="s">CMAKE_CXX_COMPILER_ID</span><span class="w"> </span><span class="s">MATCHES</span><span class="w"> </span><span class="s2">&quot;GNU|Clang&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">_project_compile_options</span><span class="w"> </span><span class="s">-fprofile-generate=</span><span class="o">${</span><span class="nv">CMAKE_BINARY_DIR</span><span class="o">}</span><span class="s">/pgo</span><span class="p">)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">_project_link_options</span><span class="w"> </span><span class="s">-fprofile-generate=</span><span class="o">${</span><span class="nv">CMAKE_BINARY_DIR</span><span class="o">}</span><span class="s">/pgo</span><span class="p">)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nb">message</span><span class="p">(</span><span class="s">STATUS</span><span class="w"> </span><span class="s2">&quot;PGO: Profile generation enabled -&gt; ${CMAKE_BINARY_DIR}/pgo&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nb">elseif</span><span class="p">(</span><span class="s">EC_PGO_USE</span><span class="w"> </span><span class="s">AND</span><span class="w"> </span><span class="s">CMAKE_CXX_COMPILER_ID</span><span class="w"> </span><span class="s">MATCHES</span><span class="w"> </span><span class="s2">&quot;GNU|Clang&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">_project_compile_options</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">        </span><span class="s">-fprofile-use=</span><span class="o">${</span><span class="nv">CMAKE_BINARY_DIR</span><span class="o">}</span><span class="s">/pgo</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">        </span><span class="s">-fprofile-correction</span><span class="p">)</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">_project_link_options</span><span class="w"> </span><span class="s">-fprofile-use=</span><span class="o">${</span><span class="nv">CMAKE_BINARY_DIR</span><span class="o">}</span><span class="s">/pgo</span><span class="p">)</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="nb">message</span><span class="p">(</span><span class="s">STATUS</span><span class="w"> </span><span class="s2">&quot;PGO: Using profile data for optimization&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nb">endif</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Usage workflow:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Step 1: Build with profiling instrumentation</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>cmake<span class="w"> </span>-DEC_PGO_GENERATE<span class="o">=</span>ON<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span>..
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>./epicChargeSharing<span class="w"> </span>run.mac<span class="w">  </span><span class="c1"># Run representative workload (1000+ events)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># Step 2: Rebuild optimized with profile data</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>cmake<span class="w"> </span>-DEC_PGO_GENERATE<span class="o">=</span>OFF<span class="w"> </span>-DEC_PGO_USE<span class="o">=</span>ON<span class="w"> </span>..
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span>
+</code></pre></div></p>
+<p>PGO is particularly effective because it optimizes branch prediction in your hot loops in <code>ComputeChargeFractions</code> and <code>ComputeFullGridFractions</code>.</p>
+<h3 id="13-additional-compiler-flags">1.3 Additional Compiler Flags<a class="headerlink" href="#13-additional-compiler-flags" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">if</span><span class="p">(</span><span class="s">CMAKE_CXX_COMPILER_ID</span><span class="w"> </span><span class="s">MATCHES</span><span class="w"> </span><span class="s2">&quot;GNU|Clang&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="c"># Better branch prediction layout</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">_project_release_compile_options</span><span class="w"> </span><span class="s">-fno-plt</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="c"># Enable OpenMP SIMD pragmas without full threading</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">_project_release_compile_options</span><span class="w"> </span><span class="s">-fopenmp-simd</span><span class="p">)</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="c"># Disable errno checking for math functions (4x+ speedup for sqrt/log)</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">_project_release_compile_options</span><span class="w"> </span><span class="s">-fno-math-errno</span><span class="p">)</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="c"># Allow reordering of floating-point operations</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">_project_release_compile_options</span><span class="w"> </span><span class="s">-ffp-contract=fast</span><span class="p">)</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="nb">endif</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="14-architecture-specific-tuning">1.4 Architecture-Specific Tuning<a class="headerlink" href="#14-architecture-specific-tuning" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Identify your CPU architecture</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>gcc<span class="w"> </span>-march<span class="o">=</span>native<span class="w"> </span>-Q<span class="w"> </span>--help<span class="o">=</span>target<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>march
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Common architecture options:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># -march=znver4      # AMD Zen 4 (Ryzen 7000/EPYC Genoa)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># -march=znver3      # AMD Zen 3 (Ryzen 5000)</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># -march=alderlake   # Intel 12th/13th Gen</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># -march=skylake     # Intel 6th-10th Gen</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1"># -march=neoverse-n1 # ARM Graviton2/Ampere Altra</span>
+</code></pre></div>
+<p><strong>References:</strong>
+- <a href="https://stackoverflow.com/questions/41361631/optimize-in-cmake-by-default">CMake Build Optimization</a>
+- <a href="https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html">GCC Optimization Options</a></p>
+<hr />
+<h2 id="2-geant4-specific-optimizations">2. Geant4-Specific Optimizations<a class="headerlink" href="#2-geant4-specific-optimizations" title="Permanent link">&para;</a></h2>
+<h3 id="21-physics-list-selection">2.1 Physics List Selection ✓<a class="headerlink" href="#21-physics-list-selection" title="Permanent link">&para;</a></h3>
+<p>Your current configuration uses <code>G4EmStandardPhysics_option1</code> (EMV), which is the <strong>fastest EM physics option</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Constructor</th>
+<th>Speed</th>
+<th>Accuracy</th>
+<th>Best Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_option1</code> (EMV) ✓</td>
+<td>Fastest</td>
+<td>Good</td>
+<td>HEP, fast simulations</td>
+</tr>
+<tr>
+<td><code>_option2</code> (EMX)</td>
+<td>Fast</td>
+<td>Good</td>
+<td>General purpose</td>
+</tr>
+<tr>
+<td><code>_option3</code> (EMY)</td>
+<td>Medium</td>
+<td>High</td>
+<td>Medical, low-energy</td>
+</tr>
+<tr>
+<td><code>_option4</code></td>
+<td>Slow</td>
+<td>Highest</td>
+<td>Precision benchmarks</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Your setup is optimal for speed.</strong></p>
+<h3 id="22-production-cut-optimization">2.2 Production Cut Optimization<a class="headerlink" href="#22-production-cut-optimization" title="Permanent link">&para;</a></h3>
+<p>Your current 50 µm cut is quite fine. Consider region-specific cuts for better performance:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// PhysicsList.cc - Region-specific cuts for optimal performance</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kt">void</span><span class="w"> </span><span class="nf">PhysicsList::SetCuts</span><span class="p">()</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="p">{</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="c1">// Fine cuts in sensitive silicon region</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="n">G4Region</span><span class="o">*</span><span class="w"> </span><span class="n">siliconRegion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">G4RegionStore</span><span class="o">::</span><span class="n">GetInstance</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetRegion</span><span class="p">(</span><span class="s">&quot;SiliconRegion&quot;</span><span class="p">);</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">siliconRegion</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="n">G4ProductionCuts</span><span class="o">*</span><span class="w"> </span><span class="n">cuts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">G4ProductionCuts</span><span class="p">();</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="n">cuts</span><span class="o">-&gt;</span><span class="n">SetProductionCut</span><span class="p">(</span><span class="mf">10.0</span><span class="o">*</span><span class="n">CLHEP</span><span class="o">::</span><span class="n">micrometer</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;gamma&quot;</span><span class="p">);</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="n">cuts</span><span class="o">-&gt;</span><span class="n">SetProductionCut</span><span class="p">(</span><span class="mf">10.0</span><span class="o">*</span><span class="n">CLHEP</span><span class="o">::</span><span class="n">micrometer</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;e-&quot;</span><span class="p">);</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="n">cuts</span><span class="o">-&gt;</span><span class="n">SetProductionCut</span><span class="p">(</span><span class="mf">10.0</span><span class="o">*</span><span class="n">CLHEP</span><span class="o">::</span><span class="n">micrometer</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;e+&quot;</span><span class="p">);</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="n">siliconRegion</span><span class="o">-&gt;</span><span class="n">SetProductionCuts</span><span class="p">(</span><span class="n">cuts</span><span class="p">);</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">    </span><span class="c1">// Coarse cuts elsewhere for speed</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">    </span><span class="n">SetDefaultCutValue</span><span class="p">(</span><span class="mf">1.0</span><span class="o">*</span><span class="n">CLHEP</span><span class="o">::</span><span class="n">millimeter</span><span class="p">);</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Impact:</strong> Production cuts have roughly exponential impact on simulation time. Doubling the cut can reduce simulation time by 30-50% in high-energy scenarios.</p>
+<h3 id="23-steppingaction-optimization-high-priority">2.3 SteppingAction Optimization ⚠️ <strong>HIGH PRIORITY</strong><a class="headerlink" href="#23-steppingaction-optimization-high-priority" title="Permanent link">&para;</a></h3>
+<p><strong>Current Issue in <code>SteppingAction.cc:41</code>:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// SLOW: String comparison on EVERY step!</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">const</span><span class="w"> </span><span class="n">G4String</span><span class="w"> </span><span class="n">enteredName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">postVol</span><span class="o">-&gt;</span><span class="n">GetLogicalVolume</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetName</span><span class="p">();</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">enteredName</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;logicBlock&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">enteredName</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;logicCube&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</code></pre></div></p>
+<p>String comparison costs ~100+ CPU cycles per step. With millions of steps per run, this is a significant overhead.</p>
+<p><strong>Optimized implementation using pointer comparison:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1">// SteppingAction.hh - Add cached volume pointers</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">SteppingAction</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">G4UserSteppingAction</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">private</span><span class="o">:</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">G4LogicalVolume</span><span class="o">*</span><span class="w"> </span><span class="n">fLogicBlock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">nullptr</span><span class="p">;</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">G4LogicalVolume</span><span class="o">*</span><span class="w"> </span><span class="n">fLogicCube</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">nullptr</span><span class="p">;</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">fVolumesCached</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">CacheVolumes</span><span class="p">();</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="p">};</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="c1">// SteppingAction.cc</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;G4LogicalVolumeStore.hh&quot;</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="kt">void</span><span class="w"> </span><span class="nf">SteppingAction::CacheVolumes</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fVolumesCached</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="w">    </span><span class="k">auto</span><span class="o">*</span><span class="w"> </span><span class="n">lvStore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">G4LogicalVolumeStore</span><span class="o">::</span><span class="n">GetInstance</span><span class="p">();</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">    </span><span class="n">fLogicBlock</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lvStore</span><span class="o">-&gt;</span><span class="n">GetVolume</span><span class="p">(</span><span class="s">&quot;logicBlock&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="w">    </span><span class="n">fLogicCube</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lvStore</span><span class="o">-&gt;</span><span class="n">GetVolume</span><span class="p">(</span><span class="s">&quot;logicCube&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="w">    </span><span class="n">fVolumesCached</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="p">}</span>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="kt">void</span><span class="w"> </span><span class="nf">SteppingAction::TrackVolumeInteractions</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">G4Step</span><span class="o">*</span><span class="w"> </span><span class="n">step</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fFirstContactVolume</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="s">&quot;NONE&quot;</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="w">    </span><span class="n">CacheVolumes</span><span class="p">();</span><span class="w">  </span><span class="c1">// One-time initialization</span>
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="w">    </span><span class="n">G4StepPoint</span><span class="o">*</span><span class="w"> </span><span class="n">postPoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">step</span><span class="o">-&gt;</span><span class="n">GetPostStepPoint</span><span class="p">();</span>
+<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">postPoint</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">postPoint</span><span class="o">-&gt;</span><span class="n">GetStepStatus</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">fGeomBoundary</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>
+<a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a><span class="w">    </span><span class="n">G4VPhysicalVolume</span><span class="o">*</span><span class="w"> </span><span class="n">postVol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">postPoint</span><span class="o">-&gt;</span><span class="n">GetTouchableHandle</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetVolume</span><span class="p">();</span>
+<a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">postVol</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a>
+<a id="__codelineno-6-34" name="__codelineno-6-34" href="#__codelineno-6-34"></a><span class="w">    </span><span class="c1">// FAST: Pointer comparison (~3 cycles vs ~100+ for string)</span>
+<a id="__codelineno-6-35" name="__codelineno-6-35" href="#__codelineno-6-35"></a><span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">G4LogicalVolume</span><span class="o">*</span><span class="w"> </span><span class="n">lv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">postVol</span><span class="o">-&gt;</span><span class="n">GetLogicalVolume</span><span class="p">();</span>
+<a id="__codelineno-6-36" name="__codelineno-6-36" href="#__codelineno-6-36"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">lv</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">fLogicBlock</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">lv</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">fLogicCube</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-37" name="__codelineno-6-37" href="#__codelineno-6-37"></a><span class="w">        </span><span class="n">fFirstContactVolume</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lv</span><span class="o">-&gt;</span><span class="n">GetName</span><span class="p">();</span><span class="w">  </span><span class="c1">// Only retrieve name when needed</span>
+<a id="__codelineno-6-38" name="__codelineno-6-38" href="#__codelineno-6-38"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fEventAction</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-39" name="__codelineno-6-39" href="#__codelineno-6-39"></a><span class="w">            </span><span class="n">fEventAction</span><span class="o">-&gt;</span><span class="n">RegisterFirstContact</span><span class="p">(</span><span class="n">postPoint</span><span class="o">-&gt;</span><span class="n">GetPosition</span><span class="p">());</span>
+<a id="__codelineno-6-40" name="__codelineno-6-40" href="#__codelineno-6-40"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-6-41" name="__codelineno-6-41" href="#__codelineno-6-41"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-6-42" name="__codelineno-6-42" href="#__codelineno-6-42"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Expected speedup:</strong> 10-50x for volume identification logic.</p>
+<h3 id="24-use-const-references-for-g4threevector">2.4 Use const References for G4ThreeVector<a class="headerlink" href="#24-use-const-references-for-g4threevector" title="Permanent link">&para;</a></h3>
+<p>The Geant4 documentation recommends using const references for composite types:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1">// SLOW: Copies G4ThreeVector</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">G4ThreeVector</span><span class="w"> </span><span class="n">pos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">step</span><span class="o">-&gt;</span><span class="n">GetPreStepPoint</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetPosition</span><span class="p">();</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1">// FAST: Uses reference, avoids copy</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">const</span><span class="w"> </span><span class="n">G4ThreeVector</span><span class="o">&amp;</span><span class="w"> </span><span class="n">pos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">step</span><span class="o">-&gt;</span><span class="n">GetPreStepPoint</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">GetPosition</span><span class="p">();</span>
+</code></pre></div>
+<h3 id="25-scorer-vs-sensitive-detector">2.5 Scorer vs Sensitive Detector<a class="headerlink" href="#25-scorer-vs-sensitive-detector" title="Permanent link">&para;</a></h3>
+<p>Your current approach using <code>G4SDManager</code> and <code>G4THitsMap</code> is good. Key optimization:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1">// EventAction.cc:338 - Cache the collection ID</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kt">void</span><span class="w"> </span><span class="nf">EventAction::CollectScorerData</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">G4Event</span><span class="o">*</span><span class="w"> </span><span class="n">event</span><span class="p">)</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="p">{</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="c1">// GOOD: You&#39;re caching edepID as static</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">G4int</span><span class="w"> </span><span class="n">edepID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">edepID</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="o">*</span><span class="w"> </span><span class="n">sdm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">G4SDManager</span><span class="o">::</span><span class="n">GetSDMpointer</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">            </span><span class="n">edepID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sdm</span><span class="o">-&gt;</span><span class="n">GetCollectionID</span><span class="p">(</span><span class="s">&quot;SiliconDetector/EnergyDeposit&quot;</span><span class="p">);</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="c1">// GetCollectionID() is expensive - caching is correct!</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="26-multithreading-configuration">2.6 Multithreading Configuration<a class="headerlink" href="#26-multithreading-configuration" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1">// Optimal thread configuration in main()</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="cp">#ifdef G4MULTITHREADED</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="n">G4int</span><span class="w"> </span><span class="n">nCores</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">G4Threading</span><span class="o">::</span><span class="n">G4GetNumberOfCores</span><span class="p">();</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="c1">// Physical cores only - hyperthreading provides no benefit for Geant4</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="n">G4int</span><span class="w"> </span><span class="n">nThreads</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">nCores</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// Leave 1 for OS</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="n">runManager</span><span class="o">-&gt;</span><span class="n">SetNumberOfThreads</span><span class="p">(</span><span class="n">nThreads</span><span class="p">);</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="c1">// Use MIXMAX for MT (guaranteed divergent sequences)</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="n">CLHEP</span><span class="o">::</span><span class="n">HepRandom</span><span class="o">::</span><span class="n">setTheEngine</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">CLHEP</span><span class="o">::</span><span class="n">MixMaxRng</span><span class="p">);</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="cp">#endif</span>
+</code></pre></div>
+<p><strong>References:</strong>
+- <a href="https://twiki.cern.ch/twiki/bin/view/Geant4/Geant4PerformanceTips">Geant4 Performance Tips - CERN TWiki</a>
+- <a href="https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/electromagnetic/emphyslist.html">Geant4 EM Physics Guide</a>
+- <a href="https://geant4.web.cern.ch/documentation/pipelines/master/bftd_html/ForToolkitDeveloper/OOAnalysisDesign/Multithreading/mt.html">Geant4 Multithreading</a></p>
+<hr />
+<h2 id="3-root-io-optimizations">3. ROOT I/O Optimizations<a class="headerlink" href="#3-root-io-optimizations" title="Permanent link">&para;</a></h2>
+<h3 id="31-current-issue-no-compression">3.1 Current Issue: No Compression ⚠️<a class="headerlink" href="#31-current-issue-no-compression" title="Permanent link">&para;</a></h3>
+<p>In <code>RunAction.cc:318</code>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">rootFile</span><span class="o">-&gt;</span><span class="n">SetCompressionLevel</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// NO COMPRESSION!</span>
+</code></pre></div></p>
+<p>This means your ROOT files are uncompressed, which:
+- Increases disk I/O time
+- Wastes storage space
+- Slows down file merging</p>
+<h3 id="32-recommended-compression-settings">3.2 Recommended Compression Settings<a class="headerlink" href="#32-recommended-compression-settings" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1">// RunAction.cc - Replace SetCompressionLevel(0) with:</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;TFile.h&quot;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;Compression.h&quot;</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1">// ZSTD: Best balance of speed and compression</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">rootFile</span><span class="o">-&gt;</span><span class="n">SetCompressionAlgorithm</span><span class="p">(</span><span class="n">ROOT</span><span class="o">::</span><span class="n">RCompressionSetting</span><span class="o">::</span><span class="n">EAlgorithm</span><span class="o">::</span><span class="n">kZSTD</span><span class="p">);</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="n">rootFile</span><span class="o">-&gt;</span><span class="n">SetCompressionLevel</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span><span class="w">  </span><span class="c1">// 1-9, 4 is good balance</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="c1">// Alternative: LZ4 for maximum write speed (less compression)</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="c1">// rootFile-&gt;SetCompressionAlgorithm(ROOT::RCompressionSetting::EAlgorithm::kLZ4);</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="c1">// rootFile-&gt;SetCompressionLevel(4);</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Write Speed</th>
+<th>Read Speed</th>
+<th>Compression Ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>None (current)</td>
+<td>Fastest</td>
+<td>Fastest</td>
+<td>1.0x</td>
+</tr>
+<tr>
+<td>LZ4</td>
+<td>Very Fast</td>
+<td>Very Fast</td>
+<td>2-3x</td>
+</tr>
+<tr>
+<td><strong>ZSTD</strong> ✓</td>
+<td>Fast</td>
+<td>Fast</td>
+<td><strong>3-5x</strong></td>
+</tr>
+<tr>
+<td>ZLIB</td>
+<td>Slow</td>
+<td>Medium</td>
+<td>3-4x</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-ttree-configuration">3.3 TTree Configuration<a class="headerlink" href="#33-ttree-configuration" title="Permanent link">&para;</a></h3>
+<p>Your current settings in <code>RunAction.cc:323-324</code>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">tree</span><span class="o">-&gt;</span><span class="n">SetAutoSave</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">   </span><span class="c1">// Disabled</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">tree</span><span class="o">-&gt;</span><span class="n">SetAutoFlush</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// Disabled</span>
+</code></pre></div></p>
+<p><strong>Recommended settings:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1">// Enable AutoFlush for better read performance</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">tree</span><span class="o">-&gt;</span><span class="n">SetAutoFlush</span><span class="p">(</span><span class="mi">50000</span><span class="p">);</span><span class="w">  </span><span class="c1">// Flush every 50k entries</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1">// Or use byte-based flushing (default is 30MB)</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">tree</span><span class="o">-&gt;</span><span class="n">SetAutoFlush</span><span class="p">(</span><span class="mi">-30000000</span><span class="p">);</span><span class="w">  </span><span class="c1">// Negative = bytes</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1">// OptimizeBaskets after filling some entries</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="c1">// Call this after ~1000 events to auto-tune buffer sizes</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="n">tree</span><span class="o">-&gt;</span><span class="n">OptimizeBaskets</span><span class="p">(</span><span class="mi">256000000</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// 256MB max memory</span>
+</code></pre></div></p>
+<h3 id="34-basket-size-for-vector-branches">3.4 Basket Size for Vector Branches<a class="headerlink" href="#34-basket-size-for-vector-branches" title="Permanent link">&para;</a></h3>
+<p>Your vector branches use 256KB baskets (good!):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">constexpr</span><span class="w"> </span><span class="n">Int_t</span><span class="w"> </span><span class="n">bufsize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">256000</span><span class="p">;</span><span class="w">  </span><span class="c1">// 256KB - already optimized ✓</span>
+</code></pre></div></p>
+<p>For very large grids (full detector fractions), consider:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1">// For branches with &gt;10KB per entry</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">tree</span><span class="o">-&gt;</span><span class="n">SetBasketSize</span><span class="p">(</span><span class="s">&quot;FiGrid&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">512000</span><span class="p">);</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">tree</span><span class="o">-&gt;</span><span class="n">SetBasketSize</span><span class="p">(</span><span class="s">&quot;QfGrid&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">512000</span><span class="p">);</span>
+</code></pre></div></p>
+<h3 id="35-future-migrate-to-rntuple">3.5 Future: Migrate to RNTuple<a class="headerlink" href="#35-future-migrate-to-rntuple" title="Permanent link">&para;</a></h3>
+<p>ROOT's RNTuple (production-ready in ROOT 6.36, Q2 2025) offers:
+- 2-5x faster read throughput
+- 20-35% smaller files
+- Better multicore scalability (&gt;100 threads tested)</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1">// Future-proof preparation</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;RVersion.h&quot;</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="cp">#if ROOT_VERSION_CODE &gt;= ROOT_VERSION(6,36,0)</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;ROOT/RNTuple.hxx&quot;</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span><span class="c1">// Use RNTuple API</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="cp">#endif</span>
+</code></pre></div>
+<h3 id="36-rdataframe-for-analysis">3.6 RDataFrame for Analysis<a class="headerlink" href="#36-rdataframe-for-analysis" title="Permanent link">&para;</a></h3>
+<p>For reading and analyzing your ROOT files:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1">// Enable implicit multithreading</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">ROOT</span><span class="o">::</span><span class="n">EnableImplicitMT</span><span class="p">();</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1">// Use RDataFrame instead of TTree loops</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="n">ROOT</span><span class="o">::</span><span class="n">RDataFrame</span><span class="w"> </span><span class="n">df</span><span class="p">(</span><span class="s">&quot;Hits&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;epicChargeSharing.root&quot;</span><span class="p">);</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="k">auto</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">df</span><span class="p">.</span><span class="n">Filter</span><span class="p">(</span><span class="s">&quot;Edep &gt; 0&quot;</span><span class="p">)</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">           </span><span class="p">.</span><span class="n">Define</span><span class="p">(</span><span class="s">&quot;deltaR&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;sqrt(ReconTrueDeltaX*ReconTrueDeltaX + ReconTrueDeltaY*ReconTrueDeltaY)&quot;</span><span class="p">)</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">           </span><span class="p">.</span><span class="n">Histo1D</span><span class="p">(</span><span class="s">&quot;deltaR&quot;</span><span class="p">);</span>
+</code></pre></div>
+<p><strong>References:</strong>
+- <a href="https://root.cern/manual/trees/">ROOT TTree Manual</a>
+- <a href="https://root.cern/blog/rntuple-update/">RNTuple Update 2024</a>
+- <a href="https://www.epj-conferences.org/articles/epjconf/abs/2019/19/epjconf_chep2018_06029/epjconf_chep2018_06029.html">RDataFrame Performance</a></p>
+<hr />
+<h2 id="4-code-level-optimizations">4. Code-Level Optimizations<a class="headerlink" href="#4-code-level-optimizations" title="Permanent link">&para;</a></h2>
+<h3 id="41-chargesharingcalculator-duplicate-weight-computation">4.1 ChargeSharingCalculator: Duplicate Weight Computation<a class="headerlink" href="#41-chargesharingcalculator-duplicate-weight-computation" title="Permanent link">&para;</a></h3>
+<p>In <code>ComputeChargeFractions()</code> (lines ~510-575), weights are computed twice:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1">// First computation (line ~388-396)</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">safeDistance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">max</span><span class="p">(</span><span class="n">distance</span><span class="p">,</span><span class="w"> </span><span class="n">d0p</span><span class="p">.</span><span class="n">minSafeDistance</span><span class="p">);</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">logValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">safeDistance</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">d0p</span><span class="p">.</span><span class="n">invLength</span><span class="p">);</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="n">G4double</span><span class="w"> </span><span class="n">weight</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">logValue</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0.0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">isfinite</span><span class="p">(</span><span class="n">logValue</span><span class="p">))</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="p">(</span><span class="n">alpha</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">logValue</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">;</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="c1">// ... later, RECOMPUTED (line ~519-528)</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">safeDistance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">max</span><span class="p">(</span><span class="n">distance</span><span class="p">,</span><span class="w"> </span><span class="n">d0p</span><span class="p">.</span><span class="n">minSafeDistance</span><span class="p">);</span><span class="w">  </span><span class="c1">// DUPLICATE</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">logValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">safeDistance</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">d0p</span><span class="p">.</span><span class="n">invLength</span><span class="p">);</span><span class="w">       </span><span class="c1">// DUPLICATE</span>
+</code></pre></div>
+<p><strong>Solution:</strong> Store original weights in the scratch buffer:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1">// Modify WeightScratch to store both original and modified weights</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="k">struct</span><span class="w"> </span><span class="nc">WeightPair</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">original</span><span class="p">;</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">modified</span><span class="p">;</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="p">};</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">WeightPair</span><span class="o">&gt;</span><span class="w"> </span><span class="n">fWeightScratch</span><span class="p">;</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="c1">// In ComputeChargeFractions:</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="n">fWeightScratch</span><span class="p">.</span><span class="n">push_back</span><span class="p">({</span><span class="n">weight</span><span class="p">,</span><span class="w"> </span><span class="n">weight</span><span class="p">});</span><span class="w">  </span><span class="c1">// Store original</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="c1">// Later, for row/col sums, use fWeightScratch[i].original</span>
+</code></pre></div>
+<h3 id="42-precompute-loop-invariants">4.2 Precompute Loop Invariants<a class="headerlink" href="#42-precompute-loop-invariants" title="Permanent link">&para;</a></h3>
+<p>In <code>ComputeFullGridFractions()</code>, move invariants outside loops:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1">// Current: computed inside nested loops</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">alpha</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CalcPixelAlphaSubtended</span><span class="p">(</span><span class="n">distance</span><span class="p">,</span><span class="w"> </span><span class="n">pixelSize</span><span class="p">,</span><span class="w"> </span><span class="n">pixelSize</span><span class="p">);</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1">// Optimization: precompute constants</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">halfDiag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">pixelSize</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">0.5</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mf">1.41421356237</span><span class="p">;</span><span class="w">  </span><span class="c1">// sqrt(2)</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">invD0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d0p</span><span class="p">.</span><span class="n">invLength</span><span class="p">;</span>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">betaInvMicron</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chargeModel</span><span class="p">.</span><span class="n">beta</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">chargeModel</span><span class="p">.</span><span class="n">invMicron</span><span class="p">;</span>
+</code></pre></div>
+<h3 id="43-use-c20-likelyunlikely-attributes">4.3 Use C++20 [[likely]]/[[unlikely]] Attributes<a class="headerlink" href="#43-use-c20-likelyunlikely-attributes" title="Permanent link">&para;</a></h3>
+<p>For predictable branches in hot paths:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kt">void</span><span class="w"> </span><span class="nf">SteppingAction::TrackVolumeInteractions</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">G4Step</span><span class="o">*</span><span class="w"> </span><span class="n">step</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fFirstContactVolume</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="s">&quot;NONE&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">[[</span><span class="n">likely</span><span class="p">]]</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">        </span><span class="k">return</span><span class="p">;</span><span class="w">  </span><span class="c1">// Most steps don&#39;t change contact</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">    </span><span class="c1">// ... rest of function</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="p">}</span>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a><span class="c1">// In ComputeChargeFractions</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cell</span><span class="p">.</span><span class="n">gridIndex</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">[[</span><span class="n">unlikely</span><span class="p">]]</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a><span class="w">    </span><span class="k">continue</span><span class="p">;</span>
+<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="44-avoid-stdvector-reallocations">4.4 Avoid std::vector Reallocations<a class="headerlink" href="#44-avoid-stdvector-reallocations" title="Permanent link">&para;</a></h3>
+<p>Your code already reserves buffers (good!), but ensure consistency:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1">// ChargeSharingCalculator.cc - ReserveBuffers()</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="kt">void</span><span class="w"> </span><span class="nf">ChargeSharingCalculator::ReserveBuffers</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">size_t</span><span class="w"> </span><span class="n">maxCells</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">fGridDim</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">fGridDim</span><span class="p">;</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">    </span><span class="c1">// Pre-allocate to avoid reallocations</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fResult</span><span class="p">.</span><span class="n">cells</span><span class="p">.</span><span class="n">capacity</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">maxCells</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="w">        </span><span class="n">fResult</span><span class="p">.</span><span class="n">cells</span><span class="p">.</span><span class="n">reserve</span><span class="p">(</span><span class="n">maxCells</span><span class="p">);</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fWeightScratch</span><span class="p">.</span><span class="n">capacity</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">maxCells</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="w">        </span><span class="n">fWeightScratch</span><span class="p">.</span><span class="n">reserve</span><span class="p">(</span><span class="n">maxCells</span><span class="p">);</span>
+<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>
+<a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a><span class="w">    </span><span class="c1">// Also reserve chargeBlock (always max 4)</span>
+<a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a><span class="w">    </span><span class="n">fResult</span><span class="p">.</span><span class="n">chargeBlock</span><span class="p">.</span><span class="n">reserve</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+<a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>References:</strong>
+- <a href="https://www.agner.org/optimize/optimizing_cpp.pdf">Agner Fog's Optimization Manual</a>
+- <a href="https://en.cppreference.com/w/cpp/language/attributes/likely">C++ likely/unlikely attributes</a></p>
+<hr />
+<h2 id="5-memory-cache-optimizations">5. Memory &amp; Cache Optimizations<a class="headerlink" href="#5-memory-cache-optimizations" title="Permanent link">&para;</a></h2>
+<h3 id="51-false-sharing-prevention">5.1 False Sharing Prevention<a class="headerlink" href="#51-false-sharing-prevention" title="Permanent link">&para;</a></h3>
+<p>In multithreaded scenarios, ensure thread-local data doesn't share cache lines:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1">// Potential false sharing in RunAction if accessed from multiple threads</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="k">struct</span><span class="w"> </span><span class="nc">alignas</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="n">ThreadLocalData</span><span class="w"> </span><span class="p">{</span><span class="w">  </span><span class="c1">// 64-byte alignment = cache line</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">fEdep</span><span class="p">;</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">fTrueX</span><span class="p">;</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">fTrueY</span><span class="p">;</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">    </span><span class="c1">// ... pad to 64 bytes if needed</span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">padding</span><span class="p">[</span><span class="mi">64</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">3</span><span class="o">*</span><span class="k">sizeof</span><span class="p">(</span><span class="n">G4double</span><span class="p">)];</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="p">};</span>
+</code></pre></div>
+<p>For your current single-threaded per-worker design, this isn't critical, but good to know for future scaling.</p>
+<h3 id="52-cache-friendly-access-patterns">5.2 Cache-Friendly Access Patterns<a class="headerlink" href="#52-cache-friendly-access-patterns" title="Permanent link">&para;</a></h3>
+<p>Your <code>Grid2D</code> template uses row-major storage (correct for C++):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1">// Grid2D::operator() - Row-major access</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">row</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">nCols</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">col</span><span class="p">;</span>
+</code></pre></div>
+<p>Ensure loops iterate row-first:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1">// GOOD: Sequential memory access</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">G4int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">rows</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">G4int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">cols</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">j</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">        </span><span class="n">grid</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">j</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span><span class="w">  </span><span class="c1">// Accesses grid[i*cols + j]</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="p">}</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="c1">// BAD: Strided access (cache misses)</span>
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">G4int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">cols</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">j</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">G4int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">rows</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a><span class="w">        </span><span class="n">grid</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">j</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span><span class="w">  </span><span class="c1">// Jumps by &#39;cols&#39; each iteration</span>
+<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="p">}</span>
+</code></pre></div></p>
+<h3 id="53-g4allocator-for-custom-hit-classes">5.3 G4Allocator for Custom Hit Classes<a class="headerlink" href="#53-g4allocator-for-custom-hit-classes" title="Permanent link">&para;</a></h3>
+<p>If you create custom hit classes, use G4Allocator for memory pooling:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyHit</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">G4VHit</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="k">public</span><span class="o">:</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="k">operator</span><span class="w"> </span><span class="k">new</span><span class="p">(</span><span class="kt">size_t</span><span class="p">);</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="k">operator</span><span class="w"> </span><span class="k">delete</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">);</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="k">private</span><span class="o">:</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">G4ThreadLocal</span><span class="w"> </span><span class="n">G4Allocator</span><span class="o">&lt;</span><span class="n">MyHit</span><span class="o">&gt;*</span><span class="w"> </span><span class="n">fAllocator</span><span class="p">;</span>
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="p">};</span>
+<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>
+<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a><span class="kr">inline</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">MyHit</span><span class="o">::</span><span class="k">operator</span><span class="w"> </span><span class="k">new</span><span class="p">(</span><span class="kt">size_t</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">fAllocator</span><span class="p">)</span><span class="w"> </span><span class="n">fAllocator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">G4Allocator</span><span class="o">&lt;</span><span class="n">MyHit</span><span class="o">&gt;</span><span class="p">;</span>
+<a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">fAllocator</span><span class="o">-&gt;</span><span class="n">MallocSingle</span><span class="p">();</span>
+<a id="__codelineno-26-13" name="__codelineno-26-13" href="#__codelineno-26-13"></a><span class="p">}</span>
+<a id="__codelineno-26-14" name="__codelineno-26-14" href="#__codelineno-26-14"></a>
+<a id="__codelineno-26-15" name="__codelineno-26-15" href="#__codelineno-26-15"></a><span class="kr">inline</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">MyHit</span><span class="o">::</span><span class="k">operator</span><span class="w"> </span><span class="k">delete</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">hit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-26-16" name="__codelineno-26-16" href="#__codelineno-26-16"></a><span class="w">    </span><span class="n">fAllocator</span><span class="o">-&gt;</span><span class="n">FreeSingle</span><span class="p">((</span><span class="n">MyHit</span><span class="o">*</span><span class="p">)</span><span class="n">hit</span><span class="p">);</span>
+<a id="__codelineno-26-17" name="__codelineno-26-17" href="#__codelineno-26-17"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>References:</strong>
+- <a href="https://medium.com/@techhara/speed-up-c-false-sharing-44b56fffe02b">False Sharing in C++</a>
+- <a href="https://apc.u-paris.fr/~franco/g4doxy4.10/html/class_g4_allocator.html">G4Allocator Documentation</a></p>
+<hr />
+<h2 id="6-simd-vectorization">6. SIMD &amp; Vectorization<a class="headerlink" href="#6-simd-vectorization" title="Permanent link">&para;</a></h2>
+<h3 id="61-enable-auto-vectorization">6.1 Enable Auto-Vectorization<a class="headerlink" href="#61-enable-auto-vectorization" title="Permanent link">&para;</a></h3>
+<p>Add compiler hints for vectorizable loops:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="c1">// In hot loops like ComputeFullGridFractions</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="cp">#pragma omp simd</span>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">G4int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">rows</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="w">    </span><span class="c1">// Loop body should be simple for vectorization</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="p">}</span>
+</code></pre></div>
+<p>Compile with <code>-fopenmp-simd</code> to enable SIMD pragmas without full OpenMP threading.</p>
+<h3 id="62-why-standard-math-is-slow">6.2 Why Standard Math is Slow<a class="headerlink" href="#62-why-standard-math-is-slow" title="Permanent link">&para;</a></h3>
+<p>Without <code>-fno-math-errno</code>, <code>std::sqrt</code> and <code>std::log</code> must set <code>errno</code> on error, preventing vectorization:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="c1">// Standard sqrt: ~12-14 cycles, non-vectorized</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="kt">double</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="p">);</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="c1">// With -fno-math-errno: vectorized, ~3-4 cycles per element</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="c1">// Add to CMakeLists.txt:</span>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="n">list</span><span class="p">(</span><span class="n">APPEND</span><span class="w"> </span><span class="n">_project_release_compile_options</span><span class="w"> </span><span class="o">-</span><span class="n">fno</span><span class="o">-</span><span class="n">math</span><span class="o">-</span><span class="n">errno</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="63-consider-eigen-for-matrix-operations">6.3 Consider Eigen for Matrix Operations<a class="headerlink" href="#63-consider-eigen-for-matrix-operations" title="Permanent link">&para;</a></h3>
+<p>For intensive grid computations, Eigen provides auto-vectorized operations:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;Eigen/Dense&gt;</span>
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="c1">// Instead of manual Grid2D operations</span>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="nf">weights</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span><span class="w"> </span><span class="n">cols</span><span class="p">);</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="n">Eigen</span><span class="o">::</span><span class="n">MatrixXd</span><span class="w"> </span><span class="n">fractions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">weights</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">weights</span><span class="p">.</span><span class="n">sum</span><span class="p">();</span>
+</code></pre></div>
+<p>Eigen auto-vectorizes with SSE/AVX/NEON and provides 2-10x speedups for dense matrix operations.</p>
+<p><strong>References:</strong>
+- <a href="https://hackernoon.com/why-math-functions-in-c-are-so-slow-nxz3155">Why C++ Math is Slow</a>
+- <a href="https://eigen.tuxfamily.org/">Eigen Library</a>
+- <a href="http://const.me/articles/simd/simd.pdf">SIMD for C++ Developers</a></p>
+<hr />
+<h2 id="7-distributed-cluster-computing">7. Distributed &amp; Cluster Computing<a class="headerlink" href="#7-distributed-cluster-computing" title="Permanent link">&para;</a></h2>
+<h3 id="71-mpi-for-multi-node-scaling">7.1 MPI for Multi-Node Scaling<a class="headerlink" href="#71-mpi-for-multi-node-scaling" title="Permanent link">&para;</a></h3>
+<p>For cluster computing, Geant4 supports hybrid MPI+MT:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="c1">// Example using G4MPImanager</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;G4MPImanager.hh&quot;</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;G4MPIsession.hh&quot;</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="w">    </span><span class="n">G4MPImanager</span><span class="o">*</span><span class="w"> </span><span class="n">g4MPI</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">G4MPImanager</span><span class="p">(</span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="n">argv</span><span class="p">);</span>
+<a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a><span class="w">    </span><span class="n">G4MPIsession</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">g4MPI</span><span class="o">-&gt;</span><span class="n">GetMPIsession</span><span class="p">();</span>
+<a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>
+<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a><span class="w">    </span><span class="c1">// Each MPI rank runs MT workers</span>
+<a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a><span class="w">    </span><span class="n">G4MTRunManager</span><span class="o">*</span><span class="w"> </span><span class="n">runManager</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">G4MTRunManager</span><span class="p">;</span>
+<a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a><span class="w">    </span><span class="n">runManager</span><span class="o">-&gt;</span><span class="n">SetNumberOfThreads</span><span class="p">(</span><span class="n">G4Threading</span><span class="o">::</span><span class="n">G4GetNumberOfCores</span><span class="p">());</span>
+<a id="__codelineno-30-12" name="__codelineno-30-12" href="#__codelineno-30-12"></a>
+<a id="__codelineno-30-13" name="__codelineno-30-13" href="#__codelineno-30-13"></a><span class="w">    </span><span class="c1">// ... setup and run</span>
+<a id="__codelineno-30-14" name="__codelineno-30-14" href="#__codelineno-30-14"></a>
+<a id="__codelineno-30-15" name="__codelineno-30-15" href="#__codelineno-30-15"></a><span class="w">    </span><span class="k">delete</span><span class="w"> </span><span class="n">g4MPI</span><span class="p">;</span>
+<a id="__codelineno-30-16" name="__codelineno-30-16" href="#__codelineno-30-16"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="72-simple-multi-process-parallelization">7.2 Simple Multi-Process Parallelization<a class="headerlink" href="#72-simple-multi-process-parallelization" title="Permanent link">&para;</a></h3>
+<p>Without MPI, use GNU Parallel for embarrassingly parallel runs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="ch">#!/bin/bash</span>
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="c1"># Run 8 independent simulations with different seeds</span>
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>parallel<span class="w"> </span>-j<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="s1">&#39;./epicChargeSharing -s {} run.mac&#39;</span><span class="w"> </span>:::<span class="w"> </span><span class="k">$(</span>seq<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">8</span><span class="k">)</span>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>
+<a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="c1"># Merge output files</span>
+<a id="__codelineno-31-6" name="__codelineno-31-6" href="#__codelineno-31-6"></a>hadd<span class="w"> </span>-f<span class="w"> </span>epicChargeSharing_merged.root<span class="w"> </span>epicChargeSharing_*.root
+</code></pre></div>
+<h3 id="73-job-arrays-on-hpc-clusters">7.3 Job Arrays on HPC Clusters<a class="headerlink" href="#73-job-arrays-on-hpc-clusters" title="Permanent link">&para;</a></h3>
+<p>For SLURM clusters:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="ch">#!/bin/bash</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="c1">#SBATCH --array=1-100</span>
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="c1">#SBATCH --ntasks=1</span>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="c1">#SBATCH --cpus-per-task=8</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>
+<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>./epicChargeSharing<span class="w"> </span>-s<span class="w"> </span><span class="nv">$SLURM_ARRAY_TASK_ID</span><span class="w"> </span>run.mac
+</code></pre></div></p>
+<p><strong>References:</strong>
+- <a href="https://arxiv.org/abs/1605.01792">Geant4 MPI Extension</a>
+- <a href="http://www.ccs.neu.edu/home/gene/pargeant4-cern.html">ParGeant4</a></p>
+<hr />
+<h2 id="8-profiling-benchmarking">8. Profiling &amp; Benchmarking<a class="headerlink" href="#8-profiling-benchmarking" title="Permanent link">&para;</a></h2>
+<h3 id="81-linux-perf-recommended">8.1 Linux perf (Recommended)<a class="headerlink" href="#81-linux-perf-recommended" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1"># Record with call graph</span>
+<a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>perf<span class="w"> </span>record<span class="w"> </span>-g<span class="w"> </span>--call-graph<span class="w"> </span>dwarf<span class="w"> </span>./epicChargeSharing<span class="w"> </span>run.mac
+<a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>
+<a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="c1"># Interactive analysis</span>
+<a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>perf<span class="w"> </span>report<span class="w"> </span>--hierarchy
+<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a>
+<a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="c1"># Flame graph (install flamegraph.pl)</span>
+<a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a>perf<span class="w"> </span>script<span class="w"> </span><span class="p">|</span><span class="w"> </span>stackcollapse-perf.pl<span class="w"> </span><span class="p">|</span><span class="w"> </span>flamegraph.pl<span class="w"> </span>&gt;<span class="w"> </span>profile.svg
+</code></pre></div>
+<h3 id="82-valgrind-cachegrind">8.2 Valgrind Cachegrind<a class="headerlink" href="#82-valgrind-cachegrind" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="c1"># Simulate cache behavior</span>
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>valgrind<span class="w"> </span>--tool<span class="o">=</span>cachegrind<span class="w"> </span>./epicChargeSharing<span class="w"> </span>run.mac
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="c1"># View results</span>
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>cg_annotate<span class="w"> </span>--auto<span class="o">=</span>yes<span class="w"> </span>cachegrind.out.*
+<a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a>
+<a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="c1"># Key metrics:</span>
+<a id="__codelineno-34-8" name="__codelineno-34-8" href="#__codelineno-34-8"></a><span class="c1"># D1mr: L1 data cache read misses</span>
+<a id="__codelineno-34-9" name="__codelineno-34-9" href="#__codelineno-34-9"></a><span class="c1"># DLmr: Last-level cache read misses (most expensive)</span>
+</code></pre></div>
+<h3 id="83-intel-vtune-if-available">8.3 Intel VTune (if available)<a class="headerlink" href="#83-intel-vtune-if-available" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>vtune<span class="w"> </span>-collect<span class="w"> </span>hotspots<span class="w"> </span>./epicChargeSharing<span class="w"> </span>run.mac
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>vtune<span class="w"> </span>-report<span class="w"> </span>hotspots<span class="w"> </span>-r<span class="w"> </span>r000hs
+</code></pre></div>
+<h3 id="84-built-in-timing">8.4 Built-in Timing<a class="headerlink" href="#84-built-in-timing" title="Permanent link">&para;</a></h3>
+<p>Add timing instrumentation:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;chrono&gt;</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;G4Timer.hh&quot;</span>
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>
+<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="c1">// In RunAction</span>
+<a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a><span class="n">G4Timer</span><span class="w"> </span><span class="n">fRunTimer</span><span class="p">;</span>
+<a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>
+<a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a><span class="kt">void</span><span class="w"> </span><span class="nf">RunAction::BeginOfRunAction</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">G4Run</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a><span class="w">    </span><span class="n">fRunTimer</span><span class="p">.</span><span class="n">Start</span><span class="p">();</span>
+<a id="__codelineno-36-9" name="__codelineno-36-9" href="#__codelineno-36-9"></a><span class="p">}</span>
+<a id="__codelineno-36-10" name="__codelineno-36-10" href="#__codelineno-36-10"></a>
+<a id="__codelineno-36-11" name="__codelineno-36-11" href="#__codelineno-36-11"></a><span class="kt">void</span><span class="w"> </span><span class="nf">RunAction::EndOfRunAction</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">G4Run</span><span class="o">*</span><span class="w"> </span><span class="n">run</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-36-12" name="__codelineno-36-12" href="#__codelineno-36-12"></a><span class="w">    </span><span class="n">fRunTimer</span><span class="p">.</span><span class="n">Stop</span><span class="p">();</span>
+<a id="__codelineno-36-13" name="__codelineno-36-13" href="#__codelineno-36-13"></a><span class="w">    </span><span class="n">G4int</span><span class="w"> </span><span class="n">nEvents</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">run</span><span class="o">-&gt;</span><span class="n">GetNumberOfEvent</span><span class="p">();</span>
+<a id="__codelineno-36-14" name="__codelineno-36-14" href="#__codelineno-36-14"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">wallTime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fRunTimer</span><span class="p">.</span><span class="n">GetRealElapsed</span><span class="p">();</span>
+<a id="__codelineno-36-15" name="__codelineno-36-15" href="#__codelineno-36-15"></a><span class="w">    </span><span class="n">G4cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Performance: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">nEvents</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">wallTime</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; events/second&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">G4endl</span><span class="p">;</span>
+<a id="__codelineno-36-16" name="__codelineno-36-16" href="#__codelineno-36-16"></a><span class="w">    </span><span class="n">G4cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Time per event: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">1000.0</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">wallTime</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">nEvents</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; ms&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">G4endl</span><span class="p">;</span>
+<a id="__codelineno-36-17" name="__codelineno-36-17" href="#__codelineno-36-17"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>References:</strong>
+- <a href="https://perf.wiki.kernel.org/">Linux perf wiki</a>
+- <a href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html">Intel VTune</a></p>
+<hr />
+<h2 id="9-geant4-113-new-features">9. Geant4 11.3 New Features<a class="headerlink" href="#9-geant4-113-new-features" title="Permanent link">&para;</a></h2>
+<p>Released December 2024, Geant4 11.3 includes several performance improvements:</p>
+<h3 id="91-parallel-geometry-voxelization">9.1 Parallel Geometry Voxelization<a class="headerlink" href="#91-parallel-geometry-voxelization" title="Permanent link">&para;</a></h3>
+<p>Enable multi-threaded geometry initialization:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;G4GeometryManager.hh&quot;</span>
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="c1">// In DetectorConstruction::Construct()</span>
+<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a><span class="n">G4GeometryManager</span><span class="o">::</span><span class="n">GetInstance</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">RequestParallelOptimisation</span><span class="p">(</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+</code></pre></div>
+<p>This accelerates voxel tree construction for complex geometries.</p>
+<h3 id="92-dynamic-particle-processing">9.2 Dynamic Particle Processing<a class="headerlink" href="#92-dynamic-particle-processing" title="Permanent link">&para;</a></h3>
+<p>New classes (<code>G4DynamicParticleIonisation</code>, <code>G4DynamicParticleMSC</code>) perform computations on-the-fly without particle definition lookups.</p>
+<h3 id="93-optimized-urbanmsc-model">9.3 Optimized UrbanMsc Model<a class="headerlink" href="#93-optimized-urbanmsc-model" title="Permanent link">&para;</a></h3>
+<p><code>G4UrbanMscModel</code> has an optimized step limitation algorithm in EM Opt3 physics.</p>
+<h3 id="94-faster-cross-section-calculations">9.4 Faster Cross-Section Calculations<a class="headerlink" href="#94-faster-cross-section-calculations" title="Permanent link">&para;</a></h3>
+<p><code>G4ChargeExchangeXS</code> now computes at element level instead of isotope level - several times faster.</p>
+<h3 id="95-improved-task-distribution">9.5 Improved Task Distribution<a class="headerlink" href="#95-improved-task-distribution" title="Permanent link">&para;</a></h3>
+<p><code>G4TaskRunManager</code> now distributes events more evenly across tasks, improving load balancing.</p>
+<p><strong>References:</strong>
+- <a href="https://geant4.web.cern.ch/download/release-notes/notes-v11.3.0.html">Geant4 11.3 Release Notes</a>
+- <a href="https://geant4.web.cern.ch/news/2025-03-11-planned-dev">2025 Planned Features</a></p>
+<hr />
+<h2 id="10-implementation-priority-matrix">10. Implementation Priority Matrix<a class="headerlink" href="#10-implementation-priority-matrix" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Optimization</th>
+<th>Impact</th>
+<th>Effort</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SteppingAction pointer comparison</strong></td>
+<td>High</td>
+<td>Low</td>
+<td><strong>P0</strong></td>
+</tr>
+<tr>
+<td><strong>Enable ROOT compression (ZSTD)</strong></td>
+<td>High</td>
+<td>Low</td>
+<td><strong>P0</strong></td>
+</tr>
+<tr>
+<td>Enable <code>-fno-math-errno</code></td>
+<td>Medium-High</td>
+<td>Low</td>
+<td><strong>P0</strong></td>
+</tr>
+<tr>
+<td>Profile-Guided Optimization</td>
+<td>High</td>
+<td>Medium</td>
+<td><strong>P1</strong></td>
+</tr>
+<tr>
+<td>Cache weight calculations</td>
+<td>Medium</td>
+<td>Medium</td>
+<td><strong>P1</strong></td>
+</tr>
+<tr>
+<td>TTree AutoFlush tuning</td>
+<td>Medium</td>
+<td>Low</td>
+<td><strong>P1</strong></td>
+</tr>
+<tr>
+<td>Region-specific production cuts</td>
+<td>Medium</td>
+<td>Medium</td>
+<td><strong>P2</strong></td>
+</tr>
+<tr>
+<td>[[likely]]/[[unlikely]] hints</td>
+<td>Low-Medium</td>
+<td>Low</td>
+<td><strong>P2</strong></td>
+</tr>
+<tr>
+<td>SIMD vectorization</td>
+<td>Medium</td>
+<td>High</td>
+<td><strong>P3</strong></td>
+</tr>
+<tr>
+<td>Migrate to RNTuple</td>
+<td>High</td>
+<td>High</td>
+<td><strong>Future</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="quick-wins-implement-today">Quick Wins (Implement Today)<a class="headerlink" href="#quick-wins-implement-today" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>SteppingAction fix</strong> - Replace string comparison with pointer comparison</li>
+<li><strong>Enable ZSTD compression</strong> - Change <code>SetCompressionLevel(0)</code> to <code>SetCompressionAlgorithm(kZSTD)</code> + level 4</li>
+<li><strong>Add <code>-fno-math-errno</code></strong> - 4x+ speedup for math functions</li>
+<li><strong>Build with <code>-DEC_FAST_MATH=ON</code></strong> - Already supported in your CMake</li>
+</ol>
+<h3 id="medium-term-this-week">Medium-Term (This Week)<a class="headerlink" href="#medium-term-this-week" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Run profiling</strong> with <code>perf</code> to identify actual hotspots</li>
+<li><strong>Implement PGO</strong> for 10-20% overall speedup</li>
+<li><strong>Enable AutoFlush</strong> for better ROOT file structure</li>
+<li><strong>Add timing instrumentation</strong> to measure improvements</li>
+</ol>
+<h3 id="long-term-future-releases">Long-Term (Future Releases)<a class="headerlink" href="#long-term-future-releases" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Consider RNTuple when ROOT 6.36 is stable</li>
+<li>Evaluate Eigen for matrix operations if compute-bound</li>
+<li>Implement MPI support for cluster scaling</li>
+</ol>
+<hr />
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p>Your codebase is already well-architected with good separation of concerns and reasonable defaults. The highest-impact improvements are:</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Expected Impact</th>
+<th>Lines to Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SteppingAction pointer comparison</td>
+<td>10-50x for volume ID</td>
+<td>~20 lines</td>
+</tr>
+<tr>
+<td>Enable ZSTD compression</td>
+<td>50-70% smaller files</td>
+<td>2 lines</td>
+</tr>
+<tr>
+<td><code>-fno-math-errno</code> flag</td>
+<td>4x faster sqrt/log</td>
+<td>1 CMake line</td>
+</tr>
+<tr>
+<td>PGO build</td>
+<td>10-20% overall</td>
+<td>CMake + workflow</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Recommended first step:</strong> Run <code>perf record -g ./epicChargeSharing run.mac</code> and analyze the flame graph to confirm where time is actually spent before making changes.</p>
+<hr />
+<h2 id="references-further-reading">References &amp; Further Reading<a class="headerlink" href="#references-further-reading" title="Permanent link">&para;</a></h2>
+<h3 id="geant4">Geant4<a class="headerlink" href="#geant4" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="https://twiki.cern.ch/twiki/bin/view/Geant4/Geant4PerformanceTips">Geant4 Performance Tips</a></li>
+<li><a href="https://geant4.web.cern.ch/download/release-notes/notes-v11.3.0.html">Geant4 11.3 Release Notes</a></li>
+<li><a href="https://geant4.web.cern.ch/news/2025-03-11-planned-dev">Geant4 2025 Planned Features</a></li>
+<li><a href="https://geant4.web.cern.ch/documentation/pipelines/master/bftd_html/ForToolkitDeveloper/OOAnalysisDesign/Multithreading/mt.html">Geant4 Multithreading</a></li>
+</ul>
+<h3 id="root">ROOT<a class="headerlink" href="#root" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="https://root.cern/manual/trees/">ROOT TTree Manual</a></li>
+<li><a href="https://root.cern/blog/rntuple-update/">RNTuple Update 2024</a></li>
+<li><a href="https://www.epj-conferences.org/articles/epjconf/abs/2019/19/epjconf_chep2018_06029/epjconf_chep2018_06029.html">RDataFrame Performance</a></li>
+<li><a href="https://indico.cern.ch/event/697389/contributions/3062030/attachments/1712625/3007684/ROOT_I_O_compression_algorithms1.pdf">ROOT I/O Compression</a></li>
+</ul>
+<h3 id="c-optimization">C++ Optimization<a class="headerlink" href="#c-optimization" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="https://www.agner.org/optimize/optimizing_cpp.pdf">Agner Fog's Optimization Manual</a></li>
+<li><a href="https://www.youtube.com/watch?v=rX0ItVEVjHc">Data-Oriented Design (Mike Acton)</a></li>
+<li><a href="https://hackernoon.com/why-math-functions-in-c-are-so-slow-nxz3155">Why C++ Math Functions Are Slow</a></li>
+<li><a href="https://medium.com/@techhara/speed-up-c-false-sharing-44b56fffe02b">False Sharing Prevention</a></li>
+<li><a href="https://eigen.tuxfamily.org/">Eigen Linear Algebra Library</a></li>
+</ul>
+<h3 id="profiling">Profiling<a class="headerlink" href="#profiling" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="https://perf.wiki.kernel.org/">Linux perf wiki</a></li>
+<li><a href="https://www.brendangregg.com/flamegraphs.html">Flame Graphs</a></li>
+<li><a href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html">Intel VTune</a></li>
+</ul>
+<hr />
+<p><em>Report generated: December 2025</em>
+<em>Based on: Geant4 11.3, ROOT 6.x, GCC/Clang with C++20</em>
+<em>Codebase analyzed: epicChargeSharing (AC-LGAD charge sharing simulation)</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/tom-bleher/epicChargeSharing" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.sections", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

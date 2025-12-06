@@ -1,0 +1,2556 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="GEANT4-based Monte Carlo simulation for charge sharing in AC-LGAD pixel detectors">
+      
+      
+        <meta name="author" content="Tom Bleher, Igor Korover">
+      
+      
+        <link rel="canonical" href="https://tom-bleher.github.io/epicChargeSharing/configuration/">
+      
+      
+        <link rel="prev" href="../getting-started/">
+      
+      
+        <link rel="next" href="../ROOT_OUTPUT_BRANCHES/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Configuration - epicChargeSharing</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="epicChargeSharing" class="md-header__button md-logo" aria-label="epicChargeSharing" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            epicChargeSharing
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tom-bleher/epicChargeSharing" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tom-bleher/epicChargeSharing
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="epicChargeSharing" class="md-nav__button md-logo" aria-label="epicChargeSharing" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    epicChargeSharing
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tom-bleher/epicChargeSharing" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tom-bleher/epicChargeSharing
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration System
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detector-geometry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detector Geometry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detector Geometry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#detectorgeometry-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DetectorGeometry Struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#geometry-calculations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Geometry Calculations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constants-namespace-equivalents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants Namespace Equivalents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#physics-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physics Parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Physics Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#physicsparameters-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PhysicsParameters Struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#charge-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Charge Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constants-namespace-equivalents_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants Namespace Equivalents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#noise-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Noise Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#noisemodel-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NoiseModel Struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#noise-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Application
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constants-namespace-equivalents_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants Namespace Equivalents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reconstruction-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconstruction Settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reconstruction Settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconstructionconfig-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReconstructionConfig Struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reconstruction-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconstruction Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#denominator-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Denominator Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dpc-mode-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DPC Mode Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constants-namespace-equivalents_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants Namespace Equivalents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Control
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output Control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#output-branches-by-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Branches by Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-grid-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Grid Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-processing-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-Processing Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#g4messenger-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        G4Messenger Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#macro-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Macro Commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Macro Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-geant4-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard GEANT4 Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-macro-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Macro Files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-resolution-study" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High-Resolution Study
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fast-dpc-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fast DPC Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#noise-study" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Study
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Changing Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#compile-time-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compile-Time Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-changes-limited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Changes (Limited)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconstruction-method-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconstruction Method Selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-size-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Size Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#noise-level-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Level Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ROOT_OUTPUT_BRANCHES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../physics-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Physics Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../NamingConventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Naming Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration System
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detector-geometry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detector Geometry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detector Geometry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#detectorgeometry-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DetectorGeometry Struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#geometry-calculations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Geometry Calculations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constants-namespace-equivalents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants Namespace Equivalents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#physics-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physics Parameters
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Physics Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#physicsparameters-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PhysicsParameters Struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#charge-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Charge Generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constants-namespace-equivalents_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants Namespace Equivalents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#noise-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Noise Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#noisemodel-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NoiseModel Struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#noise-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Application
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constants-namespace-equivalents_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants Namespace Equivalents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reconstruction-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconstruction Settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reconstruction Settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconstructionconfig-struct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReconstructionConfig Struct
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reconstruction-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconstruction Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#denominator-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Denominator Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dpc-mode-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DPC Mode Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#constants-namespace-equivalents_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constants Namespace Equivalents
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Control
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output Control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#output-branches-by-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Branches by Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-grid-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Grid Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-processing-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-Processing Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#g4messenger-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        G4Messenger Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#macro-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Macro Commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Macro Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-geant4-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standard GEANT4 Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-macro-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Macro Files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#high-resolution-study" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High-Resolution Study
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fast-dpc-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fast DPC Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#noise-study" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Study
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Changing Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#compile-time-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compile-Time Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-changes-limited" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Changes (Limited)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconstruction-method-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reconstruction Method Selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#output-size-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Size Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#noise-level-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Level Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="configuration-guide">Configuration Guide<a class="headerlink" href="#configuration-guide" title="Permanent link">&para;</a></h1>
+<p>This document provides a complete reference for all configuration parameters in epicChargeSharing.</p>
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="#configuration-system">Configuration System</a></li>
+<li><a href="#detector-geometry">Detector Geometry</a></li>
+<li><a href="#physics-parameters">Physics Parameters</a></li>
+<li><a href="#noise-model">Noise Model</a></li>
+<li><a href="#reconstruction-settings">Reconstruction Settings</a></li>
+<li><a href="#output-control">Output Control</a></li>
+<li><a href="#runtime-configuration">Runtime Configuration</a></li>
+<li><a href="#macro-commands">Macro Commands</a></li>
+</ul>
+<h2 id="configuration-system">Configuration System<a class="headerlink" href="#configuration-system" title="Permanent link">&para;</a></h2>
+<p>Configuration is managed through <code>include/Config.hh</code> using a hierarchical struct-based system:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">namespace</span><span class="w"> </span><span class="nn">ECS</span><span class="o">::</span><span class="nn">Config</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">DetectorGeometry</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">PhysicsParameters</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">NoiseModel</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">ReconstructionConfig</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">};</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">GlobalConfig</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">};</span><span class="w">  </span><span class="c1">// Combined config</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Backward Compatibility</strong>: The <code>Constants</code> namespace wraps <code>ECS::Config</code> for legacy code:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">namespace</span><span class="w"> </span><span class="nn">Constants</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">DETECTOR_SIZE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">30.0</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="c1">// etc.</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">}</span>
+</code></pre></div>
+<h2 id="detector-geometry">Detector Geometry<a class="headerlink" href="#detector-geometry" title="Permanent link">&para;</a></h2>
+<h3 id="detectorgeometry-struct">DetectorGeometry Struct<a class="headerlink" href="#detectorgeometry-struct" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Unit</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>detectorSize</code></td>
+<td>G4double</td>
+<td>30.0</td>
+<td>mm</td>
+<td>Square detector side length</td>
+</tr>
+<tr>
+<td><code>detectorThickness</code></td>
+<td>G4double</td>
+<td>0.05</td>
+<td>mm</td>
+<td>Silicon substrate thickness</td>
+</tr>
+<tr>
+<td><code>worldSize</code></td>
+<td>G4double</td>
+<td>5.0</td>
+<td>cm</td>
+<td>World volume size</td>
+</tr>
+<tr>
+<td><code>detectorZPosition</code></td>
+<td>G4double</td>
+<td>-1.0</td>
+<td>cm</td>
+<td>Z position of detector</td>
+</tr>
+<tr>
+<td><code>pixelSize</code></td>
+<td>G4double</td>
+<td>0.1</td>
+<td>mm</td>
+<td>Pixel pad side length</td>
+</tr>
+<tr>
+<td><code>pixelThickness</code></td>
+<td>G4double</td>
+<td>0.001</td>
+<td>mm</td>
+<td>Pixel pad thickness</td>
+</tr>
+<tr>
+<td><code>pitch</code></td>
+<td>G4double</td>
+<td>0.5</td>
+<td>mm</td>
+<td>Pixel center-to-center spacing</td>
+</tr>
+<tr>
+<td><code>pixelCornerOffset</code></td>
+<td>G4double</td>
+<td>0.1</td>
+<td>mm</td>
+<td>Distance from detector edge to first pixel</td>
+</tr>
+<tr>
+<td><code>neighborhoodRadius</code></td>
+<td>G4int</td>
+<td>2</td>
+<td>-</td>
+<td>Radius for charge sharing grid</td>
+</tr>
+<tr>
+<td><code>storeFullGrid</code></td>
+<td>G4bool</td>
+<td>true</td>
+<td>-</td>
+<td>Store full detector grid data</td>
+</tr>
+<tr>
+<td><code>geometryTolerance</code></td>
+<td>G4double</td>
+<td>1.0</td>
+<td>µm</td>
+<td>Geometry overlap tolerance</td>
+</tr>
+<tr>
+<td><code>precisionTolerance</code></td>
+<td>G4double</td>
+<td>1.0</td>
+<td>nm</td>
+<td>Numerical precision tolerance</td>
+</tr>
+</tbody>
+</table>
+<h3 id="geometry-calculations">Geometry Calculations<a class="headerlink" href="#geometry-calculations" title="Permanent link">&para;</a></h3>
+<p><strong>Pixels per side</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">pixelsPerSide</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">detectorSize</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">pixelCornerOffset</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">pitch</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1">// Default: (30 - 0.2) / 0.5 + 1 = 60 pixels per side</span>
+</code></pre></div></p>
+<p><strong>Total pixels</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">totalPixels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pixelsPerSide</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">pixelsPerSide</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">// Default: 60 × 60 = 3,600 pixels</span>
+</code></pre></div></p>
+<p><strong>Neighborhood size</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">neighborhoodSide</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">neighborhoodRadius</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">// Default: 2 × 2 + 1 = 5 (5×5 = 25 pixels)</span>
+</code></pre></div></p>
+<h3 id="constants-namespace-equivalents">Constants Namespace Equivalents<a class="headerlink" href="#constants-namespace-equivalents" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">namespace</span><span class="w"> </span><span class="nn">Constants</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">DETECTOR_SIZE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">30.0</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">DETECTOR_WIDTH</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.05</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">PIXEL_SIZE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.1</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">PIXEL_PITCH</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">PIXEL_CORNER_OFFSET</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.1</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4int</span><span class="w"> </span><span class="n">NEIGHBORHOOD_RADIUS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">}</span>
+</code></pre></div>
+<h2 id="physics-parameters">Physics Parameters<a class="headerlink" href="#physics-parameters" title="Permanent link">&para;</a></h2>
+<h3 id="physicsparameters-struct">PhysicsParameters Struct<a class="headerlink" href="#physicsparameters-struct" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Unit</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ionizationEnergy</code></td>
+<td>G4double</td>
+<td>3.6</td>
+<td>eV</td>
+<td>Energy per electron-hole pair in silicon</td>
+</tr>
+<tr>
+<td><code>gain</code></td>
+<td>G4double</td>
+<td>20.0</td>
+<td>-</td>
+<td>AC-LGAD amplification factor (typical: 8-25)</td>
+</tr>
+<tr>
+<td><code>d0</code></td>
+<td>G4double</td>
+<td>1.0</td>
+<td>µm</td>
+<td>Transverse hit size (Tornago Eq. 4)</td>
+</tr>
+<tr>
+<td><code>elementaryCharge</code></td>
+<td>G4double</td>
+<td>1.602×10⁻¹⁹</td>
+<td>C</td>
+<td>Electron charge</td>
+</tr>
+<tr>
+<td><code>maxStepSize</code></td>
+<td>G4double</td>
+<td>20.0</td>
+<td>µm</td>
+<td>Maximum step length in silicon</td>
+</tr>
+<tr>
+<td><code>primaryParticleZ</code></td>
+<td>G4double</td>
+<td>0.0</td>
+<td>cm</td>
+<td>Z position of particle gun</td>
+</tr>
+</tbody>
+</table>
+<h3 id="charge-generation">Charge Generation<a class="headerlink" href="#charge-generation" title="Permanent link">&para;</a></h3>
+<p><strong>Electron-hole pairs</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">pairs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">energyDeposit</span><span class="w"> </span><span class="p">[</span><span class="n">MeV</span><span class="p">]</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="mi">10</span><span class="n">⁶</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">ionizationEnergy</span><span class="w"> </span><span class="p">[</span><span class="n">eV</span><span class="p">]</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1">// For 10 GeV electron: ~2.8×10⁶ pairs</span>
+</code></pre></div></p>
+<p><strong>Amplified charge</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">amplifiedPairs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pairs</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="n">gain</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1">// With gain 20: ~5.6×10⁷ effective electrons</span>
+</code></pre></div></p>
+<h3 id="constants-namespace-equivalents_1">Constants Namespace Equivalents<a class="headerlink" href="#constants-namespace-equivalents_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">namespace</span><span class="w"> </span><span class="nn">Constants</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">IONIZATION_ENERGY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">3.6</span><span class="p">;</span><span class="w">  </span><span class="c1">// eV</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">GAIN</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">20.0</span><span class="p">;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">D0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.0</span><span class="p">;</span><span class="w">  </span><span class="c1">// µm</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">ELEMENTARY_CHARGE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.602176634e-19</span><span class="p">;</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">MAX_STEP_SIZE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">20.0</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">micrometer</span><span class="p">;</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">}</span>
+</code></pre></div>
+<h2 id="noise-model">Noise Model<a class="headerlink" href="#noise-model" title="Permanent link">&para;</a></h2>
+<h3 id="noisemodel-struct">NoiseModel Struct<a class="headerlink" href="#noisemodel-struct" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gainSigmaMin</code></td>
+<td>G4double</td>
+<td>0.010</td>
+<td>Minimum gain noise σ (1%)</td>
+</tr>
+<tr>
+<td><code>gainSigmaMax</code></td>
+<td>G4double</td>
+<td>0.050</td>
+<td>Maximum gain noise σ (5%)</td>
+</tr>
+<tr>
+<td><code>noiseElectronCount</code></td>
+<td>G4double</td>
+<td>500.0</td>
+<td>Electronic noise in electrons</td>
+</tr>
+<tr>
+<td><code>enablePositionDependence</code></td>
+<td>G4bool</td>
+<td>false</td>
+<td>Position-dependent noise</td>
+</tr>
+<tr>
+<td><code>edgeEffectWidth</code></td>
+<td>G4double</td>
+<td>10.0</td>
+<td>Edge effect width (if enabled)</td>
+</tr>
+<tr>
+<td><code>edgeNoiseMultiplier</code></td>
+<td>G4double</td>
+<td>1.5</td>
+<td>Noise multiplier at edges</td>
+</tr>
+<tr>
+<td><code>enableCrosstalk</code></td>
+<td>G4bool</td>
+<td>false</td>
+<td>Enable pixel crosstalk</td>
+</tr>
+<tr>
+<td><code>crosstalkFraction</code></td>
+<td>G4double</td>
+<td>0.02</td>
+<td>Crosstalk fraction (2%)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="noise-application">Noise Application<a class="headerlink" href="#noise-application" title="Permanent link">&para;</a></h3>
+<p><strong>Gain noise</strong> (multiplicative, per-pixel):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1">// Each pixel has a fixed σ_gain randomly assigned between min and max</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">charge_with_noise</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">charge</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">G4RandGauss</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">σ_gain</span><span class="p">))</span>
+</code></pre></div></p>
+<p><strong>Electronic noise</strong> (additive):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">σ_electronic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">noiseElectronCount</span><span class="w"> </span><span class="err">×</span><span class="w"> </span><span class="n">elementaryCharge</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">charge_final</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">charge_with_noise</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">G4RandGauss</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">σ_electronic</span><span class="p">))</span>
+</code></pre></div></p>
+<h3 id="constants-namespace-equivalents_2">Constants Namespace Equivalents<a class="headerlink" href="#constants-namespace-equivalents_2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">namespace</span><span class="w"> </span><span class="nn">Constants</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">PIXEL_GAIN_SIGMA_MIN</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.010</span><span class="p">;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">PIXEL_GAIN_SIGMA_MAX</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.050</span><span class="p">;</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">NOISE_ELECTRON_COUNT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">500.0</span><span class="p">;</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="p">}</span>
+</code></pre></div>
+<h2 id="reconstruction-settings">Reconstruction Settings<a class="headerlink" href="#reconstruction-settings" title="Permanent link">&para;</a></h2>
+<h3 id="reconstructionconfig-struct">ReconstructionConfig Struct<a class="headerlink" href="#reconstructionconfig-struct" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>signalModel</code></td>
+<td>SignalModel</td>
+<td>LogA</td>
+<td>Signal sharing model</td>
+</tr>
+<tr>
+<td><code>reconMethod</code></td>
+<td>ReconMethod</td>
+<td>DPC</td>
+<td>Position reconstruction method</td>
+</tr>
+<tr>
+<td><code>denominatorMode</code></td>
+<td>DenominatorMode</td>
+<td>Neighborhood</td>
+<td>Fraction normalization mode</td>
+</tr>
+<tr>
+<td><code>dpcKx</code></td>
+<td>G4double</td>
+<td>0.478 mm</td>
+<td>DPC k coefficient for x</td>
+</tr>
+<tr>
+<td><code>dpcKy</code></td>
+<td>G4double</td>
+<td>0.471 mm</td>
+<td>DPC k coefficient for y</td>
+</tr>
+<tr>
+<td><code>dpcTopNPixels</code></td>
+<td>G4int</td>
+<td>4</td>
+<td>Number of pixels for DPC (always 4)</td>
+</tr>
+<tr>
+<td><code>linearBeta</code></td>
+<td>G4double</td>
+<td>0.003</td>
+<td>LinA attenuation coefficient</td>
+</tr>
+<tr>
+<td><code>emitDistanceAlpha</code></td>
+<td>G4bool</td>
+<td>false</td>
+<td>Store d_i and α_i in output</td>
+</tr>
+<tr>
+<td><code>runFitGaus1D</code></td>
+<td>G4bool</td>
+<td>true</td>
+<td>Run 1D Gaussian fitting</td>
+</tr>
+<tr>
+<td><code>runFitGaus2D</code></td>
+<td>G4bool</td>
+<td>false</td>
+<td>Run 2D Gaussian fitting</td>
+</tr>
+</tbody>
+</table>
+<h3 id="signal-models">Signal Models<a class="headerlink" href="#signal-models" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Enum Value</th>
+<th>Formula</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LogA</strong></td>
+<td><code>SignalModel::LogA</code></td>
+<td><code>w_i = α_i / ln(d_i/d₀)</code></td>
+</tr>
+<tr>
+<td><strong>LinA</strong></td>
+<td><code>SignalModel::LinA</code></td>
+<td><code>w_i = α_i × exp(-β × d_i)</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reconstruction-methods">Reconstruction Methods<a class="headerlink" href="#reconstruction-methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Enum Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LogA</strong></td>
+<td><code>ReconMethod::LogA</code></td>
+<td>Chi-square fit using LogA model</td>
+</tr>
+<tr>
+<td><strong>LinA</strong></td>
+<td><code>ReconMethod::LinA</code></td>
+<td>Chi-square fit using LinA model</td>
+</tr>
+<tr>
+<td><strong>DPC</strong></td>
+<td><code>ReconMethod::DPC</code></td>
+<td>Direct position from 4-pixel charge ratios</td>
+</tr>
+</tbody>
+</table>
+<h3 id="denominator-modes">Denominator Modes<a class="headerlink" href="#denominator-modes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Enum Value</th>
+<th>Normalization</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Neighborhood</strong></td>
+<td><code>DenominatorMode::Neighborhood</code></td>
+<td><code>F_i = w_i / Σ_all(w_n)</code></td>
+</tr>
+<tr>
+<td><strong>RowCol</strong></td>
+<td><code>DenominatorMode::RowCol</code></td>
+<td>Row: <code>Σ_row(w_n)</code>, Col: <code>Σ_col(w_n)</code></td>
+</tr>
+<tr>
+<td><strong>ChargeBlock</strong></td>
+<td><code>DenominatorMode::ChargeBlock</code></td>
+<td><code>F_i = w_i / Σ_4closest(w_n)</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="dpc-mode-behavior">DPC Mode Behavior<a class="headerlink" href="#dpc-mode-behavior" title="Permanent link">&para;</a></h3>
+<p>When <code>reconMethod = ReconMethod::DPC</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full grid storage</td>
+<td>Disabled (only 4 pixels needed)</td>
+</tr>
+<tr>
+<td>Gaussian fitting</td>
+<td>Disabled (DPC provides direct position)</td>
+</tr>
+<tr>
+<td>Signal model</td>
+<td>Uses <code>DPC_SIGNAL_MODEL</code> setting</td>
+</tr>
+</tbody>
+</table>
+<h3 id="constants-namespace-equivalents_3">Constants Namespace Equivalents<a class="headerlink" href="#constants-namespace-equivalents_3" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">namespace</span><span class="w"> </span><span class="nn">Constants</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">ReconMethod</span><span class="w"> </span><span class="n">RECON_METHOD</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ReconMethod</span><span class="o">::</span><span class="n">DPC</span><span class="p">;</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">SignalModel</span><span class="w"> </span><span class="n">DPC_SIGNAL_MODEL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SignalModel</span><span class="o">::</span><span class="n">LogA</span><span class="p">;</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">DenominatorMode</span><span class="w"> </span><span class="n">DENOMINATOR_MODE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DenominatorMode</span><span class="o">::</span><span class="n">Neighborhood</span><span class="p">;</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4bool</span><span class="w"> </span><span class="n">IS_DPC_MODE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">RECON_METHOD</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">ReconMethod</span><span class="o">::</span><span class="n">DPC</span><span class="p">);</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">DPC_KX</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.478</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">DPC_KY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.471</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4int</span><span class="w"> </span><span class="n">DPC_TOP_N_PIXELS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="n">G4double</span><span class="w"> </span><span class="n">LINEAR_CHARGE_MODEL_BETA</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.001</span><span class="p">;</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="p">}</span>
+</code></pre></div>
+<h2 id="output-control">Output Control<a class="headerlink" href="#output-control" title="Permanent link">&para;</a></h2>
+<h3 id="output-branches-by-mode">Output Branches by Mode<a class="headerlink" href="#output-branches-by-mode" title="Permanent link">&para;</a></h3>
+<p><strong>DENOMINATOR_MODE</strong> controls which branches are saved:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Branches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Neighborhood</td>
+<td>Fi, Qi, Qn, Qf</td>
+</tr>
+<tr>
+<td>RowCol</td>
+<td>FiRow, FiCol, QiRow, QiCol, QnRow, QnCol, QfRow, QfCol</td>
+</tr>
+<tr>
+<td>ChargeBlock</td>
+<td>FiBlock, QiBlock, QnBlock, QfBlock</td>
+</tr>
+</tbody>
+</table>
+<h3 id="full-grid-storage">Full Grid Storage<a class="headerlink" href="#full-grid-storage" title="Permanent link">&para;</a></h3>
+<p><strong>STORE_FULL_GRID</strong> (automatically disabled in DPC mode):</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>true</td>
+<td>Store complete detector grid arrays</td>
+</tr>
+<tr>
+<td>false</td>
+<td>Store only neighborhood data</td>
+</tr>
+</tbody>
+</table>
+<h3 id="post-processing-control">Post-Processing Control<a class="headerlink" href="#post-processing-control" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FIT_GAUS_1D</code></td>
+<td><code>!IS_DPC_MODE</code></td>
+<td>Run 1D Gaussian fitting</td>
+</tr>
+<tr>
+<td><code>FIT_GAUS_2D</code></td>
+<td>false</td>
+<td>Run 2D Gaussian fitting</td>
+</tr>
+</tbody>
+</table>
+<h2 id="runtime-configuration">Runtime Configuration<a class="headerlink" href="#runtime-configuration" title="Permanent link">&para;</a></h2>
+<h3 id="g4messenger-commands">G4Messenger Commands<a class="headerlink" href="#g4messenger-commands" title="Permanent link">&para;</a></h3>
+<p><strong>Detector Configuration</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>/ecs/detector/pixelSize &lt;value&gt; &lt;unit&gt;
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>/ecs/detector/pixelPitch &lt;value&gt; &lt;unit&gt;
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>/ecs/detector/pixelCornerOffset &lt;value&gt; &lt;unit&gt;
+</code></pre></div></p>
+<p><strong>Particle Gun Configuration</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>/ecs/gun/fixedPosition &lt;true|false&gt;
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>/ecs/gun/fixedX &lt;value&gt;
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>/ecs/gun/fixedY &lt;value&gt;
+</code></pre></div></p>
+<h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a># Set pixel pitch to 400 µm
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>/ecs/detector/pixelPitch 0.4 mm
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a># Use fixed position mode
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>/ecs/gun/fixedPosition true
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>/ecs/gun/fixedX 0.125 mm
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>/ecs/gun/fixedY 0.125 mm
+</code></pre></div>
+<h2 id="macro-commands">Macro Commands<a class="headerlink" href="#macro-commands" title="Permanent link">&para;</a></h2>
+<h3 id="standard-geant4-commands">Standard GEANT4 Commands<a class="headerlink" href="#standard-geant4-commands" title="Permanent link">&para;</a></h3>
+<p><strong>Verbosity Control</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>/control/verbose &lt;0-2&gt;
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>/run/verbose &lt;0-2&gt;
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>/event/verbose &lt;0-2&gt;
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>/tracking/verbose &lt;0-2&gt;
+</code></pre></div></p>
+<p><strong>Initialization</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>/run/initialize
+</code></pre></div></p>
+<p><strong>Particle Gun</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>/gun/particle &lt;particle_name&gt;
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>/gun/energy &lt;value&gt; &lt;unit&gt;
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>/gun/position &lt;x&gt; &lt;y&gt; &lt;z&gt; &lt;unit&gt;
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>/gun/direction &lt;dx&gt; &lt;dy&gt; &lt;dz&gt;
+</code></pre></div></p>
+<p><strong>Run Control</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>/run/beamOn &lt;nEvents&gt;
+</code></pre></div></p>
+<h3 id="example-macro-files">Example Macro Files<a class="headerlink" href="#example-macro-files" title="Permanent link">&para;</a></h3>
+<p><strong>Batch Run</strong> (<code>macros/run.mac</code>):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>/control/verbose 0
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>/run/verbose 0
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>/event/verbose 0
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>/tracking/verbose 0
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>/run/initialize
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>
+<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>/gun/particle e-
+<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a>/gun/energy 10 GeV
+<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>
+<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a>/run/beamOn 10000
+</code></pre></div></p>
+<p><strong>Position Sweep</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>/control/verbose 0
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>/run/verbose 0
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>/run/initialize
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>/gun/particle e-
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>/gun/energy 10 GeV
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a># Enable fixed position mode
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>/ecs/gun/fixedPosition true
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a># Sweep across positions
+<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>/ecs/gun/fixedX 0.0 mm
+<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>/ecs/gun/fixedY 0.0 mm
+<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>/run/beamOn 1000
+<a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>
+<a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>/ecs/gun/fixedX 0.125 mm
+<a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>/ecs/gun/fixedY 0.0 mm
+<a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a>/run/beamOn 1000
+<a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a>
+<a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a># Continue sweep...
+</code></pre></div></p>
+<p><strong>Visualization</strong> (<code>macros/vis.mac</code>):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>/vis/open OGL 800x600-0+0
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>/vis/drawVolume
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>/vis/viewer/set/viewpointVector 1 1 1
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>/vis/viewer/set/autoRefresh true
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>/vis/scene/add/trajectories smooth
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>/vis/scene/add/hits
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>/vis/scene/endOfEventAction accumulate
+</code></pre></div></p>
+<h2 id="configuration-examples">Configuration Examples<a class="headerlink" href="#configuration-examples" title="Permanent link">&para;</a></h2>
+<h3 id="high-resolution-study">High-Resolution Study<a class="headerlink" href="#high-resolution-study" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1">// In Config.hh - modify defaults</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="k">struct</span><span class="w"> </span><span class="nc">DetectorGeometry</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">pixelSize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.05</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span><span class="w">       </span><span class="c1">// Smaller pixels</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">pitch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.25</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">mm</span><span class="p">;</span><span class="w">           </span><span class="c1">// Tighter pitch</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">    </span><span class="n">G4int</span><span class="w"> </span><span class="n">neighborhoodRadius</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span><span class="w">         </span><span class="c1">// Larger neighborhood</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">    </span><span class="n">G4bool</span><span class="w"> </span><span class="n">storeFullGrid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="p">};</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="k">struct</span><span class="w"> </span><span class="nc">ReconstructionConfig</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="w">    </span><span class="n">ReconMethod</span><span class="w"> </span><span class="n">reconMethod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ReconMethod</span><span class="o">::</span><span class="n">LogA</span><span class="p">;</span><span class="w">  </span><span class="c1">// Chi-square fit</span>
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a><span class="w">    </span><span class="n">G4bool</span><span class="w"> </span><span class="n">runFitGaus1D</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a><span class="w">    </span><span class="n">G4bool</span><span class="w"> </span><span class="n">runFitGaus2D</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a><span class="p">};</span>
+</code></pre></div>
+<h3 id="fast-dpc-analysis">Fast DPC Analysis<a class="headerlink" href="#fast-dpc-analysis" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1">// In Config.hh - DPC mode (default)</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="k">struct</span><span class="w"> </span><span class="nc">ReconstructionConfig</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">    </span><span class="n">SignalModel</span><span class="w"> </span><span class="n">signalModel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SignalModel</span><span class="o">::</span><span class="n">LogA</span><span class="p">;</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">    </span><span class="n">ReconMethod</span><span class="w"> </span><span class="n">reconMethod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ReconMethod</span><span class="o">::</span><span class="n">DPC</span><span class="p">;</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">    </span><span class="c1">// Full grid and fitters automatically disabled</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="p">};</span>
+</code></pre></div>
+<h3 id="noise-study">Noise Study<a class="headerlink" href="#noise-study" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1">// In Config.hh - enhanced noise modeling</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="k">struct</span><span class="w"> </span><span class="nc">NoiseModel</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">gainSigmaMin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.02</span><span class="p">;</span><span class="w">         </span><span class="c1">// Higher min noise</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">gainSigmaMax</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.10</span><span class="p">;</span><span class="w">         </span><span class="c1">// Higher max noise</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">    </span><span class="n">G4double</span><span class="w"> </span><span class="n">noiseElectronCount</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1000.0</span><span class="p">;</span><span class="w"> </span><span class="c1">// More electronic noise</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">    </span><span class="n">G4bool</span><span class="w"> </span><span class="n">enablePositionDependence</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">    </span><span class="n">G4bool</span><span class="w"> </span><span class="n">enableCrosstalk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="p">};</span>
+</code></pre></div>
+<h2 id="changing-configuration">Changing Configuration<a class="headerlink" href="#changing-configuration" title="Permanent link">&para;</a></h2>
+<h3 id="compile-time-changes">Compile-Time Changes<a class="headerlink" href="#compile-time-changes" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Edit <code>include/Config.hh</code></li>
+<li>Modify struct defaults or <code>Constants</code> namespace values</li>
+<li>Rebuild:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nb">cd</span><span class="w"> </span>build
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span>
+</code></pre></div></li>
+</ol>
+<h3 id="runtime-changes-limited">Runtime Changes (Limited)<a class="headerlink" href="#runtime-changes-limited" title="Permanent link">&para;</a></h3>
+<p>Some parameters can be changed via G4Messenger commands before <code>/run/initialize</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>./epicChargeSharing
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>/ecs/detector/pixelPitch 0.4 mm
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>/run/initialize
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a>/run/beamOn 1000
+</code></pre></div>
+<p>Note: Most physics parameters require recompilation.</p>
+<h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
+<h3 id="reconstruction-method-selection">Reconstruction Method Selection<a class="headerlink" href="#reconstruction-method-selection" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Setting</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fast position reconstruction</td>
+<td><code>RECON_METHOD = DPC</code></td>
+</tr>
+<tr>
+<td>Best resolution (slow)</td>
+<td><code>RECON_METHOD = LogA</code></td>
+</tr>
+<tr>
+<td>Alternative attenuation</td>
+<td><code>RECON_METHOD = LinA</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="output-size-control">Output Size Control<a class="headerlink" href="#output-size-control" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Settings</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Minimal output</td>
+<td><code>STORE_FULL_GRID = false</code>, <code>DENOMINATOR_MODE = Neighborhood</code></td>
+</tr>
+<tr>
+<td>Full analysis</td>
+<td><code>STORE_FULL_GRID = true</code>, <code>emitDistanceAlpha = true</code></td>
+</tr>
+<tr>
+<td>Row/Col fitting</td>
+<td><code>DENOMINATOR_MODE = RowCol</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="noise-level-control">Noise Level Control<a class="headerlink" href="#noise-level-control" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Settings</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ideal (no noise)</td>
+<td><code>gainSigmaMin = gainSigmaMax = 0</code>, <code>noiseElectronCount = 0</code></td>
+</tr>
+<tr>
+<td>Realistic</td>
+<td>Use defaults</td>
+</tr>
+<tr>
+<td>High noise study</td>
+<td>Increase <code>gainSigmaMax</code>, <code>noiseElectronCount</code></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/tom-bleher/epicChargeSharing" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.sections", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

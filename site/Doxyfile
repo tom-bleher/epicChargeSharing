@@ -1,0 +1,119 @@
+# Doxyfile for epicChargeSharing
+# Geant4-based AC-LGAD charge sharing simulation
+
+#---------------------------------------------------------------------------
+# Project related configuration options
+#---------------------------------------------------------------------------
+
+PROJECT_NAME           = "epicChargeSharing"
+PROJECT_NUMBER         = "2.0.0"
+PROJECT_BRIEF          = "Geant4 simulation for AC-LGAD charge sharing studies"
+PROJECT_LOGO           =
+
+OUTPUT_DIRECTORY       = ../docs/html
+CREATE_SUBDIRS         = NO
+
+# Language options
+OUTPUT_LANGUAGE        = English
+BRIEF_MEMBER_DESC      = YES
+REPEAT_BRIEF           = YES
+
+#---------------------------------------------------------------------------
+# Build related configuration options
+#---------------------------------------------------------------------------
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+
+# Member sort order
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = NO
+
+#---------------------------------------------------------------------------
+# Input related configuration options
+#---------------------------------------------------------------------------
+
+INPUT                  = ../include \
+                         ../src \
+                         ../epicChargeSharing.cc \
+                         ../README.md \
+                         ../DEVELOPMENT_REPORT.md
+
+FILE_PATTERNS          = *.cc \
+                         *.hh \
+                         *.md
+
+RECURSIVE              = YES
+
+EXCLUDE                =
+EXCLUDE_PATTERNS       = */build/* \
+                         */.git/*
+
+# Use README.md as main page
+USE_MDFILE_AS_MAINPAGE = ../README.md
+
+#---------------------------------------------------------------------------
+# Source browsing options
+#---------------------------------------------------------------------------
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = YES
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+#---------------------------------------------------------------------------
+# Output options
+#---------------------------------------------------------------------------
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+HTML_COLORSTYLE_HUE    = 220
+HTML_COLORSTYLE_SAT    = 100
+HTML_COLORSTYLE_GAMMA  = 80
+HTML_DYNAMIC_SECTIONS  = YES
+GENERATE_TREEVIEW      = YES
+
+GENERATE_LATEX         = NO
+
+#---------------------------------------------------------------------------
+# Preprocessor options
+#---------------------------------------------------------------------------
+
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+SEARCH_INCLUDES        = YES
+
+PREDEFINED             = G4MULTITHREADED
+
+#---------------------------------------------------------------------------
+# Diagram options
+#---------------------------------------------------------------------------
+
+HAVE_DOT               = YES
+DOT_NUM_THREADS        = 4
+CLASS_DIAGRAMS         = YES
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+INCLUDE_GRAPH          = YES
+INCLUDED_BY_GRAPH      = YES
+CALL_GRAPH             = NO
+CALLER_GRAPH           = NO
+GRAPHICAL_HIERARCHY    = YES
+DIRECTORY_GRAPH        = YES
+DOT_IMAGE_FORMAT       = svg
+DOT_TRANSPARENT        = YES
+
+#---------------------------------------------------------------------------
+# Warning and progress options
+#---------------------------------------------------------------------------
+
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO

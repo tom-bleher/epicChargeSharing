@@ -1,0 +1,1854 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="GEANT4-based Monte Carlo simulation for charge sharing in AC-LGAD pixel detectors">
+      
+      
+        <meta name="author" content="Tom Bleher, Igor Korover">
+      
+      
+        <link rel="canonical" href="https://tom-bleher.github.io/epicChargeSharing/physics-model/">
+      
+      
+        <link rel="prev" href="../analysis-guide/">
+      
+      
+        <link rel="next" href="../architecture/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>Physics Model - epicChargeSharing</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#physics-model" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="epicChargeSharing" class="md-header__button md-logo" aria-label="epicChargeSharing" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            epicChargeSharing
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Physics Model
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tom-bleher/epicChargeSharing" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tom-bleher/epicChargeSharing
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="epicChargeSharing" class="md-nav__button md-logo" aria-label="epicChargeSharing" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    epicChargeSharing
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tom-bleher/epicChargeSharing" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tom-bleher/epicChargeSharing
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ROOT_OUTPUT_BRANCHES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output Format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Physics Model
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Physics Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ac-lgad-detector-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AC-LGAD Detector Principle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AC-LGAD Detector Principle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-an-ac-lgad" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is an AC-LGAD?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-charge-sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Charge Sharing?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#charge-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Charge Generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Charge Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ionization-in-silicon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ionization in Silicon
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-amplification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal Amplification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#total-charge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Total Charge
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#charge-sharing-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Charge Sharing Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Charge Sharing Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tornago-model-eq-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tornago Model (Eq. 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#physical-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physical Interpretation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linear-attenuation-model-lina" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear Attenuation Model (LinA)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#position-reconstruction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position Reconstruction
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Position Reconstruction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#logalina-reconstruction-chi-square-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LogA/LinA Reconstruction (Chi-Square Fit)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dpc-reconstruction-discretized-positioning-circuit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DPC Reconstruction (Discretized Positioning Circuit)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#noise-modeling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Modeling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Noise Modeling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gain-noise-multiplicative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gain Noise (Multiplicative)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#electronic-noise-additive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Electronic Noise (Additive)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coordinate-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coordinate System
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighborhood-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neighborhood Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distance-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Distance Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#angle-of-view-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Angle of View Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fraction-normalization-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fraction Normalization Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#special-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Special Values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expected-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolution-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolution Scaling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dpc-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DPC Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../NamingConventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Naming Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ac-lgad-detector-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AC-LGAD Detector Principle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AC-LGAD Detector Principle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-an-ac-lgad" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is an AC-LGAD?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-charge-sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Charge Sharing?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#charge-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Charge Generation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Charge Generation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ionization-in-silicon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ionization in Silicon
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-amplification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal Amplification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#total-charge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Total Charge
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#charge-sharing-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Charge Sharing Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Charge Sharing Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tornago-model-eq-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tornago Model (Eq. 4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#physical-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physical Interpretation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linear-attenuation-model-lina" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear Attenuation Model (LinA)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#position-reconstruction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position Reconstruction
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Position Reconstruction">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#logalina-reconstruction-chi-square-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LogA/LinA Reconstruction (Chi-Square Fit)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dpc-reconstruction-discretized-positioning-circuit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DPC Reconstruction (Discretized Positioning Circuit)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#method-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#noise-modeling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise Modeling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Noise Modeling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gain-noise-multiplicative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gain Noise (Multiplicative)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#electronic-noise-additive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Electronic Noise (Additive)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined Effect
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Details
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coordinate-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coordinate System
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighborhood-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neighborhood Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distance-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Distance Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#angle-of-view-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Angle of View Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fraction-normalization-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fraction Normalization Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#special-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Special Values
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#expected-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolution-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolution Scaling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dpc-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DPC Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="physics-model">Physics Model<a class="headerlink" href="#physics-model" title="Permanent link">&para;</a></h1>
+<p>This document describes the physics underlying the epicChargeSharing simulation, based on the AC-LGAD charge sharing model from Tornago et al. (arXiv:2007.09528).</p>
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="#ac-lgad-detector-principle">AC-LGAD Detector Principle</a></li>
+<li><a href="#charge-generation">Charge Generation</a></li>
+<li><a href="#charge-sharing-model">Charge Sharing Model</a></li>
+<li><a href="#position-reconstruction">Position Reconstruction</a></li>
+<li><a href="#noise-modeling">Noise Modeling</a></li>
+<li><a href="#implementation-details">Implementation Details</a></li>
+</ul>
+<h2 id="ac-lgad-detector-principle">AC-LGAD Detector Principle<a class="headerlink" href="#ac-lgad-detector-principle" title="Permanent link">&para;</a></h2>
+<h3 id="what-is-an-ac-lgad">What is an AC-LGAD?<a class="headerlink" href="#what-is-an-ac-lgad" title="Permanent link">&para;</a></h3>
+<p><strong>AC-LGAD</strong> (Resistive AC-Coupled Low Gain Avalanche Detector) is a silicon detector technology that combines:</p>
+<ol>
+<li><strong>Low Gain Avalanche Diode (LGAD)</strong>: Internal multiplication layer providing gain (~8-25×)</li>
+<li><strong>AC Coupling</strong>: Capacitive readout that spreads signal across multiple pads</li>
+<li><strong>Resistive Layer</strong>: Enables charge sharing between neighboring electrodes</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                    Incident Particle
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                           │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                           ▼
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    ┌──────────────────────────────────────────┐
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    │           Metal Pads (Al)                │  ← Readout electrodes
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    ├──────────────────────────────────────────┤
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    │        Resistive n+ Layer                │  ← Charge spreading
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    ├──────────────────────────────────────────┤
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    │           p-type Bulk                    │  ← Active volume
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    ├──────────────────────────────────────────┤
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    │         Multiplication Layer             │  ← Gain (~20×)
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    ├──────────────────────────────────────────┤
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    │           p+ Substrate                   │
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    └──────────────────────────────────────────┘
+</code></pre></div>
+<h3 id="why-charge-sharing">Why Charge Sharing?<a class="headerlink" href="#why-charge-sharing" title="Permanent link">&para;</a></h3>
+<p>In AC-LGADs, the signal induced on a metal pad depends on:</p>
+<ul>
+<li>Distance from the hit position to the pad</li>
+<li>Solid angle subtended by the pad</li>
+<li>Resistive layer properties</li>
+</ul>
+<p>This allows <strong>sub-pixel position resolution</strong> by analyzing charge ratios.</p>
+<h2 id="charge-generation">Charge Generation<a class="headerlink" href="#charge-generation" title="Permanent link">&para;</a></h2>
+<h3 id="ionization-in-silicon">Ionization in Silicon<a class="headerlink" href="#ionization-in-silicon" title="Permanent link">&para;</a></h3>
+<p>When a charged particle traverses silicon, it creates electron-hole pairs:</p>
+<div class="arithmatex">\[
+N_{\text{pairs}} = \frac{E_{\text{dep}}}{\varepsilon}
+\]</div>
+<p>Where:</p>
+<ul>
+<li><span class="arithmatex">\(E_{\text{dep}}\)</span> = Energy deposited (typically ~100 keV/µm for MIPs)</li>
+<li><span class="arithmatex">\(\varepsilon\)</span> = 3.6 eV (ionization energy in silicon)</li>
+</ul>
+<p><strong>Example</strong>: 10 GeV electron depositing 10 MeV creates ~2.8 million e-h pairs.</p>
+<h3 id="signal-amplification">Signal Amplification<a class="headerlink" href="#signal-amplification" title="Permanent link">&para;</a></h3>
+<p>The LGAD gain layer provides internal amplification:</p>
+<div class="arithmatex">\[
+N_{\text{amplified}} = N_{\text{pairs}} \times G
+\]</div>
+<p>Where:</p>
+<ul>
+<li><span class="arithmatex">\(G\)</span> = Gain factor (default: 20)</li>
+<li>Typical range: 8-25 for AC-LGADs</li>
+</ul>
+<h3 id="total-charge">Total Charge<a class="headerlink" href="#total-charge" title="Permanent link">&para;</a></h3>
+<p>The total induced charge is:</p>
+<div class="arithmatex">\[
+Q_{\text{total}} = N_{\text{amplified}} \times e = \frac{E_{\text{dep}}}{\varepsilon} \times G \times e
+\]</div>
+<p>Where <span class="arithmatex">\(e = 1.602 \times 10^{-19}\)</span> C.</p>
+<h2 id="charge-sharing-model">Charge Sharing Model<a class="headerlink" href="#charge-sharing-model" title="Permanent link">&para;</a></h2>
+<h3 id="tornago-model-eq-4">Tornago Model (Eq. 4)<a class="headerlink" href="#tornago-model-eq-4" title="Permanent link">&para;</a></h3>
+<p>The fraction of total signal amplitude on pad <span class="arithmatex">\(i\)</span> is given by:</p>
+<div class="arithmatex">\[
+F_i = \frac{\alpha_i / \ln(d_i / d_0)}{\sum_n \alpha_n / \ln(d_n / d_0)}
+\]</div>
+<p>Where:</p>
+<ul>
+<li><span class="arithmatex">\(F_i\)</span> = Signal fraction on pad <span class="arithmatex">\(i\)</span> (normalized: <span class="arithmatex">\(\sum F_i = 1\)</span>)</li>
+<li><span class="arithmatex">\(\alpha_i\)</span> = Angle of view of pad <span class="arithmatex">\(i\)</span> from the hit position</li>
+<li><span class="arithmatex">\(d_i\)</span> = Distance from hit to pad <span class="arithmatex">\(i\)</span> (to nearest edge)</li>
+<li><span class="arithmatex">\(d_0\)</span> = Transverse hit size (characteristic length, ~1 µm)</li>
+</ul>
+<h3 id="physical-interpretation">Physical Interpretation<a class="headerlink" href="#physical-interpretation" title="Permanent link">&para;</a></h3>
+<p><strong>Angle of View (<span class="arithmatex">\(\alpha_i\)</span>)</strong>: The solid angle subtended by the pad:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>           ┌────────────┐
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>           │   Pad i    │
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>           └──────┬─────┘
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                  │ αᵢ
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>                  │/
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>            ──────●────── Hit position
+</code></pre></div>
+<p><strong>Distance Dependence</strong>: The logarithmic term <span class="arithmatex">\(\ln(d_i/d_0)\)</span> models the attenuation of the induced signal with distance. Pads closer to the hit receive more signal.</p>
+<h3 id="linear-attenuation-model-lina">Linear Attenuation Model (LinA)<a class="headerlink" href="#linear-attenuation-model-lina" title="Permanent link">&para;</a></h3>
+<p>An alternative model uses exponential attenuation (Tornago Eq. 6):</p>
+<div class="arithmatex">\[
+w_i = \alpha_i \times \exp(-\beta \times d_i)
+\]</div>
+<p>Where <span class="arithmatex">\(\beta\)</span> = Attenuation coefficient (default: 0.001-0.003 µm⁻¹).</p>
+<p>The LinA model may better describe certain detector geometries.</p>
+<h2 id="position-reconstruction">Position Reconstruction<a class="headerlink" href="#position-reconstruction" title="Permanent link">&para;</a></h2>
+<h3 id="logalina-reconstruction-chi-square-fit">LogA/LinA Reconstruction (Chi-Square Fit)<a class="headerlink" href="#logalina-reconstruction-chi-square-fit" title="Permanent link">&para;</a></h3>
+<p>For LogA and LinA methods, position is reconstructed by minimizing:</p>
+<div class="arithmatex">\[
+\chi^2 = \sum_i \frac{(F_i^{\text{measured}} - F_i^{\text{model}}(x,y))^2}{\sigma_i^2}
+\]</div>
+<p><strong>Process</strong>:</p>
+<ol>
+<li>Measure charge fractions <span class="arithmatex">\(F_i\)</span> on each pad</li>
+<li>Scan candidate positions <span class="arithmatex">\((x, y)\)</span></li>
+<li>Calculate model fractions <span class="arithmatex">\(F_i^{\text{model}}\)</span> at each position</li>
+<li>Find <span class="arithmatex">\((x, y)\)</span> that minimizes <span class="arithmatex">\(\chi^2\)</span></li>
+</ol>
+<h3 id="dpc-reconstruction-discretized-positioning-circuit">DPC Reconstruction (Discretized Positioning Circuit)<a class="headerlink" href="#dpc-reconstruction-discretized-positioning-circuit" title="Permanent link">&para;</a></h3>
+<p>DPC uses only the <strong>4 closest pads</strong> to the hit position (Tornago Section 3.4):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>          │ Pad 1 │ Pad 2 │
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>          ├───────┼───────┤
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>          │ Pad 3 │●Pad 4 │  ← Hit near Pad 4
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>          └───────┴───────┘
+</code></pre></div>
+<p><strong>Position calculation</strong>:</p>
+<div class="arithmatex">\[
+x_{\text{reco}} = x_{\text{centroid}} + k_x \times R_x
+\]</div>
+<div class="arithmatex">\[
+y_{\text{reco}} = y_{\text{centroid}} + k_y \times R_y
+\]</div>
+<p>Where:</p>
+<ul>
+<li><span class="arithmatex">\(x_{\text{centroid}}\)</span>, <span class="arithmatex">\(y_{\text{centroid}}\)</span> = Center of the 4-pad block</li>
+<li><span class="arithmatex">\(k_x\)</span>, <span class="arithmatex">\(k_y\)</span> = Calibration constants</li>
+<li><span class="arithmatex">\(R_x\)</span>, <span class="arithmatex">\(R_y\)</span> = Charge imbalance ratios</li>
+</ul>
+<p><strong>Charge ratios</strong>:</p>
+<div class="arithmatex">\[
+R_x = \frac{(Q_2 + Q_4) - (Q_1 + Q_3)}{Q_1 + Q_2 + Q_3 + Q_4}
+\]</div>
+<div class="arithmatex">\[
+R_y = \frac{(Q_1 + Q_2) - (Q_3 + Q_4)}{Q_1 + Q_2 + Q_3 + Q_4}
+\]</div>
+<h3 id="method-comparison">Method Comparison<a class="headerlink" href="#method-comparison" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Speed</th>
+<th>Resolution</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LogA</strong></td>
+<td>Slow (fitting)</td>
+<td>Best</td>
+<td>High-precision studies</td>
+</tr>
+<tr>
+<td><strong>LinA</strong></td>
+<td>Slow (fitting)</td>
+<td>Good</td>
+<td>Alternative attenuation</td>
+</tr>
+<tr>
+<td><strong>DPC</strong></td>
+<td>Fast (direct)</td>
+<td>Good</td>
+<td>Real-time reconstruction</td>
+</tr>
+</tbody>
+</table>
+<h2 id="noise-modeling">Noise Modeling<a class="headerlink" href="#noise-modeling" title="Permanent link">&para;</a></h2>
+<h3 id="gain-noise-multiplicative">Gain Noise (Multiplicative)<a class="headerlink" href="#gain-noise-multiplicative" title="Permanent link">&para;</a></h3>
+<p>Each pixel has intrinsic gain variations:</p>
+<div class="arithmatex">\[
+Q_{\text{noisy}} = Q_{\text{ideal}} \times (1 + \mathcal{N}(0, \sigma_{\text{gain}}))
+\]</div>
+<p>Where:</p>
+<ul>
+<li><span class="arithmatex">\(\sigma_{\text{gain}}\)</span> = Per-pixel gain noise (randomly assigned between 1-5%)</li>
+<li>Different pixels have different noise levels</li>
+</ul>
+<h3 id="electronic-noise-additive">Electronic Noise (Additive)<a class="headerlink" href="#electronic-noise-additive" title="Permanent link">&para;</a></h3>
+<p>Electronic readout noise adds Gaussian fluctuations:</p>
+<div class="arithmatex">\[
+Q_{\text{final}} = Q_{\text{noisy}} + \mathcal{N}(0, \sigma_{\text{electronic}})
+\]</div>
+<p>Where:</p>
+<ul>
+<li><span class="arithmatex">\(\sigma_{\text{electronic}} = N_{\text{electrons}} \times e\)</span></li>
+<li>Default: 500 electrons (~80 fC)</li>
+</ul>
+<h3 id="combined-effect">Combined Effect<a class="headerlink" href="#combined-effect" title="Permanent link">&para;</a></h3>
+<div class="arithmatex">\[
+Q_{\text{final}} = \max(0, Q_{\text{ideal}} \times (1 + \delta_{\text{gain}}) + \delta_{\text{electronic}})
+\]</div>
+<p>The <span class="arithmatex">\(\max(0, \ldots)\)</span> ensures non-negative charges (physical constraint).</p>
+<h2 id="implementation-details">Implementation Details<a class="headerlink" href="#implementation-details" title="Permanent link">&para;</a></h2>
+<h3 id="coordinate-system">Coordinate System<a class="headerlink" href="#coordinate-system" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>              Y
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>              ↑
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>              │
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        ──────┼────── X
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>              │
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    Pixel (0,0) at corner offset from detector edge
+</code></pre></div>
+<p><strong>Pixel center coordinates</strong>:</p>
+<div class="arithmatex">\[
+x_i = \text{pixelCornerOffset} + i \times \text{pitch}
+\]</div>
+<div class="arithmatex">\[
+y_j = \text{pixelCornerOffset} + j \times \text{pitch}
+\]</div>
+<h3 id="neighborhood-definition">Neighborhood Definition<a class="headerlink" href="#neighborhood-definition" title="Permanent link">&para;</a></h3>
+<p>For neighborhood radius <span class="arithmatex">\(r\)</span>, the grid is <span class="arithmatex">\((2r+1) \times (2r+1)\)</span>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>    r = 2 → 5×5 grid (25 pixels)
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    ┌───┬───┬───┬───┬───┐
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    │-2 │-2 │-2 │-2 │-2 │  Row offset from center
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    │-2 │-1 │ 0 │+1 │+2 │  Column offset
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    ├───┼───┼───┼───┼───┤
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    │   │   │   │   │   │
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    ├───┼───┼───┼───┼───┤
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    │   │   │ ● │   │   │  ← Center (nearest pixel)
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    ├───┼───┼───┼───┼───┤
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    │   │   │   │   │   │
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    ├───┼───┼───┼───┼───┤
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    │   │   │   │   │   │
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    └───┴───┴───┴───┴───┘
+</code></pre></div>
+<h3 id="distance-calculation">Distance Calculation<a class="headerlink" href="#distance-calculation" title="Permanent link">&para;</a></h3>
+<p>Distance from hit position to pixel <span class="arithmatex">\(i\)</span>:</p>
+<div class="arithmatex">\[
+d_i = \sqrt{(\Delta x)^2 + (\Delta y)^2}
+\]</div>
+<p>Where <span class="arithmatex">\(\Delta x = x_{\text{hit}} - x_{\text{pixel},i}\)</span> and <span class="arithmatex">\(\Delta y = y_{\text{hit}} - y_{\text{pixel},i}\)</span>.</p>
+<p>Clamped to avoid singularity: <span class="arithmatex">\(d_i = \max(d_i, d_0 \times \text{guardFactor})\)</span></p>
+<h3 id="angle-of-view-calculation">Angle of View Calculation<a class="headerlink" href="#angle-of-view-calculation" title="Permanent link">&para;</a></h3>
+<p>Solid angle approximation for rectangular pads:</p>
+<div class="arithmatex">\[
+\alpha_i \approx \frac{w_{\text{pixel}} \times h_{\text{pixel}}}{4\pi \times d_i^2}
+\]</div>
+<p>For more accurate calculation at close range:</p>
+<div class="arithmatex">\[
+\alpha_i = \arctan\left(\frac{\text{pixelSize}/2}{d_i}\right)
+\]</div>
+<h3 id="fraction-normalization-modes">Fraction Normalization Modes<a class="headerlink" href="#fraction-normalization-modes" title="Permanent link">&para;</a></h3>
+<p><strong>Neighborhood Mode</strong>:</p>
+<div class="arithmatex">\[
+F_i = \frac{w_i}{\sum_{\text{neighborhood}} w_n}
+\]</div>
+<p><strong>Row/Column Mode</strong> (for 1D fitting):</p>
+<div class="arithmatex">\[
+F_i^{\text{row}} = \frac{w_i}{\sum_{\text{same row}} w_n}, \quad F_i^{\text{col}} = \frac{w_i}{\sum_{\text{same col}} w_n}
+\]</div>
+<p><strong>Block Mode</strong> (for DPC):</p>
+<div class="arithmatex">\[
+F_i^{\text{block}} = \frac{w_i}{\sum_{\text{4 closest}} w_n}
+\]</div>
+<h3 id="special-values">Special Values<a class="headerlink" href="#special-values" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-999.0</code></td>
+<td>Out-of-bounds or invalid fraction</td>
+</tr>
+<tr>
+<td><code>NaN</code></td>
+<td>Uninitialized value</td>
+</tr>
+<tr>
+<td><code>-1</code></td>
+<td>Invalid pixel ID/index</td>
+</tr>
+</tbody>
+</table>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<h3 id="expected-behavior">Expected Behavior<a class="headerlink" href="#expected-behavior" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Central pixel</strong>: Highest charge fraction (~30-50% for typical geometry)</li>
+<li><strong>Adjacent pixels</strong>: Significant signal (~10-20%)</li>
+<li><strong>Distant pixels</strong>: Small but non-zero signal</li>
+<li><strong>Sum of fractions</strong>: Exactly 1.0 (by construction)</li>
+</ol>
+<h3 id="resolution-scaling">Resolution Scaling<a class="headerlink" href="#resolution-scaling" title="Permanent link">&para;</a></h3>
+<p>Theoretical position resolution scales as:</p>
+<div class="arithmatex">\[
+\sigma_{\text{position}} \propto \frac{\text{pitch}}{\text{SNR}}
+\]</div>
+<p>Where:</p>
+<ul>
+<li>pitch = Pixel pitch (default: 500 µm)</li>
+<li>SNR = Signal-to-noise ratio</li>
+</ul>
+<h3 id="dpc-resolution">DPC Resolution<a class="headerlink" href="#dpc-resolution" title="Permanent link">&para;</a></h3>
+<p>For DPC reconstruction:</p>
+<div class="arithmatex">\[
+\sigma_{\text{DPC}} \approx \frac{\text{pitch}}{4 \times \text{SNR}}
+\]</div>
+<p>Typical: ~10-50 µm for standard AC-LGAD configurations.</p>
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Tornago et al.</strong> "Resistive AC-Coupled Silicon Detectors: principles of operation and first results from a combined analysis of beam test and laser data," <a href="https://arxiv.org/abs/2007.09528">arXiv:2007.09528</a> (2021).</p>
+</li>
+<li>
+<p><strong>LGAD Collaboration</strong> papers on AC-LGAD development and characterization.</p>
+</li>
+<li>
+<p><strong>GEANT4 Physics Reference Manual</strong> for particle transport in silicon.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/tom-bleher/epicChargeSharing" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.sections", "navigation.top", "search.highlight", "content.code.copy"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
