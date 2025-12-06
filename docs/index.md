@@ -1,21 +1,21 @@
 # epicChargeSharing
 
-GEANT4-based Monte Carlo simulation for studying spatial charge sharing in AC-LGAD pixel detectors.
+GEANT4-based Monte Carlo simulation for studying charge sharing in AC-LGAD pixel detectors.
 
 ---
 
 ## Overview
 
-**epicChargeSharing** simulates how charge from particle interactions distributes across neighboring pixels in segmented AC-LGAD (Resistive AC-Coupled Low Gain Avalanche Detectors) sensors. It implements the analytical model from [Tornago et al. (arXiv:2007.09528)](https://arxiv.org/abs/2007.09528).
+**epicChargeSharing** simulates charge distribution across neighboring pixels in AC-LGAD (Resistive AC-Coupled Low Gain Avalanche Detector) sensors. It implements the analytical model from [Tornago et al. (arXiv:2007.09528)](https://arxiv.org/abs/2007.09528).
 
 ## Features
 
-- **Physics-based model** — Implements peer-reviewed Tornago charge sharing model
-- **Multiple reconstruction methods** — LogA, LinA, and DPC algorithms
-- **ROOT integration** — Comprehensive TTree output with metadata
-- **Multithreaded** — Native GEANT4 parallel processing
-- **Configurable** — Modular geometry, physics, and noise parameters
-- **Analysis tools** — Python scripts and ROOT macros included
+- **Physics-based model**: Implements the peer-reviewed Tornago charge sharing model
+- **Multiple reconstruction methods**: LogA, LinA, and DPC algorithms
+- **ROOT integration**: Comprehensive TTree output with metadata
+- **Multithreaded**: Native GEANT4 parallel processing
+- **Configurable**: Modular geometry, physics, and noise parameters
+- **Analysis tools**: Python scripts and ROOT macros included
 
 ---
 
@@ -52,8 +52,8 @@ Output: `epicChargeSharing.root`
 
 | Method | Description | Speed |
 |--------|-------------|-------|
-| **LogA** | Logarithmic attenuation model | Slow |
-| **LinA** | Linear attenuation model | Slow |
+| **LogA** | Logarithmic attenuation model | Slower |
+| **LinA** | Linear attenuation model | Slower |
 | **DPC** | Discretized Positioning Circuit | Fast |
 
 The charge fraction on pixel $i$ follows:
@@ -75,7 +75,7 @@ $$
 }
 ```
 
-**Reference:** M. Tornago et al., [arXiv:2007.09528](https://arxiv.org/abs/2007.09528)
+**Reference**: M. Tornago et al., [arXiv:2007.09528](https://arxiv.org/abs/2007.09528)
 
 ---
 
