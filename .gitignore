@@ -43,6 +43,10 @@ cmake_install.cmake
 # Root files
 *.root
 
+# ROOT ACLiC compiled files
+*_C.d
+*_rdict.pcm
+
 *.venv/
 
 # Editor/IDE specific files
