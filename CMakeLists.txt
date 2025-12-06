@@ -159,6 +159,25 @@ endforeach()
 
 include(${Geant4_USE_FILE})
 
+# ============================================================================
+# EDM4hep Support (optional)
+# ============================================================================
+option(WITH_EDM4HEP "Enable EDM4hep output format for EICrecon compatibility" OFF)
+
+if(WITH_EDM4HEP)
+    # Find PODIO (EDM4hep's I/O backend)
+    find_package(podio 1.0 REQUIRED)
+    message(STATUS "PODIO version: ${podio_VERSION}")
+
+    # Find EDM4hep
+    find_package(EDM4HEP REQUIRED)
+    message(STATUS "EDM4HEP version: ${EDM4HEP_VERSION}")
+
+    message(STATUS "EDM4hep output: ENABLED")
+else()
+    message(STATUS "EDM4hep output: DISABLED (use -DWITH_EDM4HEP=ON to enable)")
+endif()
+
 # Consolidate project sources
 set(epicChargeSharing_sources
     ${PROJECT_SOURCE_DIR}/src/ActionInitialization.cc
@@ -171,6 +190,7 @@ set(epicChargeSharing_sources
     ${PROJECT_SOURCE_DIR}/src/SteppingAction.cc
     ${PROJECT_SOURCE_DIR}/src/RootHelpers.cc
     ${PROJECT_SOURCE_DIR}/src/RootIO.cc
+    ${PROJECT_SOURCE_DIR}/src/EDM4hepIO.cc
     # ${PROJECT_SOURCE_DIR}/src/RNTupleIO.cc  # Disabled due to ROOT version incompatibility
 )
 
@@ -193,7 +213,15 @@ target_link_libraries(epicChargeSharing
         Threads::Threads
         ${ROOT_LIB_TARGETS}
         Eigen3::Eigen
+        $<$<BOOL:${WITH_EDM4HEP}>:podio::podio>
+        $<$<BOOL:${WITH_EDM4HEP}>:podio::podioRootIO>
+        $<$<BOOL:${WITH_EDM4HEP}>:EDM4HEP::edm4hep>
 )
+
+# Add EDM4hep compile definition if enabled
+if(WITH_EDM4HEP)
+    target_compile_definitions(epicChargeSharing PRIVATE WITH_EDM4HEP)
+endif()
 
 if(_project_compile_options)
     target_compile_options(epicChargeSharing PRIVATE ${_project_compile_options})
@@ -242,11 +270,11 @@ add_custom_target(performance
     COMMENT "Building with maximum performance optimizations"
 )
 
-# Print summary of multithreading capabilities
-message(STATUS "=== MULTITHREADING SUMMARY ===")
+# Print summary of build configuration
+message(STATUS "=== BUILD CONFIGURATION SUMMARY ===")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Geant4 MT support: ${Geant4_multithreaded_FOUND}")
 message(STATUS "Threading library: ${CMAKE_THREAD_LIBS_INIT}")
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     message(STATUS "Performance optimizations: ENABLED")
     if(LTO_SUPPORTED)
@@ -257,7 +285,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 else()
     message(STATUS "Performance optimizations: DISABLED (Debug build)")
 endif()
-message(STATUS "==============================")
+if(WITH_EDM4HEP)
+    message(STATUS "EDM4hep output: ENABLED (PODIO ${podio_VERSION}, EDM4HEP ${EDM4HEP_VERSION})")
+else()
+    message(STATUS "EDM4hep output: DISABLED")
+endif()
+message(STATUS "===================================")
 
 # ============================================================================
 # Testing Support (optional)

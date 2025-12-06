@@ -11,6 +11,8 @@
 
 #include "G4Event.hh"
 #include "G4GenericMessenger.hh"
+#include "G4Run.hh"
+#include "G4RunManager.hh"
 #include "G4StateManager.hh"
 #include "G4HCofThisEvent.hh"
 #include "G4SDManager.hh"
@@ -176,7 +178,13 @@ void EventAction::EndOfEventAction(const G4Event* event)
         record.fullGridCols = record.geometry.nCols;
     }
 
-    fRunAction->FillTree(record);
+    // Get event and run IDs for EDM4hep output
+    const std::uint64_t eventId = event ? static_cast<std::uint64_t>(event->GetEventID()) : 0;
+    const G4int runId = G4RunManager::GetRunManager()->GetCurrentRun()
+                            ? G4RunManager::GetRunManager()->GetCurrentRun()->GetRunID()
+                            : 0;
+
+    fRunAction->FillTree(record, eventId, runId);
 }
 
 const G4ThreeVector& EventAction::DetermineHitPosition() const

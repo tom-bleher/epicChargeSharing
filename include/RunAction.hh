@@ -12,12 +12,14 @@
 
 #include "ChargeSharingCalculator.hh"
 #include "Config.hh"
+#include "EDM4hepIO.hh"
 #include "NeighborhoodUtils.hh"
 #include "RootIO.hh"
 #include "G4Run.hh"
 #include "G4UserRunAction.hh"
 #include "globals.hh"
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -89,7 +91,11 @@ public:
     void SetGridPixelCenters(const std::vector<G4ThreeVector>& centers);
     void ConfigureFullFractionBranch(G4bool enable);
 
-    void FillTree(const EventRecord& record);
+    void FillTree(const EventRecord& record, std::uint64_t eventNumber = 0, G4int runNumber = 0);
+
+    // EDM4hep output control
+    void SetEDM4hepEnabled(G4bool enabled);
+    G4bool IsEDM4hepEnabled() const;
 
 private:
     struct ThreadContext
@@ -232,6 +238,11 @@ private:
     G4int fNearestPixelJ{-1};
     G4int fNearestPixelGlobalId{-1};
     G4int fFullGridSide{0};
+
+    // EDM4hep output support
+    std::unique_ptr<IO::EDM4hepWriter> fEDM4hepWriter;
+    IO::EDM4hepConfig fEDM4hepConfig;
+    G4bool fWriteEDM4hep{true};
 };
 
 } // namespace ECS

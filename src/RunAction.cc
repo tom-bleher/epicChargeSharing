@@ -65,7 +65,9 @@ RunAction::RunAction()
       fStoreFullFractions(Constants::STORE_FULL_GRID),
       fNearestPixelI(-1),
       fNearestPixelJ(-1),
-      fNearestPixelGlobalId(-1)
+      fNearestPixelGlobalId(-1),
+      fEDM4hepWriter(IO::MakeEDM4hepWriter()),
+      fWriteEDM4hep(true)
 {
 }
 
@@ -332,6 +334,24 @@ void RunAction::InitializeRootOutputs(const ThreadContext& context, const G4Stri
     if (fStoreFullFractions) {
         ConfigureFullFractionBranch(true);
     }
+
+    // Initialize EDM4hep output if enabled
+    if (fWriteEDM4hep && fEDM4hepWriter) {
+        // Derive EDM4hep filename from ROOT filename
+        std::string edm4hepFileName = fileName;
+        const std::size_t dotPos = edm4hepFileName.rfind('.');
+        if (dotPos != std::string::npos) {
+            edm4hepFileName = edm4hepFileName.substr(0, dotPos);
+        }
+        edm4hepFileName += ".edm4hep.root";
+
+        fEDM4hepConfig.filename = edm4hepFileName;
+        fEDM4hepWriter->Configure(fEDM4hepConfig);
+        if (!fEDM4hepWriter->Open(edm4hepFileName)) {
+            G4cout << "[RunAction] Warning: Failed to open EDM4hep file " << edm4hepFileName
+                   << ". EDM4hep output disabled for this run." << G4endl;
+        }
+    }
 }
 
 void RunAction::ConfigureCoreBranches(TTree* tree)
@@ -404,6 +424,11 @@ void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* 
                         FatalException,
                         "SafeWriteRootFile() reported failure.");
         }
+    }
+
+    // Close EDM4hep output
+    if (fEDM4hepWriter && fEDM4hepWriter->IsOpen()) {
+        fEDM4hepWriter->Close();
     }
 
     CleanupRootObjects();
@@ -943,7 +968,7 @@ ECS::IO::MetadataPublisher::EntryList RunAction::CollectMetadataEntries() const
     return BuildMetadataPublisher().CollectEntries();
 }
 
-void RunAction::FillTree(const EventRecord& record)
+void RunAction::FillTree(const EventRecord& record, std::uint64_t eventNumber, G4int runNumber)
 {
     auto treeLock = MakeTreeLock();
     auto* tree = GetTree();
@@ -971,4 +996,23 @@ void RunAction::FillTree(const EventRecord& record)
                     FatalException,
                     "TTree::Fill() reported an error.");
     }
+
+    // Write to EDM4hep output if enabled
+    if (fWriteEDM4hep && fEDM4hepWriter && fEDM4hepWriter->IsOpen()) {
+        fEDM4hepWriter->WriteEvent(record, eventNumber, runNumber);
+    }
+}
+
+void RunAction::SetEDM4hepEnabled(G4bool enabled)
+{
+    fWriteEDM4hep = enabled;
+    if (fEDM4hepWriter) {
+        fEDM4hepConfig.enabled = enabled;
+        fEDM4hepWriter->Configure(fEDM4hepConfig);
+    }
+}
+
+G4bool RunAction::IsEDM4hepEnabled() const
+{
+    return fWriteEDM4hep && fEDM4hepWriter && fEDM4hepWriter->IsEnabled();
 }
