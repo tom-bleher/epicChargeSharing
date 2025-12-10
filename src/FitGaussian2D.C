@@ -39,9 +39,109 @@
 #include <ROOT/RNTupleImporter.hxx>
 
 #include "ChargeUtils.h"
-#include "RootHelpers.hh"
 
+// ============================================================================
+// Branch utilities (inline to avoid Geant4 dependency from RootHelpers.hh)
+// ============================================================================
+namespace rootutils {
+
+struct BranchInfo {
+    const char* name;
+    double* value;
+    bool enabled;
+    TBranch** handle;
+    const char* leaflist = nullptr;
+};
+
+inline TBranch* EnsureAndResetBranch(TTree* tree, const BranchInfo& info) {
+    if (!tree || !info.name || !info.value || !info.handle) {
+        return nullptr;
+    }
+
+    TBranch* branch = tree->GetBranch(info.name);
+    if (!branch) {
+        // Branch doesn't exist - create it
+        branch = info.leaflist ? tree->Branch(info.name, info.value, info.leaflist)
+                               : tree->Branch(info.name, info.value);
+    } else {
+        // Branch exists - set address and clear for overwrite
+        tree->SetBranchAddress(info.name, info.value);
+        branch = tree->GetBranch(info.name);
+        if (branch) {
+            branch->Reset();        // Clear previous entries
+            branch->DropBaskets();  // Drop old baskets to avoid mixing
+        }
+    }
+    tree->SetBranchStatus(info.name, 1);
+    return branch;
+}
+
+inline void RegisterBranches(TTree* tree, std::vector<BranchInfo>& branches) {
+    if (!tree) return;
+    for (auto& info : branches) {
+        if (info.enabled && info.handle) {
+            *info.handle = EnsureAndResetBranch(tree, info);
+        }
+    }
+}
+
+inline void FillBranches(const std::vector<BranchInfo>& branches) {
+    for (const auto& info : branches) {
+        if (info.enabled && info.handle && *info.handle) {
+            (*info.handle)->Fill();
+        }
+    }
+}
+
+} // namespace rootutils
+
+// ============================================================================
+// Helper functions for metadata/radius inference
+// ============================================================================
 namespace {
+
+int inferRadiusFromTree(TTree* tree, const std::string& preferredBranch) {
+    if (!tree) {
+        return -1;
+    }
+    std::vector<double>* charges = nullptr;
+    auto bind = [&](const char* branch) -> bool {
+        if (!branch || tree->GetBranch(branch) == nullptr) {
+            return false;
+        }
+        tree->SetBranchStatus(branch, 1);
+        tree->SetBranchAddress(branch, &charges);
+        return true;
+    };
+    bool bound = false;
+    if (!preferredBranch.empty() && bind(preferredBranch.c_str())) {
+        bound = true;
+    } else if (bind("Q_f")) {
+        bound = true;
+    } else if (bind("F_i")) {
+        bound = true;
+    } else if (bind("Q_i")) {
+        bound = true;
+    }
+    if (!bound) {
+        return -1;
+    }
+    const Long64_t nEntries = std::min<Long64_t>(tree->GetEntries(), 50000);
+    int inferredRadius = -1;
+    for (Long64_t i = 0; i < nEntries; ++i) {
+        tree->GetEntry(i);
+        if (!charges || charges->empty()) continue;
+        const int total = static_cast<int>(charges->size());
+        const int N = static_cast<int>(std::lround(std::sqrt(static_cast<double>(total))));
+        if (N >= 3 && N * N == total) {
+            inferredRadius = (N - 1) / 2;
+            break;
+        }
+    }
+    tree->ResetBranchAddresses();
+    return inferredRadius;
+}
+
   // 2D Gaussian with constant offset:
   // A * exp(-0.5 * ((x-mux)^2/sigx^2 + (y-muy)^2/sigy^2)) + B
   double Gauss2DPlusB(double* xy, double* p) {
@@ -180,15 +280,21 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
     return 2;
   }
   
-  // Decide which charge branch to use
-  std::string chosenCharge = (chargeBranch && chargeBranch[0] != '\0') ? std::string(chargeBranch) : std::string("Q_f");
+  // Decide which charge branch to use (check multiple naming conventions)
+  std::string chosenCharge = (chargeBranch && chargeBranch[0] != '\0') ? std::string(chargeBranch) : std::string("");
   auto hasBranch = [&](const char* b){ return tree->GetBranch(b) != nullptr; };
-  if (!hasBranch(chosenCharge.c_str())) {
-    if (hasBranch("Q_f")) chosenCharge = "Q_f";
-    else if (hasBranch("F_i")) chosenCharge = "F_i";
-    else if (hasBranch("Q_i")) chosenCharge = "Q_i";
-    else {
-      ::Error("FitGaussian2D", "No charge branch found (requested '%s'). Tried Q_f, F_i, Q_i.", chargeBranch ? chargeBranch : "<null>");
+  if (chosenCharge.empty() || !hasBranch(chosenCharge.c_str())) {
+    // Try standard names first, then Block/Row/Col suffix variants
+    for (const char* name : {"Qf", "QfBlock", "QfRow", "QfCol",
+                             "Q_f", "Fi", "FiBlock", "FiRow", "FiCol",
+                             "F_i", "Qi", "QiBlock", "QiRow", "QiCol", "Q_i"}) {
+      if (hasBranch(name)) {
+        chosenCharge = name;
+        break;
+      }
+    }
+    if (chosenCharge.empty()) {
+      ::Error("FitGaussian2D", "No charge branch found. Tried Qf/Fi/Qi variants.");
       file->Close();
       return 4;
     }
@@ -352,7 +458,7 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
   // Suppress expected Minuit2 error spam during Fumili2 attempts; we'll fallback to MIGRAD if needed
   const int prevErrorLevel_FitGaussian2D = gErrorIgnoreLevel;
   gErrorIgnoreLevel = kFatal;
-  exec.Foreach([&](int i){
+  exec.Foreach([&, verticalErrorsEnabled](int i){
     const bool isPix = v_is_pixel[i] != 0;
     const auto &QLoc = v_Q[i];
     if (isPix || QLoc.empty()) {
@@ -480,7 +586,9 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
     double syInitMoment = sigmaSeed2D(false);
 
     // Low-contrast: output centroid and seed parameters instead of NaNs
-    if (A0 < 1e-6) {
+    // Use relative threshold: skip fitting only if amplitude is tiny relative to max charge
+    const double lowContrastThreshold = std::max(1e-30, qmaxNeighborhood * 1e-6);
+    if (A0 < lowContrastThreshold) {
       double wsum = 0.0, xw = 0.0, yw = 0.0;
       for (int k = 0; k < g2d.GetN(); ++k) {
         const double w = std::max(0.0, g2d.GetZ()[k] - B0);
@@ -665,16 +773,14 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
       out_sigx[i] = params[3];
       out_sigy[i] = params[4];
       out_B[i]    = params[5];
-      // Only store chi2/ndf/prob when vertical uncertainties are enabled
-      if (verticalErrorsEnabled) {
-        out_chi2[i] = chi2Calc;
-        if (ndfCalc > 0) {
-          out_ndf[i]  = static_cast<double>(ndfCalc);
-          out_prob[i] = TMath::Prob(chi2Calc, ndfCalc);
-        } else {
-          out_ndf[i]  = INVALID_VALUE;
-          out_prob[i] = INVALID_VALUE;
-        }
+      // Always store chi2/ndf/prob
+      out_chi2[i] = chi2Calc;
+      if (ndfCalc > 0) {
+        out_ndf[i]  = static_cast<double>(ndfCalc);
+        out_prob[i] = TMath::Prob(chi2Calc, ndfCalc);
+      } else {
+        out_ndf[i]  = INVALID_VALUE;
+        out_prob[i] = INVALID_VALUE;
       }
       const double xr = out_mux[i];
       const double yr = out_muy[i];
@@ -711,6 +817,7 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
   }, indices);
   // Restore previous error level
   gErrorIgnoreLevel = prevErrorLevel_FitGaussian2D;
+
 
   // Sequentially write outputs
   for (Long64_t i = 0; i < nEntries; ++i) {
