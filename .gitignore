@@ -2,7 +2,8 @@
 build/
 geant4_env/
 
-# MkDocs generated site (build with mkdocs build)
+# MkDocs documentation (not yet ready for public)
+docs/
 site/
 
 # Compiled Object files
