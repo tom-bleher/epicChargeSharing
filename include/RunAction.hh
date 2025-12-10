@@ -198,7 +198,7 @@ private:
     G4int fGridNeighborhoodRadius{0};
 
     Constants::PosReconModel fPosReconModel;
-    Constants::DenominatorMode fDenominatorMode{Constants::DENOMINATOR_MODE};
+    Constants::ActivePixelMode fActivePixelMode{Constants::ACTIVE_PIXEL_MODE};
     G4double fChargeSharingBeta;
     G4double fChargeSharingPitch;
     G4bool fEmitDistanceAlphaMeta{false};

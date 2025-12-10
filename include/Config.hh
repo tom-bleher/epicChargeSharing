@@ -22,7 +22,7 @@ namespace Constants {
 //   DPC    - Discretized Positioning Circuit (fast, no fitting)
 enum class Mode { Log, Linear, DPC };
 
-inline constexpr Mode ACTIVE_MODE = Mode::Log;
+inline constexpr Mode ACTIVE_MODE = Mode::Linear;
 
 // For DPC mode only: which signal model to use for charge calculation
 inline constexpr Mode DPC_CHARGE_MODEL = Mode::Log;
@@ -49,11 +49,37 @@ inline constexpr G4double NOISE_ELECTRON_COUNT = 500.0;    // Electronic noise (
 inline constexpr G4double DPC_K_CALIBRATION = 1.2;         // k = interpad * this
 
 // ───────────────────────────── Linear Model ─────────────────────────────────
-inline constexpr G4double LINEAR_CHARGE_MODEL_BETA = 0.001; // Attenuation coef
+inline constexpr G4double LINEAR_CHARGE_MODEL_BETA = 0.002;
 
 // ──────────────────────────── Particle Gun ──────────────────────────────────
 // Use fixed position (true) or random sampling (false) for primary particles
 inline constexpr G4bool USE_FIXED_POSITION = true;
+
+// ─────────────────────────── Active Pixel Mode ─────────────────────────────
+// Selects which pixels are "active" for signal fraction (F_i) calculation.
+// The denominator sums F_i only over active pixels.
+//
+// 1D-compatible modes (work with FIT_GAUS_1D or FIT_GAUS_2D):
+enum class ActivePixelMode1D { Neighborhood, RowCol, RowCol3x3 };
+//   Neighborhood - All pixels in the neighborhood
+//   RowCol       - Cross pattern (center row + center column)
+//   RowCol3x3    - Cross pattern + 3x3 center block
+//
+// 2D-only modes (require FIT_GAUS_2D = true):
+enum class ActivePixelMode2D { ChargeBlock2x2, ChargeBlock3x3 };
+//   ChargeBlock2x2 - 4 pixels with highest F_i
+//   ChargeBlock3x3 - 9 pixels with highest F_i
+
+inline constexpr ActivePixelMode1D ACTIVE_PIXEL_MODE_1D = ActivePixelMode1D::RowCol;
+
+// ─────────────────────────────── Fitting ───────────────────────────────────
+// Enable Gaussian fitting for position reconstruction
+// Note: To use ActivePixelMode2D, you must set FIT_GAUS_2D = true
+inline constexpr G4bool FIT_GAUS_1D = false;
+inline constexpr G4bool FIT_GAUS_2D = false;
+
+// Uncomment the following to use 2D-only modes (requires FIT_GAUS_2D = true above):
+// inline constexpr ActivePixelMode2D ACTIVE_PIXEL_MODE_2D = ActivePixelMode2D::ChargeBlock2x2;
 
 // ╔═══════════════════════════════════════════════════════════════════════════╗
 // ║                    END USER SETTINGS - Internal Below                     ║
@@ -65,7 +91,9 @@ inline constexpr G4bool USE_FIXED_POSITION = true;
 
 enum class SignalModel { LogA, LinA };
 enum class ReconMethod { LogA, LinA, DPC };
-enum class DenominatorMode { Neighborhood, ChargeBlock, RowCol };
+
+// Unified enum for runtime use (combines both 1D and 2D modes)
+enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3 };
 
 using PosReconModel = ReconMethod;  // Legacy alias
 
@@ -87,17 +115,37 @@ inline constexpr SignalModel SIGNAL_MODEL =
 inline constexpr G4bool USES_LINEAR_SIGNAL = (SIGNAL_MODEL == SignalModel::LinA);
 
 inline constexpr PosReconModel POS_RECON_MODEL = RECON_METHOD;
-inline constexpr DenominatorMode DENOMINATOR_MODE = DenominatorMode::Neighborhood;
 
-// Fitters: enabled for Log/Linear, disabled for DPC
-inline constexpr G4bool FIT_GAUS_1D = !IS_DPC_MODE;
-inline constexpr G4bool FIT_GAUS_2D = false;
+// Map 1D mode enum to unified enum
+inline constexpr ActivePixelMode ActivePixelModeFrom1D(ActivePixelMode1D m) {
+    return (m == ActivePixelMode1D::Neighborhood) ? ActivePixelMode::Neighborhood :
+           (m == ActivePixelMode1D::RowCol)       ? ActivePixelMode::RowCol :
+                                                    ActivePixelMode::RowCol3x3;
+}
 
-// Full grid storage: enabled for Log/Linear, disabled for DPC
-inline constexpr G4bool STORE_FULL_GRID = !IS_DPC_MODE;
+// Map 2D mode enum to unified enum
+inline constexpr ActivePixelMode ActivePixelModeFrom2D(ActivePixelMode2D m) {
+    return (m == ActivePixelMode2D::ChargeBlock2x2) ? ActivePixelMode::ChargeBlock2x2 :
+                                                      ActivePixelMode::ChargeBlock3x3;
+}
+
+// The active pixel mode used at runtime (derived from ACTIVE_PIXEL_MODE_1D)
+// To use 2D modes, user must define ACTIVE_PIXEL_MODE_2D and change this line
+inline constexpr ActivePixelMode ACTIVE_PIXEL_MODE = ActivePixelModeFrom1D(ACTIVE_PIXEL_MODE_1D);
+
+// Full grid storage: disabled by default (saves only neighborhood/block/strip data)
+// Set to true if you need per-event full-detector charge fractions
+inline constexpr G4bool STORE_FULL_GRID = false;
 
 // DPC always uses 4 closest pixels
 inline constexpr G4int DPC_TOP_N_PIXELS = 4;
+
+// ChargeBlock modes (2x2, 3x3) require 2D fitting to be enabled
+inline constexpr G4bool IS_CHARGE_BLOCK_MODE =
+    (ACTIVE_PIXEL_MODE == ActivePixelMode::ChargeBlock2x2 ||
+     ACTIVE_PIXEL_MODE == ActivePixelMode::ChargeBlock3x3);
+static_assert(!IS_CHARGE_BLOCK_MODE || FIT_GAUS_2D,
+    "ChargeBlock2x2 and ChargeBlock3x3 active pixel modes require FIT_GAUS_2D = true");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Additional Geometry & Physics Constants

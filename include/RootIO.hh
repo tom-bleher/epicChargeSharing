@@ -61,6 +61,15 @@ struct EventRecord {
     std::span<const ChargeSharingCalculator::Result::NeighborCell> chargeBlock;
     std::span<const G4double> neighborChargesNew;
     std::span<const G4double> neighborChargesFinal;
+    // Row-mode neighborhood noisy charges
+    std::span<const G4double> neighborChargesNewRow;
+    std::span<const G4double> neighborChargesFinalRow;
+    // Col-mode neighborhood noisy charges
+    std::span<const G4double> neighborChargesNewCol;
+    std::span<const G4double> neighborChargesFinalCol;
+    // Block-mode neighborhood noisy charges
+    std::span<const G4double> neighborChargesNewBlock;
+    std::span<const G4double> neighborChargesFinalBlock;
     // Full grid fractions
     std::span<const G4double> fullFi;
     std::span<const G4double> fullFiRow;    ///< Signal fractions with row denominator
@@ -180,14 +189,14 @@ public:
     void ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars,
                                const ClassificationBuffers& classification,
                                const VectorBuffers& vectors,
-                               Config::DenominatorMode mode = Config::DenominatorMode::Neighborhood);
+                               Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
     void ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers);
     void ConfigureClassificationBranches(TTree* tree, const ClassificationBuffers& buffers);
     void ConfigureVectorBranches(TTree* tree, const VectorBuffers& buffers,
-                                 Config::DenominatorMode mode = Config::DenominatorMode::Neighborhood);
+                                 Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
     void ConfigureNeighborhoodBranches(TTree* tree, std::vector<G4int>* pixelID);
     bool ConfigureFullGridBranches(TTree* tree, const FullGridBuffers& buffers,
-                                   Config::DenominatorMode mode = Config::DenominatorMode::Neighborhood);
+                                   Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
 
 private:
     static constexpr int kDefaultBufferSize = 256000;       ///< 256KB for neighborhood branches
@@ -355,6 +364,8 @@ public:
         G4double pixelSpacing{0.0};
         G4double pixelCornerOffset{0.0};
         G4double detectorSize{0.0};
+        G4double detectorThickness{0.0};
+        G4double interpadGap{0.0};
         G4int numBlocksPerSide{0};
         G4int neighborhoodRadius{0};
         G4int fullGridSide{0};
@@ -364,17 +375,14 @@ public:
     struct ModelMetadata {
         Config::SignalModel signalModel{Config::SignalModel::LogA};  ///< Signal sharing model
         Config::PosReconModel model{Config::PosReconModel::DPC};     ///< Reconstruction method
-        Config::DenominatorMode denominatorMode{Config::DenominatorMode::Neighborhood};
-        G4double beta{0.0};
-        G4double pitch{0.0};
-        G4bool emitDistanceAlpha{false};
+        Config::ActivePixelMode activePixelMode{Config::ActivePixelMode::Neighborhood};
+        G4double beta{0.0};  ///< Linear signal model beta parameter (per micron)
     };
 
     struct PhysicsMetadata {
         G4double d0{0.0};
         G4double ionizationEnergy{0.0};
         G4double gain{0.0};
-        G4double elementaryCharge{0.0};
     };
 
     struct NoiseMetadata {
@@ -383,16 +391,17 @@ public:
         G4double electronCount{0.0};
     };
 
-    struct PostProcessMetadata {
-        G4bool fitGaus1D{false};
-        G4bool fitGaus2D{false};
+    struct SimulationMetadata {
+        std::string timestamp;
+        std::string geant4Version;
+        std::string rootVersion;
     };
 
     void SetGridMetadata(const GridMetadata& m) { fGrid = m; }
     void SetModelMetadata(const ModelMetadata& m) { fModel = m; }
     void SetPhysicsMetadata(const PhysicsMetadata& m) { fPhysics = m; }
     void SetNoiseMetadata(const NoiseMetadata& m) { fNoise = m; }
-    void SetPostProcessMetadata(const PostProcessMetadata& m) { fPostProcess = m; }
+    void SetSimulationMetadata(const SimulationMetadata& m) { fSimulation = m; }
 
     EntryList CollectEntries() const;
     void WriteToTree(TTree* tree, std::mutex* ioMutex = nullptr) const;
@@ -406,7 +415,7 @@ private:
     ModelMetadata fModel;
     PhysicsMetadata fPhysics;
     NoiseMetadata fNoise;
-    PostProcessMetadata fPostProcess;
+    SimulationMetadata fSimulation;
 };
 
 // ============================================================================

@@ -148,8 +148,8 @@ public:
     /// \brief Fill buffers from an EventRecord.
     void FillFromRecord(const EventRecord& record);
 
-    /// \brief Set the denominator mode for fraction calculation.
-    void SetDenominatorMode(Config::DenominatorMode mode) { fDenominatorMode = mode; }
+    /// \brief Set the active pixel mode for fraction calculation.
+    void SetActivePixelMode(Config::ActivePixelMode mode) { fActivePixelMode = mode; }
 
     /// \brief Enable/disable full grid storage.
     void SetStoreFullGrid(bool enable) { fStoreFullGrid = enable; }
@@ -168,7 +168,7 @@ private:
 #endif
 
     RNTupleFieldBuffers fBuffers;
-    Config::DenominatorMode fDenominatorMode{Config::DenominatorMode::Neighborhood};
+    Config::ActivePixelMode fActivePixelMode{Config::ActivePixelMode::Neighborhood};
     bool fStoreFullGrid{false};
     int fNeighborhoodRadius{2};
     mutable std::mutex fMutex;

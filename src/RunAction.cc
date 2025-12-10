@@ -21,11 +21,16 @@
 #include "RVersion.h"
 #include "Compression.h"
 
+#include "G4Version.hh"
+
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <array>
 #include <cmath>
+#include <ctime>
 #include <filesystem>
+#include <iomanip>
 #include <limits>
 #include <mutex>
 #include <sstream>
@@ -397,7 +402,7 @@ void RunAction::ConfigureCoreBranches(TTree* tree)
     };
 
     // Delegate to BranchConfigurator
-    const auto mode = static_cast<ECS::Config::DenominatorMode>(fDenominatorMode);
+    const auto mode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
     fBranchConfigurator.ConfigureCoreBranches(tree, scalars, classification, vectors, mode);
 }
 
@@ -632,19 +637,23 @@ void RunAction::PrepareNeighborhoodStorage(std::size_t requestedCells)
 
 void RunAction::PopulateNeighborhoodFromRecord(const EventRecord& record)
 {
-    const std::size_t copyNew =
-        std::min<std::size_t>(fNeighborhoodChargeNew.size(), record.neighborChargesNew.size());
-    if (copyNew > 0) {
-        std::copy_n(record.neighborChargesNew.begin(), copyNew, fNeighborhoodChargeNew.begin());
-    }
+    auto copyCharges = [](const auto& src, auto& dst) {
+        const std::size_t n = std::min(dst.size(), src.size());
+        if (n > 0) std::copy_n(src.begin(), n, dst.begin());
+    };
 
-    const std::size_t copyFinal =
-        std::min<std::size_t>(fNeighborhoodChargeFinal.size(), record.neighborChargesFinal.size());
-    if (copyFinal > 0) {
-        std::copy_n(record.neighborChargesFinal.begin(),
-                    copyFinal,
-                    fNeighborhoodChargeFinal.begin());
-    }
+    // Neighborhood-mode noisy charges
+    copyCharges(record.neighborChargesNew, fNeighborhoodChargeNew);
+    copyCharges(record.neighborChargesFinal, fNeighborhoodChargeFinal);
+    // Row-mode noisy charges
+    copyCharges(record.neighborChargesNewRow, fNeighborhoodChargeNewRow);
+    copyCharges(record.neighborChargesFinalRow, fNeighborhoodChargeFinalRow);
+    // Col-mode noisy charges
+    copyCharges(record.neighborChargesNewCol, fNeighborhoodChargeNewCol);
+    copyCharges(record.neighborChargesFinalCol, fNeighborhoodChargeFinalCol);
+    // Block-mode noisy charges
+    copyCharges(record.neighborChargesNewBlock, fNeighborhoodChargeNewBlock);
+    copyCharges(record.neighborChargesFinalBlock, fNeighborhoodChargeFinalBlock);
 
     std::size_t activeCells = 0;
     for (const auto& cell : record.neighborCells) {
@@ -898,7 +907,7 @@ void RunAction::ConfigureFullFractionBranch(G4bool enable)
     };
 
     // Delegate to BranchConfigurator
-    const auto mode = static_cast<ECS::Config::DenominatorMode>(fDenominatorMode);
+    const auto mode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
     fFullFractionsBranchInitialized = fBranchConfigurator.ConfigureFullGridBranches(tree, buffers, mode);
 }
 
@@ -906,12 +915,27 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
 {
     ECS::IO::MetadataPublisher publisher;
 
+    // Simulation info (timestamp and versions)
+    ECS::IO::MetadataPublisher::SimulationMetadata sim;
+    {
+        const auto now = std::chrono::system_clock::now();
+        const std::time_t t = std::chrono::system_clock::to_time_t(now);
+        std::ostringstream oss;
+        oss << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S");
+        sim.timestamp = oss.str();
+    }
+    sim.geant4Version = G4Version;
+    sim.rootVersion = ROOT_RELEASE;
+    publisher.SetSimulationMetadata(sim);
+
     // Grid geometry metadata
     ECS::IO::MetadataPublisher::GridMetadata grid;
     grid.pixelSize = fGridPixelSize;
     grid.pixelSpacing = fGridPixelSpacing;
     grid.pixelCornerOffset = fGridPixelCornerOffset;
     grid.detectorSize = fGridDetSize;
+    grid.detectorThickness = Constants::DETECTOR_WIDTH / CLHEP::mm;
+    grid.interpadGap = (fGridPixelSpacing - fGridPixelSize);
     grid.numBlocksPerSide = fGridNumBlocksPerSide;
     grid.neighborhoodRadius = fGridNeighborhoodRadius;
     grid.fullGridSide = fFullGridSide;
@@ -922,10 +946,8 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
     ECS::IO::MetadataPublisher::ModelMetadata model;
     model.signalModel = Constants::SIGNAL_MODEL;
     model.model = static_cast<ECS::Config::PosReconModel>(fPosReconModel);
-    model.denominatorMode = static_cast<ECS::Config::DenominatorMode>(fDenominatorMode);
+    model.activePixelMode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
     model.beta = fChargeSharingBeta;
-    model.pitch = fChargeSharingPitch;
-    model.emitDistanceAlpha = fEmitDistanceAlphaMeta;
     publisher.SetModelMetadata(model);
 
     // Physics constants metadata
@@ -933,7 +955,6 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
     physics.d0 = Constants::D0;
     physics.ionizationEnergy = Constants::IONIZATION_ENERGY;
     physics.gain = Constants::GAIN;
-    physics.elementaryCharge = Constants::ELEMENTARY_CHARGE;
     publisher.SetPhysicsMetadata(physics);
 
     // Noise model metadata
@@ -942,12 +963,6 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
     noise.gainSigmaMax = Constants::PIXEL_GAIN_SIGMA_MAX;
     noise.electronCount = Constants::NOISE_ELECTRON_COUNT;
     publisher.SetNoiseMetadata(noise);
-
-    // Post-processing configuration
-    ECS::IO::MetadataPublisher::PostProcessMetadata postProcess;
-    postProcess.fitGaus1D = Constants::FIT_GAUS_1D;
-    postProcess.fitGaus2D = Constants::FIT_GAUS_2D;
-    publisher.SetPostProcessMetadata(postProcess);
 
     return publisher;
 }

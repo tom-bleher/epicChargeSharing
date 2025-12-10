@@ -10,7 +10,7 @@ This script combines the functionality of:
 - Fi_x.py: Extract F_i values per position
 
 Workflow per position:
-1. Configure simulation parameters (charge model, denominator mode, beta)
+1. Configure simulation parameters (charge model, active pixel mode, beta)
 2. Modify PrimaryGenerator.cc to set fFixedX
 3. Build and run simulation
 4. Save ROOT file with position-based name
@@ -26,7 +26,7 @@ Workflow per position:
 
 Simulation configuration options:
 - Charge sharing model: LogA (logarithmic, Tornago Eq.4), LinA (linear, Tornago Eq.6), DPC
-- Denominator mode: Neighborhood (all pixels), ChargeBlock (4 closest), RowCol (same row/column)
+- Active pixel mode: Neighborhood (all pixels), ChargeBlock2x2/3x3 (highest F_i), RowCol/RowCol3x3 (cross pattern)
 - Beta attenuation coefficient for linear model
 
 Final outputs:
@@ -45,8 +45,8 @@ Usage examples:
     # Run with CLI overrides (CLI args take precedence over config)
     python sweep_analysis.py run --positions 0,50,-50,100,-100
 
-    # Run with LogA charge model and ChargeBlock denominator
-    python sweep_analysis.py run --charge-model LogA --denominator-mode ChargeBlock
+    # Run with LogA charge model and ChargeBlock active pixel mode
+    python sweep_analysis.py run --charge-model LogA --active-pixel-mode ChargeBlock2x2
 
     # Run with linear model and custom beta
     python sweep_analysis.py run --charge-model LinA --beta 0.005
@@ -108,7 +108,7 @@ DEFAULT_CONFIG_FILE = FARM_DIR / "sweep_config.yaml"
 
 # Charge sharing model options
 CHARGE_MODELS = ["LogA", "LinA", "DPC"]
-DENOMINATOR_MODES = ["Neighborhood", "ChargeBlock", "RowCol"]
+ACTIVE_PIXEL_MODES = ["Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", "RowCol3x3"]
 
 # Default beta value for linear model
 DEFAULT_BETA = 0.001
@@ -256,7 +256,7 @@ class SweepConfig:
     """Configuration loaded from YAML file."""
     positions: List[float] = field(default_factory=lambda: DEFAULT_POSITIONS.copy())
     charge_model: Optional[str] = None
-    denominator_mode: Optional[str] = None
+    active_pixel_mode: Optional[str] = None
     beta: Optional[float] = None
     n_events: int = 200
     pixel_id: Optional[int] = None
@@ -292,8 +292,8 @@ def load_config(config_path: Optional[Path] = None) -> SweepConfig:
         config.positions = [float(x) for x in yaml_data["positions"]]
     if "charge_model" in yaml_data:
         config.charge_model = yaml_data["charge_model"]
-    if "denominator_mode" in yaml_data:
-        config.denominator_mode = yaml_data["denominator_mode"]
+    if "active_pixel_mode" in yaml_data:
+        config.active_pixel_mode = yaml_data["active_pixel_mode"]
     if "beta" in yaml_data:
         config.beta = yaml_data["beta"]
     if "n_events" in yaml_data:
@@ -309,11 +309,12 @@ def load_config(config_path: Optional[Path] = None) -> SweepConfig:
 # =============================================================================
 
 # Regex patterns for updating Config.hh
+# Note: Config.hh uses unqualified type names (inside Constants namespace)
 CONFIG_POS_RECON_MODEL_REGEX = re.compile(
-    r"^(\s*inline\s+constexpr\s+ECS::Config::PosReconModel\s+POS_RECON_MODEL\s*=\s*)ECS::Config::PosReconModel::\w+\s*;"
+    r"^(\s*inline\s+constexpr\s+PosReconModel\s+POS_RECON_MODEL\s*=\s*)(?:ECS::Config::)?(?:Constants::)?PosReconModel::\w+\s*;"
 )
-CONFIG_DENOMINATOR_MODE_REGEX = re.compile(
-    r"^(\s*inline\s+constexpr\s+ECS::Config::DenominatorMode\s+DENOMINATOR_MODE\s*=\s*)ECS::Config::DenominatorMode::\w+\s*;"
+CONFIG_ACTIVE_PIXEL_MODE_REGEX = re.compile(
+    r"^(\s*inline\s+constexpr\s+ActivePixelMode\s+ACTIVE_PIXEL_MODE\s*=\s*)(?:ECS::Config::)?(?:Constants::)?ActivePixelMode::\w+\s*;"
 )
 CONFIG_BETA_REGEX = re.compile(
     r"^(\s*inline\s+constexpr\s+G4double\s+LINEAR_CHARGE_MODEL_BETA\s*=\s*)[\d.]+\s*;"
@@ -323,7 +324,7 @@ CONFIG_BETA_REGEX = re.compile(
 def update_config_hh(
     source_text: str,
     charge_model: Optional[str] = None,
-    denominator_mode: Optional[str] = None,
+    active_pixel_mode: Optional[str] = None,
     beta: Optional[float] = None,
 ) -> str:
     """Update simulation parameters in Config.hh source.
@@ -331,7 +332,7 @@ def update_config_hh(
     Args:
         source_text: Current content of Config.hh
         charge_model: One of "LogA", "LinA", "DPC" (or None to keep current)
-        denominator_mode: One of "Neighborhood", "ChargeBlock", "RowCol" (or None to keep current)
+        active_pixel_mode: One of "Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", "RowCol3x3" (or None to keep current)
         beta: Beta attenuation coefficient for linear model (or None to keep current)
 
     Returns:
@@ -348,15 +349,15 @@ def update_config_hh(
         if charge_model is not None:
             m = CONFIG_POS_RECON_MODEL_REGEX.match(line)
             if m:
-                new_line = f"{m.group(1)}ECS::Config::PosReconModel::{charge_model};"
+                new_line = f"{m.group(1)}PosReconModel::{charge_model};"
                 changes.append(f"POS_RECON_MODEL = {charge_model}")
 
-        # Update DENOMINATOR_MODE
-        if denominator_mode is not None:
-            m = CONFIG_DENOMINATOR_MODE_REGEX.match(line)
+        # Update ACTIVE_PIXEL_MODE
+        if active_pixel_mode is not None:
+            m = CONFIG_ACTIVE_PIXEL_MODE_REGEX.match(line)
             if m:
-                new_line = f"{m.group(1)}ECS::Config::DenominatorMode::{denominator_mode};"
-                changes.append(f"DENOMINATOR_MODE = {denominator_mode}")
+                new_line = f"{m.group(1)}ActivePixelMode::{active_pixel_mode};"
+                changes.append(f"ACTIVE_PIXEL_MODE = {active_pixel_mode}")
 
         # Update BETA
         if beta is not None:
@@ -377,7 +378,7 @@ def get_current_config_settings(source_text: str) -> Dict[str, str]:
     """Extract current configuration settings from Config.hh.
 
     Returns:
-        Dictionary with keys: charge_model, denominator_mode, beta
+        Dictionary with keys: charge_model, active_pixel_mode, beta
     """
     settings = {}
 
@@ -389,11 +390,11 @@ def get_current_config_settings(source_text: str) -> Dict[str, str]:
             if match:
                 settings["charge_model"] = match.group(1)
 
-        m = CONFIG_DENOMINATOR_MODE_REGEX.match(line)
+        m = CONFIG_ACTIVE_PIXEL_MODE_REGEX.match(line)
         if m:
-            match = re.search(r"DenominatorMode::(\w+)", line)
+            match = re.search(r"ActivePixelMode::(\w+)", line)
             if match:
-                settings["denominator_mode"] = match.group(1)
+                settings["active_pixel_mode"] = match.group(1)
 
         m = CONFIG_BETA_REGEX.match(line)
         if m:
@@ -434,7 +435,7 @@ def configure_build_if_needed() -> None:
     """Run cmake configure if Makefile doesn't exist."""
     BUILD_DIR.mkdir(exist_ok=True)
     if not (BUILD_DIR / "Makefile").exists():
-        run_cmd(["cmake", "-S", str(REPO_ROOT), "-B", str(BUILD_DIR)])
+        run_cmd(["cmake", "-S", str(REPO_ROOT), "-B", str(BUILD_DIR), "-DWITH_EDM4HEP=OFF"])
 
 
 def build_project() -> None:
@@ -1409,7 +1410,7 @@ def run_full_pipeline(
     skip_sigma_f: bool = False,
     skip_fi: bool = False,
     charge_model: Optional[str] = None,
-    denominator_mode: Optional[str] = None,
+    active_pixel_mode: Optional[str] = None,
     beta: Optional[float] = None,
 ) -> List[PositionResult]:
     """Run the complete analysis pipeline.
@@ -1425,7 +1426,7 @@ def run_full_pipeline(
         skip_sigma_f: Skip sigma_f extraction
         skip_fi: Skip F_i extraction
         charge_model: Charge sharing model ("LogA", "LinA", or "DPC")
-        denominator_mode: Denominator mode ("Neighborhood", "ChargeBlock", or "RowCol")
+        active_pixel_mode: Signal fraction mode ("Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", or "RowCol3x3")
         beta: Beta attenuation coefficient for linear model
     """
     results: List[PositionResult] = []
@@ -1446,7 +1447,7 @@ def run_full_pipeline(
         original_config_text = read_file_text(CONFIG_FILE)
         config_updated = False
 
-        if any([charge_model, denominator_mode, beta]):
+        if any([charge_model, active_pixel_mode, beta]):
             print("\n[INFO] Updating simulation configuration...")
             current_settings = get_current_config_settings(original_config_text)
             print(f"[INFO] Current settings: {current_settings}")
@@ -1454,7 +1455,7 @@ def run_full_pipeline(
             new_config_text = update_config_hh(
                 original_config_text,
                 charge_model=charge_model,
-                denominator_mode=denominator_mode,
+                active_pixel_mode=active_pixel_mode,
                 beta=beta,
             )
 
@@ -1875,12 +1876,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
              "If not specified, uses current Config.hh setting.",
     )
     full_parser.add_argument(
-        "--denominator-mode",
+        "--active-pixel-mode",
         type=str,
-        choices=DENOMINATOR_MODES,
+        choices=ACTIVE_PIXEL_MODES,
         default=None,
-        help="Denominator mode for charge fraction calculation: "
-             "Neighborhood (all pixels), ChargeBlock (4 closest), or RowCol (same row/column). "
+        help="Active pixel mode for charge fraction calculation: "
+             "Neighborhood (all pixels), ChargeBlock2x2/3x3 (4/9 highest F_i), or RowCol/RowCol3x3 (cross pattern). "
              "If not specified, uses current Config.hh setting.",
     )
     full_parser.add_argument(
@@ -1980,7 +1981,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             n_fit_events = args.n_fit_events if args.n_fit_events != 200 else config.n_events
             pixel_id = args.pixel_id if args.pixel_id is not None else config.pixel_id
             charge_model = args.charge_model if args.charge_model else config.charge_model
-            denominator_mode = args.denominator_mode if args.denominator_mode else config.denominator_mode
+            active_pixel_mode = args.active_pixel_mode if args.active_pixel_mode else config.active_pixel_mode
             beta = args.beta if args.beta is not None else config.beta
 
             run_full_pipeline(
@@ -1994,7 +1995,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 skip_sigma_f=args.skip_sigma_f,
                 skip_fi=args.skip_fi,
                 charge_model=charge_model,
-                denominator_mode=denominator_mode,
+                active_pixel_mode=active_pixel_mode,
                 beta=beta,
             )
 

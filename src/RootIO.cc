@@ -30,7 +30,7 @@ namespace ECS::IO {
 void BranchConfigurator::ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars,
                                                 const ClassificationBuffers& classification,
                                                 const VectorBuffers& vectors,
-                                                Config::DenominatorMode mode) {
+                                                Config::ActivePixelMode mode) {
     if (!tree) return;
     ConfigureScalarBranches(tree, scalars);
     ConfigureClassificationBranches(tree, classification);
@@ -77,7 +77,7 @@ void BranchConfigurator::ConfigureClassificationBranches(TTree* tree,
 }
 
 void BranchConfigurator::ConfigureVectorBranches(TTree* tree, const VectorBuffers& buffers,
-                                                  Config::DenominatorMode mode) {
+                                                  Config::ActivePixelMode mode) {
     if (!tree) return;
 
     auto addBranch = [&](const char* name, std::vector<G4double>* vec) {
@@ -92,14 +92,15 @@ void BranchConfigurator::ConfigureVectorBranches(TTree* tree, const VectorBuffer
 
     // Mode-specific branches
     switch (mode) {
-        case Config::DenominatorMode::Neighborhood:
+        case Config::ActivePixelMode::Neighborhood:
             addBranch("Fi", buffers.chargeFractions);
             addBranch("Qi", buffers.charge);
             addBranch("Qn", buffers.chargeNew);
             addBranch("Qf", buffers.chargeFinal);
             break;
 
-        case Config::DenominatorMode::RowCol:
+        case Config::ActivePixelMode::RowCol:
+        case Config::ActivePixelMode::RowCol3x3:
             addBranch("FiRow", buffers.chargeFractionsRow);
             addBranch("FiCol", buffers.chargeFractionsCol);
             addBranch("QiRow", buffers.chargeRow);
@@ -110,7 +111,8 @@ void BranchConfigurator::ConfigureVectorBranches(TTree* tree, const VectorBuffer
             addBranch("QfCol", buffers.chargeFinalCol);
             break;
 
-        case Config::DenominatorMode::ChargeBlock:
+        case Config::ActivePixelMode::ChargeBlock2x2:
+        case Config::ActivePixelMode::ChargeBlock3x3:
             addBranch("FiBlock", buffers.chargeFractionsBlock);
             addBranch("QiBlock", buffers.chargeBlock);
             addBranch("QnBlock", buffers.chargeNewBlock);
@@ -126,7 +128,7 @@ void BranchConfigurator::ConfigureNeighborhoodBranches(TTree* tree, std::vector<
 }
 
 bool BranchConfigurator::ConfigureFullGridBranches(TTree* tree, const FullGridBuffers& buffers,
-                                                    Config::DenominatorMode mode) {
+                                                    Config::ActivePixelMode mode) {
     if (!tree) return false;
     bool configured = false;
 
@@ -144,14 +146,15 @@ bool BranchConfigurator::ConfigureFullGridBranches(TTree* tree, const FullGridBu
 
     // Mode-specific branches
     switch (mode) {
-        case Config::DenominatorMode::Neighborhood:
+        case Config::ActivePixelMode::Neighborhood:
             addBranch("FiGrid", buffers.fi);
             addBranch("QiGrid", buffers.qi);
             addBranch("QnGrid", buffers.qn);
             addBranch("QfGrid", buffers.qf);
             break;
 
-        case Config::DenominatorMode::RowCol:
+        case Config::ActivePixelMode::RowCol:
+        case Config::ActivePixelMode::RowCol3x3:
             addBranch("FiRowGrid", buffers.fiRow);
             addBranch("FiColGrid", buffers.fiCol);
             addBranch("QiRowGrid", buffers.qiRow);
@@ -162,7 +165,8 @@ bool BranchConfigurator::ConfigureFullGridBranches(TTree* tree, const FullGridBu
             addBranch("QfColGrid", buffers.qfCol);
             break;
 
-        case Config::DenominatorMode::ChargeBlock:
+        case Config::ActivePixelMode::ChargeBlock2x2:
+        case Config::ActivePixelMode::ChargeBlock3x3:
             addBranch("FiBlockGrid", buffers.fiBlock);
             addBranch("QiBlockGrid", buffers.qiBlock);
             addBranch("QnBlockGrid", buffers.qnBlock);
@@ -272,6 +276,13 @@ void TreeFiller::PopulateNeighborhoodFromRecord(const EventRecord& record) {
 
     copySpan(record.neighborChargesNew, fNeighborhoodChargeNew);
     copySpan(record.neighborChargesFinal, fNeighborhoodChargeFinal);
+    // Row/Col/Block mode noisy charges
+    copySpan(record.neighborChargesNewRow, fNeighborhoodChargeNewRow);
+    copySpan(record.neighborChargesFinalRow, fNeighborhoodChargeFinalRow);
+    copySpan(record.neighborChargesNewCol, fNeighborhoodChargeNewCol);
+    copySpan(record.neighborChargesFinalCol, fNeighborhoodChargeFinalCol);
+    copySpan(record.neighborChargesNewBlock, fNeighborhoodChargeNewBlock);
+    copySpan(record.neighborChargesFinalBlock, fNeighborhoodChargeFinalBlock);
 
     std::size_t activeCells = 0;
     for (const auto& cell : record.neighborCells) {
@@ -415,18 +426,20 @@ std::string MetadataPublisher::SignalModelToString(Config::SignalModel model) {
     }
 }
 
-std::string DenominatorModeToString(Config::DenominatorMode mode) {
+std::string ActivePixelModeToString(Config::ActivePixelMode mode) {
     switch (mode) {
-        case Config::DenominatorMode::Neighborhood: return "Neighborhood";
-        case Config::DenominatorMode::RowCol: return "RowCol";
-        case Config::DenominatorMode::ChargeBlock: return "ChargeBlock";
+        case Config::ActivePixelMode::Neighborhood: return "Neighborhood";
+        case Config::ActivePixelMode::ChargeBlock2x2: return "ChargeBlock2x2";
+        case Config::ActivePixelMode::ChargeBlock3x3: return "ChargeBlock3x3";
+        case Config::ActivePixelMode::RowCol: return "RowCol";
+        case Config::ActivePixelMode::RowCol3x3: return "RowCol3x3";
         default: return "Neighborhood";
     }
 }
 
 MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
     EntryList entries;
-    entries.reserve(25);
+    entries.reserve(20);
 
     // Helper lambdas for typed entry creation
     auto addString = [&](const std::string& key, const std::string& val) {
@@ -438,18 +451,19 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
     auto addInt = [&](const std::string& key, G4int val) {
         entries.emplace_back(key, MetaValue{val});
     };
-    auto addBool = [&](const std::string& key, G4bool val) {
-        entries.emplace_back(key, MetaValue{val});
-    };
 
-    // Schema version (int for easier comparison)
-    addInt("MetadataSchemaVersion", 3);
+    // Simulation info (timestamp and versions)
+    if (!fSimulation.timestamp.empty()) addString("SimulationTimestamp", fSimulation.timestamp);
+    if (!fSimulation.geant4Version.empty()) addString("Geant4Version", fSimulation.geant4Version);
+    if (!fSimulation.rootVersion.empty()) addString("ROOTVersion", fSimulation.rootVersion);
 
     // Grid parameters (doubles and ints)
     if (fGrid.pixelSize > 0.0) addDouble("GridPixelSize_mm", fGrid.pixelSize);
     if (fGrid.pixelSpacing > 0.0) addDouble("GridPixelSpacing_mm", fGrid.pixelSpacing);
     if (fGrid.pixelCornerOffset >= 0.0) addDouble("GridPixelCornerOffset_mm", fGrid.pixelCornerOffset);
     if (fGrid.detectorSize > 0.0) addDouble("GridDetectorSize_mm", fGrid.detectorSize);
+    if (fGrid.detectorThickness > 0.0) addDouble("DetectorThickness_mm", fGrid.detectorThickness);
+    if (fGrid.interpadGap > 0.0) addDouble("InterpadGap_mm", fGrid.interpadGap);
     if (fGrid.numBlocksPerSide > 0) addInt("GridNumBlocksPerSide", fGrid.numBlocksPerSide);
     if (fGrid.storeFullFractions && fGrid.fullGridSide > 0) addInt("FullGridSide", fGrid.fullGridSide);
     if (fGrid.neighborhoodRadius >= 0) addInt("NeighborhoodRadius", fGrid.neighborhoodRadius);
@@ -457,29 +471,21 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
     // Model parameters (strings for enums, doubles for numeric)
     addString("SignalModel", SignalModelToString(fModel.signalModel));
     addString("ReconMethod", ModelToString(fModel.model));
-    addString("DenominatorMode", DenominatorModeToString(fModel.denominatorMode));
+    addString("ActivePixelMode", ActivePixelModeToString(fModel.activePixelMode));
     // Beta is only used when LinA signal model is active
     if (fModel.signalModel == Config::SignalModel::LinA && std::isfinite(fModel.beta)) {
         addDouble("ChargeSharingLinearBeta_per_um", fModel.beta);
     }
-    if (fModel.pitch > 0.0) addDouble("ChargeSharingPitch_mm", fModel.pitch);
 
     // Physics parameters (doubles)
     addDouble("ChargeSharingReferenceD0_microns", fPhysics.d0);
     addDouble("IonizationEnergy_eV", fPhysics.ionizationEnergy);
     addDouble("Gain", fPhysics.gain);
-    addDouble("ElementaryCharge_C", fPhysics.elementaryCharge);
 
     // Noise parameters (doubles)
     addDouble("NoisePixelGainSigmaMin", fNoise.gainSigmaMin);
     addDouble("NoisePixelGainSigmaMax", fNoise.gainSigmaMax);
     addDouble("NoiseElectronCount", fNoise.electronCount);
-
-    // Boolean flags (native bool type)
-    addBool("ChargeSharingEmitDistanceAlpha", fModel.emitDistanceAlpha);
-    addBool("ChargeSharingFullFractionsEnabled", fGrid.storeFullFractions);
-    addBool("PostProcessFitGaus1DEnabled", fPostProcess.fitGaus1D);
-    addBool("PostProcessFitGaus2DEnabled", fPostProcess.fitGaus2D);
 
     return entries;
 }

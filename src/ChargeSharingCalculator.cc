@@ -429,50 +429,53 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
         totalWeight += weight;
     }
 
-    const auto denominatorMode = Constants::DENOMINATOR_MODE;
-    std::vector<const Cell*> sortedPtrs;
-    sortedPtrs.reserve(fResult.cells.size());
-    for (const auto& c : fResult.cells) {
-        sortedPtrs.push_back(&c);
+    const auto activePixelMode = Constants::ACTIVE_PIXEL_MODE;
+
+    // Create index-weight pairs for sorting by F_i (weight)
+    struct IndexWeight {
+        std::size_t index;
+        G4double weight;
+    };
+    std::vector<IndexWeight> sortedByWeight;
+    sortedByWeight.reserve(fResult.cells.size());
+    for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
+        sortedByWeight.push_back({i, fWeightScratch[i].original});
     }
 
-    // Sort pointers by distance to identify chargeBlock
-    std::sort(sortedPtrs.begin(), sortedPtrs.end(),
-              [](const Cell* a, const Cell* b) {
-                  return a->distance < b->distance;
+    // Sort by weight (F_i) in descending order to identify chargeBlock
+    std::sort(sortedByWeight.begin(), sortedByWeight.end(),
+              [](const IndexWeight& a, const IndexWeight& b) {
+                  return a.weight > b.weight;  // Descending order: highest F_i first
               });
 
-    // Identify chargeBlock (top 4)
-    const std::size_t nBlock = std::min<std::size_t>(4, sortedPtrs.size());
+    // Identify chargeBlock (top 4 for 2x2, top 9 for 3x3) by highest F_i
+    const bool use3x3Block = (activePixelMode == Constants::ActivePixelMode::ChargeBlock3x3);
+    const std::size_t nBlock = std::min<std::size_t>(use3x3Block ? 9 : 4, sortedByWeight.size());
     fResult.chargeBlock.clear();
     fResult.chargeBlock.reserve(nBlock);
     for (std::size_t k = 0; k < nBlock; ++k) {
-        fResult.chargeBlock.push_back(*sortedPtrs[k]);
+        fResult.chargeBlock.push_back(fResult.cells[sortedByWeight[k].index]);
     }
 
-    // If using ChargeBlock for denominator, recompute totalWeight and zero out others
-    if (denominatorMode == Constants::DenominatorMode::ChargeBlock) {
+    // If using ChargeBlock2x2 or ChargeBlock3x3 for denominator, recompute totalWeight and zero out others
+    if (activePixelMode == Constants::ActivePixelMode::ChargeBlock2x2 ||
+        activePixelMode == Constants::ActivePixelMode::ChargeBlock3x3) {
+        // ChargeBlock2x2: top 4 pixels by highest F_i (2x2 block)
+        // ChargeBlock3x3: top 9 pixels by highest F_i (3x3 block)
+        const std::size_t blockSize = (activePixelMode == Constants::ActivePixelMode::ChargeBlock2x2) ? 4 : 9;
+        const std::size_t effectiveBlockSize = std::min(blockSize, sortedByWeight.size());
+
+        // Build a set of block member indices for O(1) lookup
+        std::vector<bool> isBlockMember(fResult.cells.size(), false);
+        for (std::size_t k = 0; k < effectiveBlockSize; ++k) {
+            isBlockMember[sortedByWeight[k].index] = true;
+        }
+
         totalWeight = 0.0;
 
-        // Create a set of indices or checking mechanism for the block
-        // We can use the sortedPtrs since they point to cells in fResult.cells.
-        // However, we need to update fWeightScratch which corresponds to fResult.cells indices.
-
-        // Map cell address to index or use gridIndex?
-        // Simpler: Loop over fResult.cells and check if it's in the top 4.
-        // Since nBlock is small (4), a simple check is fine.
-
-        // First pass: Sum weights of block members
+        // Recompute totalWeight using only block members (this becomes the new denominator)
         for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-             bool isBlockMember = false;
-             for (std::size_t k = 0; k < nBlock; ++k) {
-                 if (&fResult.cells[i] == sortedPtrs[k]) {
-                     isBlockMember = true;
-                     break;
-                 }
-             }
-
-             if (isBlockMember) {
+             if (isBlockMember[i]) {
                  totalWeight += fWeightScratch[i].modified;
              } else {
                  // Zero out modified weight for non-block members to exclude them from sharing
@@ -480,14 +483,21 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
              }
         }
     }
-    else if (denominatorMode == Constants::DenominatorMode::RowCol) {
-        // New mode: sum only pixels in the same row or same column as the center pixel (d_i=0, d_j=0 in local coords)
-        // The center pixel of the neighborhood corresponds to local coordinates (0, 0) relative to nearest pixel.
-        // In our flattened fResult.cells, we can recover the relative indices or check against fOffsets if we stored them.
-        // However, we know that fResult.cells[i].gridIndex maps to (di, dj).
+    else if (activePixelMode == Constants::ActivePixelMode::RowCol ||
+             activePixelMode == Constants::ActivePixelMode::RowCol3x3) {
+        // RowCol mode: the denominator is the sum over the "main cross" of the neighborhood.
+        // RowCol3x3 mode: the cross PLUS the center 3x3 block (cross + 4 corner pixels of 3x3).
+        //
+        // The main cross consists of:
+        //   - Center row (di = 0, all dj values): horizontal arm
+        //   - Center column (dj = 0, all di values): vertical arm
+        // A pixel is in the cross if di == 0 OR dj == 0.
+        //
+        // The 3x3 block adds pixels where |di| <= 1 AND |dj| <= 1.
 
         const int gridRadius = std::max(0, fNeighborhoodRadius);
         const int gridDimLocal = 2 * gridRadius + 1;
+        const bool include3x3 = (activePixelMode == Constants::ActivePixelMode::RowCol3x3);
 
         totalWeight = 0.0;
         for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
@@ -498,8 +508,17 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
             const int row = idx / gridDimLocal; // this is (di + gridRadius)
             const int col = idx % gridDimLocal; // this is (dj + gridRadius)
 
-            // Check if same row (row == gridRadius) or same col (col == gridRadius)
-            if (row == gridRadius || col == gridRadius) {
+            // di = row - gridRadius, dj = col - gridRadius
+            const int di = row - gridRadius;
+            const int dj = col - gridRadius;
+
+            // Check if in the cross: di == 0 OR dj == 0
+            const bool inCross = (di == 0) || (dj == 0);
+            // Check if in the 3x3 block: |di| <= 1 AND |dj| <= 1
+            const bool in3x3 = (std::abs(di) <= 1) && (std::abs(dj) <= 1);
+
+            const bool included = inCross || (include3x3 && in3x3);
+            if (included) {
                 totalWeight += fWeightScratch[i].modified;
             } else {
                  fWeightScratch[i].modified = 0.0;
@@ -512,7 +531,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const Eigen::VectorXd rowWeightSums = fNeighborhoodWeights.RowSums();
     const Eigen::RowVectorXd colWeightSums = fNeighborhoodWeights.ColSums();
 
-    // Compute block sum (sum of the 4 closest pixels by distance)
+    // Compute block sum (sum of the 4 or 9 highest F_i pixels)
     G4double blockWeightSum = 0.0;
     std::vector<bool> isBlockMember(fResult.cells.size(), false);
     for (std::size_t k = 0; k < fResult.chargeBlock.size(); ++k) {
@@ -527,6 +546,9 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     }
 
     const int gridDimForBounds = 2 * gridRadius + 1;
+    const bool useRowColMode = (activePixelMode == Constants::ActivePixelMode::RowCol ||
+                                activePixelMode == Constants::ActivePixelMode::RowCol3x3);
+
     for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
         auto& cell = fResult.cells[i];
         const G4double modifiedWeight = fWeightScratch[i].modified;
@@ -535,7 +557,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
         cell.fraction = fraction;
         cell.charge = fraction * totalChargeElectrons * elementaryCharge;
 
-        // Compute row/column/block fractions using Eigen-based sums
+        // Compute row/column/block fractions
         const int idx = cell.gridIndex;
         if (idx >= 0 && idx < gridDimForBounds * gridDimForBounds) {
             const int row = idx / gridDimForBounds;
@@ -543,11 +565,19 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
             const G4double origWeight = fWeightScratch[i].original;
 
-            // Access Eigen vectors using () operator
-            const G4double rowSum = rowWeightSums(row);
-            const G4double colSum = colWeightSums(col);
-            cell.fractionRow = (rowSum > 0.0) ? (origWeight / rowSum) : 0.0;
-            cell.fractionCol = (colSum > 0.0) ? (origWeight / colSum) : 0.0;
+            if (useRowColMode) {
+                // RowCol/RowCol3x3 mode: fractionRow and fractionCol are the same as fraction
+                // The region (cross or cross+3x3) sums to 1, and we use the same values for row/col reconstruction
+                cell.fractionRow = cell.fraction;
+                cell.fractionCol = cell.fraction;
+            } else {
+                // Neighborhood or ChargeBlock mode: use full row/column sums
+                const G4double rowSum = rowWeightSums(row);
+                const G4double colSum = colWeightSums(col);
+                cell.fractionRow = (rowSum > 0.0) ? (origWeight / rowSum) : 0.0;
+                cell.fractionCol = (colSum > 0.0) ? (origWeight / colSum) : 0.0;
+            }
+
             // Block fraction: only non-zero for block members
             cell.fractionBlock = (isBlockMember[i] && blockWeightSum > 0.0) ? (origWeight / blockWeightSum) : 0.0;
 
@@ -690,76 +720,137 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
         }
     }
 
-    // Use Eigen's vectorized sum for total weight computation
-    const G4double totalWeight = fFullGridWeights.Sum();
+    // Use Eigen for vectorized computation
+    auto weightsEigen = fFullGridWeights.AsEigen();
+    const auto activePixelMode = Constants::ACTIVE_PIXEL_MODE;
+    const bool useRowColMode = (activePixelMode == Constants::ActivePixelMode::RowCol ||
+                                activePixelMode == Constants::ActivePixelMode::RowCol3x3);
+    const bool include3x3 = (activePixelMode == Constants::ActivePixelMode::RowCol3x3);
 
-    // Find the 4 closest pixels for block denominator
-    struct PixelDistance {
-        G4int i, j;
-        G4double distance;
+    // Get center pixel indices (the hit pixel)
+    const G4int centerI = fResult.pixelIndexI;
+    const G4int centerJ = fResult.pixelIndexJ;
+
+    // Helper lambda to check if pixel (i,j) is in the included region for RowCol modes
+    auto isInRowColRegion = [&](G4int i, G4int j) -> bool {
+        const G4int di = i - centerI;
+        const G4int dj = j - centerJ;
+        const bool inCross = (di == 0) || (dj == 0);
+        const bool in3x3 = (std::abs(di) <= 1) && (std::abs(dj) <= 1);
+        return inCross || (include3x3 && in3x3);
     };
-    std::vector<PixelDistance> pixelDistances;
-    pixelDistances.reserve(static_cast<std::size_t>(rows * cols));
+
+    // Compute total weight based on denominator mode
+    G4double totalWeight = 0.0;
+    if (useRowColMode) {
+        // RowCol/RowCol3x3 mode: sum only the cross (+ 3x3 block for RowCol3x3)
+        for (G4int i = 0; i < rows; ++i) {
+            for (G4int j = 0; j < cols; ++j) {
+                if (isInRowColRegion(i, j)) {
+                    totalWeight += fFullGridWeights(i, j);
+                }
+            }
+        }
+    } else {
+        totalWeight = fFullGridWeights.Sum();
+    }
+
+    // Find the highest F_i pixels for block denominator (4 for 2x2, 9 for 3x3)
+    const bool useChargeBlock3x3 = (activePixelMode == Constants::ActivePixelMode::ChargeBlock3x3);
+    const std::size_t blockTargetSize = useChargeBlock3x3 ? 9 : 4;
+
+    struct PixelWeight {
+        G4int i, j;
+        G4double weight;  // F_i value (before normalization)
+    };
+    std::vector<PixelWeight> pixelWeights;
+    pixelWeights.reserve(static_cast<std::size_t>(rows * cols));
     for (G4int i = 0; i < rows; ++i) {
         for (G4int j = 0; j < cols; ++j) {
-            pixelDistances.push_back({i, j, fResult.full.distance(i, j)});
+            pixelWeights.push_back({i, j, fFullGridWeights(i, j)});
         }
     }
-    std::partial_sort(pixelDistances.begin(),
-                      pixelDistances.begin() + std::min<std::size_t>(4, pixelDistances.size()),
-                      pixelDistances.end(),
-                      [](const PixelDistance& a, const PixelDistance& b) {
-                          return a.distance < b.distance;
+    // Sort by weight (F_i) in descending order: highest F_i first
+    std::partial_sort(pixelWeights.begin(),
+                      pixelWeights.begin() + std::min<std::size_t>(blockTargetSize, pixelWeights.size()),
+                      pixelWeights.end(),
+                      [](const PixelWeight& a, const PixelWeight& b) {
+                          return a.weight > b.weight;  // Descending order
                       });
 
-    // Compute block sum (sum of weights for the 4 closest pixels)
+    // Compute block sum (sum of weights for the highest F_i pixels)
     G4double blockSum = 0.0;
-    const std::size_t nBlock = std::min<std::size_t>(4, pixelDistances.size());
+    const std::size_t nBlock = std::min<std::size_t>(blockTargetSize, pixelWeights.size());
     for (std::size_t k = 0; k < nBlock; ++k) {
-        const G4int bi = pixelDistances[k].i;
-        const G4int bj = pixelDistances[k].j;
+        const G4int bi = pixelWeights[k].i;
+        const G4int bj = pixelWeights[k].j;
         blockSum += fFullGridWeights(bi, bj);
     }
     const G4double invBlockSum = (blockSum > 0.0) ? (1.0 / blockSum) : 0.0;
 
-    // Use Eigen for vectorized fraction computation
-    auto weightsEigen = fFullGridWeights.AsEigen();
     auto fractionsEigen = fResult.full.signalFraction.AsEigen();
 
-    // Compute fractions = weights / totalWeight using Eigen
-    if (totalWeight > 0.0) {
-        fractionsEigen = weightsEigen / totalWeight;
-    } else {
+    // Compute main fractions based on denominator mode
+    if (useRowColMode) {
+        // RowCol/RowCol3x3 mode: only pixels in the region get non-zero fractions
         fractionsEigen.setZero();
+        if (totalWeight > 0.0) {
+            for (G4int i = 0; i < rows; ++i) {
+                for (G4int j = 0; j < cols; ++j) {
+                    if (isInRowColRegion(i, j)) {
+                        fractionsEigen(i, j) = fFullGridWeights(i, j) / totalWeight;
+                    }
+                }
+            }
+        }
+    } else {
+        // Neighborhood or ChargeBlock mode: use full grid sum
+        if (totalWeight > 0.0) {
+            fractionsEigen = weightsEigen / totalWeight;
+        } else {
+            fractionsEigen.setZero();
+        }
     }
 
-    // Compute row-normalized fractions using Eigen
+    // Compute row-normalized fractions
     {
         auto fractionRowEigen = fResult.full.signalFractionRow.AsEigen();
-        Eigen::VectorXd rowSumsEigen = weightsEigen.rowwise().sum();
-        for (G4int i = 0; i < rows; ++i) {
-            const G4double invRowSum = (rowSumsEigen(i) > 0.0) ? (1.0 / rowSumsEigen(i)) : 0.0;
-            fractionRowEigen.row(i) = weightsEigen.row(i) * invRowSum;
+        if (useRowColMode) {
+            // RowCol/RowCol3x3 mode: fractionRow is same as fraction (region-based, sums to 1 over region)
+            fractionRowEigen = fractionsEigen;
+        } else {
+            // Other modes: each row normalized by its own sum
+            Eigen::VectorXd rowSumsEigen = weightsEigen.rowwise().sum();
+            for (G4int i = 0; i < rows; ++i) {
+                const G4double invRowSum = (rowSumsEigen(i) > 0.0) ? (1.0 / rowSumsEigen(i)) : 0.0;
+                fractionRowEigen.row(i) = weightsEigen.row(i) * invRowSum;
+            }
         }
     }
 
-    // Compute column-normalized fractions using Eigen
+    // Compute column-normalized fractions
     {
         auto fractionColEigen = fResult.full.signalFractionCol.AsEigen();
-        Eigen::RowVectorXd colSumsEigen = weightsEigen.colwise().sum();
-        for (G4int j = 0; j < cols; ++j) {
-            const G4double invColSum = (colSumsEigen(j) > 0.0) ? (1.0 / colSumsEigen(j)) : 0.0;
-            fractionColEigen.col(j) = weightsEigen.col(j) * invColSum;
+        if (useRowColMode) {
+            // RowCol/RowCol3x3 mode: fractionCol is same as fraction (region-based, sums to 1 over region)
+            fractionColEigen = fractionsEigen;
+        } else {
+            // Other modes: each column normalized by its own sum
+            Eigen::RowVectorXd colSumsEigen = weightsEigen.colwise().sum();
+            for (G4int j = 0; j < cols; ++j) {
+                const G4double invColSum = (colSumsEigen(j) > 0.0) ? (1.0 / colSumsEigen(j)) : 0.0;
+                fractionColEigen.col(j) = weightsEigen.col(j) * invColSum;
+            }
         }
     }
 
-    // Compute block fractions using precomputed block membership
+    // Compute block fractions using precomputed block membership (highest F_i pixels)
     {
         auto fractionBlockEigen = fResult.full.signalFractionBlock.AsEigen();
         fractionBlockEigen.setZero();
         for (std::size_t k = 0; k < nBlock; ++k) {
-            const G4int bi = pixelDistances[k].i;
-            const G4int bj = pixelDistances[k].j;
+            const G4int bi = pixelWeights[k].i;
+            const G4int bj = pixelWeights[k].j;
             fractionBlockEigen(bi, bj) = fFullGridWeights(bi, bj) * invBlockSum;
         }
     }
