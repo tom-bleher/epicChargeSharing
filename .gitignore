@@ -2,6 +2,9 @@
 build/
 geant4_env/
 
+# MkDocs generated site (build with mkdocs build)
+site/
+
 # Compiled Object files
 *.o
 *.obj
