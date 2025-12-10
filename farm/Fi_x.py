@@ -151,6 +151,39 @@ class RunResults:
 # ---------------------------------------------------------------------------
 
 
+def detect_fraction_branch(root_file: Path) -> str:
+    """Detect which fraction branch name is available in the ROOT file.
+
+    Returns the branch name to use for charge fractions. Supports:
+    - 'Fi' (standard Neighborhood mode)
+    - 'FiRow' (RowCol mode, row denominator)
+    - 'FiCol' (RowCol mode, column denominator)
+
+    Falls back to 'Fi' if detection fails.
+    """
+    try:
+        with uproot.open(root_file) as f:
+            if "Hits" not in f:
+                return "Fi"
+            tree = f["Hits"]
+            keys = {key.split(";")[0] for key in tree.keys()}
+
+            # Check for RowCol mode branches first (more specific)
+            if "FiRow" in keys:
+                return "FiRow"
+            if "FiCol" in keys:
+                return "FiCol"
+            # Standard neighborhood mode
+            if "Fi" in keys:
+                return "Fi"
+            # Legacy naming (if any)
+            if "F_i" in keys:
+                return "F_i"
+    except Exception:
+        pass
+    return "Fi"
+
+
 def iterate_tree_arrays(
     tree: uproot.behaviors.TBranch.HasBranches,
     branches: Sequence[str],
@@ -181,12 +214,15 @@ def infer_pixel_of_interest(
         return PixelSelection(pixel_id=int(requested_pixel_id))
 
     use_full_grid = False
+    fraction_branch = "Fi"  # Default
     if root_files:
         try:
             with uproot.open(root_files[0]) as first_file:
                 if "Hits" in first_file:
                     key_set = {key.split(";")[0] for key in first_file["Hits"].keys()}
                     use_full_grid = {"F_all", "F_all_pixel_id"}.issubset(key_set)
+            # Detect which fraction branch to use
+            fraction_branch = detect_fraction_branch(root_files[0])
         except Exception:
             use_full_grid = False
 
@@ -247,10 +283,10 @@ def infer_pixel_of_interest(
                 else:
                     for arrays in iterate_tree_arrays(
                         tree,
-                        ["F_i", "NeighborhoodPixelID"],
+                        [fraction_branch, "NeighborhoodPixelID"],
                         step_size=step_size,
                     ):
-                        fi = ak.Array(arrays["F_i"])
+                        fi = ak.Array(arrays[fraction_branch])
                         ids = ak.Array(arrays["NeighborhoodPixelID"])
 
                         # Truncate chunk if we exceed desired sample size
@@ -373,6 +409,9 @@ def collect_file_stats(
 ) -> FileStats:
     """Gather aggregate statistics for *pixel_id* from a ROOT file."""
 
+    # Detect which fraction branch to use before opening for iteration
+    fraction_branch = detect_fraction_branch(path)
+
     with uproot.open(path) as f:
         if "Hits" not in f:
             raise RuntimeError(f"Tree 'Hits' not found in {path}")
@@ -444,14 +483,14 @@ def collect_file_stats(
             for arrays in iterate_tree_arrays(
                 tree,
                 [
-                    "F_i",
+                    fraction_branch,
                     "NeighborhoodPixelID",
                     "NeighborhoodPixelX",
                     "NeighborhoodPixelY",
                 ],
                 step_size=step_size,
             ):
-                fi = ak.fill_none(ak.Array(arrays["F_i"]), np.nan)
+                fi = ak.fill_none(ak.Array(arrays[fraction_branch]), np.nan)
                 ids = ak.fill_none(ak.Array(arrays["NeighborhoodPixelID"]), -1)
                 px = ak.Array(arrays["NeighborhoodPixelX"]) if "NeighborhoodPixelX" in arrays.fields else None
                 py = ak.Array(arrays["NeighborhoodPixelY"]) if "NeighborhoodPixelY" in arrays.fields else None
