@@ -157,6 +157,15 @@ private:
     NeighborhoodLayout fNeighborhoodLayout;
     std::vector<G4double> fNeighborhoodChargeNew;
     std::vector<G4double> fNeighborhoodChargeFinal;
+    // Row-mode noisy charges
+    std::vector<G4double> fNeighborhoodChargeNewRow;
+    std::vector<G4double> fNeighborhoodChargeFinalRow;
+    // Col-mode noisy charges
+    std::vector<G4double> fNeighborhoodChargeNewCol;
+    std::vector<G4double> fNeighborhoodChargeFinalCol;
+    // Block-mode noisy charges
+    std::vector<G4double> fNeighborhoodChargeNewBlock;
+    std::vector<G4double> fNeighborhoodChargeFinalBlock;
     G4bool fEmitDistanceAlphaOutputs{false};
     G4bool fComputeFullFractions{false};
     std::unique_ptr<G4GenericMessenger> fMessenger;

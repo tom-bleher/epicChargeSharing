@@ -171,6 +171,19 @@ void EventAction::EndOfEventAction(const G4Event* event)
                                                               fNeighborhoodChargeNew.size());
         record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
                                                                 fNeighborhoodChargeFinal.size());
+        // Row/Col/Block mode noisy charges (default case)
+        record.neighborChargesNewRow = std::span<const G4double>(fNeighborhoodChargeNewRow.data(),
+                                                                  fNeighborhoodChargeNewRow.size());
+        record.neighborChargesFinalRow = std::span<const G4double>(fNeighborhoodChargeFinalRow.data(),
+                                                                    fNeighborhoodChargeFinalRow.size());
+        record.neighborChargesNewCol = std::span<const G4double>(fNeighborhoodChargeNewCol.data(),
+                                                                  fNeighborhoodChargeNewCol.size());
+        record.neighborChargesFinalCol = std::span<const G4double>(fNeighborhoodChargeFinalCol.data(),
+                                                                    fNeighborhoodChargeFinalCol.size());
+        record.neighborChargesNewBlock = std::span<const G4double>(fNeighborhoodChargeNewBlock.data(),
+                                                                    fNeighborhoodChargeNewBlock.size());
+        record.neighborChargesFinalBlock = std::span<const G4double>(fNeighborhoodChargeFinalBlock.data(),
+                                                                      fNeighborhoodChargeFinalBlock.size());
         record.includeDistanceAlpha = false;
         record.mode = ChargeSharingCalculator::ChargeMode::Patch;
         record.geometry = BuildDefaultGridGeometry();
@@ -258,6 +271,13 @@ void EventAction::EnsureNeighborhoodBuffers(std::size_t totalCells)
 {
     neighbor::ResizeAndFill(fNeighborhoodChargeNew, totalCells, 0.0);
     neighbor::ResizeAndFill(fNeighborhoodChargeFinal, totalCells, 0.0);
+    // Row/Col/Block mode noisy charges
+    neighbor::ResizeAndFill(fNeighborhoodChargeNewRow, totalCells, 0.0);
+    neighbor::ResizeAndFill(fNeighborhoodChargeFinalRow, totalCells, 0.0);
+    neighbor::ResizeAndFill(fNeighborhoodChargeNewCol, totalCells, 0.0);
+    neighbor::ResizeAndFill(fNeighborhoodChargeFinalCol, totalCells, 0.0);
+    neighbor::ResizeAndFill(fNeighborhoodChargeNewBlock, totalCells, 0.0);
+    neighbor::ResizeAndFill(fNeighborhoodChargeFinalBlock, totalCells, 0.0);
 }
 
 void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& result,
@@ -291,12 +311,38 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
     } else {
         neighbor::Fill(fNeighborhoodChargeNew, 0.0);
         neighbor::Fill(fNeighborhoodChargeFinal, 0.0);
+        neighbor::Fill(fNeighborhoodChargeNewRow, 0.0);
+        neighbor::Fill(fNeighborhoodChargeFinalRow, 0.0);
+        neighbor::Fill(fNeighborhoodChargeNewCol, 0.0);
+        neighbor::Fill(fNeighborhoodChargeFinalCol, 0.0);
+        neighbor::Fill(fNeighborhoodChargeNewBlock, 0.0);
+        neighbor::Fill(fNeighborhoodChargeFinalBlock, 0.0);
     }
 
     const auto& gainSigmas = fDetector ? fDetector->GetPixelGainSigmas() : kEmptyDoubleVector;
     const auto gainCount = gainSigmas.size();
     const bool hasGainNoise = gainCount > 0;
     const bool hasAdditiveNoise = context.sigmaNoise > 0.0;
+
+    // Helper lambda to apply noise to a base charge
+    auto applyNoise = [&](G4double baseCharge, G4int globalId) -> std::pair<G4double, G4double> {
+        G4double noisyCharge = baseCharge;
+        if (hasGainNoise && globalId >= 0) {
+            const auto gid = static_cast<std::size_t>(globalId);
+            if (gid < gainCount) {
+                const G4double sigmaGain = gainSigmas[gid];
+                if (sigmaGain > 0.0) {
+                    noisyCharge *= G4RandGauss::shoot(1.0, sigmaGain);
+                }
+            }
+        }
+        G4double finalCharge = noisyCharge;
+        if (hasAdditiveNoise) {
+            finalCharge += G4RandGauss::shoot(0.0, context.sigmaNoise);
+        }
+        finalCharge = std::max(0.0, finalCharge);
+        return {noisyCharge, finalCharge};
+    };
 
     for (const auto& cell : result.cells) {
         if (cell.gridIndex < 0) {
@@ -312,25 +358,25 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
             continue;
         }
 
-        G4double noisyCharge = cell.charge;
-        if (hasGainNoise) {
-            const auto gid = static_cast<std::size_t>(globalId);
-            if (gid < gainCount) {
-                const G4double sigmaGain = gainSigmas[gid];
-                if (sigmaGain > 0.0) {
-                    noisyCharge *= G4RandGauss::shoot(1.0, sigmaGain);
-                }
-            }
-        }
-
-        G4double finalCharge = noisyCharge;
-        if (hasAdditiveNoise) {
-            finalCharge += G4RandGauss::shoot(0.0, context.sigmaNoise);
-        }
-        finalCharge = std::max(0.0, finalCharge);
-
+        // Neighborhood mode (using cell.charge)
+        auto [noisyCharge, finalCharge] = applyNoise(cell.charge, globalId);
         fNeighborhoodChargeNew[gridIndex] = noisyCharge;
         fNeighborhoodChargeFinal[gridIndex] = finalCharge;
+
+        // Row mode (using cell.chargeRow)
+        auto [noisyRow, finalRow] = applyNoise(cell.chargeRow, globalId);
+        fNeighborhoodChargeNewRow[gridIndex] = noisyRow;
+        fNeighborhoodChargeFinalRow[gridIndex] = finalRow;
+
+        // Col mode (using cell.chargeCol)
+        auto [noisyCol, finalCol] = applyNoise(cell.chargeCol, globalId);
+        fNeighborhoodChargeNewCol[gridIndex] = noisyCol;
+        fNeighborhoodChargeFinalCol[gridIndex] = finalCol;
+
+        // Block mode (using cell.chargeBlock)
+        auto [noisyBlock, finalBlock] = applyNoise(cell.chargeBlock, globalId);
+        fNeighborhoodChargeNewBlock[gridIndex] = noisyBlock;
+        fNeighborhoodChargeFinalBlock[gridIndex] = finalBlock;
     }
 }
 
@@ -475,6 +521,19 @@ void EventAction::PopulateRecordFromChargeResult(ECS::IO::EventRecord& record,
                                                           fNeighborhoodChargeNew.size());
     record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
                                                             fNeighborhoodChargeFinal.size());
+    // Row/Col/Block mode noisy charges
+    record.neighborChargesNewRow = std::span<const G4double>(fNeighborhoodChargeNewRow.data(),
+                                                              fNeighborhoodChargeNewRow.size());
+    record.neighborChargesFinalRow = std::span<const G4double>(fNeighborhoodChargeFinalRow.data(),
+                                                                fNeighborhoodChargeFinalRow.size());
+    record.neighborChargesNewCol = std::span<const G4double>(fNeighborhoodChargeNewCol.data(),
+                                                              fNeighborhoodChargeNewCol.size());
+    record.neighborChargesFinalCol = std::span<const G4double>(fNeighborhoodChargeFinalCol.data(),
+                                                                fNeighborhoodChargeFinalCol.size());
+    record.neighborChargesNewBlock = std::span<const G4double>(fNeighborhoodChargeNewBlock.data(),
+                                                                fNeighborhoodChargeNewBlock.size());
+    record.neighborChargesFinalBlock = std::span<const G4double>(fNeighborhoodChargeFinalBlock.data(),
+                                                                  fNeighborhoodChargeFinalBlock.size());
     record.includeDistanceAlpha = fEmitDistanceAlphaOutputs;
     record.mode = result.mode;
     record.geometry = result.geometry;
