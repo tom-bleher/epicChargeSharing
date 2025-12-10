@@ -7,7 +7,15 @@
 #ifndef ECS_ROOT_HELPERS_HH
 #define ECS_ROOT_HELPERS_HH
 
+// Check if we're being compiled with Geant4 or as a standalone ROOT macro
+// ROOT macros define __CLING__ when interpreted
+#if defined(__CLING__) || defined(__ROOTCLING__)
+#define ECS_HAS_GEANT4 0
+#include <string>
+#else
+#define ECS_HAS_GEANT4 1
 #include "globals.hh"
+#endif
 
 #include <atomic>
 #include <condition_variable>
@@ -42,14 +50,16 @@ inline TBranch* EnsureAndResetBranch(TTree* tree, const BranchInfo& info) {
 
     TBranch* branch = tree->GetBranch(info.name);
     if (!branch) {
+        // Branch doesn't exist - create it
         branch = info.leaflist ? tree->Branch(info.name, info.value, info.leaflist)
                                : tree->Branch(info.name, info.value);
     } else {
+        // Branch exists - set address and clear for overwrite
         tree->SetBranchAddress(info.name, info.value);
         branch = tree->GetBranch(info.name);
         if (branch) {
-            branch->Reset();
-            branch->DropBaskets();
+            branch->Reset();        // Clear previous entries
+            branch->DropBaskets();  // Drop old baskets to avoid mixing
         }
     }
     tree->SetBranchStatus(info.name, 1);
@@ -74,6 +84,12 @@ inline void FillBranches(const std::vector<BranchInfo>& branches) {
 }
 
 } // namespace RootUtils
+
+// ============================================================================
+// Geant4-specific utilities (only available when compiled with Geant4)
+// ============================================================================
+
+#if ECS_HAS_GEANT4
 
 // ============================================================================
 // File Writer Helper
@@ -134,6 +150,8 @@ G4String WorkerFileName(G4int threadId);
 
 /// \brief Global mutex for ROOT I/O operations.
 std::mutex& RootIOMutex();
+
+#endif // ECS_HAS_GEANT4
 
 } // namespace ECS
 
