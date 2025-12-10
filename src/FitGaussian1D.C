@@ -169,18 +169,17 @@ std::string ResolveChargeBranch(TTree& tree, const std::string& requestedBranch)
     if (hasBranch(requestedBranch)) {
         return requestedBranch;
     }
-    if (hasBranch("Qf")) {
-        return "Qf";
-    }
-    if (hasBranch("Fi")) {
-        return "Fi";
-    }
-    if (hasBranch("Qi")) {
-        return "Qi";
+    // Try standard names first, then "Block"/"Row"/"Col" suffix variants (vector branches)
+    for (const char* name : {"Qf", "QfBlock", "QfRow", "QfCol",
+                             "Fi", "FiBlock", "FiRow", "FiCol",
+                             "Qi", "QiBlock", "QiRow", "QiCol"}) {
+        if (hasBranch(name)) {
+            return name;
+        }
     }
 
     ::Error("FitGaus1D",
-            "No charge branch found (requested '%s'). Tried Qf, Fi, Qi.",
+            "No charge branch found (requested '%s'). Tried Qf/Qi/Fi with Block/Row/Col suffixes.",
             requestedBranch.c_str());
     return {};
 }
@@ -478,7 +477,8 @@ namespace fitgaus1d::detail {
       return result;
     }
 
-    TF1 fLoc("fGauss1D_helper", GaussPlusB, -1e9, 1e9, 4);
+    // Thread-local static TF1 to avoid recreation overhead per fit
+    static thread_local TF1 fLoc("fGauss1D_helper", GaussPlusB, -1e9, 1e9, 4);
     auto minmaxPos = std::minmax_element(positions.begin(), positions.end());
     if (minmaxPos.first != positions.end()) {
       const double margin = 0.5 * cfg.pixelSpacing;
@@ -505,7 +505,8 @@ namespace fitgaus1d::detail {
       const double sigmaY = charge_uncert::SelectVerticalSigma(candidate, uniformSigma);
       data.Add(positions[i], charges[i], sigmaY);
     }
-    ROOT::Fit::Fitter fitter;
+    // Thread-local static Fitter to avoid recreation overhead per fit
+    static thread_local ROOT::Fit::Fitter fitter;
     fitter.Config().SetMinimizer("Minuit2", "Fumili2");
     fitter.Config().MinimizerOptions().SetStrategy(0);
     fitter.Config().MinimizerOptions().SetTolerance(1e-4);
@@ -527,10 +528,14 @@ namespace fitgaus1d::detail {
     fitter.Config().ParSettings(3).SetValue(cfg.seedB);
     bool ok = fitter.Fit(data);
     if (!ok) {
+      // Warm-start Migrad from Fumili2's partial result (if available)
+      // The fitter retains the last parameter values, so Migrad starts from
+      // where Fumili2 left off rather than from scratch
       fitter.Config().SetMinimizer("Minuit2", "Migrad");
       fitter.Config().MinimizerOptions().SetStrategy(1);
       fitter.Config().MinimizerOptions().SetTolerance(1e-3);
       fitter.Config().MinimizerOptions().SetPrintLevel(0);
+      // Parameter values are preserved from previous Fit() call - no need to reset seeds
       ok = fitter.Fit(data);
     }
     if (!ok) {
@@ -574,6 +579,11 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
                  double distanceErrorCapPercent = 10.0,
                  bool distanceErrorPreferTruthCenter = true,
                  bool distanceErrorPowerInverse = true) {
+  // Enable implicit multi-threading for parallel I/O operations
+  if (!ROOT::IsImplicitMTEnabled()) {
+    ROOT::EnableImplicitMT();
+  }
+
   ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit2", "Fumili2");
   ROOT::Math::MinimizerOptions::SetDefaultTolerance(1e-3);
   ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(100);
@@ -695,12 +705,24 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchStatus("isPixelHit", 1);
   // Enable only the chosen charge branch
   tree->SetBranchStatus(chosenCharge.c_str(), 1);
+  // Resolve Qi/Qn branch names (support both legacy and Block variants)
+  std::string qiBranchName, qnBranchName;
   if (enableQiQnErrors) {
-    haveQiBranchForErrors = tree->GetBranch("Qi") != nullptr;
-    haveQnBranchForErrors = tree->GetBranch("Qn") != nullptr;
+    if (tree->GetBranch("Qi") != nullptr) {
+      qiBranchName = "Qi";
+    } else if (tree->GetBranch("QiBlock") != nullptr) {
+      qiBranchName = "QiBlock";
+    }
+    if (tree->GetBranch("Qn") != nullptr) {
+      qnBranchName = "Qn";
+    } else if (tree->GetBranch("QnBlock") != nullptr) {
+      qnBranchName = "QnBlock";
+    }
+    haveQiBranchForErrors = !qiBranchName.empty();
+    haveQnBranchForErrors = !qnBranchName.empty();
     if (haveQiBranchForErrors && haveQnBranchForErrors) {
-      tree->SetBranchStatus("Qi", 1);
-      tree->SetBranchStatus("Qn", 1);
+      tree->SetBranchStatus(qiBranchName.c_str(), 1);
+      tree->SetBranchStatus(qnBranchName.c_str(), 1);
     } else {
       ::Warning("FitGaus1D", "Requested Qi/Qn vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
       enableQiQnErrors = false;
@@ -714,10 +736,10 @@ int FitGaus1D(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
   if (enableQiQnErrors && haveQiBranchForErrors) {
-    tree->SetBranchAddress("Qi", &Qi);
+    tree->SetBranchAddress(qiBranchName.c_str(), &Qi);
   }
   if (enableQiQnErrors && haveQnBranchForErrors) {
-    tree->SetBranchAddress("Qn", &Qn);
+    tree->SetBranchAddress(qnBranchName.c_str(), &Qn);
   }
 
   // New branches (outputs).
