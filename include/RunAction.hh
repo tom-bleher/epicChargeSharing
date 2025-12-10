@@ -242,7 +242,7 @@ private:
     // EDM4hep output support
     std::unique_ptr<IO::EDM4hepWriter> fEDM4hepWriter;
     IO::EDM4hepConfig fEDM4hepConfig;
-    G4bool fWriteEDM4hep{true};
+    G4bool fWriteEDM4hep{false};
 };
 
 } // namespace ECS

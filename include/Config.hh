@@ -53,7 +53,7 @@ inline constexpr G4double LINEAR_CHARGE_MODEL_BETA = 0.002;
 
 // ──────────────────────────── Particle Gun ──────────────────────────────────
 // Use fixed position (true) or random sampling (false) for primary particles
-inline constexpr G4bool USE_FIXED_POSITION = true;
+inline constexpr G4bool USE_FIXED_POSITION = false;
 
 // ─────────────────────────── Active Pixel Mode ─────────────────────────────
 // Selects which pixels are "active" for signal fraction (F_i) calculation.
@@ -70,13 +70,13 @@ enum class ActivePixelMode2D { ChargeBlock2x2, ChargeBlock3x3 };
 //   ChargeBlock2x2 - 4 pixels with highest F_i
 //   ChargeBlock3x3 - 9 pixels with highest F_i
 
-inline constexpr ActivePixelMode1D ACTIVE_PIXEL_MODE_1D = ActivePixelMode1D::RowCol;
+inline constexpr ActivePixelMode1D ACTIVE_PIXEL_MODE_1D = ActivePixelMode1D::RowCol3x3;
 
 // ─────────────────────────────── Fitting ───────────────────────────────────
 // Enable Gaussian fitting for position reconstruction
 // Note: To use ActivePixelMode2D, you must set FIT_GAUS_2D = true
-inline constexpr G4bool FIT_GAUS_1D = false;
-inline constexpr G4bool FIT_GAUS_2D = false;
+inline constexpr G4bool FIT_GAUS_1D = true;
+inline constexpr G4bool FIT_GAUS_2D = true;
 
 // Uncomment the following to use 2D-only modes (requires FIT_GAUS_2D = true above):
 // inline constexpr ActivePixelMode2D ACTIVE_PIXEL_MODE_2D = ActivePixelMode2D::ChargeBlock2x2;
