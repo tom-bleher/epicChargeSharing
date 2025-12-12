@@ -664,10 +664,10 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
     double xMinR =  1e300, xMaxR = -1e300; double yMinR =  1e300, yMaxR = -1e300;
     for (int k = 0; k < g2d.GetN(); ++k) { xMinR = std::min(xMinR, g2d.GetX()[k]); xMaxR = std::max(xMaxR, g2d.GetX()[k]); yMinR = std::min(yMinR, g2d.GetY()[k]); yMaxR = std::max(yMaxR, g2d.GetY()[k]); }
     xMinR -= 0.5 * pixelSpacing; xMaxR += 0.5 * pixelSpacing; yMinR -= 0.5 * pixelSpacing; yMaxR += 0.5 * pixelSpacing;
-    const double muXLo = v_x_px[i] - 0.5 * pixelSpacing;
-    const double muXHi = v_x_px[i] + 0.5 * pixelSpacing;
-    const double muYLo = v_y_px[i] - 0.5 * pixelSpacing;
-    const double muYHi = v_y_px[i] + 0.5 * pixelSpacing;
+    const double muXLo = v_x_px[i] - 1.0 * pixelSpacing;
+    const double muXHi = v_x_px[i] + 1.0 * pixelSpacing;
+    const double muYLo = v_y_px[i] - 1.0 * pixelSpacing;
+    const double muYHi = v_y_px[i] + 1.0 * pixelSpacing;
 
     // Thread-local TF2 reuse to avoid repeated allocations per fit
     thread_local TF2 fModel("fModel", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
