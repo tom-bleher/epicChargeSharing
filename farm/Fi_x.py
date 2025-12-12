@@ -46,16 +46,40 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import uproot
-
+import pathlib
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT_DIR = REPO_ROOT / "sweep_x_runs" / "latest"  # Symlink or most recent run
-DEFAULT_OUTPUT_BASE = REPO_ROOT / "proc" / "fit" / "fi_vs_x"
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+SWEEP_RUNS_DIR = REPO_ROOT / "sweep_x_runs"
 SENTINEL_INVALID_FRACTION = -999.0
+
+
+def find_latest_sweep_dir() -> pathlib.Path:
+    """Find the most recent timestamped directory in sweep_x_runs."""
+    if not SWEEP_RUNS_DIR.exists():
+        raise FileNotFoundError(f"Sweep runs directory not found: {SWEEP_RUNS_DIR}")
+    # Look for directories with timestamp pattern YYYYMMDD-HHMMSS
+    candidates = [
+        d for d in SWEEP_RUNS_DIR.iterdir()
+        if d.is_dir() and d.name[0].isdigit()
+    ]
+    if not candidates:
+        raise FileNotFoundError(f"No sweep run directories found in {SWEEP_RUNS_DIR}")
+    # Sort by name (timestamp format sorts chronologically)
+    return sorted(candidates, key=lambda d: d.name)[-1]
+
+
+def get_default_input_dir() -> pathlib.Path:
+    """Get the default input directory (latest sweep run)."""
+    return find_latest_sweep_dir()
+
+
+def get_default_output_dir(input_dir: pathlib.Path) -> pathlib.Path:
+    """Get the default output directory based on input directory."""
+    return input_dir / "fi_vs_x"
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +182,7 @@ def detect_fraction_branch(root_file: Path) -> str:
     - 'Fi' (standard Neighborhood mode)
     - 'FiRow' (RowCol mode, row denominator)
     - 'FiCol' (RowCol mode, column denominator)
+    - 'FiBlock' (RowCol3x3/Block mode)
 
     Falls back to 'Fi' if detection fails.
     """
@@ -173,6 +198,9 @@ def detect_fraction_branch(root_file: Path) -> str:
                 return "FiRow"
             if "FiCol" in keys:
                 return "FiCol"
+            # Block mode (RowCol3x3)
+            if "FiBlock" in keys:
+                return "FiBlock"
             # Standard neighborhood mode
             if "Fi" in keys:
                 return "Fi"
@@ -904,7 +932,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
-    input_dir = resolve_path(args.input_dir, default=DEFAULT_INPUT_DIR)
+    # Resolve input directory (use latest sweep run if not specified)
+    if args.input_dir:
+        p = Path(args.input_dir)
+        if not p.is_absolute():
+            input_dir = (REPO_ROOT / p).resolve()
+        else:
+            input_dir = p.resolve()
+    else:
+        input_dir = get_default_input_dir()
+
     input_dir2: Optional[Path] = None
     if args.input_dir2:
         # For second input dir, use relative resolution without default
@@ -914,8 +951,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         else:
             input_dir2 = p.resolve()
 
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    base_output_dir = resolve_path(args.output_dir, default=DEFAULT_OUTPUT_BASE / timestamp)
+    # Resolve output directory (default to input_dir/fi_vs_x)
+    if args.output_dir:
+        p = Path(args.output_dir)
+        if not p.is_absolute():
+            base_output_dir = (REPO_ROOT / p).resolve()
+        else:
+            base_output_dir = p.resolve()
+    else:
+        base_output_dir = get_default_output_dir(input_dir)
 
     # Process first run
     print("=" * 80)

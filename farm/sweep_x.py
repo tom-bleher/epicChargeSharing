@@ -155,6 +155,35 @@ def rename_output_to(target_name: Path):
         target_name.unlink()
     shutil.move(str(source), str(target_name))
 
+def run_post_analysis(output_dir: Path):
+    """Run post-sweep analysis scripts (Fi_x.py and sigma_f_x.py)."""
+    print("\n" + "=" * 80)
+    print("RUNNING POST-SWEEP ANALYSIS")
+    print("=" * 80)
+
+    # Import and run Fi_x.py
+    try:
+        print("\n[INFO] Running Fi_x.py analysis...")
+        from farm import Fi_x
+        Fi_x.main(["--input-dir", str(output_dir)])
+        print("[OK] Fi_x.py completed successfully")
+    except Exception as e:
+        print(f"[WARN] Fi_x.py failed: {e}")
+
+    # Import and run sigma_f_x.py
+    try:
+        print("\n[INFO] Running sigma_f_x.py analysis...")
+        from farm import sigma_f_x
+        sigma_f_x.main(output_dir)
+        print("[OK] sigma_f_x.py completed successfully")
+    except Exception as e:
+        print(f"[WARN] sigma_f_x.py failed: {e}")
+
+    print("\n" + "=" * 80)
+    print("POST-SWEEP ANALYSIS COMPLETE")
+    print("=" * 80)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Sweep x positions and collect output ROOT files into a dedicated directory."
@@ -164,6 +193,12 @@ def main():
         dest="output_dir",
         type=str,
         help="Directory to store output ROOT files. If relative, resolved against the repository root. Default: timestamped folder under sweep_x_runs/.",
+    )
+    parser.add_argument(
+        "--skip-analysis",
+        dest="skip_analysis",
+        action="store_true",
+        help="Skip running post-sweep analysis scripts (Fi_x.py, sigma_f_x.py).",
     )
     args = parser.parse_args()
 
@@ -203,6 +238,10 @@ def main():
             write_file_text(SRC_FILE, original_text)
         except Exception as e:
             print(f"Warning: failed to restore original source: {e}")
+
+    # Run post-analysis scripts
+    if not args.skip_analysis:
+        run_post_analysis(output_dir)
 
 
 if __name__ == "__main__":

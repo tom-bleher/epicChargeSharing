@@ -43,9 +43,33 @@ import uproot
 # ---------------------------- Configuration ---------------------------------
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-INPUT_DIR = REPO_ROOT / "sweep_x_runs" / "latest"  # Symlink or most recent run
-OUTPUT_BASE = REPO_ROOT / "proc" / "fit" / "uproot_gaussian_out"
+SWEEP_RUNS_DIR = REPO_ROOT / "sweep_x_runs"
 TREE_NAME = "Hits"
+
+
+def find_latest_sweep_dir() -> pathlib.Path:
+    """Find the most recent timestamped directory in sweep_x_runs."""
+    if not SWEEP_RUNS_DIR.exists():
+        raise FileNotFoundError(f"Sweep runs directory not found: {SWEEP_RUNS_DIR}")
+    # Look for directories with timestamp pattern YYYYMMDD-HHMMSS
+    candidates = [
+        d for d in SWEEP_RUNS_DIR.iterdir()
+        if d.is_dir() and d.name[0].isdigit()
+    ]
+    if not candidates:
+        raise FileNotFoundError(f"No sweep run directories found in {SWEEP_RUNS_DIR}")
+    # Sort by name (timestamp format sorts chronologically)
+    return sorted(candidates, key=lambda d: d.name)[-1]
+
+
+def get_default_input_dir() -> pathlib.Path:
+    """Get the default input directory (latest sweep run)."""
+    return find_latest_sweep_dir()
+
+
+def get_default_output_dir(input_dir: pathlib.Path) -> pathlib.Path:
+    """Get the default output directory based on input directory."""
+    return input_dir / "uproot_gaussian_out"
 
 BRANCHES = [
     "ReconTrueDeltaRowX",
@@ -222,7 +246,7 @@ def save_plot(
     plt.close(fig)
 
 
-def process_root_file(root_path: str, results: Dict[str, List[Tuple[float, float, float, float]]]) -> None:
+def process_root_file(root_path: str, results: Dict[str, List[Tuple[float, float, float, float]]], output_base: pathlib.Path) -> None:
     """Process one ROOT file: fit specified branches and save plots.
 
     Updates `results` in-place: results[branch].append((x_um, sigma_um, d_sigma_um, stdev_um))
@@ -251,7 +275,7 @@ def process_root_file(root_path: str, results: Dict[str, List[Tuple[float, float
                 fit = fit_gaussian_to_values(arr, num_bins=NUM_BINS)
 
                 # Save plot
-                out_dir = OUTPUT_BASE / "plots" / branch
+                out_dir = output_base / "plots" / branch
                 out_png = out_dir / pathlib.Path(root_path).with_suffix(".png").name
                 save_plot(
                     branch,
@@ -288,24 +312,62 @@ def write_excel(results: Dict[str, List[Tuple[float, float, float, float]]], out
             df.to_excel(writer, sheet_name=branch[:31], index=False)
 
 
-def main() -> None:
-    ensure_dir(str(OUTPUT_BASE))
+def main(input_dir: pathlib.Path = None, output_dir: pathlib.Path = None) -> None:
+    """Main entry point. Can be called directly with paths or via CLI."""
+    import argparse
+
+    # Handle CLI arguments if called without parameters
+    if input_dir is None:
+        parser = argparse.ArgumentParser(
+            description="Gaussian fitting for reconstruction deltas vs. x position"
+        )
+        parser.add_argument(
+            "--input-dir",
+            dest="input_dir",
+            type=str,
+            default=None,
+            help="Directory containing ROOT files (default: latest in sweep_x_runs)",
+        )
+        parser.add_argument(
+            "--output-dir",
+            dest="output_dir",
+            type=str,
+            default=None,
+            help="Output directory (default: input_dir/uproot_gaussian_out)",
+        )
+        args = parser.parse_args()
+
+        if args.input_dir:
+            p = pathlib.Path(args.input_dir)
+            input_dir = p if p.is_absolute() else (REPO_ROOT / p).resolve()
+        else:
+            input_dir = get_default_input_dir()
+
+        if args.output_dir:
+            p = pathlib.Path(args.output_dir)
+            output_dir = p if p.is_absolute() else (REPO_ROOT / p).resolve()
+        else:
+            output_dir = get_default_output_dir(input_dir)
+    elif output_dir is None:
+        output_dir = get_default_output_dir(input_dir)
+
+    ensure_dir(str(output_dir))
 
     # Gather ROOT files
-    input_dir = pathlib.Path(INPUT_DIR)
     root_files = sorted(input_dir.glob("*.root"))
     if not root_files:
-        print(f"[WARN] No ROOT files found in {INPUT_DIR}")
+        print(f"[WARN] No ROOT files found in {input_dir}")
+        return
 
     results: Dict[str, List[Tuple[float, float, float, float]]] = {}
     for path in root_files:
         print(f"[INFO] Processing {path.name}")
-        process_root_file(str(path), results)
+        process_root_file(str(path), results, output_dir)
 
-    out_excel = OUTPUT_BASE / "gaussian_sigma_summary.xlsx"
+    out_excel = output_dir / "gaussian_sigma_summary.xlsx"
     write_excel(results, str(out_excel))
     print(f"[OK] Wrote Excel: {out_excel}")
-    print(f"[OK] PNG plots rooted at: {OUTPUT_BASE / 'plots'}")
+    print(f"[OK] PNG plots rooted at: {output_dir / 'plots'}")
 
 
 if __name__ == "__main__":
