@@ -58,4 +58,4 @@ cmake_install.cmake
 .idea/
 *.swp
 *~
-*.mdc
+*.mdcpaper/
