@@ -30,7 +30,7 @@
 
 namespace {
   // Signal fraction mode enum matching Config.hh
-  enum class ActivePixelMode { Neighborhood, ChargeBlock, RowCol, Unknown };
+  enum class ActivePixelMode { Neighborhood, ChargeBlock2x2, ChargeBlock3x3, RowCol, RowCol3x3, Unknown };
 
   // Helper to read string metadata from file-level TNamed OR tree UserInfo
   std::string ReadStringNamed(TFile* file, TTree* tree, const char* key, const char* defaultVal = "")
@@ -66,8 +66,10 @@ namespace {
     std::transform(modeStr.begin(), modeStr.end(), modeStr.begin(),
                    [](unsigned char c){ return std::tolower(c); });
     if (modeStr == "neighborhood") return ActivePixelMode::Neighborhood;
-    if (modeStr == "rowcol" || modeStr == "rowcol3x3") return ActivePixelMode::RowCol;
-    if (modeStr == "chargeblock" || modeStr == "chargeblock2x2" || modeStr == "chargeblock3x3") return ActivePixelMode::ChargeBlock;
+    if (modeStr == "rowcol3x3") return ActivePixelMode::RowCol3x3;
+    if (modeStr == "rowcol") return ActivePixelMode::RowCol;
+    if (modeStr == "chargeblock3x3") return ActivePixelMode::ChargeBlock3x3;
+    if (modeStr == "chargeblock" || modeStr == "chargeblock2x2") return ActivePixelMode::ChargeBlock2x2;
     return ActivePixelMode::Neighborhood; // default
   }
 
@@ -77,7 +79,9 @@ namespace {
     switch (mode) {
       case ActivePixelMode::Neighborhood: return "Neighborhood";
       case ActivePixelMode::RowCol: return "RowCol";
-      case ActivePixelMode::ChargeBlock: return "ChargeBlock";
+      case ActivePixelMode::RowCol3x3: return "RowCol3x3";
+      case ActivePixelMode::ChargeBlock2x2: return "ChargeBlock2x2";
+      case ActivePixelMode::ChargeBlock3x3: return "ChargeBlock3x3";
       default: return "Unknown";
     }
   }
@@ -93,12 +97,15 @@ namespace {
       case ActivePixelMode::RowCol:
         // Only center row (i == 2) or center column (j == 2)
         return (i == center) || (j == center);
-      case ActivePixelMode::ChargeBlock:
-        // Only the 2x2 block closest to center: cells (1,1), (1,2), (2,1), (2,2)
-        // Actually for block mode, it's the 4 pixels surrounding the hit
-        // In a 5x5 grid centered on the nearest pixel, the relevant 2x2 block
-        // depends on which quadrant the hit is in. For simplicity, show center 2x2.
+      case ActivePixelMode::RowCol3x3:
+        // Cross plus 3x3 center block
+        return (i == center) || (j == center) || (std::abs(i - center) <= 1 && std::abs(j - center) <= 1);
+      case ActivePixelMode::ChargeBlock2x2:
+        // 2x2 block around center: cells (1,1), (1,2), (2,1), (2,2)
         return (i >= 1 && i <= 2) && (j >= 1 && j <= 2);
+      case ActivePixelMode::ChargeBlock3x3:
+        // 3x3 block around center: cells where |i-center| <= 1 and |j-center| <= 1
+        return (std::abs(i - center) <= 1) && (std::abs(j - center) <= 1);
       default:
         return true;
     }
@@ -423,11 +430,12 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   }
 
   // Build transposed 2D grid so that i->Y (row), j->X (col) matches world coordinates
+  // Data is stored as idx = x * dim + y, so we transpose: grid[y][x] = vec[x * dim + y]
   std::vector<std::vector<double>> grid(dim, std::vector<double>(dim, std::numeric_limits<double>::quiet_NaN()));
   for (int di = 0; di < dim; ++di) {
     for (int dj = 0; dj < dim; ++dj) {
-      const int idx = di * dim + dj; // stored row-major: di=row, dj=col
-      grid[di][dj] = (*vecPtr)[idx]; // no transpose: grid[row][col]
+      const int idx = dj * dim + di; // transpose: dj=col(X), di=row(Y)
+      grid[di][dj] = (*vecPtr)[idx];
     }
   }
 
@@ -571,7 +579,7 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
       // Convert grid indices to 5x5 ROI indices (0-4 where 2 is center)
       const int roiI = i - i0; // 0..4
       const int roiJ = j - j0; // 0..4
-      if (!IsCellRelevant(roiI, roiJ, denomMode)) continue;
+      if (!IsCellRelevant(roiI, roiJ, activeMode)) continue;
       valid[i][j] = true;
       ++nValid;
 
@@ -1234,11 +1242,12 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
     const int dim = static_cast<int>(std::lround(std::sqrt(static_cast<double>(nVals))));
     if (dim * dim != static_cast<int>(nVals) || dim < 5) continue;
 
-    // Build grid[row][col] from chosen source (Qi or Fi) - no transpose
+    // Build grid[row][col] from chosen source (Qi or Fi)
+    // Data is stored as idx = x * dim + y, so we transpose: grid[y][x] = vec[x * dim + y]
     std::vector<std::vector<double>> grid(dim, std::vector<double>(dim, std::numeric_limits<double>::quiet_NaN()));
     for (int di = 0; di < dim; ++di) {
       for (int dj = 0; dj < dim; ++dj) {
-        const int idx = di * dim + dj; // row-major: di=row, dj=col
+        const int idx = dj * dim + di; // transpose: dj=col(X), di=row(Y)
         grid[di][dj] = (*vec)[idx];
       }
     }
@@ -1339,7 +1348,7 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
         const int gj = j0 + jj;
         const double fval = grid[gi][gj];
         // Check data validity and denominator mode relevance
-        if (std::isfinite(fval) && fval >= 0.0 && IsCellRelevant(ii, jj, denomMode)) {
+        if (std::isfinite(fval) && fval >= 0.0 && IsCellRelevant(ii, jj, activeMode)) {
           valid[ii][jj] = true;
         }
       }
