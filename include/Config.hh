@@ -129,9 +129,11 @@ inline constexpr ActivePixelMode ActivePixelModeFrom2D(ActivePixelMode2D m) {
                                                       ActivePixelMode::ChargeBlock3x3;
 }
 
-// The active pixel mode used at runtime (derived from ACTIVE_PIXEL_MODE_1D)
-// To use 2D modes, user must define ACTIVE_PIXEL_MODE_2D and change this line
-inline constexpr ActivePixelMode ACTIVE_PIXEL_MODE = ActivePixelModeFrom1D(ACTIVE_PIXEL_MODE_1D);
+// The active pixel mode used at runtime
+// When FIT_GAUS_2D is enabled, use the 2D mode; otherwise use the 1D mode
+inline constexpr ActivePixelMode ACTIVE_PIXEL_MODE =
+    FIT_GAUS_2D ? ActivePixelModeFrom2D(ACTIVE_PIXEL_MODE_2D)
+                : ActivePixelModeFrom1D(ACTIVE_PIXEL_MODE_1D);
 
 // Full grid storage: disabled by default (saves only neighborhood/block/strip data)
 // Set to true if you need per-event full-detector charge fractions

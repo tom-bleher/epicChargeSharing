@@ -426,8 +426,8 @@ private:
 class PostProcessingRunner {
 public:
     struct Config {
-        bool runFitGaus1D{true};
-        bool runFitGaus2D{false};
+        bool runFitGaus1D{Constants::FIT_GAUS_1D};
+        bool runFitGaus2D{Constants::FIT_GAUS_2D};
         std::string sourceDir;
         std::string rootFileName{"epicChargeSharing.root"};
     };
