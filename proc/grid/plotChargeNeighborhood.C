@@ -32,17 +32,9 @@ namespace {
   // Signal fraction mode enum matching Config.hh
   enum class ActivePixelMode { Neighborhood, ChargeBlock2x2, ChargeBlock3x3, RowCol, RowCol3x3, Unknown };
 
-  // Helper to read string metadata from file-level TNamed OR tree UserInfo
-  std::string ReadStringNamed(TFile* file, TTree* tree, const char* key, const char* defaultVal = "")
+  // Helper to read string metadata from tree UserInfo
+  std::string ReadStringNamed(TTree* tree, const char* key, const char* defaultVal = "")
   {
-    // First try file-level TNamed (legacy format)
-    if (file) {
-      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
-        const char* s = obj->GetTitle();
-        if (s && *s) return std::string(s);
-      }
-    }
-    // Then try tree UserInfo with TNamed (new format)
     if (tree) {
       TList* info = tree->GetUserInfo();
       if (info) {
@@ -56,13 +48,9 @@ namespace {
   }
 
   // Read the ActivePixelMode from metadata
-  ActivePixelMode ReadActivePixelMode(TFile* file, TTree* tree)
+  ActivePixelMode ReadActivePixelMode(TTree* tree)
   {
-    // Try new key first, fall back to legacy key
-    std::string modeStr = ReadStringNamed(file, tree, "ActivePixelMode", "");
-    if (modeStr.empty()) {
-      modeStr = ReadStringNamed(file, tree, "DenominatorMode", "Neighborhood");
-    }
+    std::string modeStr = ReadStringNamed(tree, "ActivePixelMode", "Neighborhood");
     std::transform(modeStr.begin(), modeStr.end(), modeStr.begin(),
                    [](unsigned char c){ return std::tolower(c); });
     if (modeStr == "neighborhood") return ActivePixelMode::Neighborhood;
@@ -111,74 +99,33 @@ namespace {
     }
   }
 
-  // Helper to read double metadata from file-level TNamed OR tree UserInfo TParameter
-  double ReadDoubleNamed(TFile* file, TTree* tree, const char* key)
+  // Helper to read double metadata from tree UserInfo TParameter
+  double ReadDoubleNamed(TTree* tree, const char* key)
   {
-    // First try file-level TNamed (legacy format)
-    if (file) {
-      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
-        const char* s = obj->GetTitle();
-        if (s && *s) return std::atof(s);
-      }
-    }
-    // Then try tree UserInfo with TParameter<double> (new format)
     if (tree) {
       TList* info = tree->GetUserInfo();
       if (info) {
         if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
           return param->GetVal();
         }
-        // Also try TNamed in UserInfo (string representation)
-        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
-          const char* s = named->GetTitle();
-          if (s && *s) return std::atof(s);
-        }
       }
     }
     std::ostringstream oss; oss << "Missing metadata object: '" << key << "'";
     throw std::runtime_error(oss.str());
   }
 
-  // Overload for backward compatibility (file-only)
-  double ReadDoubleNamed(TFile* file, const char* key)
+  int ReadIntNamed(TTree* tree, const char* key)
   {
-    return ReadDoubleNamed(file, nullptr, key);
-  }
-
-  int ReadIntNamed(TFile* file, TTree* tree, const char* key)
-  {
-    // First try file-level TNamed
-    if (file) {
-      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
-        const char* s = obj->GetTitle();
-        if (s && *s) return static_cast<int>(std::lround(std::atof(s)));
-      }
-    }
-    // Then try tree UserInfo with TParameter<int>
     if (tree) {
       TList* info = tree->GetUserInfo();
       if (info) {
         if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(key))) {
           return param->GetVal();
         }
-        // Also try TParameter<double> and convert
-        if (auto* paramD = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
-          return static_cast<int>(std::lround(paramD->GetVal()));
-        }
-        // Also try TNamed in UserInfo
-        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
-          const char* s = named->GetTitle();
-          if (s && *s) return static_cast<int>(std::lround(std::atof(s)));
-        }
       }
     }
     std::ostringstream oss; oss << "Missing metadata object: '" << key << "'";
     throw std::runtime_error(oss.str());
-  }
-
-  int ReadIntNamed(TFile* file, const char* key)
-  {
-    return ReadIntNamed(file, nullptr, key);
   }
 
   TFile* TryOpenWithFallbacks(const char* rootFilePath)
@@ -274,10 +221,10 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   int    numPerSide          = 0;   // number of pixels per side
 
   try {
-    pixelSizeMm         = ReadDoubleNamed(f, tree, "GridPixelSize_mm");
-    pixelSpacingMm      = ReadDoubleNamed(f, tree, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(f, tree, "GridPixelCornerOffset_mm");
-    detSizeMm           = ReadDoubleNamed(f, tree, "GridDetectorSize_mm");
+    pixelSizeMm         = ReadDoubleNamed(tree, "GridPixelSize_mm");
+    pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
+    pixelCornerOffsetMm = ReadDoubleNamed(tree, "GridPixelCornerOffset_mm");
+    detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
     numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl;
@@ -287,7 +234,7 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   }
 
   // Read denominator mode to filter which cells to display
-  ActivePixelMode activeMode = ReadActivePixelMode(f, tree);
+  ActivePixelMode activeMode = ReadActivePixelMode(tree);
 
   // Inputs
   double trueX = std::numeric_limits<double>::quiet_NaN();
@@ -781,10 +728,10 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
 
   double pixelSizeMm = 0.0, pixelSpacingMm = 0.0, detSizeMm = 0.0, pixelCornerOffsetMm = 0.0; int numPerSide = 0;
   try {
-    pixelSizeMm         = ReadDoubleNamed(f, tree, "GridPixelSize_mm");
-    pixelSpacingMm      = ReadDoubleNamed(f, tree, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(f, tree, "GridPixelCornerOffset_mm");
-    detSizeMm           = ReadDoubleNamed(f, tree, "GridDetectorSize_mm");
+    pixelSizeMm         = ReadDoubleNamed(tree, "GridPixelSize_mm");
+    pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
+    pixelCornerOffsetMm = ReadDoubleNamed(tree, "GridPixelCornerOffset_mm");
+    detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
     numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl; f->Close(); delete f; return;
@@ -1097,10 +1044,10 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
   double detSizeMm           = 0.0;
   int    numPerSide          = 0;
   try {
-    pixelSizeMm         = ReadDoubleNamed(f, tree, "GridPixelSize_mm");
-    pixelSpacingMm      = ReadDoubleNamed(f, tree, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(f, tree, "GridPixelCornerOffset_mm");
-    detSizeMm           = ReadDoubleNamed(f, tree, "GridDetectorSize_mm");
+    pixelSizeMm         = ReadDoubleNamed(tree, "GridPixelSize_mm");
+    pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
+    pixelCornerOffsetMm = ReadDoubleNamed(tree, "GridPixelCornerOffset_mm");
+    detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
     numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl;
@@ -1108,7 +1055,7 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
   }
 
   // Read denominator mode to filter which cells to display
-  ActivePixelMode activeMode = ReadActivePixelMode(f, tree);
+  ActivePixelMode activeMode = ReadActivePixelMode(tree);
 
   // Inputs
   double trueX = std::numeric_limits<double>::quiet_NaN();

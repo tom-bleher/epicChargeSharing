@@ -101,53 +101,25 @@ namespace {
   constexpr double kDefaultPixelSpacingMm = 0.5;
   constexpr double kDefaultPixelSizeMm = 0.1;
 
-  // Helper functions to read metadata from tree UserInfo or file-level TNamed
-  double GetDoubleMetadata(TFile* file, TTree* tree, const char* key) {
-    // First try file-level TNamed (legacy/explicit format)
-    if (file) {
-      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
-        try { return std::stod(obj->GetTitle()); } catch (...) {}
-      }
-    }
-    // Then try tree UserInfo with TParameter<double>
+  // Helper function to read metadata from tree UserInfo
+  double GetDoubleMetadata(TTree* tree, const char* key) {
     if (tree) {
       TList* info = tree->GetUserInfo();
       if (info) {
         if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
           return param->GetVal();
         }
-        // Also try TNamed in UserInfo (string representation)
-        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
-          try { return std::stod(named->GetTitle()); } catch (...) {}
-        }
       }
     }
     return NAN;
   }
 
-  int GetIntMetadata(TFile* file, TTree* tree, const char* key) {
-    // First try file-level TNamed (legacy/explicit format)
-    if (file) {
-      if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
-        try { return std::stoi(obj->GetTitle()); }
-        catch (...) {
-          try { return static_cast<int>(std::lround(std::stod(obj->GetTitle()))); } catch (...) {}
-        }
-      }
-    }
-    // Then try tree UserInfo with TParameter<int>
+  int GetIntMetadata(TTree* tree, const char* key) {
     if (tree) {
       TList* info = tree->GetUserInfo();
       if (info) {
         if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(key))) {
           return param->GetVal();
-        }
-        // Also try TNamed in UserInfo (string representation)
-        if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
-          try { return std::stoi(named->GetTitle()); }
-          catch (...) {
-            try { return static_cast<int>(std::lround(std::stod(named->GetTitle()))); } catch (...) {}
-          }
         }
       }
     }
@@ -334,12 +306,12 @@ int processing1D_replay_qifit(const char* filename =
   }
 
   // Pixel spacing/size/radius: prefer metadata (file-level or tree UserInfo); fallback to inference
-  double pixelSpacing = GetDoubleMetadata(file, tree, "GridPixelSpacing_mm");
-  double pixelSize = GetDoubleMetadata(file, tree, "GridPixelSize_mm");
-  double detectorSize = GetDoubleMetadata(file, tree, "GridDetectorSize_mm");
-  double pixelCornerOffset = GetDoubleMetadata(file, tree, "GridPixelCornerOffset_mm");
-  int numBlocksPerSideMeta = GetIntMetadata(file, tree, "GridNumBlocksPerSide");
-  int neighborhoodRadiusMeta = GetIntMetadata(file, tree, "NeighborhoodRadius");
+  double pixelSpacing = GetDoubleMetadata(tree, "GridPixelSpacing_mm");
+  double pixelSize = GetDoubleMetadata(tree, "GridPixelSize_mm");
+  double detectorSize = GetDoubleMetadata(tree, "GridDetectorSize_mm");
+  double pixelCornerOffset = GetDoubleMetadata(tree, "GridPixelCornerOffset_mm");
+  int numBlocksPerSideMeta = GetIntMetadata(tree, "GridNumBlocksPerSide");
+  int neighborhoodRadiusMeta = GetIntMetadata(tree, "NeighborhoodRadius");
 
   pixelSpacing = ResolvePixelSpacing(tree, pixelSpacing, pixelSize, detectorSize,
                                      pixelCornerOffset, numBlocksPerSideMeta,
@@ -1570,11 +1542,11 @@ int processing1D_distance_sigma_gallery(
   }
 
   // Pixel spacing/size: prefer metadata (file-level or tree UserInfo); fallback to inference
-  double pixelSpacing = GetDoubleMetadata(file, tree, "GridPixelSpacing_mm");
-  double pixelSize = GetDoubleMetadata(file, tree, "GridPixelSize_mm");
-  double detectorSize = GetDoubleMetadata(file, tree, "GridDetectorSize_mm");
-  double pixelCornerOffset = GetDoubleMetadata(file, tree, "GridPixelCornerOffset_mm");
-  int numBlocksPerSideMeta = GetIntMetadata(file, tree, "GridNumBlocksPerSide");
+  double pixelSpacing = GetDoubleMetadata(tree, "GridPixelSpacing_mm");
+  double pixelSize = GetDoubleMetadata(tree, "GridPixelSize_mm");
+  double detectorSize = GetDoubleMetadata(tree, "GridDetectorSize_mm");
+  double pixelCornerOffset = GetDoubleMetadata(tree, "GridPixelCornerOffset_mm");
+  int numBlocksPerSideMeta = GetIntMetadata(tree, "GridNumBlocksPerSide");
 
   pixelSpacing = ResolvePixelSpacing(tree, pixelSpacing, pixelSize, detectorSize,
                                      pixelCornerOffset, numBlocksPerSideMeta,

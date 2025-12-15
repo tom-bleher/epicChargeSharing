@@ -40,7 +40,7 @@
 #include <optional>
 #include <ROOT/TThreadExecutor.hxx>
 
-#include "ChargeUtils.h"
+#include "FitUncertainty.h"
 
 namespace fitgaus1d
 {
@@ -49,53 +49,25 @@ namespace detail
 double InferPixelSpacingFromTree(TTree* tree);
 int InferRadiusFromTree(TTree* tree, const std::string& preferredBranch);
 
-// Helper functions to read metadata from tree UserInfo or file-level TNamed
-inline double GetDoubleMetadata(TFile* file, TTree* tree, const char* key) {
-    // First try file-level TNamed (legacy/explicit format)
-    if (file) {
-        if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
-            try { return std::stod(obj->GetTitle()); } catch (...) {}
-        }
-    }
-    // Then try tree UserInfo with TParameter<double>
+// Helper function to read metadata from tree UserInfo
+inline double GetDoubleMetadata(TTree* tree, const char* key) {
     if (tree) {
         TList* info = tree->GetUserInfo();
         if (info) {
             if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
                 return param->GetVal();
             }
-            // Also try TNamed in UserInfo (string representation)
-            if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
-                try { return std::stod(named->GetTitle()); } catch (...) {}
-            }
         }
     }
     return std::numeric_limits<double>::quiet_NaN();
 }
 
-inline int GetIntMetadata(TFile* file, TTree* tree, const char* key) {
-    // First try file-level TNamed (legacy/explicit format)
-    if (file) {
-        if (auto* obj = dynamic_cast<TNamed*>(file->Get(key))) {
-            try { return std::stoi(obj->GetTitle()); }
-            catch (...) {
-                try { return static_cast<int>(std::lround(std::stod(obj->GetTitle()))); } catch (...) {}
-            }
-        }
-    }
-    // Then try tree UserInfo with TParameter<int>
+inline int GetIntMetadata(TTree* tree, const char* key) {
     if (tree) {
         TList* info = tree->GetUserInfo();
         if (info) {
             if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(key))) {
                 return param->GetVal();
-            }
-            // Also try TNamed in UserInfo (string representation)
-            if (auto* named = dynamic_cast<TNamed*>(info->FindObject(key))) {
-                try { return std::stoi(named->GetTitle()); }
-                catch (...) {
-                    try { return static_cast<int>(std::lround(std::stod(named->GetTitle()))); } catch (...) {}
-                }
             }
         }
     }
@@ -137,10 +109,10 @@ std::optional<Metadata> ExtractMetadata(TFile& file,
 {
     Metadata meta;
 
-    // Read metadata from file-level TNamed or tree UserInfo (TParameter)
-    meta.pixelSpacing = detail::GetDoubleMetadata(&file, &tree, "GridPixelSpacing_mm");
-    meta.pixelSize = detail::GetDoubleMetadata(&file, &tree, "GridPixelSize_mm");
-    meta.neighborhoodRadius = detail::GetIntMetadata(&file, &tree, "NeighborhoodRadius");
+    // Read metadata from tree UserInfo (TParameter)
+    meta.pixelSpacing = detail::GetDoubleMetadata(&tree, "GridPixelSpacing_mm");
+    meta.pixelSize = detail::GetDoubleMetadata(&tree, "GridPixelSize_mm");
+    meta.neighborhoodRadius = detail::GetIntMetadata(&tree, "NeighborhoodRadius");
 
     if (!std::isfinite(meta.pixelSpacing) || meta.pixelSpacing <= 0.0) {
         meta.pixelSpacing = detail::InferPixelSpacingFromTree(&tree);
