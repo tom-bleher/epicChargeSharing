@@ -49,7 +49,7 @@ namespace {
   }
 }
 
-// Replay diagonal fits and additionally fit Q_i points on main and secondary diagonals
+// Replay diagonal fits and additionally fit Qi points on main and secondary diagonals
 // following the same logic and styling as plotProcessing2DReplayQiFit.C (rows/cols).
 int processing2D_diag_replay_qifit(const char* filename =
                                      "/home/tom/Desktop/Putza/epicChargeSharing/noisy/0um.root",
@@ -151,11 +151,11 @@ int processing2D_diag_replay_qifit(const char* filename =
 
   // Decide which charge branch to use for plotting points
   std::string chosenCharge;
-  if (tree->GetBranch("Q_f")) chosenCharge = "Q_f";
-  else if (tree->GetBranch("F_i")) chosenCharge = "F_i";
-  else if (tree->GetBranch("Q_i")) chosenCharge = "Q_i";
+  if (tree->GetBranch("Qf")) chosenCharge = "Qf";
+  else if (tree->GetBranch("Fi")) chosenCharge = "Fi";
+  else if (tree->GetBranch("Qi")) chosenCharge = "Qi";
   else {
-    ::Error("processing2D_diag_replay_qifit", "No charge branch found (tried Q_f, F_i, Q_i)");
+    ::Error("processing2D_diag_replay_qifit", "No charge branch found (tried Qf, Fi, Qi)");
     file->Close();
     delete file;
     return 4;
@@ -177,9 +177,9 @@ int processing2D_diag_replay_qifit(const char* filename =
   tree->SetBranchAddress("PixelY",  &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
-  const bool haveQiBranch = (tree->GetBranch("Q_i") != nullptr);
+  const bool haveQiBranch = (tree->GetBranch("Qi") != nullptr);
   if (haveQiBranch) {
-    tree->SetBranchAddress("Q_i", &QiVec);
+    tree->SetBranchAddress("Qi", &QiVec);
   }
 
   bool haveD1A = tree->GetBranch("GaussMDiagA") != nullptr;
@@ -331,7 +331,7 @@ int processing2D_diag_replay_qifit(const char* filename =
     baseD2Ptr->SetLineColor(kBlue+2);
 
     // =========================
-    // Optional Q_i fits (match row/col Qi logic)
+    // Optional Qi fits (match row/col Qi logic)
     // =========================
     bool haveQi = (haveQiBranch && QiVec);
     bool didD1FitQi = false, didD2FitQi = false;
@@ -539,10 +539,10 @@ int processing2D_diag_replay_qifit(const char* filename =
         box->Draw("SAME L");
       }
     }
-    // Optional overlay of Q_i points
+    // Optional overlay of Qi points
     bool drewD1QiPts = false;
     TGraph gD1QiPts;
-    const bool canOverlayQi = plotQiOverlayPts && haveQiBranch && (chosenCharge != "Q_i");
+    const bool canOverlayQi = plotQiOverlayPts && haveQiBranch && (chosenCharge != "Qi");
     if (canOverlayQi && QiVec) {
       std::vector<std::pair<double,double>> d1Points;
       d1Points.reserve(idx_d1.size());
@@ -596,8 +596,8 @@ int processing2D_diag_replay_qifit(const char* filename =
       legLeft.SetFillStyle(0);
       legLeft.SetTextSize(0.03);
       {
-        std::string basePtsLabel = (chosenCharge == "Q_f") ? "Q_{f} points"
-                                   : (chosenCharge == "F_i") ? "F_{i} points"
+        std::string basePtsLabel = (chosenCharge == "Qf") ? "Q_{f} points"
+                                   : (chosenCharge == "Fi") ? "F_{i} points"
                                    : "Q_{i} points";
         legLeft.AddEntry(baseD1Ptr, basePtsLabel.c_str(), "p");
       }
@@ -734,8 +734,8 @@ int processing2D_diag_replay_qifit(const char* filename =
       legLeft.SetFillStyle(0);
       legLeft.SetTextSize(0.03);
       {
-        std::string basePtsLabel = (chosenCharge == "Q_f") ? "Q_{f} points"
-                                   : (chosenCharge == "F_i") ? "F_{i} points"
+        std::string basePtsLabel = (chosenCharge == "Qf") ? "Q_{f} points"
+                                   : (chosenCharge == "Fi") ? "F_{i} points"
                                    : "Q_{i} points";
         legLeft.AddEntry(baseD2Ptr, basePtsLabel.c_str(), "p");
       }

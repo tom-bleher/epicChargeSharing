@@ -150,11 +150,11 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
 
   // Decide which charge branch to use for plotting points. This only affects point y-values.
   std::string chosenCharge;
-  if (tree->GetBranch("Q_f")) chosenCharge = "Q_f";
-  else if (tree->GetBranch("F_i")) chosenCharge = "F_i";
-  else if (tree->GetBranch("Q_i")) chosenCharge = "Q_i";
+  if (tree->GetBranch("Qf")) chosenCharge = "Qf";
+  else if (tree->GetBranch("Fi")) chosenCharge = "Fi";
+  else if (tree->GetBranch("Qi")) chosenCharge = "Qi";
   else {
-    ::Error("processing2D_diag_replay", "No charge branch found (tried Q_f, F_i, Q_i)");
+    ::Error("processing2D_diag_replay", "No charge branch found (tried Qf, Fi, Qi)");
     file->Close();
     delete file;
     return 4;
@@ -178,9 +178,9 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
   tree->SetBranchAddress("PixelY",  &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
-  const bool haveQiBranch = (tree->GetBranch("Q_i") != nullptr);
+  const bool haveQiBranch = (tree->GetBranch("Qi") != nullptr);
   if (haveQiBranch) {
-    tree->SetBranchAddress("Q_i", &QiVec);
+    tree->SetBranchAddress("Qi", &QiVec);
   }
 
   bool haveD1A = tree->GetBranch("GaussMDiagA") != nullptr;
@@ -403,10 +403,10 @@ int processing2D_diag_replay(const char* filename = "/home/tom/Desktop/Putza/epi
         box->Draw("SAME L");
       }
     }
-    // Optional overlay of Q_i points
+    // Optional overlay of Qi points
     bool drewD1Qi = false;
     TGraph gD1Qi;
-    const bool canOverlayQi = plotQiOverlay && haveQiBranch && (chosenCharge != "Q_i");
+    const bool canOverlayQi = plotQiOverlay && haveQiBranch && (chosenCharge != "Qi");
     if (canOverlayQi && QiVec) {
       std::vector<std::pair<double,double>> d1Points;
       d1Points.reserve(idx_d1.size());

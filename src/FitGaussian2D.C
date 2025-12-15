@@ -1,7 +1,7 @@
 // ROOT macro: FitGaussian2D.C
 // Performs 2D Gaussian fit on the full charge neighborhood to reconstruct
 // deltas, and appends them as new branches.
-// Uses Q_f (noisy charge per pixel, Coulombs) when available; falls back to Q_i.
+// Uses Qf (noisy charge per pixel, Coulombs) when available; falls back to Qi.
 
 #include <TFile.h>
 #include <TTree.h>
@@ -116,11 +116,11 @@ int inferRadiusFromTree(TTree* tree, const std::string& preferredBranch) {
     bool bound = false;
     if (!preferredBranch.empty() && bind(preferredBranch.c_str())) {
         bound = true;
-    } else if (bind("Q_f")) {
+    } else if (bind("Qf")) {
         bound = true;
-    } else if (bind("F_i")) {
+    } else if (bind("Fi")) {
         bound = true;
-    } else if (bind("Q_i")) {
+    } else if (bind("Qi")) {
         bound = true;
     }
     if (!bound) {
@@ -170,7 +170,7 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
                  bool saveParamSigx = true,
                  bool saveParamSigy = true,
                  bool saveParamB = true,
-                 const char* chargeBranch = "Q_f",
+                 const char* chargeBranch = "Qf",
                  bool useQnQiPercentErrors = false,
                  bool useDistanceWeightedErrors = false,
                  double distanceErrorScalePixels = 1.0,
@@ -213,14 +213,14 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
     }
     if (useQnQiPercentErrors) {
       ::Warning("FitGaussian2D",
-                "Vertical uncertainties disabled; ignoring Q_n/Q_i uncertainty "
+                "Vertical uncertainties disabled; ignoring Qn/Qi uncertainty"
                 "model.");
     }
   }
 
   if (distanceErrorsEnabled && useQnQiPercentErrors) {
     ::Warning("FitGaussian2D",
-              "Distance-weighted uncertainties requested; ignoring Q_n/Q_i"
+              "Distance-weighted uncertainties requested; ignoring Qn/Qi"
               " vertical uncertainty model.");
   }
 
@@ -286,8 +286,8 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
   if (chosenCharge.empty() || !hasBranch(chosenCharge.c_str())) {
     // Try standard names first, then Block/Row/Col suffix variants
     for (const char* name : {"Qf", "QfBlock", "QfRow", "QfCol",
-                             "Q_f", "Fi", "FiBlock", "FiRow", "FiCol",
-                             "F_i", "Qi", "QiBlock", "QiRow", "QiCol", "Q_i"}) {
+                             "Fi", "FiBlock", "FiRow", "FiCol",
+                             "Qi", "QiBlock", "QiRow", "QiCol"}) {
       if (hasBranch(name)) {
         chosenCharge = name;
         break;
@@ -307,7 +307,7 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
   double x_hit = 0.0, y_hit = 0.0;
   double x_px  = 0.0, y_px  = 0.0;
   Bool_t is_pixel_hit = kFALSE;
-  // Use Q_f (noisy) for fits; fall back to Q_i (Coulombs)
+  // Use Qf (noisy) for fits; fall back to Qi (Coulombs)
   std::vector<double>* Q = nullptr;
   std::vector<double>* Qi = nullptr;
   std::vector<double>* Qn = nullptr;
@@ -325,13 +325,13 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
   // Enable only the chosen charge branch
   tree->SetBranchStatus(chosenCharge.c_str(), 1);
   if (enableQiQnErrors) {
-    haveQiBranchForErrors = tree->GetBranch("Q_i") != nullptr;
-    haveQnBranchForErrors = tree->GetBranch("Q_n") != nullptr;
+    haveQiBranchForErrors = tree->GetBranch("Qi") != nullptr;
+    haveQnBranchForErrors = tree->GetBranch("Qn") != nullptr;
     if (haveQiBranchForErrors && haveQnBranchForErrors) {
-      tree->SetBranchStatus("Q_i", 1);
-      tree->SetBranchStatus("Q_n", 1);
+      tree->SetBranchStatus("Qi", 1);
+      tree->SetBranchStatus("Qn", 1);
     } else {
-      ::Warning("FitGaussian2D", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
+      ::Warning("FitGaussian2D", "Requested Qi/Qn vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
       enableQiQnErrors = false;
     }
   }
@@ -343,10 +343,10 @@ int FitGaussian2D(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchAddress("isPixelHit", &is_pixel_hit);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
   if (enableQiQnErrors && haveQiBranchForErrors) {
-    tree->SetBranchAddress("Q_i", &Qi);
+    tree->SetBranchAddress("Qi", &Qi);
   }
   if (enableQiQnErrors && haveQnBranchForErrors) {
-    tree->SetBranchAddress("Q_n", &Qn);
+    tree->SetBranchAddress("Qn", &Qn);
   }
 
   // New branches (outputs).

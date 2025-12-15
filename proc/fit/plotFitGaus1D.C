@@ -180,10 +180,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
 
   auto inferRadiusFromTree = [&](TTree* t) -> int {
     std::vector<double>* Qi_tmp = nullptr;
-    // Try Q_i first, fall back to Qi
-    if (t->GetBranch("Q_i")) {
-      t->SetBranchAddress("Q_i", &Qi_tmp);
-    } else if (t->GetBranch("Qi")) {
+    if (t->GetBranch("Qi")) {
       t->SetBranchAddress("Qi", &Qi_tmp);
     }
     Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
@@ -228,10 +225,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchAddress("PixelX",  &x_px);
   tree->SetBranchAddress("PixelY",  &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
-  // Try Q_i first, fall back to Qi
-  if (tree->GetBranch("Q_i")) {
-    tree->SetBranchAddress("Q_i", &Qi);
-  } else if (tree->GetBranch("Qi")) {
+  if (tree->GetBranch("Qi")) {
     tree->SetBranchAddress("Qi", &Qi);
   }
 
@@ -268,7 +262,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
     const Long64_t eventIndex = indices[sampleIdx];
     tree->GetEntry(eventIndex);
 
-    // Only non-pixel-pad trues with valid neighborhood (Q_i present)
+    // Only non-pixel-pad trues with valid neighborhood (Qi present)
     if (is_pixel_true || !Qi || Qi->empty()) continue;
 
     const size_t total = Qi->size();
@@ -479,7 +473,7 @@ int processing2D_plots(const char* filename = "../build/epicChargeSharing.root",
       fitCol.Config().ParSettings(2).SetName("sigma");
       fitCol.Config().ParSettings(3).SetName("B");
 
-      // Bounds for Q_i fits: A in (0, ~2*qmax], B in [0, ~qmax]
+      // Bounds for Qi fits: A in (0, ~2*qmax], B in [0, ~qmax]
       const double AHi = std::max(1e-18, 2.0 * std::max(qmaxNeighborhood, 0.0));
       const double BHi = std::max(1e-18, 1.0 * std::max(qmaxNeighborhood, 0.0));
       fitRow.Config().ParSettings(0).SetLimits(1e-18, AHi);

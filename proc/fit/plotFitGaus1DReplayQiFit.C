@@ -40,7 +40,7 @@
 #include <sstream>
 #include <iomanip>
 
-#include "../../src/ChargeUtils.h"
+#include "../../src/FitUncertainty.h"
 
 namespace {
   // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
@@ -264,9 +264,9 @@ namespace {
   }
 }
 
-// Replay Q_f/F_i fits (from saved parameters) and additionally fit Q_i points
+// Replay Qf/Fi fits (from saved parameters) and additionally fit Qi points
 // exactly like diagnostic/fit/plotProcessing1D.C does, drawing dashed green
-// Gaussian curves and vertical recon lines for Q_i with legend deltas.
+// Gaussian curves and vertical recon lines for Qi with legend deltas.
 int processing1D_replay_qifit(const char* filename =
                               "build/epicChargeSharing.root",
                               double errorPercentOfMax = 5.0,
@@ -307,7 +307,7 @@ int processing1D_replay_qifit(const char* filename =
 
   if (distanceErrorsEnabled && useQiQnPercentErrors) {
     ::Warning("processing1D_replay_qifit",
-              "Distance-weighted uncertainties requested; ignoring Q_n/Q_i"
+              "Distance-weighted uncertainties requested; ignoring Qn/Qi"
               " vertical uncertainty model when plotting.");
   }
 
@@ -374,30 +374,23 @@ int processing1D_replay_qifit(const char* filename =
   };
 
   std::string chosenCharge;
-  if (hasBranch("Q_f")) chosenCharge = "Q_f";
-  else if (hasBranch("Qf")) chosenCharge = "Qf";
-  else if (hasBranch("F_i")) chosenCharge = "F_i";
+  if (hasBranch("Qf")) chosenCharge = "Qf";
   else if (hasBranch("Fi")) chosenCharge = "Fi";
-  else if (hasBranch("Q_i")) chosenCharge = "Q_i";
   else if (hasBranch("Qi")) chosenCharge = "Qi";
   else {
     ::Error("processing1D_replay_qifit",
-            "No charge branch found (tried Q_f, Qf, F_i, Fi, Q_i, Qi)");
+            "No charge branch found (tried Qf, Fi, Qi)");
     file->Close();
     delete file;
     return 4;
   }
 
   const char* qiBranchName = nullptr;
-  if (hasBranch("Q_i")) {
-    qiBranchName = "Q_i";
-  } else if (hasBranch("Qi")) {
+  if (hasBranch("Qi")) {
     qiBranchName = "Qi";
   }
   const char* qnBranchName = nullptr;
-  if (hasBranch("Q_n")) {
-    qnBranchName = "Q_n";
-  } else if (hasBranch("Qn")) {
+  if (hasBranch("Qn")) {
     qnBranchName = "Qn";
   }
 
@@ -433,7 +426,7 @@ int processing1D_replay_qifit(const char* filename =
     tree->SetBranchAddress(qnBranchName, &QnVec);
   }
   if (enableQiQnErrors && (!haveQiBranch || !haveQnBranch)) {
-    ::Warning("processing1D_replay_qifit", "Requested Q_i/Q_n vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
+    ::Warning("processing1D_replay_qifit", "Requested Qi/Qn vertical errors but required branches are missing. Falling back to percent-of-max uncertainty.");
     enableQiQnErrors = false;
   }
 
@@ -606,7 +599,7 @@ int processing1D_replay_qifit(const char* filename =
       }
     }
 
-    // Must have mus to draw recon lines for saved Q_f/F_i parameters
+    // Must have mus to draw recon lines for saved Qf/Fi parameters
     bool haveMuRow = haveRowMu && IsFinite(rowMu);
     bool haveMuCol = haveColMu && IsFinite(colMu);
     if (!(haveMuRow && haveMuCol)) continue;
@@ -763,7 +756,7 @@ int processing1D_replay_qifit(const char* filename =
     baseColPtr->SetLineColor(kBlue+2);
 
     // =========================
-    // Optional Q_i fits (match plotProcessing1D.C logic)
+    // Optional Qi fits (match plotProcessing1D.C logic)
     // =========================
     bool haveQi = (haveQiBranch && QiVec);
     bool didRowFitQi = false, didColFitQi = false;
@@ -1100,10 +1093,10 @@ int processing1D_replay_qifit(const char* filename =
         }
       }
     }
-    // Optional overlay of Q_i points (kept subset)
+    // Optional overlay of Qi points (kept subset)
     bool drewColQiPts = false;
     TGraph gColQiPts;
-    const bool baseChargeIsQi = (chosenCharge == "Q_i") || (chosenCharge == "Qi");
+    const bool baseChargeIsQi = (chosenCharge == "Qi");
     const bool canOverlayQi = plotQiOverlayPts && haveQiBranch && !baseChargeIsQi;
     if (canOverlayQi && QiVec) {
       std::vector<std::pair<double,double>> colPoints;
@@ -1157,8 +1150,8 @@ int processing1D_replay_qifit(const char* filename =
     legCLeft.SetFillStyle(0);
     legCLeft.SetTextSize(0.03);
     {
-      std::string basePtsLabel = (chosenCharge == "Q_f") ? "Q_{f} points"
-                                 : (chosenCharge == "F_i") ? "F_{i} points"
+      std::string basePtsLabel = (chosenCharge == "Qf") ? "Q_{f} points"
+                                 : (chosenCharge == "Fi") ? "F_{i} points"
                                  : "Q_{i} points";
       legCLeft.AddEntry(baseColPtr, basePtsLabel.c_str(), "p");
     }
@@ -1270,7 +1263,7 @@ int processing1D_replay_qifit(const char* filename =
         }
       }
     }
-    // Optional overlay of Q_i points (kept subset)
+    // Optional overlay of Qi points (kept subset)
     bool drewRowQiPts = false;
     TGraph gRowQiPts;
     if (canOverlayQi && QiVec) {
@@ -1325,8 +1318,8 @@ int processing1D_replay_qifit(const char* filename =
     legLeft.SetFillStyle(0);
     legLeft.SetTextSize(0.03);
     {
-      std::string basePtsLabel = (chosenCharge == "Q_f") ? "Q_{f} points"
-                                 : (chosenCharge == "F_i") ? "F_{i} points"
+      std::string basePtsLabel = (chosenCharge == "Qf") ? "Q_{f} points"
+                                 : (chosenCharge == "Fi") ? "F_{i} points"
                                  : "Q_{i} points";
       legLeft.AddEntry(baseRowPtr, basePtsLabel.c_str(), "p");
     }
@@ -1601,9 +1594,9 @@ int processing1D_distance_sigma_gallery(
     }
   }
 
-  if (tree->GetBranch("Q_f") == nullptr) {
+  if (tree->GetBranch("Qf") == nullptr) {
     ::Error("processing1D_distance_sigma_gallery",
-            "Q_f branch not found; cannot plot Q_f data points.");
+            "Qf branch not found; cannot plot Qf data points.");
     file->Close();
     delete file;
     return 4;
@@ -1619,7 +1612,7 @@ int processing1D_distance_sigma_gallery(
   tree->SetBranchAddress("PixelX", &x_px);
   tree->SetBranchAddress("PixelY", &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
-  tree->SetBranchAddress("Q_f", &QfVec);
+  tree->SetBranchAddress("Qf", &QfVec);
 
   const Long64_t nEntries = tree->GetEntries();
   std::vector<Long64_t> indices;

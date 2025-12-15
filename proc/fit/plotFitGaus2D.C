@@ -154,7 +154,7 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchAddress("PixelX", &x_px);
   tree->SetBranchAddress("PixelY", &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
-  tree->SetBranchAddress("F_i", &Fi);
+  tree->SetBranchAddress("Fi", &Fi);
 
   // Style
   gROOT->SetBatch(true);

@@ -269,7 +269,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         self._draw_current()
 
     def _populate_branches(self):
-        # Clear and repopulate with explicit options. Default selection will be Q_f if present.
+        # Clear and repopulate with explicit options. Default selection will be Qf if present.
         try:
             self.branch_combo.blockSignals(True)
         except Exception:
@@ -286,15 +286,15 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
             available = set()
 
         # Base branches in preferred order
-        for key in ["Q_f", "Q_i", "Q_n", "F_i"]:
+        for key in ["Qf", "Qi", "Qn", "Fi"]:
             if key in available:
                 self.branch_combo.addItem(key, key)
 
         # Computed options (absolute differences)
-        if ("Q_i" in available) and ("Q_f" in available):
-            self.branch_combo.addItem("|Q_i - Q_f|", "delta_if")
-        if ("Q_n" in available) and ("Q_f" in available):
-            self.branch_combo.addItem("|Q_n - Q_f|", "delta_nf")
+        if ("Qi" in available) and ("Qf" in available):
+            self.branch_combo.addItem("|Qi - Qf|", "delta_if")
+        if ("Qn" in available) and ("Qf" in available):
+            self.branch_combo.addItem("|Qn - Qf|", "delta_nf")
 
         # Outlier mask options (discrete binary coloring)
         if "Gauss3DMaskRemoved" in available:
@@ -304,9 +304,9 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         if "GaussColMaskRemoved" in available:
             self.branch_combo.addItem("Outlier mask (col)", "mask_col")
 
-        # Default to Q_f if present, else first entry
+        # Default to Qf if present, else first entry
         try:
-            idx_qf = next((i for i in range(self.branch_combo.count()) if self.branch_combo.itemData(i) == "Q_f"), 0)
+            idx_qf = next((i for i in range(self.branch_combo.count()) if self.branch_combo.itemData(i) == "Qf"), 0)
             self.branch_combo.setCurrentIndex(max(0, idx_qf))
         except Exception:
             pass
@@ -318,10 +318,10 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
     def _find_first_valid_event(self) -> Optional[int]:
         if self._tree is None or self._n_entries <= 0:
             return None
-        # Use a concrete vector branch present in the file; prefer Q_f
+        # Use a concrete vector branch present in the file; prefer Qf
         key = None
         try:
-            for k in ["Q_f", "Q_n", "Q_i", "F_i", "d_i", "alpha_i"]:
+            for k in ["Qf", "Qn", "Qi", "Fi", "d_i", "alpha_i"]:
                 if self._tree is not None and k in self._tree.keys():
                     key = k
                     break
@@ -353,8 +353,8 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
 
         Forms:
           ("direct", key) for a direct branch key
-          ("delta_abs", ("Q_i", "Q_f"))
-          ("delta_signed", ("Q_i", "Q_f"))
+          ("delta_abs", ("Qi", "Qf"))
+          ("delta_signed", ("Qi", "Qf"))
           ("mask", "mask_3d" | "mask_row" | "mask_col")
         If selection missing, fallback to first available direct key.
         """
@@ -364,20 +364,20 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         except Exception:
             sel = None
         # Direct branches
-        if sel in ("Q_f", "Q_i", "Q_n", "F_i"):
+        if sel in ("Qf", "Qi", "Qn", "Fi"):
             return ("direct", sel)
         # Computed absolute deltas
         if sel == "delta_if":
-            return ("delta_abs", ("Q_i", "Q_f"))
+            return ("delta_abs", ("Qi", "Qf"))
         if sel == "delta_nf":
-            return ("delta_abs", ("Q_n", "Q_f"))
+            return ("delta_abs", ("Qn", "Qf"))
         # Mask selections
         if sel in ("mask_3d", "mask_row", "mask_col"):
             return ("mask", sel)
         # Fallback: pick first available
         try:
             if self._tree is not None:
-                for k in ["Q_f", "Q_i", "Q_n", "F_i"]:
+                for k in ["Qf", "Qi", "Qn", "Fi"]:
                     if k in self._tree.keys():
                         return ("direct", k)
         except Exception:
@@ -425,7 +425,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
             try:
                 a, b = spec
             except Exception:
-                a, b = "Q_i", "Q_f"
+                a, b = "Qi", "Qf"
             branches += [a, b]
         elif mask_mode:
             # Determine necessary branches for masks
@@ -440,7 +440,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 available = set(self._tree.keys()) if self._tree is not None else set()
             except Exception:
                 available = set()
-            for kshape in ["Q_f", "F_i", "Q_i", "Q_n"]:
+            for kshape in ["Qf", "Fi", "Qi", "Qn"]:
                 if kshape in available:
                     shape_key = kshape
                     branches.append(kshape)
@@ -594,7 +594,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 aux_grid = None
 
         # vmin/vmax on ROI
-        usingQ = False if mask_mode else (True if kind != "direct" else (key in ("Q_f", "Q_n", "Q_i")))
+        usingQ = False if mask_mode else (True if kind != "direct" else (key in ("Qf", "Qn", "Qi")))
         roi_vals_for_range: List[float] = []
         for ii in range(i0, i1 + 1):
             for jj in range(j0, j1 + 1):
@@ -791,7 +791,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                     try:
                         a, b = spec
                     except Exception:
-                        a, b = "Q_i", "Q_f"
+                        a, b = "Qi", "Qf"
                     branches += [a, b]
                 elif mask_mode:
                     if mask_sel == "mask_3d":
@@ -805,7 +805,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                         available = set(self._tree.keys()) if self._tree is not None else set()
                     except Exception:
                         available = set()
-                    for kshape in ["Q_f", "F_i", "Q_i", "Q_n"]:
+                    for kshape in ["Qf", "Fi", "Qi", "Qn"]:
                         if kshape in available:
                             shape_key = kshape
                             branches.append(kshape)
@@ -906,7 +906,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 e_charge = 1.602176634e-19
                 pair_e_ev = 3.60
                 q_total = edep * 1.0e6 / pair_e_ev * e_charge if (edep > 0) else 0.0
-                usingQ = False if mask_mode else (True if kind != "direct" else (spec in ("Q_f", "Q_n", "Q_i")))
+                usingQ = False if mask_mode else (True if kind != "direct" else (spec in ("Qf", "Qn", "Qi")))
 
                 # Optional aux grid for d_i / alpha_i
                 aux_grid = None

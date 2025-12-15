@@ -115,14 +115,14 @@ DEFAULT_BETA = 0.001
 
 # Charge neighborhood visualization types
 # Maps user-friendly names to (dataKind, chargeBranch) pairs for the ROOT macro
-# - dataKind: "fraction" (shows F_i values), "coulomb" (shows charge values), "distance" (shows distance to hit)
-# - chargeBranch: ROOT branch name to use ("F_i", "Q_i", "Q_n", "Q_f")
+# - dataKind: "fraction" (shows Fi values), "coulomb" (shows charge values), "distance" (shows distance to hit)
+# - chargeBranch: ROOT branch name to use ("Fi", "Qi", "Qn", "Qf")
 NEIGHBORHOOD_TYPES = {
-    "Fi": ("fraction", "F_i"),     # Signal fraction (from F_i branch)
-    "Qi": ("coulomb", "Q_i"),      # Induced charge (from Q_i branch)
-    "Qn": ("coulomb", "Q_n"),      # Charge with noise (from Q_n branch)
-    "Qf": ("coulomb", "Q_f"),      # Final charge (from Q_f branch)
-    "distance": ("distance", "Q_n"),  # Distance to hit (uses Q_n for valid cell detection)
+    "Fi": ("fraction", "Fi"),     # Signal fraction (from Fi branch)
+    "Qi": ("coulomb", "Qi"),      # Induced charge (from Qi branch)
+    "Qn": ("coulomb", "Qn"),      # Charge with noise (from Qn branch)
+    "Qf": ("coulomb", "Qf"),      # Final charge (from Qf branch)
+    "distance": ("distance", "Qn"),  # Distance to hit (uses Qn for valid cell detection)
 }
 
 # Default positions to sweep (micrometers)

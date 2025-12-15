@@ -2173,7 +2173,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         except Exception:
             return None
         try:
-            arrs = hits.arrays(["TrueX","TrueY","PixelX","PixelY","isPixelHit","F_i"],
+            arrs = hits.arrays(["TrueX","TrueY","PixelX","PixelY","isPixelHit","Fi"],
                                entry_start=int(evt_idx), entry_stop=int(evt_idx)+1,
                                library="ak")
         except Exception:
@@ -2184,7 +2184,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             x_px = float(arrs["PixelX"][0])
             y_px = float(arrs["PixelY"][0])
             is_pixel = bool(arrs["isPixelHit"][0])
-            Fi = np.asarray(arrs["F_i"][0], dtype=float)
+            Fi = np.asarray(arrs["Fi"][0], dtype=float)
         except Exception:
             return None
         if Fi is None or Fi.size == 0:
