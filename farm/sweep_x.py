@@ -1,11 +1,24 @@
 #!/usr/bin/env python3
+"""
+Sweep particle gun X position across gap regions between pixels.
+
+This script runs simulations at multiple X positions without recompiling,
+using Geant4 macro commands to set the particle gun position at runtime.
+
+The simulation is built once, then for each position:
+1. A temporary macro file is generated with the position commands
+2. The simulation is run with that macro
+3. The output ROOT file is collected
+
+This is much faster than the old approach of modifying source code and
+recompiling for each position.
+"""
 import argparse
 import os
-import re
-import sys
-import time
 import shutil
 import subprocess
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -13,28 +26,96 @@ from typing import Optional
 # Configuration
 # Resolve repository root relative to this script so the tool works anywhere
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SRC_FILE = REPO_ROOT / "src" / "PrimaryGenerator.cc"
 BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"
-RUN_MAC = (BUILD_DIR / "run.mac") if (BUILD_DIR / "run.mac").exists() else (REPO_ROOT / "macros" / "run.mac")
+BASE_MAC = REPO_ROOT / "macros" / "run.mac"
 DEFAULT_OUTPUT_BASE = REPO_ROOT / "sweep_x_runs"
 
-# Positions to sweep (micrometers)
-# First group: [+-25, +-50, ..., +-175]
-GROUP1 = [25, 50, 75, 100, 125, 150, 175]
-# Second group: [+-325, +-350, ..., +-475]
-GROUP2 = []#[325, 350, 375, 400, 425, 450, 475]
-POSITIONS = [0]
-for p in GROUP1:
-    POSITIONS.extend([p, -p])
-for p in GROUP2:
-    POSITIONS.extend([p, -p])
+# ═══════════════════════════════════════════════════════════════════════════════
+# Geometry Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+# Pixel pitch = 500 µm (pixels centered at ..., -500, 0, +500, ... µm)
+# Metal pad size = 150 µm (pads span ±75 µm from pixel center)
+#
+# For 3 pixels centered at -500, 0, +500 µm:
+#   Metal pads at: [-575,-425], [-75,+75], [+425,+575] µm
+#   Gap regions:   [-425,-75] and [+75,+425] µm
+#
+# We want positions that:
+#   1. Stay in the gap regions (avoid hitting metal pads)
+#   2. Are equally spaced
+#   3. Get close to pixel edges from left and right
 
-# Regex pattern to locate the fixed X assignment in PrimaryGenerator.cc
-# We expect a line like:     fFixedX = -25.0*um; (the default code uses fFixedX = 0.0;)
-FIXED_X_LINE_REGEX = re.compile(
-    r"^(\s*)fFixedX\s*=\s*([-+]?\d+(?:\.\d+)?)\s*(?:\*\s*um)?\s*;\s*$"
-)
+PIXEL_PITCH_UM = 500.0      # Pixel spacing in µm
+METAL_PAD_SIZE_UM = 150.0   # Metal pad size in µm
+HALF_PAD_UM = METAL_PAD_SIZE_UM / 2.0  # 75 µm
+EDGE_MARGIN_UM = 3.0        # Margin from pad edge to avoid touching
+STEP_SIZE_UM = 25.0         # Step size between positions
+
+def calculate_gap_positions(
+    pixel_pitch: float = PIXEL_PITCH_UM,
+    half_pad: float = HALF_PAD_UM,
+    edge_margin: float = EDGE_MARGIN_UM,
+    step_size: float = STEP_SIZE_UM,
+    n_pixels: int = 3,
+    include_edges: bool = True,
+) -> list:
+    """Calculate scan positions in the gap regions between metal pads.
+
+    Args:
+        pixel_pitch: Distance between pixel centers in µm (default: 500)
+        half_pad: Half of metal pad size in µm (default: 75)
+        edge_margin: Margin from pad edge in µm (default: 3)
+        step_size: Step size between positions in µm (default: 25)
+        n_pixels: Number of pixels to span (default: 3)
+        include_edges: Ensure both gap edges are included even if step doesn't align (default: True)
+
+    Returns:
+        List of positions in µm, sorted from most negative to most positive
+
+    Example for 3 pixels with default geometry:
+        Pixels at: -500, 0, +500 µm
+        Pads at: [-575,-425], [-75,+75], [+425,+575] µm
+        Gap 1: [-425+margin, -75-margin] = [-422, -78] µm
+        Gap 2: [+75+margin, +425-margin] = [+78, +422] µm
+
+    The positions are calculated to:
+    1. Stay within gap regions (avoid metal pads)
+    2. Be equally spaced within each gap
+    3. Include positions very close to both left and right edges of each gap
+    """
+    positions = set()  # Use set to avoid duplicates
+
+    # Calculate pixel centers (symmetric around 0)
+    # For n_pixels=3: centers at -500, 0, +500 µm
+    # For n_pixels=5: centers at -1000, -500, 0, +500, +1000 µm
+    half_span = (n_pixels - 1) // 2
+    pixel_centers = [i * pixel_pitch for i in range(-half_span, half_span + 1)]
+
+    # Generate positions in each gap between adjacent pixels
+    for i in range(len(pixel_centers) - 1):
+        left_pixel = pixel_centers[i]
+        right_pixel = pixel_centers[i + 1]
+
+        # Gap boundaries (with margin from pad edges)
+        gap_start = left_pixel + half_pad + edge_margin   # Right edge of left pad + margin
+        gap_end = right_pixel - half_pad - edge_margin     # Left edge of right pad - margin
+
+        # Always include edge positions if requested
+        if include_edges:
+            positions.add(round(gap_start, 1))
+            positions.add(round(gap_end, 1))
+
+        # Generate equally-spaced interior positions
+        pos = gap_start + step_size
+        while pos < gap_end - 0.1:  # Don't include gap_end (already added if include_edges)
+            positions.add(round(pos, 1))
+            pos += step_size
+
+    return sorted(positions)
+
+# Default positions: gap regions between 3 pixels, avoiding metal pads
+POSITIONS = calculate_gap_positions()
 
 
 def determine_output_dir(output_dir_arg: Optional[str]) -> Path:
@@ -62,26 +143,45 @@ def write_file_text(path: Path, text: str) -> None:
         f.write(text)
 
 
-def update_primary_generator_x_um(source_text: str, x_um: float) -> str:
-    lines = source_text.splitlines()
-    replaced = False
-    new_lines = []
-    for line in lines:
-        m = FIXED_X_LINE_REGEX.match(line)
-        if m:
-            indent = m.group(1)
-            value_str = f"{x_um:.1f}"
-            newline = f"{indent}fFixedX = {value_str}*um;"
-            new_lines.append(newline)
-            replaced = True
-        else:
-            new_lines.append(line)
-    if not replaced:
-        raise RuntimeError(
-            "Could not find fixed X assignment in PrimaryGenerator.cc (expected fFixedX = ...;)"
-        )
-    # Preserve trailing newline presence
-    return "\n".join(new_lines) + ("\n" if source_text.endswith("\n") else "")
+def generate_position_macro(x_um: float, n_events: int = 10000) -> str:
+    """Generate a Geant4 macro that sets the particle gun to a fixed X position.
+
+    Uses the /epic/gun/ messenger commands defined in PrimaryGenerator.cc:
+    - /epic/gun/useFixedPosition true  (enable fixed position mode)
+    - /epic/gun/fixedX <value> mm      (set X coordinate)
+    - /epic/gun/fixedY 0 mm            (set Y to center of pad row)
+
+    Args:
+        x_um: X position in micrometers
+        n_events: Number of events to simulate
+
+    Returns:
+        Macro file contents as a string
+    """
+    x_mm = x_um / 1000.0  # Convert µm to mm
+
+    return f"""# Auto-generated macro for sweep position x = {x_um:.1f} µm
+# Set verbosity
+/control/verbose 0
+/run/verbose 0
+/event/verbose 0
+/tracking/verbose 0
+
+# Initialize
+/run/initialize
+
+# Set particle gun parameters
+/gun/particle e-
+/gun/energy 10 GeV
+
+# Set fixed position mode with X = {x_um:.1f} µm ({x_mm:.4f} mm)
+/epic/gun/useFixedPosition true
+/epic/gun/fixedX {x_mm:.4f} mm
+/epic/gun/fixedY 0 mm
+
+# Run events
+/run/beamOn {n_events}
+"""
 
 
 def run_cmd(cmd, cwd: Path = None):
@@ -103,13 +203,14 @@ def build_project():
     run_cmd(["cmake", "--build", str(BUILD_DIR), "-j"])
 
 
-def run_simulation():
+def run_simulation(macro_path: Path):
+    """Run the simulation with the specified macro file."""
     if not EXECUTABLE.exists():
         raise RuntimeError(f"Executable not found: {EXECUTABLE}")
-    if not RUN_MAC.exists():
-        raise RuntimeError(f"Run macro not found: {RUN_MAC}")
-    # Multithreaded by default (let executable decide threads); remove -t 1
-    run_cmd([str(EXECUTABLE), "-m", str(RUN_MAC)])
+    if not macro_path.exists():
+        raise RuntimeError(f"Macro file not found: {macro_path}")
+    # Multithreaded by default (let executable decide threads)
+    run_cmd([str(EXECUTABLE), "-m", str(macro_path)])
 
 
 def wait_for_file(path: Path, timeout_s: int = 120):
@@ -161,6 +262,11 @@ def run_post_analysis(output_dir: Path):
     print("RUNNING POST-SWEEP ANALYSIS")
     print("=" * 80)
 
+    # Ensure repo root is in sys.path for 'from farm import ...' to work
+    repo_root_str = str(REPO_ROOT)
+    if repo_root_str not in sys.path:
+        sys.path.insert(0, repo_root_str)
+
     # Import and run Fi_x.py
     try:
         print("\n[INFO] Running Fi_x.py analysis...")
@@ -186,7 +292,8 @@ def run_post_analysis(output_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Sweep x positions and collect output ROOT files into a dedicated directory."
+        description="Sweep x positions and collect output ROOT files into a dedicated directory.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--output-dir",
@@ -200,44 +307,64 @@ def main():
         action="store_true",
         help="Skip running post-sweep analysis scripts (Fi_x.py, sigma_f_x.py).",
     )
+    parser.add_argument(
+        "--n-events",
+        dest="n_events",
+        type=int,
+        default=10000,
+        help="Number of events per position.",
+    )
+    parser.add_argument(
+        "--skip-build",
+        dest="skip_build",
+        action="store_true",
+        help="Skip building (assume executable is already up to date).",
+    )
     args = parser.parse_args()
 
     os.chdir(str(REPO_ROOT))
 
-    configure_build_if_needed()
-
-    original_text = read_file_text(SRC_FILE)
-
     output_dir = determine_output_dir(args.output_dir)
     print(f"Writing output ROOT files to {output_dir}")
+    print(f"Positions to sweep: {len(POSITIONS)} points")
+    print(f"Events per position: {args.n_events}")
 
-    try:
-        for x_um in POSITIONS:
-            out_name = output_dir / (
-                f"{int(x_um)}um.root" if float(x_um).is_integer() else f"{x_um}um.root"
-            )
+    # Build once at the start (no recompilation needed for position changes!)
+    if not args.skip_build:
+        print("\n" + "=" * 80)
+        print("BUILDING PROJECT (once)")
+        print("=" * 80)
+        configure_build_if_needed()
+        build_project()
+    else:
+        print("\n[INFO] Skipping build (--skip-build specified)")
 
-            print(f"=== Running for x = {x_um} um (multithreaded) ===")
+    # Create a temporary directory for macro files
+    macro_dir = output_dir / "macros"
+    macro_dir.mkdir(parents=True, exist_ok=True)
 
-            # Update source
-            new_text = update_primary_generator_x_um(original_text, float(x_um))
-            write_file_text(SRC_FILE, new_text)
+    print("\n" + "=" * 80)
+    print("RUNNING SIMULATIONS")
+    print("=" * 80)
+    print("Using Geant4 macro commands to set position (no recompilation needed)")
 
-            # Build
-            build_project()
+    for i, x_um in enumerate(POSITIONS, 1):
+        out_name = output_dir / (
+            f"{int(x_um)}um.root" if float(x_um).is_integer() else f"{x_um}um.root"
+        )
 
-            # Run
-            run_simulation()
+        print(f"\n=== [{i}/{len(POSITIONS)}] Position x = {x_um} µm ===")
 
-            # Rename/move output (merged file)
-            rename_output_to(out_name)
+        # Generate position-specific macro
+        macro_content = generate_position_macro(x_um, args.n_events)
+        macro_path = macro_dir / f"run_x{int(x_um) if float(x_um).is_integer() else x_um}um.mac"
+        write_file_text(macro_path, macro_content)
 
-    finally:
-        # Restore original source
-        try:
-            write_file_text(SRC_FILE, original_text)
-        except Exception as e:
-            print(f"Warning: failed to restore original source: {e}")
+        # Run simulation with macro
+        run_simulation(macro_path)
+
+        # Rename/move output (merged file)
+        rename_output_to(out_name)
 
     # Run post-analysis scripts
     if not args.skip_analysis:
