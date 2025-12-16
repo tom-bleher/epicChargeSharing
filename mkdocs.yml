@@ -41,6 +41,7 @@ nav:
   - Reference:
     - Physics Model: physics-model.md
     - Architecture: architecture.md
+    - Weightfield Integration: weightfield-integration.md
     - Naming Conventions: NamingConventions.md
 
 # Extensions

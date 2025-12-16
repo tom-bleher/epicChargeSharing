@@ -36,7 +36,7 @@
 DetectorConstruction::DetectorConstruction()
     : G4VUserDetectorConstruction(),
       fPixelSize(Constants::PIXEL_SIZE),
-      fPixelWidth(Constants::PIXEL_WIDTH),
+      fPixelWidth(Constants::PIXEL_THICKNESS),
       fPixelSpacing(Constants::PIXEL_PITCH),
       fPixelCornerOffset(Constants::PIXEL_CORNER_OFFSET),
       fDetSize(Constants::DETECTOR_SIZE),

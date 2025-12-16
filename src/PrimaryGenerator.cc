@@ -56,7 +56,7 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
 
     fFixedX = -150.0*um;
     if (fDetector) {
-        fFixedY = 0.5 * fDetector->GetPixelSpacing();
+        fFixedY = 0.0;  // Center of pad row (red line), not gap row
     }
 
     const auto& window = EnsureSamplingWindow();
