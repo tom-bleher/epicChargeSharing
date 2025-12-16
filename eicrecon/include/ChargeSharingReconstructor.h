@@ -28,7 +28,7 @@ class ChargeSharingReconstructor {
   struct NeighborData {
     double fraction{-999.0};
     double chargeC{0.0};
-    double distanceMM{0.0};
+    double distanceMM{0.0};  ///< d_i: distance to pixel center (mm)
     double alphaRad{0.0};
     double pixelXMM{0.0};
     double pixelYMM{0.0};
@@ -82,7 +82,9 @@ class ChargeSharingReconstructor {
   void ensureGrid();
   void resetBuffers();
   void rebuildOffsets();
-  double calcPixelAlpha(double distanceMM, double pixelWidthMM, double pixelHeightMM) const;
+  double calcDistanceToCenter(double dxToCenterMM,
+                               double dyToCenterMM) const;
+  double calcPadViewAngle(double distanceToCenterMM, double padWidthMM, double padHeightMM) const;
   double linearModelBeta(double pitchMM) const;
   int linearizedPixelId(int indexI, int indexJ) const;
 
@@ -107,4 +109,3 @@ class ChargeSharingReconstructor {
 };
 
 }  // namespace epic::chargesharing
-

@@ -27,11 +27,11 @@ struct ChargeSharingConfig {
   float minEDepGeV = 0.0F;
   int neighborhoodRadius = 2;
 
-  double pixelSizeMM = 0.1;          ///< Square pixel side length
+  double pixelSizeMM = 0.1;          ///< Square pixel/pad side length
   double pixelSizeYMM = 0.1;         ///< Optional Y pixel size override
   double pixelSpacingMM = 0.5;       ///< Center-to-center pitch
   double pixelSpacingYMM = 0.5;      ///< Optional Y pitch override
-  double pixelCornerOffsetMM = 0.1;  ///< Distance from detector edge to first pixel center
+  double pixelCornerOffsetMM = 0.1;  ///< Distance from detector edge to first pixel/pad center
   double detectorSizeMM = 30.0;
   double detectorThicknessMM = 0.05;
   double pixelThicknessMM = 0.001;
@@ -49,4 +49,3 @@ struct ChargeSharingConfig {
 };
 
 }  // namespace epic::chargesharing
-

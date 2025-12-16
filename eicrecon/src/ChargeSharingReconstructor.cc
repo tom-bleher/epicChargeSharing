@@ -14,8 +14,9 @@ constexpr double kOutOfBoundsFraction = -999.0;
 constexpr double kGuardFactor = 1.0 + 1e-6;
 constexpr double kMillimeterPerMicron = 1.0e-3;
 
-enum class ChargeSharingModel { Log, Linear };
-constexpr ChargeSharingModel kChargeSharingModel = ChargeSharingModel::Linear;
+// Paper terminology: LogA and LinA are the signal sharing models.
+enum class ChargeSharingModel { LogA, LinA };
+constexpr ChargeSharingModel kChargeSharingModel = ChargeSharingModel::LinA;
 
 constexpr double kLinearBetaNarrow = 0.003;  // 1/um
 constexpr double kLinearBetaWide = 0.001;    // 1/um
@@ -134,7 +135,7 @@ ChargeSharingReconstructor::Result ChargeSharingReconstructor::process(const Inp
                                  : m_cfg.pixelSizeYMM;
   const double pitchForBeta = std::max(0.5 * (pixelSpacingX + pixelSpacingY), 1.0e-6);
   const double beta = linearModelBeta(pitchForBeta);
-  const bool useLinearModel = (kChargeSharingModel == ChargeSharingModel::Linear);
+  const bool useLinearModel = (kChargeSharingModel == ChargeSharingModel::LinA);
 
   double totalWeight = 0.0;
 
@@ -154,19 +155,19 @@ ChargeSharingReconstructor::Result ChargeSharingReconstructor::process(const Inp
     const double pixelCenterX = neighborLoc.center[0];
     const double pixelCenterY = neighborLoc.center[1];
 
-    const double dx = hitX - pixelCenterX;
-    const double dy = hitY - pixelCenterY;
-    const double distance = std::hypot(dx, dy);
-    const double alpha = calcPixelAlpha(distance,
-                                        (pixelWidth > 0.0) ? pixelWidth : pixelSpacingX,
-                                        (pixelHeight > 0.0) ? pixelHeight : pixelSpacingY);
+    const double dxToCenter = hitX - pixelCenterX;
+    const double dyToCenter = hitY - pixelCenterY;
+    const double distanceToCenter = calcDistanceToCenter(dxToCenter, dyToCenter);
+    const double alpha = calcPadViewAngle(distanceToCenter,
+                                          (pixelWidth > 0.0) ? pixelWidth : pixelSpacingX,
+                                          (pixelHeight > 0.0) ? pixelHeight : pixelSpacingY);
 
-    const double safeDistance = std::max(distance, minSafeDistance);
+    const double safeDistance = std::max(distanceToCenter, minSafeDistance);
     const double logValue = (invD0 > 0.0) ? std::log(safeDistance * invD0) : 0.0;
     double weight = (logValue > 0.0 && std::isfinite(logValue)) ? (alpha / logValue) : 0.0;
 
     if (useLinearModel) {
-      const double distanceUM = distance / kMillimeterPerMicron;
+      const double distanceUM = distanceToCenter / kMillimeterPerMicron;
       const double attenuation = std::max(0.0, 1.0 - beta * distanceUM);
       weight = attenuation * alpha;
     }
@@ -178,7 +179,7 @@ ChargeSharingReconstructor::Result ChargeSharingReconstructor::process(const Inp
     m_pixelIds[idx] = linearizedPixelId(gridPixelI, gridPixelJ);
 
     if (!m_distances.empty()) {
-      m_distances[idx] = distance;
+      m_distances[idx] = distanceToCenter;
       m_alphas[idx] = alpha;
     }
 
@@ -304,19 +305,26 @@ void ChargeSharingReconstructor::rebuildOffsets() {
   }
 }
 
-double ChargeSharingReconstructor::calcPixelAlpha(double distanceMM, double pixelWidthMM,
-                                                  double pixelHeightMM) const {
-  const double l = (pixelWidthMM + pixelHeightMM) / 2.0;
+double ChargeSharingReconstructor::calcDistanceToCenter(double dxToCenterMM,
+                                                         double dyToCenterMM) const {
+  // Compute d_i: Euclidean distance from hit point to pixel center.
+  return std::hypot(dxToCenterMM, dyToCenterMM);
+}
+
+double ChargeSharingReconstructor::calcPadViewAngle(double distanceToCenterMM,
+                                                    double padWidthMM,
+                                                    double padHeightMM) const {
+  const double l = (padWidthMM + padHeightMM) / 2.0;
   const double numerator = (l / 2.0) * std::sqrt(2.0);
-  const double denominator = numerator + distanceMM;
-  if (distanceMM == 0.0) {
+  const double denominator = numerator + distanceToCenterMM;
+  if (distanceToCenterMM == 0.0) {
     return std::atan(1.0);
   }
   return std::atan(numerator / denominator);
 }
 
 double ChargeSharingReconstructor::linearModelBeta(double pitchMM) const {
-  if (kChargeSharingModel != ChargeSharingModel::Linear) {
+  if (kChargeSharingModel != ChargeSharingModel::LinA) {
     return 0.0;
   }
 
@@ -417,4 +425,3 @@ int ChargeSharingReconstructor::linearizedPixelId(int indexI, int indexJ) const 
 }
 
 }  // namespace epic::chargesharing
-
