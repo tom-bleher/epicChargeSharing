@@ -796,7 +796,9 @@ def extract_sigma_f(
     result = SigmaFResult(x_um=x_um)
 
     try:
-        with uproot.open(root_file) as f:
+        # Use MemmapSource for local files so ZSTD-compressed branches are readable
+        # even if the filesystem backend selection changes.
+        with uproot.open(root_file, handler=uproot.source.file.MemmapSource) as f:
             if "Hits" not in f:
                 print(f"[WARN] Tree 'Hits' not found in {root_file}")
                 return result
@@ -858,7 +860,7 @@ def infer_pixel_of_interest(
     have_coords = False
     if root_files:
         try:
-            with uproot.open(root_files[0]) as first_file:
+            with uproot.open(root_files[0], handler=uproot.source.file.MemmapSource) as first_file:
                 if "Hits" in first_file:
                     key_set = {key.split(";")[0] for key in first_file["Hits"].keys()}
                     use_full_grid = {"F_all", "F_all_pixel_id"}.issubset(key_set)
@@ -888,7 +890,7 @@ def infer_pixel_of_interest(
         if remaining <= 0:
             break
         try:
-            with uproot.open(path) as f:
+            with uproot.open(path, handler=uproot.source.file.MemmapSource) as f:
                 if "Hits" not in f:
                     continue
                 tree = f["Hits"]
@@ -1056,7 +1058,7 @@ def extract_fi_from_file(
     """Extract F_i statistics for a specific pixel from a ROOT file."""
     x_um = parse_x_um_from_filename(root_file)
 
-    with uproot.open(root_file) as f:
+    with uproot.open(root_file, handler=uproot.source.file.MemmapSource) as f:
         if "Hits" not in f:
             raise RuntimeError(f"Tree 'Hits' not found in {root_file}")
 
@@ -1170,6 +1172,481 @@ def extract_fi_from_file(
 # Summary Plots
 # =============================================================================
 
+# Default pixel geometry for plots (can be overridden)
+DEFAULT_PIXEL_SPACING_MM = 0.5   # 500 µm
+DEFAULT_PIXEL_SIZE_MM = 0.15    # 150 µm
+
+
+def draw_pixel_regions(
+    ax: plt.Axes,
+    pixel_spacing_mm: float = DEFAULT_PIXEL_SPACING_MM,
+    pixel_size_mm: float = DEFAULT_PIXEL_SIZE_MM,
+    x_range_mm: Tuple[float, float] = (-0.8, 0.8),
+    color: str = "#d0d0d0",
+    alpha: float = 0.6,
+) -> None:
+    """Draw gray vertical bands for pixel pad locations (FNAL paper style).
+
+    Assumes pixels are centered at 0, ±pixel_spacing_mm, ±2*pixel_spacing_mm, etc.
+    Each pixel pad extends ±(pixel_size_mm/2) from its center.
+    """
+    half_size = pixel_size_mm / 2.0
+    x_min, x_max = x_range_mm
+
+    # Find all pixel centers in range
+    max_n = int(np.ceil(max(abs(x_min), abs(x_max)) / pixel_spacing_mm)) + 1
+    for n in range(-max_n, max_n + 1):
+        center = n * pixel_spacing_mm
+        left = center - half_size
+        right = center + half_size
+        if right >= x_min and left <= x_max:
+            ax.axvspan(left, right, color=color, alpha=alpha, zorder=0)
+
+
+def get_pixel_boundaries(
+    pixel_spacing_mm: float,
+    pixel_size_mm: float,
+    x_range_mm: Tuple[float, float],
+) -> List[Tuple[float, float]]:
+    """Get list of (left_edge, right_edge) for all pixel regions in x_range."""
+    half_size = pixel_size_mm / 2.0
+    x_min, x_max = x_range_mm
+    boundaries = []
+
+    max_n = int(np.ceil(max(abs(x_min), abs(x_max)) / pixel_spacing_mm)) + 1
+    for n in range(-max_n, max_n + 1):
+        center = n * pixel_spacing_mm
+        left = center - half_size
+        right = center + half_size
+        if right >= x_min and left <= x_max:
+            boundaries.append((left, right))
+
+    return sorted(boundaries, key=lambda b: b[0])
+
+
+def add_binary_resolution_in_pixel_regions(
+    x_vals_mm: np.ndarray,
+    sigma_vals_um: np.ndarray,
+    pixel_spacing_mm: float,
+    pixel_size_mm: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Add points with binary resolution (pixel_size/sqrt(12)) inside pixel regions.
+
+    This makes step plots show the degraded binary resolution inside metal pads
+    rather than interpolating across them.
+
+    Returns:
+        Tuple of (x_vals_mm, sigma_vals_um) with inserted pixel region points.
+    """
+    if len(x_vals_mm) == 0:
+        return x_vals_mm, sigma_vals_um
+
+    # Binary resolution in µm
+    binary_res_um = (pixel_size_mm * 1000.0) / math.sqrt(12.0)
+
+    x_min, x_max = np.nanmin(x_vals_mm), np.nanmax(x_vals_mm)
+    boundaries = get_pixel_boundaries(pixel_spacing_mm, pixel_size_mm, (x_min, x_max))
+
+    if not boundaries:
+        return x_vals_mm, sigma_vals_um
+
+    # Build new arrays with inserted pixel region points
+    new_x = list(x_vals_mm)
+    new_sigma = list(sigma_vals_um)
+
+    # Small offset to place points just inside pixel boundaries
+    eps = 0.001  # 1 µm in mm
+
+    for left, right in boundaries:
+        # Add points just inside the pixel boundaries with binary resolution
+        # These create the flat horizontal line inside the pixel region
+        left_inside = left + eps
+        right_inside = right - eps
+
+        # Only add if within data range and not duplicating existing points
+        if left_inside >= x_min and left_inside <= x_max:
+            if not any(abs(x - left_inside) < eps * 2 for x in new_x):
+                new_x.append(left_inside)
+                new_sigma.append(binary_res_um)
+
+        if right_inside >= x_min and right_inside <= x_max:
+            if not any(abs(x - right_inside) < eps * 2 for x in new_x):
+                new_x.append(right_inside)
+                new_sigma.append(binary_res_um)
+
+    # Sort by x position
+    sort_idx = np.argsort(new_x)
+    return np.array(new_x)[sort_idx], np.array(new_sigma)[sort_idx]
+
+
+def add_fi_in_pixel_regions(
+    x_vals_mm: np.ndarray,
+    fi_vals: np.ndarray,
+    pixel_spacing_mm: float,
+    pixel_size_mm: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Add points with F_i = 1.0 inside pixel regions.
+
+    When a track hits directly on the metal pad, all charge goes to that pixel,
+    so F_i = 1.0.
+
+    Returns:
+        Tuple of (x_vals_mm, fi_vals) with inserted pixel region points.
+    """
+    if len(x_vals_mm) == 0:
+        return x_vals_mm, fi_vals
+
+    x_min, x_max = np.nanmin(x_vals_mm), np.nanmax(x_vals_mm)
+    boundaries = get_pixel_boundaries(pixel_spacing_mm, pixel_size_mm, (x_min, x_max))
+
+    if not boundaries:
+        return x_vals_mm, fi_vals
+
+    # Build new arrays with inserted pixel region points
+    new_x = list(x_vals_mm)
+    new_fi = list(fi_vals)
+
+    # Small offset to place points just inside pixel boundaries
+    eps = 0.001  # 1 µm in mm
+
+    for left, right in boundaries:
+        # Add points just inside the pixel boundaries with F_i = 1.0
+        left_inside = left + eps
+        right_inside = right - eps
+
+        # Only add if within data range and not duplicating existing points
+        if left_inside >= x_min and left_inside <= x_max:
+            if not any(abs(x - left_inside) < eps * 2 for x in new_x):
+                new_x.append(left_inside)
+                new_fi.append(1.0)
+
+        if right_inside >= x_min and right_inside <= x_max:
+            if not any(abs(x - right_inside) < eps * 2 for x in new_x):
+                new_x.append(right_inside)
+                new_fi.append(1.0)
+
+    # Sort by x position
+    sort_idx = np.argsort(new_x)
+    return np.array(new_x)[sort_idx], np.array(new_fi)[sort_idx]
+
+
+def save_pixel_grid_visualization(
+    measurement_positions_um: Sequence[float],
+    output_dir: Path,
+    pixel_spacing_mm: float = DEFAULT_PIXEL_SPACING_MM,
+    pixel_size_mm: float = DEFAULT_PIXEL_SIZE_MM,
+    n_cols: int = 3,
+    n_rows: int = 2,
+) -> Path:
+    """Create a visualization of the pixel grid showing measurement positions.
+
+    Shows the actual detector geometry with:
+    - Metal pads as gray rectangles
+    - Gap regions between pads
+    - Red dots marking where measurements are taken
+    - Proper scale with dimensions in µm
+
+    Args:
+        measurement_positions_um: List of x positions in µm where measurements are taken
+        output_dir: Directory to save the output image
+        pixel_spacing_mm: Distance between pixel centers in mm (default: 0.5 mm = 500 µm)
+        pixel_size_mm: Size of metal pads in mm (default: 0.15 mm = 150 µm)
+        n_cols: Number of pixel columns (default: 3)
+        n_rows: Number of pixel rows (default: 2)
+
+    Returns:
+        Path to the saved image
+    """
+    ensure_dir(output_dir)
+
+    # Convert to µm for easier visualization
+    pixel_spacing_um = pixel_spacing_mm * 1000.0
+    pixel_size_um = pixel_size_mm * 1000.0
+    half_pad = pixel_size_um / 2.0
+
+    # Calculate grid extent
+    half_cols = (n_cols - 1) // 2
+    half_rows = (n_rows - 1) // 2
+    x_centers = [i * pixel_spacing_um for i in range(-half_cols, half_cols + 1)]
+    y_centers = [j * pixel_spacing_um for j in range(-half_rows, half_rows + 1)]
+
+    # Calculate figure bounds (add margin)
+    margin_um = 100.0
+    x_min = x_centers[0] - pixel_spacing_um / 2 - margin_um
+    x_max = x_centers[-1] + pixel_spacing_um / 2 + margin_um
+    y_min = y_centers[0] - pixel_spacing_um / 2 - margin_um
+    y_max = y_centers[-1] + pixel_spacing_um / 2 + margin_um
+
+    # Create figure with proper aspect ratio
+    width_um = x_max - x_min
+    height_um = y_max - y_min
+    fig_width = 10
+    fig_height = fig_width * height_um / width_um
+
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=120)
+
+    # Draw pixel boundaries (dashed lines)
+    for x in x_centers:
+        ax.axvline(x - pixel_spacing_um / 2, color='gray', linestyle='--', alpha=0.3, linewidth=0.5)
+        ax.axvline(x + pixel_spacing_um / 2, color='gray', linestyle='--', alpha=0.3, linewidth=0.5)
+    for y in y_centers:
+        ax.axhline(y - pixel_spacing_um / 2, color='gray', linestyle='--', alpha=0.3, linewidth=0.5)
+        ax.axhline(y + pixel_spacing_um / 2, color='gray', linestyle='--', alpha=0.3, linewidth=0.5)
+
+    # Draw metal pads as gray rectangles
+    from matplotlib.patches import Rectangle
+    for x in x_centers:
+        for y in y_centers:
+            rect = Rectangle(
+                (x - half_pad, y - half_pad),
+                pixel_size_um,
+                pixel_size_um,
+                linewidth=1,
+                edgecolor='#404040',
+                facecolor='#d0d0d0',
+                zorder=1,
+            )
+            ax.add_patch(rect)
+
+    # Highlight the row where measurements are taken (y=0, the "pad row")
+    # Draw a light red band across the measurement row
+    measurement_row_y = 0  # Assuming measurements are in the row at y=0
+    row_band_height = pixel_spacing_um
+    ax.axhspan(
+        measurement_row_y - row_band_height / 2,
+        measurement_row_y + row_band_height / 2,
+        color='#ffcccc',
+        alpha=0.3,
+        zorder=0,
+        label='Measurement row'
+    )
+
+    # Draw gap regions (columns between pads) with light blue
+    for i in range(len(x_centers) - 1):
+        gap_left = x_centers[i] + half_pad
+        gap_right = x_centers[i + 1] - half_pad
+        ax.axvspan(
+            gap_left, gap_right,
+            color='#cce5ff',
+            alpha=0.4,
+            zorder=0,
+        )
+
+    # Draw measurement positions as red dots
+    measurement_y = 0  # All measurements are at y=0 (upper pad row)
+    xs = np.array(measurement_positions_um)
+    ys = np.full_like(xs, measurement_y)
+    ax.scatter(xs, ys, c='red', s=30, zorder=3, label='Measurement positions', edgecolors='darkred', linewidths=0.5)
+
+    # Add dimension annotations
+    # Show pixel pitch
+    ax.annotate(
+        '', xy=(x_centers[0], y_max - 30), xytext=(x_centers[1], y_max - 30),
+        arrowprops=dict(arrowstyle='<->', color='black', lw=1.5)
+    )
+    ax.text((x_centers[0] + x_centers[1]) / 2, y_max - 10, f'Pitch: {pixel_spacing_um:.0f} µm',
+            ha='center', va='bottom', fontsize=9)
+
+    # Show pad size
+    ax.annotate(
+        '', xy=(x_centers[1] - half_pad, y_centers[-1] + half_pad + 20),
+        xytext=(x_centers[1] + half_pad, y_centers[-1] + half_pad + 20),
+        arrowprops=dict(arrowstyle='<->', color='black', lw=1.5)
+    )
+    ax.text(x_centers[1], y_centers[-1] + half_pad + 40, f'Pad: {pixel_size_um:.0f} µm',
+            ha='center', va='bottom', fontsize=9)
+
+    # Axis settings
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_xlabel('x position [µm]', fontsize=11)
+    ax.set_ylabel('y position [µm]', fontsize=11)
+    ax.set_title('Pixel Grid with Measurement Positions', fontsize=12)
+    ax.set_aspect('equal')
+    ax.grid(False)
+
+    # Legend
+    ax.legend(loc='upper left', fontsize=9)
+
+    # Add text annotation for number of positions
+    n_positions = len(measurement_positions_um)
+    ax.text(
+        0.98, 0.02,
+        f'{n_positions} measurement positions\nin gap regions',
+        transform=ax.transAxes,
+        ha='right', va='bottom',
+        fontsize=9,
+        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8)
+    )
+
+    fig.tight_layout()
+    out_path = output_dir / "pixel_grid_with_measurements.png"
+    fig.savefig(out_path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+    return out_path
+
+
+def save_sigma_f_vs_x_plot(
+    results: List[PositionResult],
+    output_dir: Path,
+    branch: str = "ReconTrueDeltaRowX",
+    pixel_spacing_mm: float = DEFAULT_PIXEL_SPACING_MM,
+    pixel_size_mm: float = DEFAULT_PIXEL_SIZE_MM,
+) -> Path:
+    """FNAL paper-style plot of sigma_f vs track x position with gray pixel bands.
+
+    Shows binary resolution (pixel_size/sqrt(12)) inside pixel regions where
+    no measurements exist, and uses data-driven y-axis limits.
+    """
+    xs_um = []
+    ys = []
+
+    for r in results:
+        if r.sigma_f is None or branch not in r.sigma_f.branch_results:
+            continue
+        fit = r.sigma_f.branch_results[branch]
+        if not np.isfinite(fit.sigma):
+            continue
+        xs_um.append(r.x_um)
+        ys.append(fit.sigma * 1000.0)  # mm -> um
+
+    if not xs_um:
+        print(f"[WARN] No valid sigma_f data for {branch}")
+        return output_dir / f"sigma_f_vs_x_{branch}.png"
+
+    # Sort by x position
+    sort_idx = np.argsort(xs_um)
+    xs_um = np.array(xs_um)[sort_idx]
+    ys = np.array(ys)[sort_idx]
+    xs_mm = xs_um / 1000.0
+
+    # Add binary resolution points inside pixel regions
+    xs_mm_extended, ys_extended = add_binary_resolution_in_pixel_regions(
+        xs_mm, ys, pixel_spacing_mm, pixel_size_mm
+    )
+
+    # FNAL paper-style figure
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=DPI)
+
+    # Determine x range
+    x_min = np.nanmin(xs_mm) - 0.05
+    x_max = np.nanmax(xs_mm) + 0.05
+
+    # Draw gray pixel regions first (behind the data)
+    draw_pixel_regions(ax, pixel_spacing_mm, pixel_size_mm, x_range_mm=(x_min, x_max))
+
+    # Plot as histogram-style step (FNAL paper style) with extended data
+    ax.step(xs_mm_extended, ys_extended, where="mid", color="#1f77b4", lw=2, zorder=2, label="Simulation")
+
+    # Add square markers at measurement points (FNAL paper style)
+    ax.scatter(xs_mm, ys, marker='s', s=40, color="#1f77b4",
+               edgecolors='black', linewidths=0.5, zorder=4)
+
+    # FNAL paper-style axis labels
+    ax.set_xlabel("Track x position [mm]", fontsize=12)
+    ax.set_ylabel(r"Position resolution [µm]", fontsize=12)
+    ax.set_xlim(x_min, x_max)
+
+    # Y-axis starts from 0, extends above max with margin
+    y_max_data = np.nanmax(ys_extended)
+    ax.set_ylim(0, y_max_data * 1.1)
+
+    # Minimal grid
+    ax.grid(True, alpha=0.3, zorder=1, linestyle='-')
+    ax.tick_params(axis='both', which='major', labelsize=10)
+
+    branch_name = branch.replace("ReconTrueDelta", "").replace("_2D", " (2D)")
+    ax.set_title(f"Position resolution vs track position - {branch_name}", fontsize=12)
+    ax.legend(loc='upper right', fontsize=10)
+
+    ensure_dir(output_dir)
+    out_path = output_dir / f"sigma_f_vs_x_{branch}.png"
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+
+    return out_path
+
+
+def save_fi_vs_x_plot(
+    results: List[PositionResult],
+    output_dir: Path,
+    pixel_spacing_mm: float = DEFAULT_PIXEL_SPACING_MM,
+    pixel_size_mm: float = DEFAULT_PIXEL_SIZE_MM,
+) -> Path:
+    """FNAL paper-style plot of F_i vs track x position with gray pixel bands.
+
+    Shows F_i = 1.0 inside pixel regions where all charge goes to that pixel.
+    """
+    xs_um = []
+    ys = []
+
+    for r in results:
+        if r.fi is None or not np.isfinite(r.fi.mean):
+            continue
+        xs_um.append(r.x_um)
+        ys.append(r.fi.mean)
+
+    if not xs_um:
+        print("[WARN] No valid F_i data")
+        return output_dir / "fi_vs_x.png"
+
+    # Sort by x position
+    sort_idx = np.argsort(xs_um)
+    xs_um = np.array(xs_um)[sort_idx]
+    ys = np.array(ys)[sort_idx]
+    xs_mm = xs_um / 1000.0
+
+    # Add F_i = 1.0 points inside pixel regions
+    xs_mm_extended, ys_extended = add_fi_in_pixel_regions(
+        xs_mm, ys, pixel_spacing_mm, pixel_size_mm
+    )
+
+    # FNAL paper-style figure
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=DPI)
+
+    # Determine x range
+    x_min = np.nanmin(xs_mm) - 0.05
+    x_max = np.nanmax(xs_mm) + 0.05
+
+    # Draw gray pixel regions first (behind the data)
+    draw_pixel_regions(ax, pixel_spacing_mm, pixel_size_mm, x_range_mm=(x_min, x_max))
+
+    # Plot as histogram-style step (FNAL paper style) with extended data
+    ax.step(xs_mm_extended, ys_extended, where="mid", color="#1f77b4", lw=2, zorder=2, label="Simulation")
+
+    # Add square markers at measurement points (FNAL paper style)
+    ax.scatter(xs_mm, ys, marker='s', s=40, color="#1f77b4",
+               edgecolors='black', linewidths=0.5, zorder=4)
+
+    # FNAL paper-style axis labels
+    ax.set_xlabel("Track x position [mm]", fontsize=12)
+    ax.set_ylabel(r"Signal fraction $F_i$", fontsize=12)
+    ax.set_xlim(x_min, x_max)
+
+    # Data-driven y-axis limits with margin (F_i bounded by 0 and 1)
+    y_min_data = np.nanmin(ys_extended)
+    y_max_data = np.nanmax(ys_extended)
+    y_margin = (y_max_data - y_min_data) * 0.1
+    ax.set_ylim(max(0, y_min_data - y_margin), min(1.05, y_max_data + y_margin))
+
+    # Minimal grid
+    ax.grid(True, alpha=0.3, zorder=1, linestyle='-')
+    ax.tick_params(axis='both', which='major', labelsize=10)
+
+    ax.set_title("Signal fraction vs track position", fontsize=12)
+    ax.legend(loc='upper right', fontsize=10)
+
+    ensure_dir(output_dir)
+    out_path = output_dir / "fi_vs_x.png"
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+
+    return out_path
+
+
 def save_sigma_f_vs_d_plot(
     results: List[PositionResult],
     output_dir: Path,
@@ -1282,16 +1759,17 @@ def save_combined_summary_plot(
     results: List[PositionResult],
     output_dir: Path,
     sigma_f_branch: str = "ReconTrueDeltaRowX",
+    pixel_spacing_mm: float = DEFAULT_PIXEL_SPACING_MM,
+    pixel_size_mm: float = DEFAULT_PIXEL_SIZE_MM,
 ) -> Path:
-    """Create a combined plot with sigma_f and F_i vs d.
+    """FNAL paper-style combined plot with sigma_f and F_i vs track position.
 
-    The F_i plot follows the style of Tornago et al. Figure 5.
-    Distance is signed: d = x_particle_gun - x_pixel_center
+    Both plots use gray pixel bands and step/histogram style.
     """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), dpi=DPI)
 
-    # sigma_f plot
-    xs_sigma = []
+    # Collect sigma_f data
+    xs_sigma_um = []
     ys_sigma = []
     for r in results:
         if r.sigma_f is None or sigma_f_branch not in r.sigma_f.branch_results:
@@ -1299,41 +1777,65 @@ def save_combined_summary_plot(
         fit = r.sigma_f.branch_results[sigma_f_branch]
         if not np.isfinite(fit.sigma):
             continue
-        if r.distance_to_reference_pixel_um is None:
-            continue
-        xs_sigma.append(r.distance_to_reference_pixel_um)
+        xs_sigma_um.append(r.x_um)
         ys_sigma.append(fit.sigma * 1000.0)
 
-    if xs_sigma:
-        ax1.scatter(xs_sigma, ys_sigma, color="#1f77b4", s=50, alpha=0.8)
-
-    ax1.set_xlabel(r"$d = x_{gun} - x_{pixel}$ [µm]", fontsize=12)
-    ax1.set_ylabel(r"$\sigma_F$ [µm]", fontsize=12)
-    ax1.set_title(r"$\sigma_F$ vs distance", fontsize=11)
-    ax1.grid(True, linestyle="-", alpha=0.3)
-
-    # F_i plot (Tornago paper style)
-    xs_fi = []
+    # Collect F_i data
+    xs_fi_um = []
     ys_fi = []
     for r in results:
         if r.fi is None or not np.isfinite(r.fi.mean):
             continue
-        if r.distance_to_reference_pixel_um is None:
-            continue
-        xs_fi.append(r.distance_to_reference_pixel_um)
+        xs_fi_um.append(r.x_um)
         ys_fi.append(r.fi.mean)
 
-    if xs_fi:
-        ax2.scatter(xs_fi, ys_fi, color="#2b5fff", s=50, alpha=0.8)
+    # Determine x range from all data
+    all_xs_um = xs_sigma_um + xs_fi_um
+    if all_xs_um:
+        all_xs_mm = np.array(all_xs_um) / 1000.0
+        x_min = np.nanmin(all_xs_mm) - 0.05
+        x_max = np.nanmax(all_xs_mm) + 0.05
+    else:
+        x_min, x_max = -0.5, 0.5
 
-    ax2.set_xlabel(r"$d = x_{gun} - x_{pixel}$ [µm]", fontsize=12)
-    ax2.set_ylabel("Fractional amplitude", fontsize=12)
-    ax2.set_title("Fractional amplitude seen in a pad as a function of the hit distance", fontsize=11)
+    # sigma_f plot
+    draw_pixel_regions(ax1, pixel_spacing_mm, pixel_size_mm, x_range_mm=(x_min, x_max))
+
+    if xs_sigma_um:
+        sort_idx = np.argsort(xs_sigma_um)
+        xs_mm = np.array(xs_sigma_um)[sort_idx] / 1000.0
+        ys = np.array(ys_sigma)[sort_idx]
+        ax1.step(xs_mm, ys, where="mid", color="#1f77b4", lw=2, zorder=2, label="Simulation")
+
+    ax1.set_xlabel("Track x position [mm]", fontsize=12)
+    ax1.set_ylabel(r"Position resolution [µm]", fontsize=12)
+    ax1.set_xlim(x_min, x_max)
+    y_max = max(ys_sigma) * 1.15 if ys_sigma else 100
+    ax1.set_ylim(0, max(y_max, 80))
+    ax1.grid(True, linestyle="-", alpha=0.3, zorder=1)
+    branch_name = sigma_f_branch.replace("ReconTrueDelta", "").replace("_2D", " (2D)")
+    ax1.set_title(f"Position resolution - {branch_name}", fontsize=11)
+    ax1.legend(loc='upper right', fontsize=10)
+
+    # F_i plot
+    draw_pixel_regions(ax2, pixel_spacing_mm, pixel_size_mm, x_range_mm=(x_min, x_max))
+
+    if xs_fi_um:
+        sort_idx = np.argsort(xs_fi_um)
+        xs_mm = np.array(xs_fi_um)[sort_idx] / 1000.0
+        ys = np.array(ys_fi)[sort_idx]
+        ax2.step(xs_mm, ys, where="mid", color="#1f77b4", lw=2, zorder=2, label="Simulation")
+
+    ax2.set_xlabel("Track x position [mm]", fontsize=12)
+    ax2.set_ylabel(r"Signal fraction $F_i$", fontsize=12)
+    ax2.set_xlim(x_min, x_max)
     ax2.set_ylim(0, 1.05)
-    ax2.grid(True, linestyle="-", alpha=0.3)
+    ax2.grid(True, linestyle="-", alpha=0.3, zorder=1)
+    ax2.set_title("Signal fraction vs track position", fontsize=11)
+    ax2.legend(loc='upper right', fontsize=10)
 
     ensure_dir(output_dir)
-    out_path = output_dir / "summary_sigma_f_and_fi_vs_d.png"
+    out_path = output_dir / "summary_sigma_f_and_fi_vs_x.png"
     fig.tight_layout()
     fig.savefig(out_path)
     plt.close(fig)
@@ -1607,21 +2109,34 @@ def run_full_pipeline(
     plots_dir = output_dir / "summary_plots"
     ensure_dir(plots_dir)
 
-    # sigma_f vs d plots for each branch
+    # Generate pixel grid visualization with measurement positions
+    measurement_positions = [r.x_um for r in results]
+    grid_viz_path = save_pixel_grid_visualization(measurement_positions, plots_dir)
+    print(f"[INFO] Saved pixel grid visualization: {grid_viz_path}")
+
+    # FNAL paper-style plots: resolution and F_i vs track position with gray pixel bands
     for branch in SIGMA_F_BRANCHES:
         has_data = any(
             r.sigma_f and branch in r.sigma_f.branch_results and np.isfinite(r.sigma_f.branch_results[branch].sigma)
             for r in results
         )
         if has_data:
+            # FNAL paper-style: resolution vs track position with gray bands
+            plot_path = save_sigma_f_vs_x_plot(results, plots_dir, branch)
+            print(f"[INFO] Saved sigma_f vs x plot (FNAL style): {plot_path}")
+            # Also save traditional distance plot
             plot_path = save_sigma_f_vs_d_plot(results, plots_dir, branch)
-            print(f"[INFO] Saved sigma_f plot: {plot_path}")
+            print(f"[INFO] Saved sigma_f vs d plot: {plot_path}")
 
-    # F_i vs d plot
+    # FNAL paper-style: F_i vs track position with gray bands
+    fi_x_plot_path = save_fi_vs_x_plot(results, plots_dir)
+    print(f"[INFO] Saved F_i vs x plot (FNAL style): {fi_x_plot_path}")
+
+    # Traditional distance plot
     fi_plot_path = save_fi_vs_d_plot(results, plots_dir)
-    print(f"[INFO] Saved F_i plot: {fi_plot_path}")
+    print(f"[INFO] Saved F_i vs d plot: {fi_plot_path}")
 
-    # Combined summary plot
+    # Combined summary plot (FNAL style with gray bands)
     combined_plot_path = save_combined_summary_plot(results, plots_dir)
     print(f"[INFO] Saved combined summary plot: {combined_plot_path}")
 
@@ -1771,18 +2286,34 @@ def analyze_existing_directory(
     plots_dir = output_dir / "summary_plots"
     ensure_dir(plots_dir)
 
+    # Generate pixel grid visualization with measurement positions
+    measurement_positions = [r.x_um for r in results]
+    grid_viz_path = save_pixel_grid_visualization(measurement_positions, plots_dir)
+    print(f"[INFO] Saved pixel grid visualization: {grid_viz_path}")
+
+    # FNAL paper-style plots: resolution and F_i vs track position with gray pixel bands
     for branch in SIGMA_F_BRANCHES:
         has_data = any(
             r.sigma_f and branch in r.sigma_f.branch_results and np.isfinite(r.sigma_f.branch_results[branch].sigma)
             for r in results
         )
         if has_data:
+            # FNAL paper-style: resolution vs track position with gray bands
+            plot_path = save_sigma_f_vs_x_plot(results, plots_dir, branch)
+            print(f"[INFO] Saved sigma_f vs x plot (FNAL style): {plot_path}")
+            # Also save traditional distance plot
             plot_path = save_sigma_f_vs_d_plot(results, plots_dir, branch)
-            print(f"[INFO] Saved sigma_f plot: {plot_path}")
+            print(f"[INFO] Saved sigma_f vs d plot: {plot_path}")
 
+    # FNAL paper-style: F_i vs track position with gray bands
+    fi_x_plot_path = save_fi_vs_x_plot(results, plots_dir)
+    print(f"[INFO] Saved F_i vs x plot (FNAL style): {fi_x_plot_path}")
+
+    # Traditional distance plot
     fi_plot_path = save_fi_vs_d_plot(results, plots_dir)
-    print(f"[INFO] Saved F_i plot: {fi_plot_path}")
+    print(f"[INFO] Saved F_i vs d plot: {fi_plot_path}")
 
+    # Combined summary plot (FNAL style with gray bands)
     combined_plot_path = save_combined_summary_plot(results, plots_dir)
     print(f"[INFO] Saved combined summary plot: {combined_plot_path}")
 
