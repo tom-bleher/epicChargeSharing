@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """Compute `F_i` charge fractions versus particle-gun x position.
 
-Tailored for the `sweep_x` production, this utility mirrors the overall
-workflow of `sigma_f_x.py`, but instead of Gaussian fits on reconstruction
-deltas it focuses on the raw neighborhood fractions (`F_i`).  Given a directory
-of sweep ROOT files, it extracts the fraction recorded for a *single, fixed
-pixel of interest* from every event, aggregates mean fractions at each
-particle-gun x position (50k shots per file), and exports artefacts that are
-easy to plot or post-process.
+Tailored for the `sweep_x` production, this utility extracts the F_i fraction
+for a *single, fixed pixel of interest* from the first event at each particle-
+gun x position.  Since F_i is computed from a formula and is constant (no noise),
+there is no need to aggregate statistics over multiple events.
 
 Key features
 ------------
@@ -17,10 +14,8 @@ Key features
 - Automatic pixel detection prioritising the x ≈ 0 file (where the beam starts
   midway between two pads); we pick the dominant pixel and verify that the same
   pad is present across the sweep.
-- Outputs: an Excel workbook summarising mean/std per x position together with
-  pixel coordinate drifts and event coverage, a consolidated PNG plotting mean
-  fraction vs. x with error bars, and optional per-file histograms of the
-  event-level distributions.
+- Outputs: an Excel workbook with F_i per x position together with pixel
+  coordinate drifts, and a consolidated PNG plotting F_i vs. x.
 - Comparison mode: optionally process two directories (--input-dir2) to generate
   individual plots for each plus an overlay comparison plot.
 
@@ -32,9 +27,7 @@ Python packages: `uproot`, `awkward`, `numpy`, `pandas`, `matplotlib`.
 from __future__ import annotations
 
 import argparse
-import math
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -93,6 +86,69 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+def read_metadata_from_root_file(root_path: Path) -> Dict[str, float]:
+    """Read grid metadata (pixel size, spacing) from a ROOT file.
+    
+    Returns a dict with keys like 'GridPixelSize_mm', 'GridPixelSpacing_mm'.
+    Uses TParameter<double> objects stored in the tree's UserInfo.
+    """
+    metadata = {}
+    try:
+        with uproot.open(root_path) as f:
+            if "Hits" not in f:
+                return metadata
+            tree = f["Hits"]
+            user_info = tree.get("fUserInfo", None)
+            if user_info is None:
+                # Try accessing via the tree's user_info list
+                try:
+                    # uproot stores UserInfo as objects in tree directory
+                    for key in f.keys():
+                        obj = f[key]
+                        if hasattr(obj, 'member'):
+                            try:
+                                # Check if it's a TParameter<double>
+                                name = key.split(';')[0]
+                                if name.startswith('Grid') or name == 'Gain':
+                                    val = obj.member('fVal')
+                                    metadata[name] = float(val)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return metadata
+
+
+def draw_pixel_regions(
+    ax: plt.Axes,
+    pixel_spacing_mm: float,
+    pixel_size_mm: float,
+    x_range_mm: Tuple[float, float] = (-0.8, 0.8),
+    color: str = "lightgray",
+    alpha: float = 0.5,
+) -> None:
+    """Draw gray vertical bands for pixel pad locations.
+    
+    Assumes pixels are centered at 0, ±pixel_spacing_mm, ±2*pixel_spacing_mm, etc.
+    Each pixel pad extends ±(pixel_size_mm/2) from its center.
+    """
+    half_size = pixel_size_mm / 2.0
+    x_min, x_max = x_range_mm
+    
+    # Find all pixel centers in range
+    # Pixels at 0, ±spacing, ±2*spacing, ...
+    max_n = int(np.ceil(max(abs(x_min), abs(x_max)) / pixel_spacing_mm)) + 1
+    for n in range(-max_n, max_n + 1):
+        center = n * pixel_spacing_mm
+        left = center - half_size
+        right = center + half_size
+        # Only draw if it overlaps with the visible range
+        if right >= x_min and left <= x_max:
+            ax.axvspan(left, right, color=color, alpha=alpha, zorder=0)
+
+
 def resolve_path(path: Optional[str], *, default: Path | str) -> Path:
     base = Path(default)
     if path is None:
@@ -148,15 +204,11 @@ class PixelSelection:
 class FileStats:
     path: Path
     x_um: float
-    mean: float
-    std: float
-    count: int
-    event_has_pixel: int
+    fi_value: float
     total_events: int
     coord_mm: Optional[Tuple[float, float]]
     offset_um: Optional[Tuple[float, float]] = None
     distance_um: Optional[float] = None
-    values: Optional[np.ndarray] = None
 
 
 @dataclass
@@ -204,9 +256,6 @@ def detect_fraction_branch(root_file: Path) -> str:
             # Standard neighborhood mode
             if "Fi" in keys:
                 return "Fi"
-            # Legacy naming (if any)
-            if "F_i" in keys:
-                return "F_i"
     except Exception:
         pass
     return "Fi"
@@ -263,8 +312,8 @@ def infer_pixel_of_interest(
     prioritized = sorted(
         root_files,
         key=lambda p: (
-            math.isnan(parse_x_um_from_filename(p)),
-            abs(parse_x_um_from_filename(p)) if not math.isnan(parse_x_um_from_filename(p)) else float("inf"),
+            np.isnan(parse_x_um_from_filename(p)),
+            abs(parse_x_um_from_filename(p)) if not np.isnan(parse_x_um_from_filename(p)) else float("inf"),
         ),
     )
 
@@ -433,9 +482,12 @@ def collect_file_stats(
     pixel_id: int,
     *,
     step_size: str,
-    capture_values: bool,
 ) -> FileStats:
-    """Gather aggregate statistics for *pixel_id* from a ROOT file."""
+    """Extract F_i for *pixel_id* from the first event in a ROOT file.
+
+    Since F_i is formula-based and constant (no noise), we only need the first
+    event's value rather than aggregating statistics.
+    """
 
     # Detect which fraction branch to use before opening for iteration
     fraction_branch = detect_fraction_branch(path)
@@ -449,173 +501,77 @@ def collect_file_stats(
         have_full_coords = {"F_all_pixel_x", "F_all_pixel_y"}.issubset(tree_keys)
 
         total_events = int(tree.num_entries)
-        event_has_pixel = 0
         coord_mm: Optional[Tuple[float, float]] = None
-        values_sum = 0.0
-        values_sumsq = 0.0
-        values_count = 0
-        values_chunks: List[np.ndarray] = [] if capture_values else []
+        fi_value: Optional[float] = None
 
         if use_full_grid:
             branch_names = ["F_all", "F_all_pixel_id"]
             if have_full_coords:
                 branch_names.extend(["F_all_pixel_x", "F_all_pixel_y"])
 
-            mapping_idx: Optional[int] = None
-            full_ids: Optional[np.ndarray] = None
+            # Read just the first event
+            arrays = tree.arrays(branch_names, library="ak", entry_stop=1)
+            if len(arrays) == 0:
+                raise RuntimeError(f"No events in {path}")
 
-            for arrays in iterate_tree_arrays(tree, branch_names, step_size=step_size):
-                fractions = ak.Array(arrays["F_all"])
-                n_events = len(fractions)
-                if n_events == 0:
-                    continue
-                np_fractions = ak.to_numpy(fractions)
-                if np_fractions.ndim == 1:
-                    np_fractions = np_fractions[np.newaxis, :]
-                if full_ids is None:
-                    raw_ids = ak.to_numpy(arrays["F_all_pixel_id"][0])
-                    full_ids = np.asarray(raw_ids, dtype=int)
-                    matches = np.where(full_ids == pixel_id)[0]
-                    if matches.size == 0:
-                        continue
-                    mapping_idx = int(matches[0])
-                    if have_full_coords and coord_mm is None:
-                        px_vals = ak.to_numpy(arrays["F_all_pixel_x"][0])
-                        py_vals = ak.to_numpy(arrays["F_all_pixel_y"][0])
-                        if mapping_idx < len(px_vals) and mapping_idx < len(py_vals):
-                            coord_mm = (float(px_vals[mapping_idx]), float(py_vals[mapping_idx]))
-                if mapping_idx is None:
-                    continue
-                pixel_vals = np.asarray(np_fractions[:, mapping_idx], dtype=float)
-                event_has_pixel += pixel_vals.shape[0]
-                finite_mask = np.isfinite(pixel_vals)
-                if not finite_mask.any():
-                    continue
-                pixel_vals = pixel_vals[finite_mask]
-                valid_mask = pixel_vals >= 0.0
-                if not valid_mask.any():
-                    continue
-                pixel_vals = pixel_vals[valid_mask]
-                if pixel_vals.size == 0:
-                    continue
-                values_sum += float(np.sum(pixel_vals))
-                values_sumsq += float(np.sum(pixel_vals * pixel_vals))
-                values_count += int(pixel_vals.size)
-                if capture_values:
-                    values_chunks.append(pixel_vals.astype(float, copy=False))
-
-            if mapping_idx is None:
+            raw_ids = ak.to_numpy(arrays["F_all_pixel_id"][0])
+            full_ids = np.asarray(raw_ids, dtype=int)
+            matches = np.where(full_ids == pixel_id)[0]
+            if matches.size == 0:
                 raise RuntimeError(f"Pixel ID {pixel_id} not present in full-grid fractions for {path}")
-            event_has_pixel = total_events
+            mapping_idx = int(matches[0])
+
+            fractions = ak.to_numpy(arrays["F_all"])
+            if fractions.ndim == 1:
+                fractions = fractions[np.newaxis, :]
+            fi_value = float(fractions[0, mapping_idx])
+
+            if have_full_coords:
+                px_vals = ak.to_numpy(arrays["F_all_pixel_x"][0])
+                py_vals = ak.to_numpy(arrays["F_all_pixel_y"][0])
+                if mapping_idx < len(px_vals) and mapping_idx < len(py_vals):
+                    coord_mm = (float(px_vals[mapping_idx]), float(py_vals[mapping_idx]))
+
         else:
-            for arrays in iterate_tree_arrays(
-                tree,
-                [
-                    fraction_branch,
-                    "NeighborhoodPixelID",
-                    "NeighborhoodPixelX",
-                    "NeighborhoodPixelY",
-                ],
-                step_size=step_size,
-            ):
-                fi = ak.fill_none(ak.Array(arrays[fraction_branch]), np.nan)
-                ids = ak.fill_none(ak.Array(arrays["NeighborhoodPixelID"]), -1)
-                px = ak.Array(arrays["NeighborhoodPixelX"]) if "NeighborhoodPixelX" in arrays.fields else None
-                py = ak.Array(arrays["NeighborhoodPixelY"]) if "NeighborhoodPixelY" in arrays.fields else None
+            # Read just the first event
+            arrays = tree.arrays(
+                [fraction_branch, "NeighborhoodPixelID", "NeighborhoodPixelX", "NeighborhoodPixelY"],
+                library="ak",
+                entry_stop=1,
+            )
+            if len(arrays) == 0:
+                raise RuntimeError(f"No events in {path}")
 
-                mask_pixel = ids == pixel_id
+            fi = ak.fill_none(ak.Array(arrays[fraction_branch]), np.nan)
+            ids = ak.fill_none(ak.Array(arrays["NeighborhoodPixelID"]), -1)
+            px = ak.Array(arrays["NeighborhoodPixelX"]) if "NeighborhoodPixelX" in arrays.fields else None
+            py = ak.Array(arrays["NeighborhoodPixelY"]) if "NeighborhoodPixelY" in arrays.fields else None
 
-                try:
-                    per_event = ak.to_numpy(ak.any(mask_pixel, axis=1))
-                except Exception:
-                    per_event = np.zeros(len(ids), dtype=bool)
-                event_has_pixel += int(np.count_nonzero(per_event))
-
-                if coord_mm is None and px is not None and py is not None:
-                    coord_mm = _first_pixel_coordinates(fi, ids, px, py, pixel_id)
-
-                if not ak.any(mask_pixel, axis=None):
-                    continue
-
+            mask_pixel = ids == pixel_id
+            if not ak.any(mask_pixel, axis=None):
+                # Pixel not in neighborhood (e.g., scan position too far from target pixel)
+                fi_value = float("nan")
+            else:
+                # Get the F_i value for this pixel from the first event
                 fi_selected = fi[mask_pixel]
                 fi_flat = ak.to_numpy(ak.flatten(fi_selected, axis=None)).astype(float)
-                if fi_flat.size == 0:
-                    continue
-
-                finite_mask = np.isfinite(fi_flat)
-                if not finite_mask.any():
-                    continue
-
-                fi_flat = fi_flat[finite_mask]
-                if fi_flat.size == 0:
-                    continue
-
-                valid_mask = (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
+                valid_mask = np.isfinite(fi_flat) & (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
                 if not valid_mask.any():
-                    continue
+                    fi_value = float("nan")  # No valid fraction for this pixel
+                else:
+                    fi_value = float(fi_flat[valid_mask][0])
 
-                fi_flat = fi_flat[valid_mask]
-                if fi_flat.size == 0:
-                    continue
-
-                values_sum += float(np.sum(fi_flat))
-                values_sumsq += float(np.sum(fi_flat * fi_flat))
-                values_count += int(fi_flat.size)
-                if capture_values:
-                    values_chunks.append(fi_flat)
-
-        if capture_values and values_chunks:
-            stored_values = np.concatenate(values_chunks)
-        elif capture_values:
-            stored_values = np.empty(0, dtype=float)
-        else:
-            stored_values = None
-
-    count = values_count
-    if count > 0:
-        mean = values_sum / count
-    else:
-        mean = float("nan")
-
-    if count > 1:
-        variance = (values_sumsq - count * mean * mean) / (count - 1)
-        variance = max(variance, 0.0)
-        std = math.sqrt(variance)
-    else:
-        std = float("nan")
+            # Get coordinates
+            if px is not None and py is not None:
+                coord_mm = _first_pixel_coordinates(fi, ids, px, py, pixel_id)
 
     return FileStats(
         path=path,
         x_um=parse_x_um_from_filename(path),
-        mean=mean,
-        std=std,
-        count=count,
-        event_has_pixel=event_has_pixel,
+        fi_value=fi_value,
         total_events=total_events,
         coord_mm=coord_mm,
-        values=stored_values,
     )
-
-
-def save_histogram(values: Optional[np.ndarray], stats: FileStats, pixel_id: int, out_dir: Path) -> None:
-    if values is None or values.size == 0:
-        return
-
-    ensure_dir(out_dir)
-    fig, ax = plt.subplots(figsize=(9, 6), dpi=120)
-    ax.hist(values, bins=50, color="#2b5fff", alpha=0.75, edgecolor="#1c3fa0")
-    ax.set_xlabel("F_i (fraction)")
-    ax.set_ylabel("Entries")
-    ax.set_title(
-        f"F_i distribution — x={stats.x_um:+.1f} µm, pixel {pixel_id}\n"
-        f"N={stats.count}, mean={stats.mean:.4f}, σ={stats.std:.4f}"
-    )
-    ax.grid(True, linestyle="--", alpha=0.35)
-    fig.tight_layout()
-
-    basename = f"x_{stats.x_um:+.1f}um_pixel{pixel_id}.png".replace("+", "plus").replace("-", "minus")
-    fig.savefig(out_dir / basename)
-    plt.close(fig)
 
 
 def save_summary_plot(
@@ -624,28 +580,67 @@ def save_summary_plot(
     out_dir: Path,
     *,
     label: Optional[str] = None,
+    pixel_spacing_mm: float = 0.5,
+    pixel_size_mm: float = 0.15,
 ) -> Path:
-    ensure_dir(out_dir)
-    xs = np.array([
-        r.distance_um if (r.distance_um is not None and math.isfinite(r.distance_um)) else abs(r.x_um)
-        for r in results
-    ], dtype=float)
-    ys = np.array([r.mean for r in results], dtype=float)
-    yerr = np.array([r.std if math.isfinite(r.std) else 0.0 for r in results], dtype=float)
+    """Save FNAL paper-style plot of Fi vs x with gray pixel regions.
 
+    Style based on Tornago et al. / FNAL beam test publications:
+    - Gray bands for pixel/metal pad regions
+    - Step/histogram style lines
+    - Clean axis labels: "Track x position [mm]"
+    """
+    ensure_dir(out_dir)
+
+    # Use x_um (gun position) directly - convert to mm
+    xs_um = np.array([r.x_um for r in results], dtype=float)
+    xs_mm = xs_um / 1000.0  # Convert µm to mm
+    ys = np.array([r.fi_value for r in results], dtype=float)
+
+    # Sort by x position for proper step plot
+    sort_idx = np.argsort(xs_mm)
+    xs_mm = xs_mm[sort_idx]
+    ys = ys[sort_idx]
+
+    # FNAL paper-style figure
     fig, ax = plt.subplots(figsize=(10, 6), dpi=120)
-    ax.errorbar(xs, ys, yerr=yerr, fmt="o-", color="#d62728", ecolor="#ff9896", capsize=5, lw=2)
-    ax.set_xlabel("Distance from pixel center |Δx| [µm]")
-    ax.set_ylabel("Mean F_i (dimensionless)")
+
+    # Determine x range from data, extended slightly
+    x_min = np.nanmin(xs_mm) - 0.05
+    x_max = np.nanmax(xs_mm) + 0.05
+
+    # Draw gray pixel regions first (behind the data)
+    # Using lighter gray like the paper
+    draw_pixel_regions(ax, pixel_spacing_mm, pixel_size_mm,
+                       x_range_mm=(x_min, x_max), color="#d0d0d0", alpha=0.6)
+
+    # Plot as histogram-style step (FNAL paper style)
+    ax.step(xs_mm, ys, where="mid", color="#1f77b4", lw=2, zorder=2,
+            label="Simulation")
+
+    # FNAL paper-style axis labels
+    ax.set_xlabel("Track x position [mm]", fontsize=12)
+    ax.set_ylabel(r"Signal fraction $F_i$", fontsize=12)
+    ax.set_xlim(x_min, x_max)
+
+    # Set y-axis range (F_i is between 0 and 1)
+    ax.set_ylim(0, 1.05)
+
+    # Minimal grid like paper
+    ax.grid(True, linestyle="-", alpha=0.3, zorder=1)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+
+    # Title with pixel info
     coord_note = ""
     if pixel.coord_mm is not None:
         cx, cy = pixel.coord_mm
-        coord_note = f" (pixel {pixel.pixel_id}, x={cx:.3f} mm, y={cy:.3f} mm)"
-    title = f"F_i vs. distance{coord_note}"
+        coord_note = f" (pixel at x={cx:.3f} mm)"
+    title = f"Signal fraction vs track position{coord_note}"
     if label:
         title = f"{title}\n{label}"
-    ax.set_title(title)
-    ax.grid(True, linestyle="--", alpha=0.35)
+    ax.set_title(title, fontsize=12)
+    ax.legend(loc='upper right', fontsize=10)
+
     fig.tight_layout()
 
     suffix = f"_{label.replace(' ', '_')}" if label else ""
@@ -665,34 +660,30 @@ def save_overlay_plot(
 
     # Extract data for run 1
     xs1 = np.array([
-        r.distance_um if (r.distance_um is not None and math.isfinite(r.distance_um)) else abs(r.x_um)
+        r.distance_um if (r.distance_um is not None and np.isfinite(r.distance_um)) else abs(r.x_um)
         for r in run1.stats
     ], dtype=float)
-    ys1 = np.array([r.mean for r in run1.stats], dtype=float)
-    yerr1 = np.array([r.std if math.isfinite(r.std) else 0.0 for r in run1.stats], dtype=float)
+    ys1 = np.array([r.fi_value for r in run1.stats], dtype=float)
 
     # Extract data for run 2
     xs2 = np.array([
-        r.distance_um if (r.distance_um is not None and math.isfinite(r.distance_um)) else abs(r.x_um)
+        r.distance_um if (r.distance_um is not None and np.isfinite(r.distance_um)) else abs(r.x_um)
         for r in run2.stats
     ], dtype=float)
-    ys2 = np.array([r.mean for r in run2.stats], dtype=float)
-    yerr2 = np.array([r.std if math.isfinite(r.std) else 0.0 for r in run2.stats], dtype=float)
+    ys2 = np.array([r.fi_value for r in run2.stats], dtype=float)
 
     fig, ax = plt.subplots(figsize=(10, 6), dpi=120)
 
     # Plot run 1
     label1 = run1.input_dir.name
-    ax.errorbar(xs1, ys1, yerr=yerr1, fmt="o-", color="#d62728", ecolor="#ff9896",
-                capsize=5, lw=2, label=label1, alpha=0.8)
+    ax.plot(xs1, ys1, "o-", color="#d62728", lw=2, markersize=6, label=label1, alpha=0.8)
 
     # Plot run 2
     label2 = run2.input_dir.name
-    ax.errorbar(xs2, ys2, yerr=yerr2, fmt="s-", color="#1f77b4", ecolor="#aec7e8",
-                capsize=5, lw=2, label=label2, alpha=0.8)
+    ax.plot(xs2, ys2, "s-", color="#1f77b4", lw=2, markersize=6, label=label2, alpha=0.8)
 
     ax.set_xlabel("Distance from pixel center |Δx| [µm]")
-    ax.set_ylabel("Mean F_i (dimensionless)")
+    ax.set_ylabel("F_i (dimensionless)")
 
     coord_note = ""
     if run1.pixel.coord_mm is not None:
@@ -725,19 +716,15 @@ def write_excel(results: Sequence[FileStats], pixel: PixelSelection, out_dir: Pa
             {
                 "gun x (um)": r.x_um,
                 "distance |Δx| (um)": r.distance_um if r.distance_um is not None else float("nan"),
-                "mean F_i": r.mean,
-                "std F_i": r.std,
-                "samples": r.count,
-                "events with pixel": r.event_has_pixel,
+                "F_i": r.fi_value,
                 "total events": r.total_events,
                 "pixel Δx (um)": dx_um,
                 "pixel Δy (um)": dy_um,
-                "coverage": (r.event_has_pixel / r.total_events) if r.total_events else float("nan"),
             }
         )
 
     df = pd.DataFrame(records).sort_values("gun x (um)")
-    for col in ["distance |Δx| (um)", "mean F_i", "std F_i", "pixel Δx (um)", "pixel Δy (um)", "coverage"]:
+    for col in ["distance |Δx| (um)", "F_i", "pixel Δx (um)", "pixel Δy (um)"]:
         df[col] = df[col].astype(float)
 
     out_path = out_dir / f"fi_vs_x_pixel{pixel.pixel_id}.xlsx"
@@ -788,7 +775,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         dest="output_dir",
         type=str,
         default=None,
-        help="Directory to store Excel, plots, and histograms",
+        help="Directory to store Excel and plots",
     )
     parser.add_argument(
         "--pixel-id",
@@ -803,11 +790,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         default=20000,
         help="Maximum number of events to inspect when inferring the pixel",
-    )
-    parser.add_argument(
-        "--skip-histograms",
-        action="store_true",
-        help="Do not save per-file F_i histograms",
     )
     parser.add_argument(
         "--step-size",
@@ -825,7 +807,6 @@ def process_single_run(
     *,
     pixel_id: Optional[int],
     sample_events: int,
-    skip_histograms: bool,
     step_size: str,
     label: Optional[str] = None,
 ) -> RunResults:
@@ -837,6 +818,17 @@ def process_single_run(
     root_files = list_root_files(input_dir)
     print(f"[INFO] Found {len(root_files)} ROOT files")
 
+    # Read pixel geometry metadata from first ROOT file
+    pixel_spacing_mm = 0.5  # Default: 500 µm
+    pixel_size_mm = 0.15    # Default: 150 µm
+    if root_files:
+        metadata = read_metadata_from_root_file(root_files[0])
+        if "GridPixelSpacing_mm" in metadata:
+            pixel_spacing_mm = metadata["GridPixelSpacing_mm"]
+        if "GridPixelSize_mm" in metadata:
+            pixel_size_mm = metadata["GridPixelSize_mm"]
+        print(f"[INFO] Pixel geometry: spacing={pixel_spacing_mm:.3f} mm, size={pixel_size_mm:.3f} mm")
+
     pixel = infer_pixel_of_interest(
         root_files,
         requested_pixel_id=pixel_id,
@@ -846,7 +838,6 @@ def process_single_run(
     print(f"[INFO] Tracking pixel ID: {pixel.pixel_id}")
 
     stats: List[FileStats] = []
-    histogram_dir = output_dir / "histograms"
     reference_coord: Optional[Tuple[float, float]] = None
 
     for path in root_files:
@@ -855,7 +846,6 @@ def process_single_run(
             path,
             pixel.pixel_id,
             step_size=step_size,
-            capture_values=not skip_histograms,
         )
         stats.append(file_stats)
         if file_stats.coord_mm is not None:
@@ -875,24 +865,12 @@ def process_single_run(
         if reference_coord is not None:
             ref_x_um = reference_coord[0] * 1000.0
             file_stats.distance_um = abs(file_stats.x_um - ref_x_um)
-        coverage = (
-            file_stats.event_has_pixel / file_stats.total_events
-            if file_stats.total_events > 0
-            else float("nan")
-        )
-        if coverage < 0.999:
-            print(
-                f"\n[WARN] Pixel ID {pixel.pixel_id} present in only {coverage*100:.2f}% of events in {path.name}",
-                end="",
-            )
-        if not skip_histograms:
-            save_histogram(file_stats.values, file_stats, pixel.pixel_id, histogram_dir)
         dist_note = (
             f", |Δx|={file_stats.distance_um:.3f} µm"
-            if file_stats.distance_um is not None and math.isfinite(file_stats.distance_um)
+            if file_stats.distance_um is not None and np.isfinite(file_stats.distance_um)
             else ""
         )
-        print(f" done (N={file_stats.count}, mean={file_stats.mean:.6f}{dist_note})")
+        print(f" done (F_i={file_stats.fi_value:.6f}{dist_note})")
 
     if not stats:
         raise RuntimeError("No statistics were collected; aborting.")
@@ -909,7 +887,12 @@ def process_single_run(
     stats_sorted = sorted(stats, key=lambda s: s.x_um)
 
     excel_path = write_excel(stats_sorted, pixel, output_dir)
-    plot_path = save_summary_plot(stats_sorted, pixel, output_dir, label=label)
+    plot_path = save_summary_plot(
+        stats_sorted, pixel, output_dir, 
+        label=label,
+        pixel_spacing_mm=pixel_spacing_mm,
+        pixel_size_mm=pixel_size_mm,
+    )
 
     print(f"[INFO] Excel summary written to: {excel_path}")
     print(f"[INFO] Summary plot written to: {plot_path}")
@@ -971,7 +954,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         output_dir1,
         pixel_id=args.pixel_id,
         sample_events=args.sample_events,
-        skip_histograms=args.skip_histograms,
         step_size=args.step_size,
         label=input_dir.name if input_dir2 else None,
     )
@@ -988,7 +970,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             output_dir2,
             pixel_id=args.pixel_id,
             sample_events=args.sample_events,
-            skip_histograms=args.skip_histograms,
             step_size=args.step_size,
             label=input_dir2.name,
         )
