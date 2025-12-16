@@ -184,6 +184,7 @@ set(epicChargeSharing_sources
     ${PROJECT_SOURCE_DIR}/src/ChargeSharingCalculator.cc
     ${PROJECT_SOURCE_DIR}/src/DetectorConstruction.cc
     ${PROJECT_SOURCE_DIR}/src/EventAction.cc
+    ${PROJECT_SOURCE_DIR}/src/GaussianFitter.cc
     ${PROJECT_SOURCE_DIR}/src/PhysicsList.cc
     ${PROJECT_SOURCE_DIR}/src/PrimaryGenerator.cc
     ${PROJECT_SOURCE_DIR}/src/RunAction.cc
