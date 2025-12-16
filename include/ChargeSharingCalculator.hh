@@ -25,20 +25,23 @@ namespace ECS {
 // Forward declarations
 class DetectorConstruction;
 
-/// \brief Computes charge sharing fractions across pixel neighborhoods.
+/// \brief Computes charge sharing fractions across pad neighborhoods.
 ///
 /// This class implements the charge sharing model described in
-/// arXiv:2007.09528 (Tornago et al.) for AC-LGAD detectors.
+/// arXiv:2007.09528 (Tornago et al.) for AC-LGAD / RSD detectors.
 ///
-/// The calculator supports three reconstruction models:
-/// - **Log**: Logarithmic attenuation model
-/// - **Linear**: Exponential attenuation with configurable beta parameter
-/// - **DPC**: Discretized Positioning Circuit reconstruction
+/// Paper terminology note: the paper refers to readout **pads**. This codebase
+/// historically uses the term "pixel" for the same metal pad objects.
+///
+/// The calculator supports the terminology of Tornago et al.:
+/// - **LogA**: Logarithmic attenuation model (paper Eq. (\ref{eq:masterformula}))
+/// - **LinA**: Linear attenuation model (paper Eq. (\ref{eq:LA}))
+/// - **DPC**: Discretized Positioning Circuit reconstruction (paper Section 3.4)
 ///
 /// For each event, the calculator:
-/// 1. Finds the nearest pixel to the hit position
-/// 2. Defines a (2r+1)x(2r+1) neighborhood grid centered on that pixel
-/// 3. Computes charge fractions F_i for each pixel in the grid
+/// 1. Finds the nearest pad to the hit position
+/// 2. Defines a (2r+1)x(2r+1) neighborhood grid centered on that pad
+/// 3. Computes charge fractions F_i for each pad in the grid
 /// 4. Applies noise models (gain variations, electronic noise)
 /// 5. Optionally computes full detector grid fractions
 ///
@@ -248,10 +251,10 @@ public:
         G4int Cols() const { return signalFraction.Cols(); }
         bool Empty() const { return signalFraction.Empty(); }
 
-        Grid2D<G4double> signalFraction;      ///< F_i: fraction of total signal (Tornago Eq. 4)
+        Grid2D<G4double> signalFraction;      ///< F_i: fraction of total signal
         Grid2D<G4double> signalFractionRow;   ///< F_i normalized by row sum (for 1D row fits)
         Grid2D<G4double> signalFractionCol;   ///< F_i normalized by column sum (for 1D col fits)
-        Grid2D<G4double> signalFractionBlock; ///< F_i normalized by 4-pixel block sum
+        Grid2D<G4double> signalFractionBlock; ///< F_i normalized by 4-pad block sum
         // Neighborhood-based charges
         Grid2D<G4double> chargeInduced;       ///< Induced charge before noise
         Grid2D<G4double> chargeWithNoise;     ///< Charge after adding noise
@@ -301,7 +304,9 @@ public:
             if (!pixelY.Empty()) pixelY.Fill(0.0);
         }
 
+        /// \brief d_i grid: distance to pixel center.
         Grid2D<G4double> distance;
+        /// \brief α_i grid (paper notation): pad angle of view.
         Grid2D<G4double> alpha;
         Grid2D<G4double> pixelX;
         Grid2D<G4double> pixelY;
@@ -349,12 +354,18 @@ public:
             G4double fraction{0.0};       ///< Signal fraction (neighborhood denominator)
             G4double fractionRow{0.0};    ///< Signal fraction (row denominator, for 1D row fits)
             G4double fractionCol{0.0};    ///< Signal fraction (column denominator, for 1D col fits)
-            G4double fractionBlock{0.0};  ///< Signal fraction (4-pixel block denominator)
+            G4double fractionBlock{0.0};  ///< Signal fraction (4-pad block denominator)
             G4double charge{0.0};         ///< Charge (neighborhood denominator)
             G4double chargeRow{0.0};      ///< Charge (row denominator)
             G4double chargeCol{0.0};      ///< Charge (col denominator)
             G4double chargeBlock{0.0};    ///< Charge (block denominator)
+            /// \brief d_i: distance from hit point to pixel center.
+            ///
+            /// Note: GEANT4 uses millimeters as base length unit; this value is stored in
+            /// those internal units.
             G4double distance{0.0};
+
+            /// \brief α_i (paper notation): pad angle of view.
             G4double alpha{0.0};
         };
 
@@ -385,6 +396,11 @@ public:
         G4int gridSide{1};
         std::size_t totalCells{0};
         std::vector<NeighborCell> cells;
+        /// \brief Dominant-pad set.
+        ///
+        /// Historical note: stored as `chargeBlock` for backward compatibility with
+        /// earlier analysis code. This corresponds to the highest-weight pads used by
+        /// ChargeBlock active pixel modes.
         std::vector<NeighborCell> chargeBlock;
         FullGridCharges full;
         PatchGridCharges patch;
@@ -436,9 +452,12 @@ private:
 
     void ReserveBuffers();
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
-    G4double CalcPixelAlphaSubtended(G4double distance,
-                                     G4double pixelWidth,
-                                     G4double pixelHeight) const;
+    G4double CalcDistanceToCenter(G4double dxToCenter,
+                                   G4double dyToCenter) const;
+
+    G4double CalcPadViewAngleApprox(G4double distanceToCenter,
+                                    G4double padWidth,
+                                    G4double padHeight) const;
     void ComputeChargeFractions(const G4ThreeVector& hitPos,
                                 G4double totalChargeElectrons,
                                 G4double d0,

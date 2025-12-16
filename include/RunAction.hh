@@ -148,10 +148,10 @@ private:
     G4double fEdep;
     G4double fPixelTrueDeltaX;
     G4double fPixelTrueDeltaY;
-    G4double fReconX{0.0};
-    G4double fReconY{0.0};
-    G4double fReconTrueDeltaX{0.0};
-    G4double fReconTrueDeltaY{0.0};
+    G4double fReconDPCX{0.0};
+    G4double fReconDPCY{0.0};
+    G4double fReconDPCTrueDeltaX{0.0};
+    G4double fReconDPCTrueDeltaY{0.0};
 
     G4bool fFirstContactIsPixel{false};
     G4bool fGeometricIsPixel{false};

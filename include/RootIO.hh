@@ -45,10 +45,10 @@ struct EventSummaryData {
     G4double nearestPixelY{0.0};
     G4double pixelTrueDeltaX{0.0};
     G4double pixelTrueDeltaY{0.0};
-    G4double reconX{0.0};
-    G4double reconY{0.0};
-    G4double reconTrueDeltaX{0.0};
-    G4double reconTrueDeltaY{0.0};
+    G4double reconDPCX{0.0};
+    G4double reconDPCY{0.0};
+    G4double reconDPCTrueDeltaX{0.0};
+    G4double reconDPCTrueDeltaY{0.0};
     G4bool firstContactIsPixel{false};
     G4bool geometricIsPixel{false};
     G4bool isPixelHitCombined{false};
@@ -74,7 +74,7 @@ struct EventRecord {
     std::span<const G4double> fullFi;
     std::span<const G4double> fullFiRow;    ///< Signal fractions with row denominator
     std::span<const G4double> fullFiCol;    ///< Signal fractions with column denominator
-    std::span<const G4double> fullFiBlock;  ///< Signal fractions with 4-pixel block denominator
+    std::span<const G4double> fullFiBlock;  ///< Signal fractions with 4-pad block denominator
     // Full grid neighborhood-mode charges
     std::span<const G4double> fullQi;
     std::span<const G4double> fullQn;
@@ -124,10 +124,10 @@ public:
         G4double* edep{nullptr};
         G4double* pixelTrueDeltaX{nullptr};
         G4double* pixelTrueDeltaY{nullptr};
-        G4double* reconX{nullptr};
-        G4double* reconY{nullptr};
-        G4double* reconTrueDeltaX{nullptr};
-        G4double* reconTrueDeltaY{nullptr};
+        G4double* reconDPCX{nullptr};
+        G4double* reconDPCY{nullptr};
+        G4double* reconDPCTrueDeltaX{nullptr};
+        G4double* reconDPCTrueDeltaY{nullptr};
     };
 
     struct ClassificationBuffers {
@@ -227,10 +227,10 @@ public:
     G4double& Edep() { return fEdep; }
     G4double& PixelTrueDeltaX() { return fPixelTrueDeltaX; }
     G4double& PixelTrueDeltaY() { return fPixelTrueDeltaY; }
-    G4double& ReconX() { return fReconX; }
-    G4double& ReconY() { return fReconY; }
-    G4double& ReconTrueDeltaX() { return fReconTrueDeltaX; }
-    G4double& ReconTrueDeltaY() { return fReconTrueDeltaY; }
+    G4double& ReconDPCX() { return fReconDPCX; }
+    G4double& ReconDPCY() { return fReconDPCY; }
+    G4double& ReconDPCTrueDeltaX() { return fReconDPCTrueDeltaX; }
+    G4double& ReconDPCTrueDeltaY() { return fReconDPCTrueDeltaY; }
     G4bool& IsPixelHit() { return fIsPixelHit; }
     G4int& NeighborhoodActiveCells() { return fNeighborhoodActiveCells; }
     G4int& NearestPixelI() { return fNearestPixelI; }
@@ -300,8 +300,8 @@ private:
     G4double fPixelX{0.0}, fPixelY{0.0};
     G4double fEdep{0.0};
     G4double fPixelTrueDeltaX{0.0}, fPixelTrueDeltaY{0.0};
-    G4double fReconX{0.0}, fReconY{0.0};
-    G4double fReconTrueDeltaX{0.0}, fReconTrueDeltaY{0.0};
+    G4double fReconDPCX{0.0}, fReconDPCY{0.0};
+    G4double fReconDPCTrueDeltaX{0.0}, fReconDPCTrueDeltaY{0.0};
     G4bool fIsPixelHit{false};
     G4int fNeighborhoodActiveCells{0};
     G4int fNearestPixelI{-1}, fNearestPixelJ{-1}, fNearestPixelGlobalId{-1};

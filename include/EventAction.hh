@@ -37,7 +37,7 @@ class SteppingAction;
 /// - Determines hit position from first contact or geometric center
 /// - Classifies hits as pixel or silicon based on contact volume
 /// - Computes charge sharing fractions across pixel neighborhood
-/// - Reconstructs position using configured model (Log/Linear/DPC)
+/// - Reconstructs position using configured model (LogA/LinA/DPC)
 /// - Populates ROOT tree branches via RunAction
 ///
 /// The charge sharing computation uses the ChargeSharingCalculator
@@ -90,17 +90,16 @@ private:
     void ReconstructPosition(const ChargeSharingCalculator::Result& result,
                              const G4ThreeVector& hitPos);
 
-    /// \brief DPC position reconstruction using top-N pixels.
+    /// \brief DPC position reconstruction using the closest pads.
     ///
     /// Implements the Discretized Positioning Circuit algorithm:
-    /// 1. Collect pixels with positive charge from the neighborhood
-    /// 2. Sort by charge (descending) and select top N pixels
-    /// 3. Compute geometric centroid of selected pixels
-    /// 4. Calculate signal imbalance ratios (Sx, Sy)
-    /// 5. Apply calibration constants (Kx, Ky) for final position
+    /// 1. Select the N closest pads to the hit (paper Section 3.4)
+    /// 2. Compute geometric centroid of selected pads
+    /// 3. Calculate signal imbalance ratios (Sx, Sy)
+    /// 4. Apply calibration constants (Kx, Ky) for final position
     ///
     /// \param result Charge sharing calculation result
-    /// \return true if reconstruction succeeded, false if insufficient pixels
+    /// \return true if reconstruction succeeded, false if insufficient pads
     bool ReconstructDPC(const ChargeSharingCalculator::Result& result);
 
     /// \brief Build EventSummaryData from current event state.
@@ -140,10 +139,10 @@ private:
     G4int fPixelIndexJ;
     G4double fPixelTrueDeltaX;
     G4double fPixelTrueDeltaY;
-    G4double fReconX{0.0};
-    G4double fReconY{0.0};
-    G4double fReconTrueDeltaX{0.0};
-    G4double fReconTrueDeltaY{0.0};
+    G4double fReconDPCX{0.0};
+    G4double fReconDPCY{0.0};
+    G4double fReconDPCTrueDeltaX{0.0};
+    G4double fReconDPCTrueDeltaY{0.0};
 
     G4double fIonizationEnergy;
     G4double fGain;

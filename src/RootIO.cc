@@ -3,6 +3,7 @@
 
 #include "RootIO.hh"
 #include "Config.hh"
+#include "GaussianFitter.hh"
 
 #include "G4Exception.hh"
 #include "G4ios.hh"
@@ -50,10 +51,10 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
         {"Edep", buffers.edep, "Edep/D"},
         {"PixelTrueDeltaX", buffers.pixelTrueDeltaX, "PixelTrueDeltaX/D"},
         {"PixelTrueDeltaY", buffers.pixelTrueDeltaY, "PixelTrueDeltaY/D"},
-        {"ReconX", buffers.reconX, "ReconX/D"},
-        {"ReconY", buffers.reconY, "ReconY/D"},
-        {"ReconTrueDeltaX", buffers.reconTrueDeltaX, "ReconTrueDeltaX/D"},
-        {"ReconTrueDeltaY", buffers.reconTrueDeltaY, "ReconTrueDeltaY/D"},
+        {"ReconDPCX", buffers.reconDPCX, "ReconDPCX/D"},
+        {"ReconDPCY", buffers.reconDPCY, "ReconDPCY/D"},
+        {"ReconDPCTrueDeltaX", buffers.reconDPCTrueDeltaX, "ReconDPCTrueDeltaX/D"},
+        {"ReconDPCTrueDeltaY", buffers.reconDPCTrueDeltaY, "ReconDPCTrueDeltaY/D"},
     }};
 
     for (const auto& def : branches) {
@@ -223,10 +224,10 @@ void TreeFiller::UpdateSummaryScalars(const EventRecord& record) {
     fPixelY = record.summary.nearestPixelY;
     fPixelTrueDeltaX = record.summary.pixelTrueDeltaX;
     fPixelTrueDeltaY = record.summary.pixelTrueDeltaY;
-    fReconX = record.summary.reconX;
-    fReconY = record.summary.reconY;
-    fReconTrueDeltaX = record.summary.reconTrueDeltaX;
-    fReconTrueDeltaY = record.summary.reconTrueDeltaY;
+    fReconDPCX = record.summary.reconDPCX;
+    fReconDPCY = record.summary.reconDPCY;
+    fReconDPCTrueDeltaX = record.summary.reconDPCTrueDeltaX;
+    fReconDPCTrueDeltaY = record.summary.reconDPCTrueDeltaY;
     fIsPixelHit = record.summary.isPixelHitCombined;
     fNearestPixelI = record.nearestPixelI;
     fNearestPixelJ = record.nearestPixelJ;
@@ -574,24 +575,18 @@ bool PostProcessingRunner::RunMacro(const std::string& macroPath, const std::str
 bool PostProcessingRunner::Run() {
     if (!fConfig.runFitGaus1D && !fConfig.runFitGaus2D) return false;
 
-    if (fConfig.sourceDir.empty()) {
-        G4cout << "[PostProcessingRunner] Warning: sourceDir not set, skipping post-processing"
-               << G4endl;
-        return false;
-    }
-
     EnsureBatchMode();
-    ConfigureIncludePaths();
 
-    const std::string sourceDir = NormalizePath(fConfig.sourceDir);
     bool executed = false;
 
     if (fConfig.runFitGaus1D) {
-        RunMacro(sourceDir + "/src/FitGaussian1D.C", "FitGaussian1D", fConfig.rootFileName);
+        G4cout << "[PostProcessingRunner] Running FitGaussian1D..." << G4endl;
+        ECS::Fit::FitGaussian1D(fConfig.rootFileName.c_str());
         executed = true;
     }
     if (fConfig.runFitGaus2D) {
-        RunMacro(sourceDir + "/src/FitGaussian2D.C", "FitGaussian2D", fConfig.rootFileName);
+        G4cout << "[PostProcessingRunner] Running FitGaussian2D..." << G4endl;
+        ECS::Fit::FitGaussian2D(fConfig.rootFileName.c_str());
         executed = true;
     }
 

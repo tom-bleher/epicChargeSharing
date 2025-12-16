@@ -72,8 +72,11 @@ RunAction::RunAction()
       fNearestPixelJ(-1),
       fNearestPixelGlobalId(-1),
       fEDM4hepWriter(IO::MakeEDM4hepWriter()),
-      fWriteEDM4hep(true)
+      fWriteEDM4hep(false)
 {
+    if (fEDM4hepWriter && fEDM4hepWriter->IsEnabled()) {
+        fWriteEDM4hep = true;
+    }
 }
 
 RunAction::~RunAction()
@@ -369,7 +372,7 @@ void RunAction::ConfigureCoreBranches(TTree* tree)
     IO::BranchConfigurator::ScalarBuffers scalars{
         &fTrueX, &fTrueY, &fPixelX, &fPixelY, &fEdep,
         &fPixelTrueDeltaX, &fPixelTrueDeltaY,
-        &fReconX, &fReconY, &fReconTrueDeltaX, &fReconTrueDeltaY
+        &fReconDPCX, &fReconDPCY, &fReconDPCTrueDeltaX, &fReconDPCTrueDeltaY
     };
 
     IO::BranchConfigurator::ClassificationBuffers classification{
@@ -412,6 +415,12 @@ void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* 
 
     bool wroteOutput = false;
     if (nofEvents > 0) {
+        // In single-threaded mode, attach metadata before writing so the tree streamer
+        // persists it for post-processing macros.
+        if (!context.multithreaded) {
+            WriteMetadataToTree(fRootWriter ? fRootWriter->Tree() : nullptr);
+        }
+
         if (SafeWriteRootFile()) {
             wroteOutput = true;
             if (context.multithreaded) {
@@ -419,9 +428,6 @@ void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* 
                        << " events" << G4endl;
             } else {
                 G4cout << "[RunAction] Stored " << nofEvents << " events" << G4endl;
-            }
-            if (!context.multithreaded) {
-                WriteMetadataToTree(fRootWriter ? fRootWriter->Tree() : nullptr);
             }
         } else {
             G4Exception("RunAction::HandleWorkerEndOfRun",
@@ -585,10 +591,10 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record)
     fPixelY = record.summary.nearestPixelY;
     fPixelTrueDeltaX = record.summary.pixelTrueDeltaX;
     fPixelTrueDeltaY = record.summary.pixelTrueDeltaY;
-    fReconX = record.summary.reconX;
-    fReconY = record.summary.reconY;
-    fReconTrueDeltaX = record.summary.reconTrueDeltaX;
-    fReconTrueDeltaY = record.summary.reconTrueDeltaY;
+    fReconDPCX = record.summary.reconDPCX;
+    fReconDPCY = record.summary.reconDPCY;
+    fReconDPCTrueDeltaX = record.summary.reconDPCTrueDeltaX;
+    fReconDPCTrueDeltaY = record.summary.reconDPCTrueDeltaY;
     fFirstContactIsPixel = record.summary.firstContactIsPixel;
     fGeometricIsPixel = record.summary.geometricIsPixel;
     fIsPixelHit = record.summary.isPixelHitCombined;
