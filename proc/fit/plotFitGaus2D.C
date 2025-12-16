@@ -1,15 +1,22 @@
-// ROOT macro: processing3D_plots.C
-// Produces a multi-page PDF previewing 3D Gaussian fits (data heatmap with
-// model contours, residuals heatmap, and 1D row/column profiles) to assess
-// goodness-of-fit for non-pixel-pad trues.
+// ROOT macro: plotFitGaus2D.C
+// Produces a multi-page PDF previewing 2D Gaussian fits with enhanced
+// diagnostics for visual assessment of fit quality:
+//   - Data heatmap with 1σ/2σ/3σ model contours
+//   - Normalized residuals (pulls) heatmap
+//   - Pull histogram with Gaussian reference
+//   - 1D row/column profiles with fit overlays
+//   - Fit quality metrics and color-coded status
 
 #include <TFile.h>
 #include <TTree.h>
 #include <TBranch.h>
 #include <TNamed.h>
+#include <TSystem.h>
+#include <TGraph.h>
 #include <TGraph2D.h>
 #include <TF2.h>
 #include <TF1.h>
+#include <TH1D.h>
 #include <TH2D.h>
 #include <TROOT.h>
 #include <TError.h>
@@ -21,6 +28,9 @@
 #include <TLatex.h>
 #include <TMarker.h>
 #include <TMath.h>
+#include <TColor.h>
+#include <TText.h>
+#include <TPaveText.h>
 #include <Math/MinimizerOptions.h>
 #include <Fit/Fitter.h>
 #include <Fit/BinData.h>
@@ -94,7 +104,23 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
     try { pixelSize = std::stod(sizeObj->GetTitle()); } catch (...) {}
   }
 
+  auto computeGap = [](std::vector<double>& v)->double{
+    if (v.size() < 2) return NAN;
+    std::sort(v.begin(), v.end());
+    v.erase(std::unique(v.begin(), v.end()), v.end());
+    if (v.size() < 2) return NAN;
+    std::vector<double> gaps; gaps.reserve(v.size());
+    for (size_t i=1;i<v.size();++i) {
+      double d = v[i]-v[i-1];
+      if (d > 1e-9 && IsFinite(d)) gaps.push_back(d);
+    }
+    if (gaps.empty()) return NAN;
+    std::nth_element(gaps.begin(), gaps.begin()+gaps.size()/2, gaps.end());
+    return gaps[gaps.size()/2];
+  };
+
   auto inferSpacingFromTree = [&](TTree* t) -> double {
+    // First try PixelX/PixelY
     std::vector<double> xs; xs.reserve(5000);
     std::vector<double> ys; ys.reserve(5000);
     double x_px_tmp = 0.0, y_px_tmp = 0.0;
@@ -106,30 +132,35 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
       if (IsFinite(x_px_tmp)) xs.push_back(x_px_tmp);
       if (IsFinite(y_px_tmp)) ys.push_back(y_px_tmp);
     }
-    auto computeGap = [](std::vector<double>& v)->double{
-      if (v.size() < 2) return NAN;
-      std::sort(v.begin(), v.end());
-      v.erase(std::unique(v.begin(), v.end()), v.end());
-      if (v.size() < 2) return NAN;
-      std::vector<double> gaps; gaps.reserve(v.size());
-      for (size_t i=1;i<v.size();++i) {
-        double d = v[i]-v[i-1];
-        if (d > 1e-9 && IsFinite(d)) gaps.push_back(d);
-      }
-      if (gaps.empty()) return NAN;
-      std::nth_element(gaps.begin(), gaps.begin()+gaps.size()/2, gaps.end());
-      return gaps[gaps.size()/2];
-    };
     double gx = computeGap(xs);
     double gy = computeGap(ys);
     if (IsFinite(gx) && gx>0 && IsFinite(gy) && gy>0) return 0.5*(gx+gy);
     if (IsFinite(gx) && gx>0) return gx;
     if (IsFinite(gy) && gy>0) return gy;
+
+    // Fallback: try NeighborhoodPixelX/Y from first entry
+    t->ResetBranchAddresses();
+    std::vector<double>* nbX = nullptr;
+    std::vector<double>* nbY = nullptr;
+    if (t->GetBranch("NeighborhoodPixelX")) t->SetBranchAddress("NeighborhoodPixelX", &nbX);
+    if (t->GetBranch("NeighborhoodPixelY")) t->SetBranchAddress("NeighborhoodPixelY", &nbY);
+    if (nbX || nbY) {
+      t->GetEntry(0);
+      xs.clear(); ys.clear();
+      if (nbX) for (auto v : *nbX) if (IsFinite(v)) xs.push_back(v);
+      if (nbY) for (auto v : *nbY) if (IsFinite(v)) ys.push_back(v);
+      gx = computeGap(xs);
+      gy = computeGap(ys);
+      if (IsFinite(gx) && gx>0 && IsFinite(gy) && gy>0) return 0.5*(gx+gy);
+      if (IsFinite(gx) && gx>0) return gx;
+      if (IsFinite(gy) && gy>0) return gy;
+    }
     return NAN;
   };
 
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
     pixelSpacing = inferSpacingFromTree(tree);
+    tree->ResetBranchAddresses(); // Clean up after inference
   }
   if (!IsFinite(pixelSpacing) || pixelSpacing <= 0) {
     ::Error("processing3D_plots", "Pixel spacing unavailable (metadata missing and inference failed). Aborting.");
@@ -154,15 +185,26 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
   tree->SetBranchAddress("PixelX", &x_px);
   tree->SetBranchAddress("PixelY", &y_px);
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
-  tree->SetBranchAddress("Fi", &Fi);
+  // Try both "Fi" and "FiBlock" branch names for compatibility
+  if (tree->GetBranch("Fi")) {
+    tree->SetBranchAddress("Fi", &Fi);
+  } else if (tree->GetBranch("FiBlock")) {
+    tree->SetBranchAddress("FiBlock", &Fi);
+  } else {
+    ::Error("processing3D_plots", "Neither Fi nor FiBlock branch found in tree. Aborting.");
+    file->Close();
+    delete file;
+    return 4;
+  }
 
   // Style
   gROOT->SetBatch(true);
   gStyle->SetOptStat(0);
   gStyle->SetOptFit(0);
 
-  TCanvas c("c", "processing3D fit preview", 1200, 900);
-  c.Divide(2, 2); // 2x2: Data+Contours, Residuals, Row profile, Column profile
+  TCanvas c("c", "2D Gaussian Fit Diagnostics", 1800, 1200);
+  c.Divide(3, 2); // 3x2: Data+Contours, Pulls heatmap, Pull histogram
+                  //      Row profile, Column profile, Fit summary
 
   // Open multipage PDF
   c.Print("fit3d.pdf[");
@@ -201,6 +243,8 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
                N, xLo, xHi, N, yLo, yHi);
     TH2D hModel("hModel", "Model fit; x [mm]; y [mm]", N, xLo, xHi, N, yLo, yHi);
     TH2D hResid("hResid", "Residuals (data - model); x [mm]; y [mm]", N, xLo, xHi, N, yLo, yHi);
+    TH2D hPull("hPull", "Normalized Residuals (pulls); x [mm]; y [mm]", N, xLo, xHi, N, yLo, yHi);
+    TH1D hPullDist("hPullDist", "Pull Distribution; (data - model) / #sigma; Entries", 50, -5, 5);
 
     // Row/column profiles through pixel center
     std::vector<double> x_row, q_row;
@@ -402,8 +446,9 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
     f2D.SetRange(xLo, xHi, yLo, yHi);
     f2D.SetParameters(A, mux, muy, sx, sy, B);
 
-    // Fill model and residuals on the same grid
+    // Fill model, residuals, and pulls on the same grid
     double chi2 = 0.0; int nPtsUsed = 0;
+    double pullSum = 0.0, pullSum2 = 0.0;
     for (int ix = 1; ix <= N; ++ix) {
       const double xc = hData.GetXaxis()->GetBinCenter(ix);
       for (int iy = 1; iy <= N; ++iy) {
@@ -414,6 +459,12 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
         hModel.SetBinContent(ix, iy, model);
         const double r = data - model;
         hResid.SetBinContent(ix, iy, r);
+        // Normalized residual (pull)
+        const double pull = (uniformSigma > 0.0) ? (r / uniformSigma) : r;
+        hPull.SetBinContent(ix, iy, pull);
+        hPullDist.Fill(pull);
+        pullSum += pull;
+        pullSum2 += pull * pull;
         const double invVar = (uniformSigma > 0.0) ? 1.0/(uniformSigma*uniformSigma) : 1.0;
         chi2 += (uniformSigma > 0.0) ? (r*r*invVar) : (r*r);
         nPtsUsed++;
@@ -421,6 +472,9 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
     }
     const int nPar = 6;
     const int ndof = std::max(1, nPtsUsed - nPar);
+    // Pull statistics
+    const double pullMean = (nPtsUsed > 0) ? pullSum / nPtsUsed : 0.0;
+    const double pullRMS = (nPtsUsed > 1) ? std::sqrt((pullSum2 - pullSum*pullSum/nPtsUsed) / (nPtsUsed - 1)) : 0.0;
 
     // Determine color scales
     double zDataMax = hData.GetMaximum();
@@ -434,50 +488,157 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
     hResid.SetMaximum(+absRmax);
     hResid.SetMinimum(-absRmax);
 
-    // Draw Data + contours
+    // Determine fit quality for color coding
+    const double chi2ndof = static_cast<double>(chi2) / static_cast<double>(ndof);
+    int fitQualityColor = kGreen+2;  // Good fit
+    const char* fitQualityLabel = "GOOD";
+    if (chi2ndof > 3.0) { fitQualityColor = kRed+1; fitQualityLabel = "POOR"; }
+    else if (chi2ndof > 1.5) { fitQualityColor = kOrange+1; fitQualityLabel = "FAIR"; }
+
+    // Draw Data + explicit sigma contours
     c.cd(1);
-    gPad->SetRightMargin(0.12);
-    hData.SetTitle(Form("Event %lld: Data with fit contours; F_{i} [unitless]", i));
+    gPad->SetRightMargin(0.14);
+    gPad->SetLeftMargin(0.12);
+    hData.SetTitle(Form("Event %lld: Data with 1#sigma/2#sigma/3#sigma contours", i));
+    hData.GetXaxis()->SetTitleSize(0.045);
+    hData.GetYaxis()->SetTitleSize(0.045);
     hData.Draw("COLZ");
     if (haveFit && A > 0.0) {
-      f2D.SetNpx(80); // contour resolution in x
-      f2D.SetNpy(80); // contour resolution in y
-      f2D.SetLineColor(kRed+1);
+      // Draw explicit sigma level contours: f(x,y) = A*exp(-0.5*r^2) + B
+      // At n-sigma: r^2 = n^2, so value = A*exp(-0.5*n^2) + B
+      double contourLevels[3];
+      contourLevels[0] = A * std::exp(-0.5 * 1.0) + B;  // 1σ (60.65% of peak)
+      contourLevels[1] = A * std::exp(-0.5 * 4.0) + B;  // 2σ (13.53% of peak)
+      contourLevels[2] = A * std::exp(-0.5 * 9.0) + B;  // 3σ (1.11% of peak)
+
+      f2D.SetNpx(100);
+      f2D.SetNpy(100);
+      f2D.SetContour(3, contourLevels);
       f2D.SetLineWidth(2);
-      f2D.Draw("CONT3 SAME");
+
+      // Draw each contour with different style
+      TF2* f1sig = new TF2("f1sig", Gauss2DPlusB, xLo, xHi, yLo, yHi, 6);
+      f1sig->SetParameters(A, mux, muy, sx, sy, B);
+      f1sig->SetContour(1, &contourLevels[0]);
+      f1sig->SetLineColor(kRed+1);
+      f1sig->SetLineWidth(3);
+      f1sig->SetLineStyle(1);
+      f1sig->SetNpx(100); f1sig->SetNpy(100);
+      f1sig->Draw("CONT3 SAME");
+      f1sig->SetBit(kCanDelete);
+
+      TF2* f2sig = new TF2("f2sig", Gauss2DPlusB, xLo, xHi, yLo, yHi, 6);
+      f2sig->SetParameters(A, mux, muy, sx, sy, B);
+      f2sig->SetContour(1, &contourLevels[1]);
+      f2sig->SetLineColor(kOrange+1);
+      f2sig->SetLineWidth(2);
+      f2sig->SetLineStyle(2);
+      f2sig->SetNpx(100); f2sig->SetNpy(100);
+      f2sig->Draw("CONT3 SAME");
+      f2sig->SetBit(kCanDelete);
+
+      TF2* f3sig = new TF2("f3sig", Gauss2DPlusB, xLo, xHi, yLo, yHi, 6);
+      f3sig->SetParameters(A, mux, muy, sx, sy, B);
+      f3sig->SetContour(1, &contourLevels[2]);
+      f3sig->SetLineColor(kYellow+1);
+      f3sig->SetLineWidth(2);
+      f3sig->SetLineStyle(3);
+      f3sig->SetNpx(100); f3sig->SetNpy(100);
+      f3sig->Draw("CONT3 SAME");
+      f3sig->SetBit(kCanDelete);
     }
     // Markers: draw REC last so it is visible when overlapping the pixel center
-    TMarker mtrue(x_true, y_true, 33); mtrue.SetMarkerColor(kBlack); mtrue.SetMarkerSize(1.4);
-    TMarker mPix(x_px, y_px, 28); mPix.SetMarkerColor(kBlue+2); mPix.SetMarkerSize(1.2);
-    TMarker mRec; if (IsFinite(mux) && IsFinite(muy)) { mRec = TMarker(mux, muy, 29); mRec.SetMarkerColor(kRed+1); mRec.SetMarkerSize(1.5); }
+    TMarker mtrue(x_true, y_true, 33); mtrue.SetMarkerColor(kBlack); mtrue.SetMarkerSize(1.6);
+    TMarker mPix(x_px, y_px, 28); mPix.SetMarkerColor(kBlue+2); mPix.SetMarkerSize(1.4);
+    TMarker mRec; if (IsFinite(mux) && IsFinite(muy)) { mRec = TMarker(mux, muy, 29); mRec.SetMarkerColor(kRed+1); mRec.SetMarkerSize(1.8); }
     mtrue.Draw();
     mPix.Draw();
     if (IsFinite(mux) && IsFinite(muy)) mRec.Draw();
-    TLegend leg1(0.12, 0.80, 0.46, 0.94);
-    leg1.SetBorderSize(0); leg1.SetFillStyle(0); leg1.SetTextSize(0.030);
+
+    // Legend for markers and contours
+    TLegend leg1(0.01, 0.72, 0.38, 0.92);
+    leg1.SetBorderSize(0); leg1.SetFillStyle(0); leg1.SetTextSize(0.032);
     leg1.AddEntry(&mtrue, "(x_{true},y_{true})", "p");
     leg1.AddEntry(&mPix, "(x_{px},y_{px})", "p");
     if (IsFinite(mux) && IsFinite(muy)) leg1.AddEntry(&mRec, "(x_{rec},y_{rec})", "p");
     leg1.Draw();
 
-    // Metrics box
-    c.cd(1);
-    double chi2ndof = static_cast<double>(chi2) / static_cast<double>(ndof);
-    latex.DrawLatex(0.50, 0.93, Form("#chi^{2}/ndof = %.3g / %d = %.3g", chi2, ndof, chi2ndof));
-    latex.DrawLatex(0.50, 0.88, Form("A=%.3g, B=%.3g, #sigma_{x}=%.3g, #sigma_{y}=%.3g", A, B, sx, sy));
-    latex.DrawLatex(0.50, 0.83, Form("|x_{true}-x_{rec}|=%.1f #mum, |y_{true}-y_{rec}|=%.1f #mum", 1000.0*std::abs(x_true - mux), 1000.0*std::abs(y_true - muy)));
-    latex.DrawLatex(0.50, 0.78, Form("|x_{true}-x_{px}|=%.1f #mum, |y_{true}-y_{px}|=%.1f #mum", 1000.0*std::abs(x_true - x_px), 1000.0*std::abs(y_true - y_px)));
+    // Contour legend
+    if (haveFit && A > 0.0) {
+      TLegend legC(0.60, 0.01, 0.99, 0.18);
+      legC.SetBorderSize(0); legC.SetFillStyle(0); legC.SetTextSize(0.028);
+      TLine* l1 = new TLine(); l1->SetLineColor(kRed+1); l1->SetLineWidth(3); l1->SetLineStyle(1); l1->SetBit(kCanDelete);
+      TLine* l2 = new TLine(); l2->SetLineColor(kOrange+1); l2->SetLineWidth(2); l2->SetLineStyle(2); l2->SetBit(kCanDelete);
+      TLine* l3 = new TLine(); l3->SetLineColor(kYellow+1); l3->SetLineWidth(2); l3->SetLineStyle(3); l3->SetBit(kCanDelete);
+      legC.AddEntry(l1, "1#sigma (60.7%)", "l");
+      legC.AddEntry(l2, "2#sigma (13.5%)", "l");
+      legC.AddEntry(l3, "3#sigma (1.1%)", "l");
+      legC.Draw();
+    }
 
-    // Draw Residuals heatmap
+    // Draw Pulls (normalized residuals) heatmap with diverging colormap
     c.cd(2);
-    gPad->SetRightMargin(0.12);
-    hResid.SetTitle("Residuals (data - model)");
-    hResid.SetContour(100);
-    hResid.Draw("COLZ");
-    // Zero residual contour (approx by line at 0 via contours): use TF2 difference? Skip for simplicity
+    gPad->SetRightMargin(0.14);
+    gPad->SetLeftMargin(0.12);
+    // Symmetric pull range centered at zero
+    double pullMax = std::max(3.0, std::abs(hPull.GetMaximum()));
+    pullMax = std::max(pullMax, std::abs(hPull.GetMinimum()));
+    hPull.SetMaximum(+pullMax);
+    hPull.SetMinimum(-pullMax);
+    hPull.SetTitle("Normalized Residuals (Pulls)");
+    hPull.GetXaxis()->SetTitleSize(0.045);
+    hPull.GetYaxis()->SetTitleSize(0.045);
+    hPull.SetContour(100);
+    // Use a diverging colormap (blue-white-red)
+    gStyle->SetPalette(kTemperatureMap);
+    hPull.Draw("COLZ");
+    // Mark bins with |pull| > 2 as potentially problematic
+    latex.SetTextSize(0.035);
+    latex.DrawLatex(0.15, 0.92, Form("Pull mean: %.2f", pullMean));
+    latex.DrawLatex(0.15, 0.87, Form("Pull RMS: %.2f", pullRMS));
+    // Reset palette to default for other plots
+    gStyle->SetPalette(kBird);
 
-    // Row profile (y fixed at y_px)
+    // Draw Pull histogram (panel 3)
     c.cd(3);
+    gPad->SetLeftMargin(0.12);
+    gPad->SetRightMargin(0.05);
+    hPullDist.SetTitle("Pull Distribution");
+    hPullDist.GetXaxis()->SetTitleSize(0.045);
+    hPullDist.GetYaxis()->SetTitleSize(0.045);
+    hPullDist.SetFillColor(kAzure-9);
+    hPullDist.SetLineColor(kBlue+2);
+    hPullDist.SetLineWidth(2);
+    hPullDist.Draw("HIST");
+    // Overlay reference Gaussian N(0,1)
+    if (hPullDist.GetEntries() > 0) {
+      double normFactor = hPullDist.GetEntries() * hPullDist.GetBinWidth(1);
+      TF1* fGausRef = new TF1("fGausRef", "[0]*exp(-0.5*x*x)", -5, 5);
+      fGausRef->SetParameter(0, normFactor / std::sqrt(2.0 * TMath::Pi()));
+      fGausRef->SetLineColor(kRed+1);
+      fGausRef->SetLineWidth(2);
+      fGausRef->SetLineStyle(2);
+      fGausRef->Draw("L SAME");
+      fGausRef->SetBit(kCanDelete);
+      TLegend legPull(0.60, 0.75, 0.94, 0.92);
+      legPull.SetBorderSize(0); legPull.SetFillStyle(0); legPull.SetTextSize(0.032);
+      legPull.AddEntry(&hPullDist, "Pulls", "f");
+      legPull.AddEntry(fGausRef, "N(0,1) reference", "l");
+      legPull.Draw();
+    }
+    // Add statistics
+    latex.SetTextSize(0.035);
+    latex.DrawLatex(0.15, 0.92, Form("#mu = %.3f", pullMean));
+    latex.DrawLatex(0.15, 0.86, Form("#sigma = %.3f", pullRMS));
+    // Quality indicator
+    latex.SetTextColor(fitQualityColor);
+    latex.DrawLatex(0.15, 0.80, Form("Fit: %s", fitQualityLabel));
+    latex.SetTextColor(kBlack);
+
+    // Row profile (y fixed at y_px) - Panel 4
+    c.cd(4);
+    gPad->SetLeftMargin(0.12);
+    gPad->SetRightMargin(0.05);
     std::vector<double> x_row_sorted = x_row; std::sort(x_row_sorted.begin(), x_row_sorted.end());
     TGraph gRow(static_cast<int>(x_row.size()));
     for (int k = 0; k < (int)x_row.size(); ++k) gRow.SetPoint(k, x_row[k], q_row[k]);
@@ -548,8 +709,10 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
       legR.Draw();
     }
 
-    // Column profile (x fixed at x_px)
-    c.cd(4);
+    // Column profile (x fixed at x_px) - Panel 5
+    c.cd(5);
+    gPad->SetLeftMargin(0.12);
+    gPad->SetRightMargin(0.05);
     std::vector<double> y_col_sorted = y_col; std::sort(y_col_sorted.begin(), y_col_sorted.end());
     TGraph gCol(static_cast<int>(y_col.size()));
     for (int k = 0; k < (int)y_col.size(); ++k) gCol.SetPoint(k, y_col[k], q_col[k]);
@@ -609,11 +772,89 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
       gPad->Update(); double yPadMin = gPad->GetUymin(); double yPadMax = gPad->GetUymax();
       TLine lineYtrue(y_true, yPadMin, y_true, yPadMax); lineYtrue.SetLineStyle(2); lineYtrue.SetLineWidth(2); lineYtrue.SetLineColor(kBlack); lineYtrue.Draw("SAME");
       if (IsFinite(muy)) { TLine lineYrec(muy, yPadMin, muy, yPadMax); lineYrec.SetLineStyle(2); lineYrec.SetLineWidth(2); lineYrec.SetLineColor(kRed+1); lineYrec.Draw("SAME"); }
-      TLegend legC(0.12, 0.78, 0.42, 0.94); legC.SetBorderSize(0); legC.SetFillStyle(0); legC.SetTextSize(0.030);
-      legC.AddEntry((TObject*)nullptr, Form("|y_{true}-y_{px}|=%.1f #mum", 1000.0*std::abs(y_true - y_px)), "");
-      if (IsFinite(muy)) legC.AddEntry((TObject*)nullptr, Form("|y_{true}-y_{rec}|=%.1f #mum", 1000.0*std::abs(y_true - muy)), "");
-      legC.Draw();
+      TLegend legColY(0.12, 0.78, 0.42, 0.94); legColY.SetBorderSize(0); legColY.SetFillStyle(0); legColY.SetTextSize(0.030);
+      legColY.AddEntry((TObject*)nullptr, Form("|y_{true}-y_{px}|=%.1f #mum", 1000.0*std::abs(y_true - y_px)), "");
+      if (IsFinite(muy)) legColY.AddEntry((TObject*)nullptr, Form("|y_{true}-y_{rec}|=%.1f #mum", 1000.0*std::abs(y_true - muy)), "");
+      legColY.Draw();
     }
+
+    // Fit Summary Panel (Panel 6)
+    c.cd(6);
+    gPad->SetLeftMargin(0.02);
+    gPad->SetRightMargin(0.02);
+    gPad->SetTopMargin(0.02);
+    gPad->SetBottomMargin(0.02);
+
+    TPaveText summaryBox(0.05, 0.05, 0.95, 0.95, "NDC");
+    summaryBox.SetBorderSize(1);
+    summaryBox.SetFillColor(kWhite);
+    summaryBox.SetTextAlign(12);
+    summaryBox.SetTextFont(42);
+    summaryBox.SetTextSize(0.045);
+
+    // Title with quality indicator
+    TText* titleLine = summaryBox.AddText(Form("Event %lld - Fit Summary", i));
+    titleLine->SetTextSize(0.055);
+    titleLine->SetTextFont(62);
+
+    summaryBox.AddText(" ");  // spacer
+
+    // Fit quality with color
+    TText* qualLine = summaryBox.AddText(Form("Fit Quality: %s (#chi^{2}/ndf = %.2f)", fitQualityLabel, chi2ndof));
+    qualLine->SetTextColor(fitQualityColor);
+    qualLine->SetTextSize(0.050);
+
+    summaryBox.AddText(" ");  // spacer
+
+    // Fit parameters
+    summaryBox.AddText(Form("Amplitude A = %.4g", A));
+    summaryBox.AddText(Form("Baseline B = %.4g", B));
+    summaryBox.AddText(Form("#sigma_{x} = %.4f mm (%.1f #mum)", sx, sx*1000));
+    summaryBox.AddText(Form("#sigma_{y} = %.4f mm (%.1f #mum)", sy, sy*1000));
+
+    summaryBox.AddText(" ");  // spacer
+
+    // Position reconstruction
+    summaryBox.AddText(Form("#mu_{x} = %.4f mm, #mu_{y} = %.4f mm", mux, muy));
+
+    summaryBox.AddText(" ");  // spacer
+
+    // Reconstruction errors
+    double errX_rec = IsFinite(mux) ? 1000.0*std::abs(x_true - mux) : NAN;
+    double errY_rec = IsFinite(muy) ? 1000.0*std::abs(y_true - muy) : NAN;
+    double errX_px = 1000.0*std::abs(x_true - x_px);
+    double errY_px = 1000.0*std::abs(y_true - y_px);
+
+    TText* errRecLine = summaryBox.AddText(Form("Rec. error: #Deltax = %.1f #mum, #Deltay = %.1f #mum", errX_rec, errY_rec));
+    // Color code based on improvement
+    if (IsFinite(errX_rec) && IsFinite(errY_rec)) {
+      double errRec = std::sqrt(errX_rec*errX_rec + errY_rec*errY_rec);
+      double errPx = std::sqrt(errX_px*errX_px + errY_px*errY_px);
+      if (errRec < errPx * 0.8) errRecLine->SetTextColor(kGreen+2);
+      else if (errRec > errPx * 1.2) errRecLine->SetTextColor(kRed+1);
+    }
+
+    summaryBox.AddText(Form("Pixel error: #Deltax = %.1f #mum, #Deltay = %.1f #mum", errX_px, errY_px));
+
+    summaryBox.AddText(" ");  // spacer
+
+    // Pull statistics assessment
+    TText* pullLine = summaryBox.AddText(Form("Pull stats: #mu = %.2f, #sigma = %.2f", pullMean, pullRMS));
+    if (std::abs(pullMean) < 0.3 && std::abs(pullRMS - 1.0) < 0.3) {
+      pullLine->SetTextColor(kGreen+2);
+    } else if (std::abs(pullMean) > 1.0 || std::abs(pullRMS - 1.0) > 0.5) {
+      pullLine->SetTextColor(kRed+1);
+    } else {
+      pullLine->SetTextColor(kOrange+1);
+    }
+
+    // Interpretation guide
+    summaryBox.AddText(" ");
+    TText* guideLine = summaryBox.AddText("Good fit: #chi^{2}/ndf #approx 1, pull #mu #approx 0, #sigma #approx 1");
+    guideLine->SetTextSize(0.035);
+    guideLine->SetTextColor(kGray+2);
+
+    summaryBox.Draw();
 
     c.Print("fit3d.pdf");
     nPages++;
@@ -631,19 +872,19 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
 
 
 // Convenience wrappers so the macro can be executed directly as:
-//   root -l -b -q plotProcessing3D.C
+//   root -l -b -q plotFitGaus2D.C
 // They forward to processing3D_plots and try a few common default paths.
-int plotProcessing3D() {
+int plotFitGaus2D() {
   TString macroDir = gSystem->DirName(__FILE__);
   TString def = macroDir + "/../../build/epicChargeSharing.root";
   return processing3D_plots(def.Data(), 5.0);
 }
 
-int plotProcessing3D(const char* filename) {
+int plotFitGaus2D(const char* filename) {
   return processing3D_plots(filename, 5.0);
 }
 
-int plotProcessing3D(const char* filename, double errorPercentOfMax) {
+int plotFitGaus2D(const char* filename, double errorPercentOfMax) {
   return processing3D_plots(filename, errorPercentOfMax);
 }
 
