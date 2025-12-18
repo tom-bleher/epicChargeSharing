@@ -1,23 +1,10 @@
 # epicChargeSharing
 
-**GEANT4-based Monte Carlo simulation for studying charge sharing in AC-LGAD pixel detectors.**
-
-[![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://isocpp.org/std/the-standard)
-[![GEANT4](https://img.shields.io/badge/GEANT4-11.0%2B-green.svg)](https://geant4.web.cern.ch/)
-[![ROOT](https://img.shields.io/badge/ROOT-6.20%2B-orange.svg)](https://root.cern/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+GEANT4-based simulation and reconstruction plugin for studying charge sharing position reconstruction in AC-LGAD detectors.
 
 ## Overview
 
 epicChargeSharing simulates charge distribution across neighboring pixels in AC-LGAD (Resistive AC-Coupled Low Gain Avalanche Detector) sensors. It implements the analytical model from [Tornago et al. (arXiv:2007.09528)](https://arxiv.org/abs/2007.09528).
-
-### Features
-
-- **Physics-based charge sharing** using the peer-reviewed Tornago model
-- **Three reconstruction methods**: LogA, LinA, and DPC algorithms
-- **Realistic noise modeling** with per-pixel gain variations
-- **Multithreaded execution** with automatic file merging
-- **ROOT output** with event data and simulation metadata
 
 ## Quick Start
 
@@ -31,17 +18,6 @@ make -j$(nproc)
 ```
 
 Output: `epicChargeSharing.root`
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Getting Started](docs/getting-started.md) | Installation and first run |
-| [Configuration](docs/configuration.md) | All parameters and options |
-| [Physics Model](docs/physics-model.md) | Charge sharing physics |
-| [Output Format](docs/ROOT_OUTPUT_BRANCHES.md) | ROOT file structure |
-| [Analysis Guide](docs/analysis-guide.md) | Post-processing workflows |
-| [Architecture](docs/architecture.md) | System design |
 
 ## Requirements
 
@@ -64,14 +40,6 @@ Output: `epicChargeSharing.root`
 # Interactive
 ./epicChargeSharing
 ```
-
-## Reconstruction Methods
-
-| Method | Description |
-|--------|-------------|
-| LogA | Logarithmic attenuation (Tornago Eq. 4) |
-| LinA | Linear attenuation |
-| DPC | Discretized Positioning Circuit |
 
 ## Citation
 
