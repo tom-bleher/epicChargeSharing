@@ -9,10 +9,14 @@ list(APPEND CMAKE_PREFIX_PATH "$ENV{JANA_HOME}/lib/JANA/cmake")
 find_package(EICrecon REQUIRED)
 find_package(DD4hep REQUIRED COMPONENTS DDCore)
 
+# Find ROOT for Gaussian fitting
+find_package(ROOT REQUIRED COMPONENTS Core MathCore Minuit2)
+
 add_library(chargeSharingRecon SHARED
     src/ChargeSharingReconFactory.cc
     src/ChargeSharingReconPlugin.cc
     src/ChargeSharingReconstructor.cc
+    # ChargeSharingMonitor.cc excluded - requires JANA ROOT integration to be added later
 )
 
 target_include_directories(chargeSharingRecon
@@ -20,6 +24,7 @@ target_include_directories(chargeSharingRecon
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${EICrecon_INCLUDE_DIR}
         ${EICrecon_INCLUDE_DIR}/EICrecon
+        ${ROOT_INCLUDE_DIRS}
 )
 
 target_link_libraries(chargeSharingRecon
@@ -28,6 +33,10 @@ target_link_libraries(chargeSharingRecon
         EDM4HEP::edm4hep
         EDM4EIC::edm4eic
         DD4hep::DDCore
+        ROOT::Core
+        ROOT::MathCore
+        ROOT::Minuit2
+        fmt::fmt
 )
 
 set_target_properties(chargeSharingRecon PROPERTIES

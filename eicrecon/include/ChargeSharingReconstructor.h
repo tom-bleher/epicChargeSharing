@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ChargeSharingConfig.h"
+#include "ChargeSharingCore.hh"
+#include "GaussianFit.hh"
 
 #include <array>
 #include <cstdint>
@@ -35,6 +37,14 @@ class ChargeSharingReconstructor {
     int pixelId{-1};
     int di{0};
     int dj{0};
+
+    // Mode-specific fractions and charges for diagnostics
+    double fractionRow{0.0};     ///< Fraction using row-only denominator
+    double fractionCol{0.0};     ///< Fraction using col-only denominator
+    double fractionBlock{0.0};   ///< Fraction using block denominator
+    double chargeRowC{0.0};      ///< Charge using row fraction (Coulombs)
+    double chargeColC{0.0};      ///< Charge using col fraction (Coulombs)
+    double chargeBlockC{0.0};    ///< Charge using block fraction (Coulombs)
   };
 
   struct Result {
@@ -44,6 +54,29 @@ class ChargeSharingReconstructor {
     int pixelIndexJ{0};
     double totalCollectedChargeC{0.0};
     std::vector<NeighborData> neighbors;
+
+    // Fit results (if Gaussian fitting enabled)
+    fit::GaussFit1DResult fitRowX;
+    fit::GaussFit1DResult fitColY;
+    fit::GaussFit2DResult fit2D;
+
+    // ─────────────────────────── Diagnostic Metadata ───────────────────────────
+    // Truth information (from input)
+    std::array<double, 3> truthPositionMM{};    ///< Original hit position (mm)
+    double inputEnergyDepositGeV{0.0};          ///< Input energy deposit (GeV)
+    std::uint64_t inputCellID{0};               ///< Input cell ID
+
+    // Reconstruction residuals
+    double residualXMM() const { return reconstructedPositionMM[0] - truthPositionMM[0]; }
+    double residualYMM() const { return reconstructedPositionMM[1] - truthPositionMM[1]; }
+
+    // Summary charge statistics
+    double maxNeighborChargeC{0.0};             ///< Max charge in neighborhood
+    int numActiveNeighbors{0};                  ///< Number of pixels with charge > 0
+
+    // Grid info
+    int neighborhoodRadius{0};                  ///< Neighborhood radius used
+    int neighborhoodGridSize{0};                ///< Total grid size (2*r+1)^2
   };
 
   void configure(const ChargeSharingConfig& cfg,
@@ -60,12 +93,6 @@ class ChargeSharingReconstructor {
     int indexJ{0};
   };
 
-  struct Offset {
-    int di{0};
-    int dj{0};
-    std::size_t idx{0};
-  };
-
   struct IndexBounds {
     int minIndex{0};
     int maxIndex{-1};
@@ -78,15 +105,32 @@ class ChargeSharingReconstructor {
   PixelLocation findPixelFromSegmentation(std::uint64_t cellID) const;
   PixelLocation pixelLocationFromIndices(int indexI, int indexJ) const;
   bool isPixelIndexInBounds(int indexI, int indexJ) const;
-  double firstPixelCenterCoordinate(double detectorSize, double cornerOffset, double pixelSize) const;
-  void ensureGrid();
-  void resetBuffers();
-  void rebuildOffsets();
-  double calcDistanceToCenter(double dxToCenterMM,
-                               double dyToCenterMM) const;
-  double calcPadViewAngle(double distanceToCenterMM, double padWidthMM, double padHeightMM) const;
-  double linearModelBeta(double pitchMM) const;
-  int linearizedPixelId(int indexI, int indexJ) const;
+
+  /// Perform position reconstruction using configured method
+  std::array<double, 3> reconstructPosition(
+      const core::NeighborhoodResult& neighborhood,
+      double centerZ,
+      fit::GaussFit1DResult& fitRowX,
+      fit::GaussFit1DResult& fitColY,
+      fit::GaussFit2DResult& fit2D) const;
+
+  /// Reconstruct using charge-weighted centroid (fallback)
+  std::array<double, 3> reconstructCentroid(
+      const core::NeighborhoodResult& neighborhood,
+      double centerZ) const;
+
+  /// Reconstruct using 1D Gaussian fits on row and column
+  std::array<double, 3> reconstructGaussian1D(
+      const core::NeighborhoodResult& neighborhood,
+      double centerZ,
+      fit::GaussFit1DResult& fitRowX,
+      fit::GaussFit1DResult& fitColY) const;
+
+  /// Reconstruct using 2D Gaussian fit
+  std::array<double, 3> reconstructGaussian2D(
+      const core::NeighborhoodResult& neighborhood,
+      double centerZ,
+      fit::GaussFit2DResult& fit2D) const;
 
   ChargeSharingConfig m_cfg{};
   const dd4hep::DDSegmentation::CartesianGridXY* m_segmentation{nullptr};
@@ -94,18 +138,7 @@ class ChargeSharingReconstructor {
   bool m_haveSegmentation{false};
   IndexBounds m_boundsX{};
   IndexBounds m_boundsY{};
-  int m_gridDim{0};
-  std::vector<Offset> m_offsets;
-
-  std::vector<double> m_weightGrid;
-  std::vector<bool> m_inBounds;
-  std::vector<double> m_fractions;
-  std::vector<double> m_charges;
-  std::vector<double> m_distances;
-  std::vector<double> m_alphas;
-  std::vector<double> m_pixelX;
-  std::vector<double> m_pixelY;
-  std::vector<int> m_pixelIds;
+  mutable core::NoiseModel m_noiseModel{};  ///< Noise model for realistic charge simulation
 };
 
 }  // namespace epic::chargesharing

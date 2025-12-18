@@ -62,18 +62,6 @@ eicrecon -Pplugins=chargeSharingRecon \
          sim_output.edm4hep.root
 ```
 
-### Custom Parameters
-
-Override default configuration:
-
-```bash
-eicrecon -Pplugins=chargeSharingRecon \
-         -PChargeSharingRecon:neighborhoodRadius=3 \
-         -PChargeSharingRecon:minEDep=0.0001 \
-         -Ppodio:output_file=output.edm4hep.root \
-         input.edm4hep.root
-```
-
 ## Configuration Parameters
 
 | Parameter | Type | Default | Description |
@@ -97,6 +85,15 @@ Geometry values are auto-populated from DD4hep `CartesianGridXY` segmentation wh
 | Input | `SiTrackerHits` (configurable) | `edm4hep::SimTrackerHit` |
 | Output | `ChargeSharingTrackerHits` | `edm4eic::TrackerHit` |
 
+## Supported Detectors
+
+The plugin registers factories for AC-LGAD detector subsystems:
+
+| Detector | Input Collection | Output Collection |
+|----------|-----------------|-------------------|
+| B0 Tracker | `B0TrackerHits` | `B0ChargeSharingTrackerHits` |
+| Lumi Spectrometer | `LumiSpecTrackerHits` | `LumiSpecTrackerChargeSharingHits` |
+
 ## Algorithm
 
 The plugin implements a charge-sharing model:
@@ -106,25 +103,37 @@ The plugin implements a charge-sharing model:
 3. Computes charge-weighted centroid position across the pixel neighborhood
 4. Outputs TrackerHit with improved position estimate
 
-## Troubleshooting
+## Monitoring Output
 
-### Plugin not found
+The plugin includes a `ChargeSharingMonitor` processor that automatically compares
+reconstructed positions to truth and produces validation output:
 
-Ensure `EICrecon_MY` points to the install directory:
-```bash
-export EICrecon_MY=/path/to/eicrecon/install
-ls $EICrecon_MY/plugins/chargeSharingRecon.so
-```
+### Histograms (per detector)
 
-### Parameter errors
+| Histogram | Description |
+|-----------|-------------|
+| `hResidualX` | X position residual (recon - truth) |
+| `hResidualY` | Y position residual (recon - truth) |
+| `hResidualR` | Radial residual |
+| `hRecoVsTrueX/Y` | Correlation between reco and true positions |
+| `hTrueXY` | 2D true hit positions |
+| `hRecoXY` | 2D reconstructed positions |
+| `hResidualVsTrueX/Y` | Residual vs position (for bias detection) |
+| `hEnergyDeposit` | Energy deposit distribution |
 
-Use relaxed parameter checking if needed:
-```bash
-eicrecon -Pjana:parameter_strictness=0 ...
-```
+### TTree Output
 
-### View available parameters
+A TTree named `hits` is created with per-hit data matching the main simulation format:
 
-```bash
-eicrecon -Pplugins=chargeSharingRecon -Pjana:show_all_parameters=1
-```
+| Branch | Type | Description |
+|--------|------|-------------|
+| `trueX/Y/Z` | double | True hit position (mm) |
+| `reconX/Y/Z` | double | Reconstructed position (mm) |
+| `residualX/Y/R` | double | Position residuals (mm) |
+| `edep` | double | Energy deposit (GeV) |
+| `time` | double | Hit time |
+| `cellID` | uint64 | Cell identifier |
+| `eventNumber` | int | Event number |
+| `detectorIndex` | int | Detector index (0=B0, 1=Lumi) |
+
+Output is written to the standard EICrecon output file (`eicrecon.root`)
