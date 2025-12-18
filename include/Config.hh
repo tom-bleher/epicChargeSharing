@@ -7,6 +7,7 @@
 
 #include "G4SystemOfUnits.hh"
 #include "globals.hh"
+#include <cmath>
 
 namespace Constants {
 
@@ -31,10 +32,13 @@ inline constexpr Mode DPC_CHARGE_MODEL = Mode::LogA;
 inline const G4double DETECTOR_SIZE        = 30.0 * mm;    // Sensor side length
 inline const G4double DETECTOR_WIDTH       = 0.05 * mm;    // Silicon thickness
 inline const G4double PIXEL_SIZE           = 0.15 * mm;    // Pixel pad size
-inline const G4double PIXEL_PITCH          = 0.5  * mm;    // Pixel spacing
-inline const G4double PIXEL_CORNER_OFFSET  = 0.1  * mm;    // Edge to first pixel
+inline const G4double PIXEL_PITCH          = 0.5  * mm;    // Pixel spacing (pitch)
 inline constexpr G4int NEIGHBORHOOD_RADIUS = 2;            // Charge sharing radius
-inline const G4double PIXEL_THICKNESS      = 0.02 * mm;   // Pixel depth/thickness
+inline const G4double PIXEL_THICKNESS      = 0.02 * mm;    // Pixel depth/thickness
+
+// DD4hep-style grid offset: position = index * pitch + offset
+// Set to 0.0 for centered grid (indices can be negative), or non-zero to shift grid origin
+inline const G4double GRID_OFFSET          = 0.0  * mm;    // Grid origin offset
 
 // ─────────────────────────────── Physics ────────────────────────────────────
 inline constexpr G4double IONIZATION_ENERGY = 3.6;         // eV per e-h pair
@@ -227,6 +231,34 @@ inline const G4double PRECISION_TOLERANCE = 1.0 * nm;
 
 inline constexpr G4double ELEMENTARY_CHARGE = 1.602176634e-19;
 inline constexpr G4double OUT_OF_BOUNDS_FRACTION_SENTINEL = -999.0;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DD4hep-style Grid Helper Functions
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// These functions implement the DD4hep CartesianGrid formulas:
+//   position = index * gridSize + offset
+//   index = floor((position + 0.5 * gridSize - offset) / gridSize)
+//
+// This allows for centered grids where indices can be negative.
+
+/// @brief Convert grid index to position (DD4hep-style: position = index * pitch + offset)
+/// @param index The grid index (can be negative for centered grids)
+/// @param gridSize The grid pitch/spacing
+/// @param offset The grid origin offset (default 0.0 for centered grid)
+/// @return Position in world coordinates
+inline G4double IndexToPosition(G4int index, G4double gridSize, G4double offset = 0.0) {
+    return static_cast<G4double>(index) * gridSize + offset;
+}
+
+/// @brief Convert position to grid index (DD4hep-style: floor formula)
+/// @param position Position in world coordinates
+/// @param gridSize The grid pitch/spacing
+/// @param offset The grid origin offset (default 0.0 for centered grid)
+/// @return Grid index (can be negative for centered grids)
+inline G4int PositionToIndex(G4double position, G4double gridSize, G4double offset = 0.0) {
+    return static_cast<G4int>(std::floor((position + 0.5 * gridSize - offset) / gridSize));
+}
 
 } // namespace Constants
 

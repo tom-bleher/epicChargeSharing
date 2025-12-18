@@ -51,7 +51,7 @@ RunAction* ActionInitialization::CreateRunAction() const
     runAction->SetDetectorGridParameters(
         fDetector->GetPixelSize(),
         fDetector->GetPixelSpacing(),
-        fDetector->GetPixelCornerOffset(),
+        fDetector->GetGridOffset(),
         fDetector->GetDetSize(),
         fDetector->GetNumBlocksPerSide());
     runAction->SetNeighborhoodRadiusMeta(fDetector->GetNeighborhoodRadius());

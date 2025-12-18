@@ -135,8 +135,9 @@ G4double PrimaryGenerator::CalculateSafeMargin() const
     }
 
     const G4int radius = fDetector->GetNeighborhoodRadius();
-    const G4double margin = fDetector->GetPixelCornerOffset() +
-                            0.5 * fDetector->GetPixelSize() +
+    // For DD4hep-style centered grid, margin is based on neighborhood radius
+    // to ensure all neighbor pixels stay within detector bounds
+    const G4double margin = 0.5 * fDetector->GetPixelSize() +
                             radius * fDetector->GetPixelSpacing();
 
     const G4double detHalfSize = fDetector->GetDetSize() / 2.0;

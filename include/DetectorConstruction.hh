@@ -63,20 +63,26 @@ public:
     void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
     void SetRunAction(RunAction* runAction);
     
-    void SetPixelCornerOffset(G4double cornerOffset);
+    void SetGridOffset(G4double offset);
     void SetPixelSize(G4double size);
     void SetPixelSpacing(G4double spacing);
     void SetNeighborhoodRadius(G4int radius);
-    
+
     G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
-    
+
     G4double GetPixelSize() const { return fPixelSize; }
     G4double GetPixelSpacing() const { return fPixelSpacing; }
     G4double GetPixelPitch() const { return fPixelSpacing; }
     G4double GetLinearChargeModelBeta() const { return Constants::LINEAR_CHARGE_MODEL_BETA; }
-    G4double GetPixelCornerOffset() const { return fPixelCornerOffset; }
+    G4double GetGridOffset() const { return fGridOffset; }
     G4double GetDetSize() const { return fDetSize; }
     G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
+
+    /// @brief Get minimum pixel index (DD4hep-style, can be negative for centered grid).
+    G4int GetMinIndexX() const { return fMinIndexX; }
+    G4int GetMinIndexY() const { return fMinIndexY; }
+    G4int GetMaxIndexX() const { return fMaxIndexX; }
+    G4int GetMaxIndexY() const { return fMaxIndexY; }
     const G4ThreeVector& GetDetectorPos() const { return fDetectorPos; }
     PixelLocation FindNearestPixel(const G4ThreeVector& pos) const;
     const std::vector<G4ThreeVector>& GetPixelCenters() const { return fPixelCenters; }
@@ -110,12 +116,18 @@ private:
     G4double fPixelSize;
     G4double fPixelWidth;
     G4double fPixelSpacing;
-    G4double fPixelCornerOffset;
-    
+    G4double fGridOffset;  ///< DD4hep-style grid offset (0 = centered grid)
+
     G4double fDetSize;
     G4double fDetWidth;
     G4int fNumBlocksPerSide;
     G4ThreeVector fDetectorPos;
+
+    /// DD4hep-style index ranges (can be negative for centered grid)
+    G4int fMinIndexX{0};
+    G4int fMinIndexY{0};
+    G4int fMaxIndexX{0};
+    G4int fMaxIndexY{0};
 
     EventAction* fEventAction;
     RunAction* fRunAction{nullptr};

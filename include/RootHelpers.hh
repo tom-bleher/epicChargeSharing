@@ -109,7 +109,7 @@ public:
     bool Validate(const G4String& filename, bool* hasEntries);
     void Cleanup();
     void WriteMetadataSingleThread(G4double pixelSize, G4double pixelSpacing,
-                                   G4double pixelCornerOffset, G4double detSize,
+                                   G4double gridOffset, G4double detSize,
                                    G4int numBlocksPerSide, G4int neighborhoodRadius);
 
 private:

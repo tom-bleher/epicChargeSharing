@@ -620,17 +620,15 @@ ChargeSharingCalculator::PixelGridGeometry EventAction::BuildDefaultGridGeometry
     const G4int numBlocks = std::max(0, fDetector->GetNumBlocksPerSide());
     const G4double spacing = fDetector->GetPixelSpacing();
     const G4ThreeVector& detPos = fDetector->GetDetectorPos();
-    const G4double detSize = fDetector->GetDetSize();
-    const G4double cornerOffset = fDetector->GetPixelCornerOffset();
-    const G4double pixelSize = fDetector->GetPixelSize();
-    const G4double firstPixelCenter = -detSize / 2.0 + cornerOffset + pixelSize / 2.0;
+    const G4double gridOffset = fDetector->GetGridOffset();
 
+    // DD4hep-style grid geometry: position = index * pitch + offset
     geom.nRows = numBlocks;
     geom.nCols = numBlocks;
     geom.pitchX = spacing;
     geom.pitchY = spacing;
-    geom.x0 = detPos.x() + firstPixelCenter - 0.5 * spacing;
-    geom.y0 = detPos.y() + firstPixelCenter - 0.5 * spacing;
+    geom.x0 = detPos.x() + gridOffset;
+    geom.y0 = detPos.y() + gridOffset;
 
     return geom;
 }

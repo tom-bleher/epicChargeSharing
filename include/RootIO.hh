@@ -189,8 +189,10 @@ public:
     void ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars,
                                const ClassificationBuffers& classification,
                                const VectorBuffers& vectors,
-                               Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
-    void ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers);
+                               Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood,
+                               Config::PosReconModel reconModel = Config::PosReconModel::LogA);
+    void ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers,
+                                 Config::PosReconModel reconModel = Config::PosReconModel::LogA);
     void ConfigureClassificationBranches(TTree* tree, const ClassificationBuffers& buffers);
     void ConfigureVectorBranches(TTree* tree, const VectorBuffers& buffers,
                                  Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
@@ -362,7 +364,7 @@ public:
     struct GridMetadata {
         G4double pixelSize{0.0};
         G4double pixelSpacing{0.0};
-        G4double pixelCornerOffset{0.0};
+        G4double gridOffset{0.0};  ///< DD4hep-style grid offset
         G4double detectorSize{0.0};
         G4double detectorThickness{0.0};
         G4double interpadGap{0.0};

@@ -134,7 +134,7 @@ void RootFileWriter::Cleanup() {
 }
 
 void RootFileWriter::WriteMetadataSingleThread(G4double pixelSize, G4double pixelSpacing,
-                                                G4double pixelCornerOffset, G4double detSize,
+                                                G4double gridOffset, G4double detSize,
                                                 G4int numBlocksPerSide, G4int neighborhoodRadius) {
     std::lock_guard<std::mutex> globalLock(RootIOMutex());
     std::lock_guard<std::mutex> lock(fMutex);
@@ -145,14 +145,14 @@ void RootFileWriter::WriteMetadataSingleThread(G4double pixelSize, G4double pixe
 
     TNamed pixelSizeMeta("GridPixelSize_mm", Form("%.6f", pixelSize));
     TNamed pixelSpacingMeta("GridPixelSpacing_mm", Form("%.6f", pixelSpacing));
-    TNamed pixelCornerOffsetMeta("GridPixelCornerOffset_mm", Form("%.6f", pixelCornerOffset));
+    TNamed gridOffsetMeta("GridOffset_mm", Form("%.6f", gridOffset));
     TNamed detSizeMeta("GridDetectorSize_mm", Form("%.6f", detSize));
     TNamed numBlocksMeta("GridNumBlocksPerSide", Form("%d", numBlocksPerSide));
     TNamed neighborhoodRadiusMeta("NeighborhoodRadius", Form("%d", neighborhoodRadius));
 
     pixelSizeMeta.Write("", TObject::kOverwrite);
     pixelSpacingMeta.Write("", TObject::kOverwrite);
-    pixelCornerOffsetMeta.Write("", TObject::kOverwrite);
+    gridOffsetMeta.Write("", TObject::kOverwrite);
     detSizeMeta.Write("", TObject::kOverwrite);
     numBlocksMeta.Write("", TObject::kOverwrite);
     neighborhoodRadiusMeta.Write("", TObject::kOverwrite);

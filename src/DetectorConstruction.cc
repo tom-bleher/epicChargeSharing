@@ -38,11 +38,15 @@ DetectorConstruction::DetectorConstruction()
       fPixelSize(Constants::PIXEL_SIZE),
       fPixelWidth(Constants::PIXEL_THICKNESS),
       fPixelSpacing(Constants::PIXEL_PITCH),
-      fPixelCornerOffset(Constants::PIXEL_CORNER_OFFSET),
+      fGridOffset(Constants::GRID_OFFSET),
       fDetSize(Constants::DETECTOR_SIZE),
       fDetWidth(Constants::DETECTOR_WIDTH),
       fNumBlocksPerSide(0),
       fDetectorPos(0., 0., Constants::DETECTOR_Z_POSITION),
+      fMinIndexX(0),
+      fMinIndexY(0),
+      fMaxIndexX(0),
+      fMaxIndexY(0),
       fEventAction(nullptr),
       fRunAction(nullptr),
       fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),
@@ -61,10 +65,10 @@ void DetectorConstruction::SetRunAction(RunAction* runAction)
     }
 }
 
-void DetectorConstruction::SetPixelCornerOffset(G4double cornerOffset)
+void DetectorConstruction::SetGridOffset(G4double offset)
 {
-    G4cout << "[Detector] Pixel corner offset set to " << cornerOffset / mm << " mm" << G4endl;
-    fPixelCornerOffset = cornerOffset;
+    G4cout << "[Detector] Grid offset set to " << offset / mm << " mm" << G4endl;
+    fGridOffset = offset;
 
     if (G4RunManager* runManager = G4RunManager::GetRunManager()) {
         runManager->GeometryHasBeenModified();
@@ -150,34 +154,26 @@ G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* log
 
     fLogicSilicon = logicCube;
 
-    fNumBlocksPerSide = static_cast<G4int>(
-        std::round((fDetSize - 2 * fPixelCornerOffset - fPixelSize) / fPixelSpacing + 1));
+    // DD4hep-style grid: compute index range based on detector size and pitch
+    // Grid is centered at origin (detector center), indices can be negative
+    //
+    // For a detector of size D centered at 0, valid positions are [-D/2, +D/2]
+    // Using DD4hep formula: index = floor((position + 0.5*pitch - offset) / pitch)
+    //
+    // Min index: position = -D/2 + pixelSize/2 (first pixel must fit inside detector)
+    // Max index: position = +D/2 - pixelSize/2 (last pixel must fit inside detector)
 
-    const G4double requiredDetSize =
-        2 * fPixelCornerOffset + fPixelSize + (fNumBlocksPerSide - 1) * fPixelSpacing;
+    const G4double halfDet = fDetSize / 2.0;
+    const G4double halfPad = fPixelSize / 2.0;
 
-    if (std::abs(requiredDetSize - fDetSize) > Constants::GEOMETRY_TOLERANCE) {
-        fDetSize = requiredDetSize;
+    // Compute index range using DD4hep formula
+    // Ensure pixels fit within detector bounds
+    fMinIndexX = Constants::PositionToIndex(-halfDet + halfPad, fPixelSpacing, fGridOffset);
+    fMaxIndexX = Constants::PositionToIndex(+halfDet - halfPad, fPixelSpacing, fGridOffset);
+    fMinIndexY = fMinIndexX;  // Square detector
+    fMaxIndexY = fMaxIndexX;
 
-        delete detCube;
-        detCube = new G4Box("detCube", fDetSize / 2, fDetSize / 2, fDetWidth / 2);
-        delete logicCube;
-        logicCube = new G4LogicalVolume(detCube, mats.silicon, "logicCube");
-        logicCube->SetVisAttributes(cubeVisAtt);
-        fLogicSilicon = logicCube;
-    }
-
-    const G4double actualCornerOffset =
-        (fDetSize - (fNumBlocksPerSide - 1) * fPixelSpacing - fPixelSize) / 2;
-    if (std::abs(actualCornerOffset - fPixelCornerOffset) > Constants::PRECISION_TOLERANCE) {
-        std::ostringstream oss;
-        oss << "Corner offset calculation failed. Expected " << fPixelCornerOffset / mm
-            << " mm but got " << actualCornerOffset / mm << " mm.";
-        G4Exception("DetectorConstruction::BuildSiliconDetector",
-                    "CornerOffsetMismatch",
-                    FatalException,
-                    oss.str().c_str());
-    }
+    fNumBlocksPerSide = fMaxIndexX - fMinIndexX + 1;
 
     new G4PVPlacement(
         nullptr,
@@ -213,18 +209,24 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
 
     const G4ThreeVector& detectorPos = GetDetectorPos();
     const G4double pixelZ = detectorPos.z() + fDetWidth / 2 + fPixelWidth / 2;
-    const G4double firstPixelPos = -fDetSize / 2 + fPixelCornerOffset + fPixelSize / 2;
 
+    // DD4hep-style grid: iterate over index range (can include negative indices)
     const G4int totalPixels = fNumBlocksPerSide * fNumBlocksPerSide;
     fPixelCenters.assign(static_cast<std::size_t>(std::max(0, totalPixels)),
                          G4ThreeVector(0., 0., 0.));
 
     G4int copyNo = 0;
-    for (G4int i = 0; i < fNumBlocksPerSide; ++i) {
-        for (G4int j = 0; j < fNumBlocksPerSide; ++j) {
-            const G4double pixelX = firstPixelPos + i * fPixelSpacing;
-            const G4double pixelY = firstPixelPos + j * fPixelSpacing;
-            const G4int globalId = i * fNumBlocksPerSide + j;
+    for (G4int i = fMinIndexX; i <= fMaxIndexX; ++i) {
+        for (G4int j = fMinIndexY; j <= fMaxIndexY; ++j) {
+            // DD4hep formula: position = index * pitch + offset
+            const G4double pixelX = Constants::IndexToPosition(i, fPixelSpacing, fGridOffset);
+            const G4double pixelY = Constants::IndexToPosition(j, fPixelSpacing, fGridOffset);
+
+            // Convert from DD4hep index to flat array index
+            // localI = i - fMinIndexX, localJ = j - fMinIndexY
+            const G4int localI = i - fMinIndexX;
+            const G4int localJ = j - fMinIndexY;
+            const G4int globalId = localI * fNumBlocksPerSide + localJ;
 
             new G4PVPlacement(
                 nullptr,
@@ -254,7 +256,8 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
                     message.c_str());
     }
 
-    G4cout << "[Detector] Configured " << copyNo << " aluminum pixel pads" << G4endl;
+    G4cout << "[Detector] Configured " << copyNo << " aluminum pixel pads (indices "
+           << fMinIndexX << " to " << fMaxIndexX << ")" << G4endl;
 
     stats.totalPixelArea =
         static_cast<G4double>(fNumBlocksPerSide) * fNumBlocksPerSide * fPixelSize * fPixelSize;
@@ -290,7 +293,7 @@ void DetectorConstruction::SyncRunMetadata()
     fRunAction->SetDetectorGridParameters(
         fPixelSize,
         fPixelSpacing,
-        fPixelCornerOffset,
+        fGridOffset,
         fDetSize,
         fNumBlocksPerSide);
     fRunAction->SetGridPixelCenters(fPixelCenters);
@@ -311,19 +314,22 @@ DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const
 
     const G4ThreeVector& detectorPos = GetDetectorPos();
     const G4ThreeVector relativePos = pos - detectorPos;
-    const G4double firstPixelPos = -fDetSize / 2 + fPixelCornerOffset + fPixelSize / 2;
 
-    G4int i = static_cast<G4int>(std::round((relativePos.x() - firstPixelPos) / fPixelSpacing));
-    G4int j = static_cast<G4int>(std::round((relativePos.y() - firstPixelPos) / fPixelSpacing));
+    // DD4hep formula: index = floor((position + 0.5*pitch - offset) / pitch)
+    G4int i = Constants::PositionToIndex(relativePos.x(), fPixelSpacing, fGridOffset);
+    G4int j = Constants::PositionToIndex(relativePos.y(), fPixelSpacing, fGridOffset);
 
+    // Check if within valid index range
     result.withinDetector =
-        (i >= 0 && i < fNumBlocksPerSide && j >= 0 && j < fNumBlocksPerSide);
+        (i >= fMinIndexX && i <= fMaxIndexX && j >= fMinIndexY && j <= fMaxIndexY);
 
-    i = std::max(0, std::min(i, fNumBlocksPerSide - 1));
-    j = std::max(0, std::min(j, fNumBlocksPerSide - 1));
+    // Clamp to valid range
+    i = std::max(fMinIndexX, std::min(i, fMaxIndexX));
+    j = std::max(fMinIndexY, std::min(j, fMaxIndexY));
 
-    const G4double pixelX = firstPixelPos + i * fPixelSpacing;
-    const G4double pixelY = firstPixelPos + j * fPixelSpacing;
+    // DD4hep formula: position = index * pitch + offset
+    const G4double pixelX = Constants::IndexToPosition(i, fPixelSpacing, fGridOffset);
+    const G4double pixelY = Constants::IndexToPosition(j, fPixelSpacing, fGridOffset);
     const G4double pixelZ = detectorPos.z() + fDetWidth / 2 + fPixelWidth / 2;
 
     result.center = {pixelX, pixelY, pixelZ};
@@ -421,11 +427,10 @@ void DetectorConstruction::SetupMessenger()
         .SetRange("spacing > 0")
         .SetStates(G4State_PreInit, G4State_Idle);
 
-    fMessenger->DeclareMethodWithUnit("pixelCornerOffset", "mm",
-                                       &DetectorConstruction::SetPixelCornerOffset)
-        .SetGuidance("Set offset from detector corner to first pixel center")
+    fMessenger->DeclareMethodWithUnit("gridOffset", "mm",
+                                       &DetectorConstruction::SetGridOffset)
+        .SetGuidance("Set grid origin offset (DD4hep-style, 0 = centered)")
         .SetParameterName("offset", false)
-        .SetRange("offset >= 0")
         .SetStates(G4State_PreInit, G4State_Idle);
 
     fMessenger->DeclareMethod("neighborhoodRadius",

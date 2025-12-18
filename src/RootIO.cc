@@ -31,19 +31,23 @@ namespace ECS::IO {
 void BranchConfigurator::ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars,
                                                 const ClassificationBuffers& classification,
                                                 const VectorBuffers& vectors,
-                                                Config::ActivePixelMode mode) {
+                                                Config::ActivePixelMode mode,
+                                                Config::PosReconModel reconModel) {
     if (!tree) return;
-    ConfigureScalarBranches(tree, scalars);
+    ConfigureScalarBranches(tree, scalars, reconModel);
     ConfigureClassificationBranches(tree, classification);
     ConfigureVectorBranches(tree, vectors, mode);
     ConfigureNeighborhoodBranches(tree, vectors.pixelID);
 }
 
-void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers) {
+void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers,
+                                                  Config::PosReconModel reconModel) {
     if (!tree) return;
 
     struct BranchDef { const char* name; G4double* addr; const char* leaf; };
-    const std::array<BranchDef, 11> branches{{
+
+    // Core branches (always present)
+    const std::array<BranchDef, 7> coreBranches{{
         {"TrueX", buffers.trueX, "TrueX/D"},
         {"TrueY", buffers.trueY, "TrueY/D"},
         {"PixelX", buffers.pixelX, "PixelX/D"},
@@ -51,14 +55,24 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
         {"Edep", buffers.edep, "Edep/D"},
         {"PixelTrueDeltaX", buffers.pixelTrueDeltaX, "PixelTrueDeltaX/D"},
         {"PixelTrueDeltaY", buffers.pixelTrueDeltaY, "PixelTrueDeltaY/D"},
-        {"ReconDPCX", buffers.reconDPCX, "ReconDPCX/D"},
-        {"ReconDPCY", buffers.reconDPCY, "ReconDPCY/D"},
-        {"ReconDPCTrueDeltaX", buffers.reconDPCTrueDeltaX, "ReconDPCTrueDeltaX/D"},
-        {"ReconDPCTrueDeltaY", buffers.reconDPCTrueDeltaY, "ReconDPCTrueDeltaY/D"},
     }};
 
-    for (const auto& def : branches) {
+    for (const auto& def : coreBranches) {
         if (def.addr) tree->Branch(def.name, def.addr, def.leaf);
+    }
+
+    // DPC branches (only when DPC model is selected)
+    if (reconModel == Config::PosReconModel::DPC) {
+        const std::array<BranchDef, 4> dpcBranches{{
+            {"ReconDPCX", buffers.reconDPCX, "ReconDPCX/D"},
+            {"ReconDPCY", buffers.reconDPCY, "ReconDPCY/D"},
+            {"ReconDPCTrueDeltaX", buffers.reconDPCTrueDeltaX, "ReconDPCTrueDeltaX/D"},
+            {"ReconDPCTrueDeltaY", buffers.reconDPCTrueDeltaY, "ReconDPCTrueDeltaY/D"},
+        }};
+
+        for (const auto& def : dpcBranches) {
+            if (def.addr) tree->Branch(def.name, def.addr, def.leaf);
+        }
     }
 }
 
@@ -461,7 +475,7 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
     // Grid parameters (doubles and ints)
     if (fGrid.pixelSize > 0.0) addDouble("GridPixelSize_mm", fGrid.pixelSize);
     if (fGrid.pixelSpacing > 0.0) addDouble("GridPixelSpacing_mm", fGrid.pixelSpacing);
-    if (fGrid.pixelCornerOffset >= 0.0) addDouble("GridPixelCornerOffset_mm", fGrid.pixelCornerOffset);
+    addDouble("GridOffset_mm", fGrid.gridOffset);  // DD4hep-style grid offset
     if (fGrid.detectorSize > 0.0) addDouble("GridDetectorSize_mm", fGrid.detectorSize);
     if (fGrid.detectorThickness > 0.0) addDouble("DetectorThickness_mm", fGrid.detectorThickness);
     if (fGrid.interpadGap > 0.0) addDouble("InterpadGap_mm", fGrid.interpadGap);

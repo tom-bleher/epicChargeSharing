@@ -59,7 +59,7 @@ RunAction::RunAction()
       fNeighborhoodLayout(Constants::NEIGHBORHOOD_RADIUS),
       fGridPixelSize(0.0),
       fGridPixelSpacing(0.0),
-      fGridPixelCornerOffset(0.0),
+      fGridOffset(0.0),
       fGridDetSize(0.0),
       fGridNumBlocksPerSide(0),
       fGridNeighborhoodRadius(0),
@@ -406,7 +406,8 @@ void RunAction::ConfigureCoreBranches(TTree* tree)
 
     // Delegate to BranchConfigurator
     const auto mode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
-    fBranchConfigurator.ConfigureCoreBranches(tree, scalars, classification, vectors, mode);
+    const auto reconModel = static_cast<ECS::Config::PosReconModel>(fPosReconModel);
+    fBranchConfigurator.ConfigureCoreBranches(tree, scalars, classification, vectors, mode, reconModel);
 }
 
 void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run)
@@ -808,13 +809,13 @@ void RunAction::CleanupRootObjects()
 
 void RunAction::SetDetectorGridParameters(G4double pixelSize,
                                           G4double pixelSpacing,
-                                          G4double pixelCornerOffset,
+                                          G4double gridOffset,
                                           G4double detSize,
                                           G4int numBlocksPerSide)
 {
     fGridPixelSize = pixelSize;
     fGridPixelSpacing = pixelSpacing;
-    fGridPixelCornerOffset = pixelCornerOffset;
+    fGridOffset = gridOffset;
     fGridDetSize = detSize;
     fGridNumBlocksPerSide = numBlocksPerSide;
     fFullGridSide = numBlocksPerSide;
@@ -938,7 +939,7 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
     ECS::IO::MetadataPublisher::GridMetadata grid;
     grid.pixelSize = fGridPixelSize;
     grid.pixelSpacing = fGridPixelSpacing;
-    grid.pixelCornerOffset = fGridPixelCornerOffset;
+    grid.gridOffset = fGridOffset;
     grid.detectorSize = fGridDetSize;
     grid.detectorThickness = Constants::DETECTOR_WIDTH / CLHEP::mm;
     grid.interpadGap = (fGridPixelSpacing - fGridPixelSize);

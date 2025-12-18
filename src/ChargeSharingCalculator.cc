@@ -171,17 +171,16 @@ ChargeSharingCalculator::PixelGridGeometry ChargeSharingCalculator::BuildGridGeo
     const G4int numBlocks = std::max(0, fDetector->GetNumBlocksPerSide());
     const G4double spacing = fDetector->GetPixelSpacing();
     const G4ThreeVector& detectorPos = fDetector->GetDetectorPos();
-    const G4double detSize = fDetector->GetDetSize();
-    const G4double cornerOffset = fDetector->GetPixelCornerOffset();
-    const G4double pixelSize = fDetector->GetPixelSize();
-    const G4double firstPixelCenter = -detSize / 2.0 + cornerOffset + pixelSize / 2.0;
+    const G4double gridOffset = fDetector->GetGridOffset();
 
+    // DD4hep-style grid geometry
+    // x0, y0 represent the grid origin offset for position calculation
     geom.nRows = numBlocks;
     geom.nCols = numBlocks;
     geom.pitchX = spacing;
     geom.pitchY = spacing;
-    geom.x0 = detectorPos.x() + firstPixelCenter - 0.5 * spacing;
-    geom.y0 = detectorPos.y() + firstPixelCenter - 0.5 * spacing;
+    geom.x0 = detectorPos.x() + gridOffset;
+    geom.y0 = detectorPos.y() + gridOffset;
     return geom;
 }
 
@@ -783,14 +782,19 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
     const G4double totalChargeCoulomb = totalChargeElectrons * elementaryCharge;
 
     const G4ThreeVector& detectorPos = fDetector->GetDetectorPos();
-    const G4double detSize = fDetector->GetDetSize();
-    const G4double cornerOffset = fDetector->GetPixelCornerOffset();
-    const G4double firstPixelPos = -detSize / 2.0 + cornerOffset + pixelSize / 2.0;
+    const G4double gridOffset = fDetector->GetGridOffset();
+    const G4int minIndexX = fDetector->GetMinIndexX();
+    const G4int minIndexY = fDetector->GetMinIndexY();
 
-    for (G4int i = 0; i < rows; ++i) {
-        const G4int di = i - fResult.pixelIndexI;
-        for (G4int j = 0; j < cols; ++j) {
-            const G4int dj = j - fResult.pixelIndexJ;
+    for (G4int localI = 0; localI < rows; ++localI) {
+        // Convert local array index to DD4hep grid index
+        const G4int gridI = localI + minIndexX;
+        const G4int di = gridI - fResult.pixelIndexI;
+
+        for (G4int localJ = 0; localJ < cols; ++localJ) {
+            const G4int gridJ = localJ + minIndexY;
+            const G4int dj = gridJ - fResult.pixelIndexJ;
+
             const G4double dxToCenter = baseDx - di * pixelSpacing;
             const G4double dyToCenter = baseDy - dj * pixelSpacing;
             const G4double distanceToCenter = CalcDistanceToCenter(dxToCenter, dyToCenter);
@@ -805,14 +809,15 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
                 weight = attenuation * alpha;
             }
 
-            const G4double pixelCenterX = detectorPos.x() + firstPixelPos + i * pixelSpacing;
-            const G4double pixelCenterY = detectorPos.y() + firstPixelPos + j * pixelSpacing;
+            // DD4hep formula: position = index * pitch + offset
+            const G4double pixelCenterX = detectorPos.x() + Constants::IndexToPosition(gridI, pixelSpacing, gridOffset);
+            const G4double pixelCenterY = detectorPos.y() + Constants::IndexToPosition(gridJ, pixelSpacing, gridOffset);
 
-            fFullGridWeights(i, j) = weight;
-            fResult.full.distance(i, j) = distanceToCenter;
-            fResult.full.alpha(i, j) = alpha;
-            fResult.full.pixelX(i, j) = pixelCenterX;
-            fResult.full.pixelY(i, j) = pixelCenterY;
+            fFullGridWeights(localI, localJ) = weight;
+            fResult.full.distance(localI, localJ) = distanceToCenter;
+            fResult.full.alpha(localI, localJ) = alpha;
+            fResult.full.pixelX(localI, localJ) = pixelCenterX;
+            fResult.full.pixelY(localI, localJ) = pixelCenterY;
         }
     }
 

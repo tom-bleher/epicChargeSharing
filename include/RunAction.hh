@@ -80,7 +80,7 @@ public:
 
     void SetDetectorGridParameters(G4double pixelSize,
                                    G4double pixelSpacing,
-                                   G4double pixelCornerOffset,
+                                   G4double gridOffset,
                                    G4double detSize,
                                    G4int numBlocksPerSide);
     void SetNeighborhoodRadiusMeta(G4int radius);
@@ -192,7 +192,7 @@ private:
 
     G4double fGridPixelSize;
     G4double fGridPixelSpacing;
-    G4double fGridPixelCornerOffset;
+    G4double fGridOffset;  ///< DD4hep-style grid offset
     G4double fGridDetSize;
     G4int fGridNumBlocksPerSide;
     G4int fGridNeighborhoodRadius{0};
