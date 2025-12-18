@@ -216,14 +216,14 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
 
   double pixelSizeMm         = 0.0; // pad side length
   double pixelSpacingMm      = 0.0; // center-to-center spacing
-  double pixelCornerOffsetMm = 0.0; // gap from detector edge to first pad edge
+  double gridOffsetMm        = 0.0; // DD4hep-style grid offset (0 = centered grid)
   double detSizeMm           = 0.0; // detector square size
   int    numPerSide          = 0;   // number of pixels per side
 
   try {
     pixelSizeMm         = ReadDoubleNamed(tree, "GridPixelSize_mm");
     pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(tree, "GridPixelCornerOffset_mm");
+    gridOffsetMm        = ReadDoubleNamed(tree, "GridOffset_mm");
     detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
     numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
@@ -726,11 +726,11 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
   TTree* tree = dynamic_cast<TTree*>(f->Get("Hits"));
   if (!tree) { std::cerr << "ERROR: 'Hits' tree not found." << std::endl; f->Close(); delete f; return; }
 
-  double pixelSizeMm = 0.0, pixelSpacingMm = 0.0, detSizeMm = 0.0, pixelCornerOffsetMm = 0.0; int numPerSide = 0;
+  double pixelSizeMm = 0.0, pixelSpacingMm = 0.0, detSizeMm = 0.0, gridOffsetMm = 0.0; int numPerSide = 0;
   try {
     pixelSizeMm         = ReadDoubleNamed(tree, "GridPixelSize_mm");
     pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(tree, "GridPixelCornerOffset_mm");
+    gridOffsetMm        = ReadDoubleNamed(tree, "GridOffset_mm");
     detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
     numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
@@ -1040,13 +1040,13 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
 
   double pixelSizeMm         = 0.0;
   double pixelSpacingMm      = 0.0;
-  double pixelCornerOffsetMm = 0.0;
+  double gridOffsetMm        = 0.0;
   double detSizeMm           = 0.0;
   int    numPerSide          = 0;
   try {
     pixelSizeMm         = ReadDoubleNamed(tree, "GridPixelSize_mm");
     pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
-    pixelCornerOffsetMm = ReadDoubleNamed(tree, "GridPixelCornerOffset_mm");
+    gridOffsetMm        = ReadDoubleNamed(tree, "GridOffset_mm");
     detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
     numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {

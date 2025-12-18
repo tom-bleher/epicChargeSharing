@@ -231,7 +231,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
             self._meta = {
                 "pixel_size": read_named_double(self._root, "GridPixelSize_mm"),
                 "pixel_spacing": read_named_double(self._root, "GridPixelSpacing_mm"),
-                "pixel_corner_offset": read_named_double(self._root, "GridPixelCornerOffset_mm"),
+                "grid_offset": read_named_double(self._root, "GridOffset_mm"),
                 "det_size": read_named_double(self._root, "GridDetectorSize_mm"),
                 "num_per_side": read_named_int(self._root, "GridNumBlocksPerSide"),
             }

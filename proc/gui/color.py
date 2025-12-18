@@ -229,10 +229,28 @@ class _AggregateWorker(QtCore.QObject):
 class Geometry:
     pixel_size_mm: float = 0.0
     pixel_spacing_mm: float = 0.0
-    pixel_corner_offset_mm: float = 0.0
+    grid_offset_mm: float = 0.0  # DD4hep-style grid offset (0 = centered grid)
     det_size_mm: float = 0.0
     num_per_side: int = 0
     neighborhood_radius: int = 1
+
+    def first_pixel_center(self) -> float:
+        """Compute the position of the first pixel center using DD4hep-style formula.
+
+        For a centered grid (offset=0), indices can be negative and index 0
+        is at the detector center. This method computes the position of the
+        pixel with the minimum (most negative) index.
+        """
+        import math
+        half_det = self.det_size_mm / 2.0
+        half_pad = self.pixel_size_mm / 2.0
+        pitch = self.pixel_spacing_mm
+        offset = self.grid_offset_mm
+        # DD4hep formula: index = floor((position + 0.5*pitch - offset) / pitch)
+        # Compute minimum index for a pixel that fits inside detector
+        min_index = int(math.floor((-half_det + half_pad + 0.5 * pitch - offset) / pitch))
+        # position = index * pitch + offset
+        return min_index * pitch + offset
 
 
 class Mode:
@@ -934,7 +952,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         j0 = self.j0 if (0 <= self.j0 <= n-3) else 0
 
         half_det = self.geom.det_size_mm / 2.0
-        first_center = -half_det + self.geom.pixel_corner_offset_mm + self.geom.pixel_size_mm / 2.0
+        first_center = self.geom.first_pixel_center()
         half_pitch = 0.5 * self.geom.pixel_spacing_mm
 
         xC0 = first_center + i0 * self.geom.pixel_spacing_mm
@@ -1169,7 +1187,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             return
         self.geom.pixel_size_mm = read_named_double(self.file, "GridPixelSize_mm")
         self.geom.pixel_spacing_mm = read_named_double(self.file, "GridPixelSpacing_mm")
-        self.geom.pixel_corner_offset_mm = read_named_double(self.file, "GridPixelCornerOffset_mm")
+        self.geom.grid_offset_mm = read_named_double(self.file, "GridOffset_mm")
         self.geom.det_size_mm = read_named_double(self.file, "GridDetectorSize_mm")
         self.geom.num_per_side = read_named_int(self.file, "GridNumBlocksPerSide")
         try:
@@ -1183,7 +1201,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             return
         self.geom_b.pixel_size_mm = read_named_double(self.file_b, "GridPixelSize_mm")
         self.geom_b.pixel_spacing_mm = read_named_double(self.file_b, "GridPixelSpacing_mm")
-        self.geom_b.pixel_corner_offset_mm = read_named_double(self.file_b, "GridPixelCornerOffset_mm")
+        self.geom_b.grid_offset_mm = read_named_double(self.file_b, "GridOffset_mm")
         self.geom_b.det_size_mm = read_named_double(self.file_b, "GridDetectorSize_mm")
         self.geom_b.num_per_side = read_named_int(self.file_b, "GridNumBlocksPerSide")
         try:
@@ -1202,7 +1220,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             return (
                 feq(a.pixel_size_mm, b.pixel_size_mm) and
                 feq(a.pixel_spacing_mm, b.pixel_spacing_mm) and
-                feq(a.pixel_corner_offset_mm, b.pixel_corner_offset_mm) and
+                feq(a.grid_offset_mm, b.grid_offset_mm) and
                 feq(a.det_size_mm, b.det_size_mm) and
                 int(a.neighborhood_radius) == int(b.neighborhood_radius)
             )
@@ -1530,7 +1548,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             return
 
         half_det = self.geom.det_size_mm / 2.0
-        first_center = -half_det + self.geom.pixel_corner_offset_mm + self.geom.pixel_size_mm / 2.0
+        first_center = self.geom.first_pixel_center()
         half_pitch = 0.5 * self.geom.pixel_spacing_mm
 
         n = int(self.geom.num_per_side)
@@ -2649,7 +2667,7 @@ class CompareDialog(QtWidgets.QDialog):
 
         # Geometry (already checked compatible by caller)
         g = self.gui.geom
-        first_center = -g.det_size_mm/2.0 + g.pixel_corner_offset_mm + g.pixel_size_mm/2.0
+        first_center = g.first_pixel_center()
         pitch = float(g.pixel_spacing_mm)
         n = int(g.num_per_side)
         r = max(1, int(g.neighborhood_radius))
