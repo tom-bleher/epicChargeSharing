@@ -105,6 +105,27 @@ def run_macro(
     subprocess.run([root_executable, "-l", "-b", "-q", macro_call], check=True)
 
 
+def run_1d_plots_macro(
+    root_executable: str,
+    macro_path: Path,
+    root_file: Path,
+    output_pdf: Path,
+    n_events: int = 50,
+) -> None:
+    """Run the plotFitGaus1D macro to generate 1D reconstruction plots."""
+    output_pdf.parent.mkdir(parents=True, exist_ok=True)
+    # plotFitGaus1D(plotRowCol, plotDiagonals, doQiFit, plotQiOverlay, filename,
+    #               errorPercentOfMax, nRandomEvents, replayMode, outputPdf)
+    macro_call = (
+        f"{macro_path.as_posix()}("
+        f"true, false, true, true, "
+        f"\"{root_file.as_posix()}\", "
+        f"5.0, {n_events}, true, "
+        f"\"{output_pdf.as_posix()}\")"
+    )
+    subprocess.run([root_executable, "-l", "-b", "-q", macro_call], check=True)
+
+
 def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -142,6 +163,7 @@ def main(argv: Iterable[str]) -> int:
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[1]
     macro_path = project_root / "proc" / "fit" / "plotFitGaus1DReplayQiFit.C"
+    plot_1d_macro_path = project_root / "proc" / "fit" / "plotFitGaus1D.C"
     gaussian_fits_dir = project_root / "gaussian_fits"
 
     missing_datasets = [d for d in args.datasets if d not in DATASET_CONFIG]
@@ -198,6 +220,23 @@ def main(argv: Iterable[str]) -> int:
             except subprocess.CalledProcessError as exc:
                 print(
                     f"ROOT macro failed for {root_file} (exit code {exc.returncode}).",
+                    file=sys.stderr,
+                )
+                return exc.returncode
+
+            # Also generate 1D reconstruction plots (50 events per file)
+            output_1d_pdf = dataset_output_dir / f"{root_file.stem}_1Dfits.pdf"
+            try:
+                run_1d_plots_macro(
+                    args.root_bin,
+                    plot_1d_macro_path,
+                    root_file.resolve(),
+                    output_1d_pdf,
+                    n_events=50,
+                )
+            except subprocess.CalledProcessError as exc:
+                print(
+                    f"1D plots macro failed for {root_file} (exit code {exc.returncode}).",
                     file=sys.stderr,
                 )
                 return exc.returncode
