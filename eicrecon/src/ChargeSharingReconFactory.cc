@@ -1,11 +1,14 @@
-#include "ChargeSharingReconFactory.h"
-
+// Include DD4hep headers first to resolve forward declarations
 #include <DD4hep/Detector.h>
 #include <DD4hep/Readout.h>
 #include <DD4hep/Segmentations.h>
-#include <DD4hep/CartesianGridXY.h>
+#include <DDSegmentation/CartesianGridXY.h>
 #include <DDSegmentation/BitFieldCoder.h>
-#include <podio/Vec3f.h>
+
+#include "ChargeSharingReconFactory.h"
+
+#include <edm4hep/Vector3f.h>
+#include <edm4eic/CovDiag3f.h>
 
 #include <array>
 #include <exception>
@@ -13,10 +16,6 @@
 #include <vector>
 
 namespace epic::chargesharing {
-
-ChargeSharingReconFactory::ChargeSharingReconFactory() {
-  SetTag("ChargeSharingRecon");
-}
 
 void ChargeSharingReconFactory::Configure() {
   ChargeSharingConfig cfg{};
@@ -42,89 +41,88 @@ void ChargeSharingReconFactory::Configure() {
   const dd4hep::DDSegmentation::CartesianGridXY* segImpl = nullptr;
   const dd4hep::DDSegmentation::BitFieldCoder* decoder = nullptr;
 
-  if (m_dd4hep()) {
+  auto& dd4hep_service = m_dd4hep();
+  const dd4hep::Detector* detector = dd4hep_service.detector();
+  if (detector) {
     try {
-      const auto* detector = m_dd4hep().detector();
-      if (detector != nullptr) {
-        dd4hep::Readout readout = detector->readout(cfg.readout);
-        dd4hep::Segmentation segmentation = readout.segmentation();
+      dd4hep::Readout readout = detector->readout(cfg.readout);
+      dd4hep::Segmentation segmentation = readout.segmentation();
 
-        if (!segmentation.isValid()) {
+      if (!segmentation.isValid()) {
+        if (auto log = logger()) {
+          log->warn("Readout '{}' has no valid segmentation; falling back to manual geometry", cfg.readout);
+        }
+      } else {
+        segImpl = dynamic_cast<const dd4hep::DDSegmentation::CartesianGridXY*>(segmentation.segmentation());
+        if (segImpl == nullptr) {
           if (auto log = logger()) {
-            log->warn("Readout '{}' has no valid segmentation; falling back to manual geometry", cfg.readout);
+            log->warn("Segmentation for readout '{}' is '{}'; expected CartesianGridXY", cfg.readout,
+                      segmentation.type());
           }
         } else {
-          segImpl = dynamic_cast<const dd4hep::DDSegmentation::CartesianGridXY*>(segmentation.segmentation());
-          if (segImpl == nullptr) {
+          decoder = segmentation.decoder();
+          if (decoder == nullptr) {
             if (auto log = logger()) {
-              log->warn("Segmentation for readout '{}' is '{}'; expected CartesianGridXY", cfg.readout,
-                        segmentation.type());
+              log->warn("Segmentation for readout '{}' lacks a BitField decoder; neighbor bounds unavailable",
+                        cfg.readout);
             }
-          } else {
-            decoder = segmentation.decoder();
-            if (decoder == nullptr) {
-              if (auto log = logger()) {
-                log->warn("Segmentation for readout '{}' lacks a BitField decoder; neighbor bounds unavailable",
-                          cfg.readout);
-              }
-            }
+          }
 
-            SegmentationConfig segCfg{};
-            segCfg.valid = segImpl != nullptr && decoder != nullptr;
-            segCfg.gridSizeXMM = segImpl->gridSizeX();
-            segCfg.gridSizeYMM = segImpl->gridSizeY();
-            segCfg.offsetXMM = segImpl->offsetX();
-            segCfg.offsetYMM = segImpl->offsetY();
-            segCfg.fieldNameX = segImpl->fieldNameX();
-            segCfg.fieldNameY = segImpl->fieldNameY();
+          SegmentationConfig segCfg{};
+          segCfg.valid = segImpl != nullptr && decoder != nullptr;
+          segCfg.gridSizeXMM = segImpl->gridSizeX();
+          segCfg.gridSizeYMM = segImpl->gridSizeY();
+          segCfg.offsetXMM = segImpl->offsetX();
+          segCfg.offsetYMM = segImpl->offsetY();
+          segCfg.fieldNameX = segImpl->fieldNameX();
+          segCfg.fieldNameY = segImpl->fieldNameY();
 
-            if (decoder != nullptr) {
-              const auto& fieldX = (*decoder)[segCfg.fieldNameX];
-              const auto& fieldY = (*decoder)[segCfg.fieldNameY];
-              segCfg.minIndexX = fieldX.minValue();
-              segCfg.maxIndexX = fieldX.maxValue();
-              segCfg.minIndexY = fieldY.minValue();
-              segCfg.maxIndexY = fieldY.maxValue();
-              if (fieldX.maxValue() >= fieldX.minValue()) {
-                segCfg.numCellsX = fieldX.maxValue() - fieldX.minValue() + 1;
-              }
-              if (fieldY.maxValue() >= fieldY.minValue()) {
-                segCfg.numCellsY = fieldY.maxValue() - fieldY.minValue() + 1;
-              }
+          if (decoder != nullptr) {
+            const auto& fieldX = (*decoder)[segCfg.fieldNameX];
+            const auto& fieldY = (*decoder)[segCfg.fieldNameY];
+            segCfg.minIndexX = fieldX.minValue();
+            segCfg.maxIndexX = fieldX.maxValue();
+            segCfg.minIndexY = fieldY.minValue();
+            segCfg.maxIndexY = fieldY.maxValue();
+            if (fieldX.maxValue() >= fieldX.minValue()) {
+              segCfg.numCellsX = fieldX.maxValue() - fieldX.minValue() + 1;
             }
+            if (fieldY.maxValue() >= fieldY.minValue()) {
+              segCfg.numCellsY = fieldY.maxValue() - fieldY.minValue() + 1;
+            }
+          }
 
-            const auto dims = segImpl->cellDimensions(0);
-            if (!dims.empty()) {
-              segCfg.cellSizeXMM = dims[0];
-              if (dims.size() > 1) {
-                segCfg.cellSizeYMM = dims[1];
-              }
+          const auto dims = segImpl->cellDimensions(0);
+          if (!dims.empty()) {
+            segCfg.cellSizeXMM = dims[0];
+            if (dims.size() > 1) {
+              segCfg.cellSizeYMM = dims[1];
             }
-            if (segCfg.cellSizeXMM <= 0.0) {
-              segCfg.cellSizeXMM = segCfg.gridSizeXMM;
-            }
-            if (segCfg.cellSizeYMM <= 0.0) {
-              segCfg.cellSizeYMM = segCfg.gridSizeYMM;
-            }
+          }
+          if (segCfg.cellSizeXMM <= 0.0) {
+            segCfg.cellSizeXMM = segCfg.gridSizeXMM;
+          }
+          if (segCfg.cellSizeYMM <= 0.0) {
+            segCfg.cellSizeYMM = segCfg.gridSizeYMM;
+          }
 
-            cfg.segmentation = segCfg;
+          cfg.segmentation = segCfg;
 
-            if (segCfg.valid) {
-              cfg.pixelSpacingMM = segCfg.gridSizeXMM;
-              cfg.pixelSpacingYMM = segCfg.gridSizeYMM;
-              cfg.pixelSizeMM = segCfg.cellSizeXMM;
-              cfg.pixelSizeYMM = segCfg.cellSizeYMM;
+          if (segCfg.valid) {
+            cfg.pixelSpacingMM = segCfg.gridSizeXMM;
+            cfg.pixelSpacingYMM = segCfg.gridSizeYMM;
+            cfg.pixelSizeMM = segCfg.cellSizeXMM;
+            cfg.pixelSizeYMM = segCfg.cellSizeYMM;
 
-              if (cfg.pixelsPerSide <= 0 && segCfg.numCellsX > 0 && segCfg.numCellsX == segCfg.numCellsY) {
-                cfg.pixelsPerSide = segCfg.numCellsX;
-              }
+            if (cfg.pixelsPerSide <= 0 && segCfg.numCellsX > 0 && segCfg.numCellsX == segCfg.numCellsY) {
+              cfg.pixelsPerSide = segCfg.numCellsX;
             }
+          }
 
-            if (auto log = logger()) {
-              log->info("Using DD4hep segmentation for readout '{}': pitch=({}, {}) mm, cells=({}, {})",
-                        cfg.readout, cfg.pixelSpacingMM, cfg.pixelSpacingYMM,
-                        segCfg.numCellsX, segCfg.numCellsY);
-            }
+          if (auto log = logger()) {
+            log->info("Using DD4hep segmentation for readout '{}': pitch=({}, {}) mm, cells=({}, {})",
+                      cfg.readout, cfg.pixelSpacingMM, cfg.pixelSpacingYMM,
+                      segCfg.numCellsX, segCfg.numCellsY);
           }
         }
       }
@@ -134,21 +132,20 @@ void ChargeSharingReconFactory::Configure() {
       }
     }
   } else if (auto log = logger()) {
-    log->warn("DD4hep service unavailable; using configured geometry parameters only");
+    log->warn("DD4hep detector unavailable; using configured geometry parameters only");
   }
 
   m_reconstructor.configure(cfg, segImpl, decoder);
 }
 
 void ChargeSharingReconFactory::Process(int32_t /*runNumber*/, uint64_t /*eventNumber*/) {
-  const auto& simhits = m_in_simhits();
+  const auto* simhits = m_in_simhits();
+  auto* output = m_out_hits().get();
 
-  auto converter = m_dd4hep() ? m_dd4hep().converter() : nullptr;
+  auto& dd4hep_service = m_dd4hep();
+  auto converter = dd4hep_service.converter();
 
-  std::vector<edm4eic::TrackerHit> outHits;
-  outHits.reserve(simhits.size());
-
-  for (const auto& hit : simhits) {
+  for (const auto& hit : *simhits) {
     const double edep = hit.getEDep();
     if (edep < static_cast<double>(m_minEDep())) {
       continue;
@@ -167,19 +164,19 @@ void ChargeSharingReconFactory::Process(int32_t /*runNumber*/, uint64_t /*eventN
 
     const auto result = m_reconstructor.process(input);
 
-    edm4eic::TrackerHit reco;
-    reco.setCellID(hit.getCellID());
-    reco.setEDep(static_cast<float>(edep));
-    reco.setTime(hit.getTime());
-    reco.setPosition(podio::Vec3f{static_cast<float>(result.reconstructedPositionMM[0]),
-                                   static_cast<float>(result.reconstructedPositionMM[1]),
-                                   static_cast<float>(result.reconstructedPositionMM[2])});
-
-    outHits.push_back(std::move(reco));
+    // Create the output TrackerHit using the collection's create() method
+    output->create(
+        hit.getCellID(),                                                          // cellID
+        edm4hep::Vector3f{static_cast<float>(result.reconstructedPositionMM[0]),  // position
+                          static_cast<float>(result.reconstructedPositionMM[1]),
+                          static_cast<float>(result.reconstructedPositionMM[2])},
+        edm4eic::CovDiag3f{0.0f, 0.0f, 0.0f},                                      // positionError (TODO: compute)
+        hit.getTime(),                                                             // time
+        0.0f,                                                                      // timeError
+        static_cast<float>(edep),                                                  // edep
+        0.0f                                                                       // edepError
+    );
   }
-
-  m_out_hits().assign(outHits.begin(), outHits.end());
 }
 
 }  // namespace epic::chargesharing
-

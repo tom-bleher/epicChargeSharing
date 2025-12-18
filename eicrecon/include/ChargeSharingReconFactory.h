@@ -6,17 +6,17 @@
 #include "extensions/jana/JOmniFactory.h"
 #include "services/geometry/dd4hep/DD4hep_service.h"
 
-#include <edm4hep/SimTrackerHit.h>
-#include <edm4eic/TrackerHit.h>
+#include <edm4hep/SimTrackerHitCollection.h>
+#include <edm4eic/TrackerHitCollection.h>
 
 namespace epic::chargesharing {
 
 class ChargeSharingReconFactory : public JOmniFactory<ChargeSharingReconFactory, ChargeSharingConfig> {
  public:
-  ChargeSharingReconFactory();
+  using AlgoT = ChargeSharingReconstructor;
 
-  void Configure() override;
-  void Process(int32_t runNumber, uint64_t eventNumber) override;
+  void Configure();
+  void Process(int32_t runNumber, uint64_t eventNumber);
 
  private:
   PodioInput<edm4hep::SimTrackerHit> m_in_simhits{this};

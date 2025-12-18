@@ -2,10 +2,12 @@ cmake_minimum_required(VERSION 3.16)
 
 project(chargeSharingRecon LANGUAGES CXX)
 
-find_package(JANA2 REQUIRED)
-find_package(EDM4HEP REQUIRED)
-find_package(EDM4EIC REQUIRED)
-find_package(DD4hep REQUIRED)
+# Add JANA cmake directory to module path (eic-shell installs to non-standard location)
+list(APPEND CMAKE_PREFIX_PATH "$ENV{JANA_HOME}/lib/JANA/cmake")
+
+# Find EICrecon which brings in JANA, EDM4hep, EDM4eic, DD4hep, etc.
+find_package(EICrecon REQUIRED)
+find_package(DD4hep REQUIRED COMPONENTS DDCore)
 
 add_library(chargeSharingRecon SHARED
     src/ChargeSharingReconFactory.cc
@@ -16,11 +18,13 @@ add_library(chargeSharingRecon SHARED
 target_include_directories(chargeSharingRecon
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${EICrecon_INCLUDE_DIR}
+        ${EICrecon_INCLUDE_DIR}/EICrecon
 )
 
 target_link_libraries(chargeSharingRecon
     PRIVATE
-        JANA2::jana2
+        ${JANA_LIBRARIES}
         EDM4HEP::edm4hep
         EDM4EIC::edm4eic
         DD4hep::DDCore
@@ -30,6 +34,7 @@ set_target_properties(chargeSharingRecon PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
+    PREFIX ""  # JANA plugins don't use 'lib' prefix
 )
 
 install(TARGETS chargeSharingRecon
