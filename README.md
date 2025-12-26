@@ -6,7 +6,7 @@ GEANT4-based simulation and reconstruction plugin for studying charge sharing po
 
 ## Overview
 
-epicChargeSharing simulates charge distribution across neighboring pixels in AC-LGAD (Resistive AC-Coupled Low Gain Avalanche Detector) sensors. It implements the analytical model from [Tornago et al. (arXiv:2007.09528)](https://arxiv.org/abs/2007.09528).
+epicChargeSharing simulates charge sharing in AC-LGAD sensors to provide reconstructed position.
 
 ### Key Features
 
@@ -105,8 +105,6 @@ See [eicrecon/README.md](eicrecon/README.md) for full configuration options and 
 
 ## Documentation
 
-Full documentation is available at **https://tom-bleher.github.io/epicChargeSharing/**
-
 - [Getting Started](https://tom-bleher.github.io/epicChargeSharing/getting-started/) - Build and run instructions
 - [Configuration](https://tom-bleher.github.io/epicChargeSharing/configuration/) - Compile-time and runtime options
 - [Physics Model](https://tom-bleher.github.io/epicChargeSharing/physics-model/) - Charge sharing theory
@@ -133,7 +131,7 @@ Reference: M. Tornago et al., [Nucl. Instrum. Meth. A 1003 (2021) 165319](https:
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome.
 
 ## Contact
 
