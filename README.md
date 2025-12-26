@@ -1,5 +1,7 @@
 # epicChargeSharing
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 GEANT4-based simulation and reconstruction plugin for studying charge sharing position reconstruction in AC-LGAD detectors.
 
 ## Overview
@@ -67,6 +69,39 @@ Edit `include/Config.hh` to customize:
 - Fitting options (1D/2D Gaussian, uncertainty models)
 
 See the [documentation](https://tom-bleher.github.io/epicChargeSharing/) for details.
+
+## EICrecon Plugin
+
+The `chargeSharingRecon` plugin integrates charge-sharing reconstruction into the EIC software stack. It processes `edm4hep::SimTrackerHit` collections and outputs reconstructed `edm4eic::TrackerHit` positions with improved spatial resolution.
+
+### Supported Detectors
+
+| Detector | Input Collection | Output Collection |
+|----------|-----------------|-------------------|
+| B0 Tracker | `B0TrackerHits` | `B0ChargeSharingTrackerHits` |
+| Lumi Spectrometer | `LumiSpecTrackerHits` | `LumiSpecTrackerChargeSharingHits` |
+
+### Plugin Features
+
+- **DD4hep integration**: Automatic geometry extraction from `CartesianGridXY`/`CartesianGridXZ` segmentations
+- **Charge sharing models**: LogA (logarithmic) and LinA (linear) attenuation models
+- **Position reconstruction**: Charge-weighted centroid and 1D/2D Gaussian fitting
+- **Noise simulation**: Per-pixel gain variation and electronic noise injection
+- **Monitoring output**: Residual histograms, correlation plots, and per-hit TTree for validation
+
+### Quick Start
+
+```bash
+# Build inside eic-shell
+cmake -S eicrecon -B build/eicrecon -DCMAKE_INSTALL_PREFIX=$(pwd)/eicrecon/install
+cmake --build build/eicrecon --target install
+
+# Run reconstruction
+export EICrecon_MY=$(pwd)/eicrecon/install
+eicrecon -Pplugins=chargeSharingRecon -Ppodio:output_file=output.edm4hep.root input.edm4hep.root
+```
+
+See [eicrecon/README.md](eicrecon/README.md) for full configuration options and usage details.
 
 ## Documentation
 
