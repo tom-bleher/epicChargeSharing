@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Bleher"
+    given-names: "Tom"
+    orcid: "https://orcid.org/0009-0009-9832-804X"
+  - family-names: "Korover"
+    given-names: "Igor"
+    orcid: "https://orcid.org/0009-0005-8988-693X"
+title: "epicChargeSharing: GEANT4 Simulation for Charge Sharing in AC-LGAD Detectors"
+version: 1.0.0
+date-released: 2025-01-01
+url: "https://github.com/tom-bleher/epicChargeSharing"
+repository-code: "https://github.com/tom-bleher/epicChargeSharing"
+license: MIT
+keywords:
+  - GEANT4
+  - AC-LGAD
+  - charge sharing
+  - EIC
+references:
+  - type: article
+    authors:
+      - family-names: "Tornago"
+        given-names: "Marta"
+    title: "Resistive AC-Coupled Silicon Detectors: Principles of operation and first results from a combined analysis of beam test and laser data"
+    journal: "Nuclear Instruments and Methods in Physics Research Section A: Accelerators, Spectrometers, Detectors and Associated Equipment"
+    volume: 1003
+    pages: "165319"
+    year: 2021
+    doi: "10.1016/j.nima.2021.165319"
+    url: "https://www.sciencedirect.com/science/article/pii/S016890022100303X"
