@@ -41,17 +41,18 @@ inline const G4double PIXEL_THICKNESS      = 0.02 * mm;    // Pixel depth/thickn
 inline const G4double GRID_OFFSET          = 0.0  * mm;    // Grid origin offset
 
 // ─────────────────────────────── Physics ────────────────────────────────────
-inline constexpr G4double IONIZATION_ENERGY = 3.6;         // eV per e-h pair
-inline constexpr G4double GAIN              = 20.0;        // AC-LGAD gain (8-25)
-inline constexpr G4double D0                = 1.0;         // Hit size d0 (um)
+inline constexpr G4double IONIZATION_ENERGY = 3.6;         // eV per e-h pair (silicon at room temperature)
+inline constexpr G4double GAIN              = 20.0;        // AC-LGAD gain factor; typical range 8-25
+inline constexpr G4double D0                = 1.0;         // LogA reference distance d0 (um); controls charge spread width
 
 // ────────────────────────────── Noise Model ─────────────────────────────────
+// Gain sigma bounds: typical AC-LGAD per-pixel gain variation range from lab measurements
 inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010;    // Min gain noise (1%)
 inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050;    // Max gain noise (5%)
 inline constexpr G4double NOISE_ELECTRON_COUNT = 500.0;    // Electronic noise (e-)
 
 // ────────────────────────────── DPC Tuning ──────────────────────────────────
-inline constexpr G4double DPC_K_CALIBRATION = 1.2;         // k = interpad * this
+inline constexpr G4double DPC_K_CALIBRATION = 1.2;         // Empirical calibration constant from DPC reconstruction tuning (k = interpad * this)
 
 // ───────────────────────────── Linear Model ─────────────────────────────────
 // LinA attenuation coefficient beta in 1/um (paper Eq. (\ref{eq:LA})).

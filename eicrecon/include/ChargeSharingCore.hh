@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iostream>
 #include <limits>
 #include <random>
 #include <vector>
@@ -47,16 +48,16 @@ enum class ReconMethod {
 namespace constants {
 constexpr double kMillimeterPerMicron = 1.0e-3;
 constexpr double kMicronPerMillimeter = 1.0e3;
-constexpr double kGuardFactor = 1.0 + 1e-6;
-constexpr double kMinD0Micron = 1e-6;
-constexpr double kOutOfBoundsFraction = -999.0;
+constexpr double kGuardFactor = 1.0 + 1e-6;  // Prevents log(0) singularity when distance == d0, with minimal bias
+constexpr double kMinD0Micron = 1e-6;        // Floor for d0 to avoid division by zero in log(d/d0)
+constexpr double kOutOfBoundsFraction = -999.0;  // Sentinel value indicating pixel is outside detector bounds
 
-// Linear model beta coefficients (1/um) from paper
-constexpr double kLinearBetaNarrow = 0.003;   // For pitch 100-200 um
-constexpr double kLinearBetaWide = 0.001;     // For pitch 200-500 um
-constexpr double kLinearMinPitchUM = 100.0;
-constexpr double kLinearBoundaryPitchUM = 200.0;
-constexpr double kLinearMaxPitchUM = 500.0;
+// Linear model beta coefficients (1/um) from paper -- empirical fits to AC-LGAD data
+constexpr double kLinearBetaNarrow = 0.003;   // For pitch 100-200 um (steeper attenuation)
+constexpr double kLinearBetaWide = 0.001;     // For pitch 200-500 um (gentler attenuation)
+constexpr double kLinearMinPitchUM = 100.0;        // Minimum supported AC-LGAD pitch
+constexpr double kLinearBoundaryPitchUM = 200.0;   // Pitch threshold between narrow/wide beta regimes
+constexpr double kLinearMaxPitchUM = 500.0;         // Maximum supported AC-LGAD pitch
 }  // namespace constants
 
 // ============================================================================
@@ -127,10 +128,16 @@ inline double calcWeightLogA(double distanceMM, double alphaPadViewAngle, double
   const double minSafeDistance = d0MM * constants::kGuardFactor;
   const double safeDistance = std::max(distanceMM, minSafeDistance);
   const double logValue = std::log(safeDistance / d0MM);
-  if (logValue > 0.0 && std::isfinite(logValue)) {
-    return alphaPadViewAngle / logValue;
+  if (!(logValue > 0.0 && std::isfinite(logValue))) {
+    static thread_local bool warned = false;
+    if (!warned) {
+      std::cerr << "[ChargeSharingCore] Warning: calcWeightLogA returned 0 due to invalid logValue="
+                << logValue << " (distance=" << distanceMM << ", d0=" << d0MM << ")\n";
+      warned = true;
+    }
+    return 0.0;
   }
-  return 0.0;
+  return alphaPadViewAngle / logValue;
 }
 
 /// Calculate weight for LinA model: w_i = (1 - beta * d_i) * alpha_i
@@ -140,7 +147,17 @@ inline double calcWeightLogA(double distanceMM, double alphaPadViewAngle, double
 inline double calcWeightLinA(double distanceMM, double alphaPadViewAngle, double betaPerMicron) {
   const double distanceUM = distanceMM * constants::kMicronPerMillimeter;
   const double attenuation = std::max(0.0, 1.0 - betaPerMicron * distanceUM);
-  return attenuation * alphaPadViewAngle;
+  const double weight = attenuation * alphaPadViewAngle;
+  if (!(std::isfinite(weight) && weight >= 0.0)) {
+    static thread_local bool warned = false;
+    if (!warned) {
+      std::cerr << "[ChargeSharingCore] Warning: calcWeightLinA returned non-finite/negative weight="
+                << weight << " (distance=" << distanceMM << ", beta=" << betaPerMicron << ")\n";
+      warned = true;
+    }
+    return 0.0;
+  }
+  return weight;
 }
 
 /// Calculate charge sharing weight using specified model
@@ -536,8 +553,12 @@ struct NoiseConfig {
   double elementaryCharge{1.602176634e-19};  ///< For converting electrons to Coulombs
 };
 
-/// Noise model for realistic charge simulation
-/// Applies gain variations and electronic noise to charge values
+/// Noise model for realistic charge simulation.
+/// Applies gain variations and electronic noise to charge values.
+///
+/// @note Thread Safety: This class contains an std::mt19937 generator and
+/// distribution objects whose operator() mutates internal state. Instances
+/// are NOT thread-safe; each thread must own its own NoiseModel.
 class NoiseModel {
  public:
   NoiseModel() : m_generator(std::random_device{}()) {}
