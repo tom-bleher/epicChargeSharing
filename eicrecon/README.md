@@ -96,17 +96,17 @@ The plugin registers factories for AC-LGAD detector subsystems:
 
 ## Algorithm
 
-The plugin implements a charge-sharing model:
+For each SimTrackerHit, the plugin:
 
-1. For each SimTrackerHit, identifies the hit pixel from DD4hep geometry
-2. Calculates charge diffusion to neighboring pixels using a Gaussian model
-3. Computes charge-weighted centroid position across the pixel neighborhood
-4. Outputs TrackerHit with improved position estimate
+1. Identifies the nearest pixel from DD4hep segmentation geometry
+2. Computes charge fractions across a pixel neighborhood using an analytical pad-view-angle model (LogA or LinA, based on [Tornago et al.](https://doi.org/10.1016/j.nima.2021.165319))
+3. Optionally applies per-pixel gain variation and electronic noise
+4. Reconstructs the hit position via charge-weighted centroid or Gaussian fitting
+5. Outputs `TrackerHit` with improved spatial resolution
 
 ## Monitoring Output
 
-The plugin includes a `ChargeSharingMonitor` processor that automatically compares
-reconstructed positions to truth and produces validation output:
+The `ChargeSharingMonitor` processor compares reconstructed positions to truth and produces validation output. Note: monitoring is not yet included in the default build.
 
 ### Histograms (per detector)
 

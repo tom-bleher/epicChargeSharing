@@ -118,8 +118,9 @@ epicChargeSharing/
 ├── src/              # Source files
 ├── macros/           # GEANT4 macro scripts
 ├── eicrecon/         # EICrecon plugin for EIC integration
-├── farm/             # Python analysis tools for parameter sweeps
-├── proc/             # ROOT macros for visualization
+├── farm/             # Python analysis and parameter sweep tools
+├── proc/             # ROOT macros and GUI for visualization
+├── tests/            # Unit tests (build with -DBUILD_TESTING=ON)
 └── docs/             # Documentation source
 ```
 
@@ -129,9 +130,25 @@ If you use this software, please cite it using the metadata in [CITATION.cff](CI
 
 Reference: M. Tornago et al., [Nucl. Instrum. Meth. A 1003 (2021) 165319](https://doi.org/10.1016/j.nima.2021.165319)
 
+## Development
+
+```bash
+# Run unit tests
+cmake -DBUILD_TESTING=ON ..
+make test_charge_sharing_core && ctest
+
+# Static analysis (requires clang-tidy via brew install llvm)
+make tidy
+
+# Auto-format code
+make format
+```
+
+Python analysis scripts require packages listed in `requirements.txt` (`pip install -r requirements.txt`).
+
 ## Contributing
 
-Contributions are welcome.
+Contributions are welcome. Please run `make tidy` and `make format-check` before submitting changes.
 
 ## Contact
 
