@@ -18,6 +18,12 @@ class CartesianGridXY;
 
 namespace epic::chargesharing {
 
+/// @note Thread Safety: The process() method mutates internal RNG state
+/// (m_noiseModel contains std::mt19937) and is NOT safe for concurrent use
+/// from multiple threads on the same instance. In JANA2/EICrecon, this is
+/// safe because JOmniFactory creates a separate factory instance per worker
+/// thread, each owning its own ChargeSharingReconstructor. If this class is
+/// used outside JANA2, callers MUST ensure each thread owns its own instance.
 class ChargeSharingReconstructor {
  public:
   struct Input {
@@ -138,7 +144,11 @@ class ChargeSharingReconstructor {
   bool m_haveSegmentation{false};
   IndexBounds m_boundsX{};
   IndexBounds m_boundsY{};
-  mutable core::NoiseModel m_noiseModel{};  ///< Noise model for realistic charge simulation
+  /// Noise model for realistic charge simulation.
+  /// Declared mutable so noise can be applied in logically-const contexts.
+  /// Contains std::mt19937 RNG state -- not thread-safe for concurrent access.
+  /// See class-level @note for threading contract.
+  mutable core::NoiseModel m_noiseModel{};
 };
 
 }  // namespace epic::chargesharing

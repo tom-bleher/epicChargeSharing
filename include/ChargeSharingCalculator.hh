@@ -46,6 +46,13 @@ class DetectorConstruction;
 /// 5. Optionally computes full detector grid fractions
 ///
 /// The Result struct contains all computed data for downstream processing.
+///
+/// @note Thread Safety: Each thread MUST own its own ChargeSharingCalculator instance.
+/// The Compute() method mutates internal state (fResult, scratch buffers) and calls
+/// G4RandGauss::shoot() for noise application, making it NOT safe for concurrent use
+/// from multiple threads on the same instance. In the Geant4 simulation, this is
+/// guaranteed by the worker-thread model: ActionInitialization::Build() creates a
+/// fresh EventAction (which owns a ChargeSharingCalculator) for each worker thread.
 class ChargeSharingCalculator
 {
 public:

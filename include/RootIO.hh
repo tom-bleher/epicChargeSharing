@@ -219,6 +219,19 @@ public:
     void SetStoreFullFractions(G4bool enable) { fStoreFullFractions = enable; }
     void SetGridNumBlocksPerSide(G4int numBlocks) { fGridNumBlocksPerSide = numBlocks; }
 
+    /// \brief Fill the TTree with the current event data.
+    ///
+    /// Populates branch buffers from the EventRecord, then calls TTree::Fill().
+    /// In multithreaded Geant4 (G4MTRunManager), multiple worker threads share
+    /// the same TTree, so a mutex is needed to serialize access.
+    ///
+    /// @param tree        The TTree to fill (must have branches configured).
+    /// @param record      Event data to write.
+    /// @param treeMutex   Mutex for thread-safe TTree::Fill().
+    ///        REQUIRED when running with G4MTRunManager (multi-threaded mode).
+    ///        Passing nullptr in MT mode will cause data corruption in the
+    ///        ROOT file due to unsynchronized concurrent TTree::Fill() calls.
+    /// @return true on success, false if tree is null or Fill() fails.
     bool Fill(TTree* tree, const EventRecord& record, std::mutex* treeMutex = nullptr);
 
     // Scalar accessors
@@ -406,6 +419,14 @@ public:
     void SetSimulationMetadata(const SimulationMetadata& m) { fSimulation = m; }
 
     EntryList CollectEntries() const;
+
+    /// \brief Write metadata entries to TTree UserInfo.
+    ///
+    /// @param tree     The TTree to attach metadata to.
+    /// @param ioMutex  Mutex for thread-safe ROOT object creation.
+    ///        REQUIRED when running with G4MTRunManager (multi-threaded mode).
+    ///        Passing nullptr in MT mode risks concurrent modification of
+    ///        the TTree's UserInfo list.
     void WriteToTree(TTree* tree, std::mutex* ioMutex = nullptr) const;
     static void WriteEntriesToUserInfo(TTree* tree, const EntryList& entries);
 
