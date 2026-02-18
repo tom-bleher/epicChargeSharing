@@ -91,7 +91,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 # Find Eigen3 for optimized matrix operations (header-only library)
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(Eigen3 3.3...5 REQUIRED NO_MODULE)
 message(STATUS "Eigen3 version: ${Eigen3_VERSION}")
 message(STATUS "Eigen3 include dir: ${EIGEN3_INCLUDE_DIR}")
 
