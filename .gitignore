@@ -24,7 +24,6 @@ site/
 # Executables
 *.exe
 *.out
-*.txt
 *.log
 
 # Images
