@@ -15,7 +15,7 @@ enum class VerticalUncertaintyModel {
   QnQiScaled,
 };
 
-inline constexpr std::string_view VerticalUncertaintyModelName(
+constexpr std::string_view VerticalUncertaintyModelName(
     VerticalUncertaintyModel model) {
   switch (model) {
     case VerticalUncertaintyModel::UniformPercentOfMax:
@@ -401,7 +401,7 @@ inline double SigmaLogistic(double distance,
   const double sigma_max = (capPercent / 100.0) * maxCharge;
   const double steepness = std::max(0.0, k);
   const double t = 1.0 / (1.0 + std::exp(-steepness * (r - r0)));
-  const double sigma_raw = sigma_min + (sigma_max - sigma_min) * t;
+  const double sigma_raw = sigma_min + ((sigma_max - sigma_min) * t);
   return ApplySigmaBounds(sigma_raw, maxCharge, floorPercent, capPercent);
 }
 

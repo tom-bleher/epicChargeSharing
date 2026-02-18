@@ -75,7 +75,7 @@ private:
     void GenerateRandomPos();
 
     std::unique_ptr<G4ParticleGun> fParticleGun;
-    DetectorConstruction* fDetector;
+    DetectorConstruction* fDetector{nullptr};
 
     std::unique_ptr<G4GenericMessenger> fMessenger;
     G4bool fUseFixedPosition{Constants::USE_FIXED_POSITION};

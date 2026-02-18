@@ -182,14 +182,14 @@ inline constexpr G4bool USES_LINEAR_SIGNAL = (SIGNAL_MODEL == SignalModel::LinA)
 inline constexpr PosReconModel POS_RECON_MODEL = RECON_METHOD;
 
 // Map 1D mode enum to unified enum
-inline constexpr ActivePixelMode ActivePixelModeFrom1D(ActivePixelMode1D m) {
+constexpr ActivePixelMode ActivePixelModeFrom1D(ActivePixelMode1D m) {
     return (m == ActivePixelMode1D::Neighborhood) ? ActivePixelMode::Neighborhood :
            (m == ActivePixelMode1D::RowCol)       ? ActivePixelMode::RowCol :
                                                     ActivePixelMode::RowCol3x3;
 }
 
 // Map 2D mode enum to unified enum
-inline constexpr ActivePixelMode ActivePixelModeFrom2D(ActivePixelMode2D m) {
+constexpr ActivePixelMode ActivePixelModeFrom2D(ActivePixelMode2D m) {
     return (m == ActivePixelMode2D::Neighborhood)   ? ActivePixelMode::Neighborhood :
            (m == ActivePixelMode2D::ChargeBlock2x2) ? ActivePixelMode::ChargeBlock2x2 :
                                                       ActivePixelMode::ChargeBlock3x3;
@@ -249,7 +249,7 @@ inline constexpr G4double OUT_OF_BOUNDS_FRACTION_SENTINEL = -999.0;
 /// @param offset The grid origin offset (default 0.0 for centered grid)
 /// @return Position in world coordinates
 inline G4double IndexToPosition(G4int index, G4double gridSize, G4double offset = 0.0) {
-    return static_cast<G4double>(index) * gridSize + offset;
+    return (static_cast<G4double>(index) * gridSize) + offset;
 }
 
 /// @brief Convert position to grid index (DD4hep-style: floor formula)
