@@ -307,6 +307,53 @@ if(BUILD_TESTING)
 endif()
 
 # ============================================================================
+# Static Analysis (clang-tidy) and Formatting (clang-format)
+# ============================================================================
+find_program(CLANG_TIDY_EXE
+    NAMES clang-tidy
+    HINTS /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin
+    DOC "Path to clang-tidy executable")
+
+find_program(CLANG_FORMAT_EXE
+    NAMES clang-format
+    HINTS /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin
+    DOC "Path to clang-format executable")
+
+# Gather project sources and headers for linting/formatting
+file(GLOB_RECURSE ALL_PROJECT_SOURCES
+    ${PROJECT_SOURCE_DIR}/src/*.cc
+    ${PROJECT_SOURCE_DIR}/include/*.hh
+    ${PROJECT_SOURCE_DIR}/include/*.h
+    ${PROJECT_SOURCE_DIR}/epicChargeSharing.cc)
+
+if(CLANG_TIDY_EXE)
+    add_custom_target(tidy
+        COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR} ${ALL_PROJECT_SOURCES}
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMENT "Running clang-tidy static analysis"
+        VERBATIM)
+    message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE} ('make tidy' available)")
+else()
+    message(STATUS "clang-tidy not found - static analysis disabled")
+endif()
+
+if(CLANG_FORMAT_EXE)
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXE} -i ${ALL_PROJECT_SOURCES}
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMENT "Running clang-format on project sources"
+        VERBATIM)
+    add_custom_target(format-check
+        COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror ${ALL_PROJECT_SOURCES}
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMENT "Checking clang-format compliance (no changes)"
+        VERBATIM)
+    message(STATUS "clang-format found: ${CLANG_FORMAT_EXE} ('make format' / 'make format-check' available)")
+else()
+    message(STATUS "clang-format not found - formatting targets disabled")
+endif()
+
+# ============================================================================
 # Documentation Support
 # ============================================================================
 find_package(Doxygen)
