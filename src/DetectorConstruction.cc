@@ -34,23 +34,16 @@
 #include <sstream>
 
 DetectorConstruction::DetectorConstruction()
-    : G4VUserDetectorConstruction(),
+    : 
       fPixelSize(Constants::PIXEL_SIZE),
       fPixelWidth(Constants::PIXEL_THICKNESS),
       fPixelSpacing(Constants::PIXEL_PITCH),
       fGridOffset(Constants::GRID_OFFSET),
       fDetSize(Constants::DETECTOR_SIZE),
       fDetWidth(Constants::DETECTOR_WIDTH),
-      fNumBlocksPerSide(0),
-      fDetectorPos(0., 0., Constants::DETECTOR_Z_POSITION),
-      fMinIndexX(0),
-      fMinIndexY(0),
-      fMaxIndexX(0),
-      fMaxIndexY(0),
-      fEventAction(nullptr),
-      fRunAction(nullptr),
-      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),
-      fLogicSilicon(nullptr)
+      
+      fDetectorPos(0., 0., Constants::DETECTOR_Z_POSITION)
+      
 {
     SetupMessenger();
 }
@@ -83,7 +76,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     const MaterialSet materials = PrepareMaterials();
 
     G4LogicalVolume* logicWorld = nullptr;
-    G4VPhysicalVolume* physWorld = BuildWorld(materials, checkOverlaps, logicWorld);
+    G4VPhysicalVolume* const physWorld = BuildWorld(materials, checkOverlaps, logicWorld);
 
     G4LogicalVolume* siliconLogical =
         BuildSiliconDetector(logicWorld, materials, checkOverlaps, originalDetSize);
@@ -107,7 +100,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
 DetectorConstruction::MaterialSet DetectorConstruction::PrepareMaterials() const
 {
     MaterialSet mats{};
-    G4NistManager* nist = G4NistManager::Instance();
+    G4NistManager* const nist = G4NistManager::Instance();
     mats.world = nist->FindOrBuildMaterial("G4_Galactic");
     mats.silicon = nist->FindOrBuildMaterial("G4_Si");
     mats.aluminum = nist->FindOrBuildMaterial("G4_Al");
@@ -208,7 +201,7 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
     InitializePixelGainSigmas();
 
     const G4ThreeVector& detectorPos = GetDetectorPos();
-    const G4double pixelZ = detectorPos.z() + fDetWidth / 2 + fPixelWidth / 2;
+    const G4double pixelZ = detectorPos.z() + (fDetWidth / 2) + (fPixelWidth / 2);
 
     // DD4hep-style grid: iterate over index range (can include negative indices)
     const G4int totalPixels = fNumBlocksPerSide * fNumBlocksPerSide;
@@ -226,7 +219,7 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
             // localI = i - fMinIndexX, localJ = j - fMinIndexY
             const G4int localI = i - fMinIndexX;
             const G4int localJ = j - fMinIndexY;
-            const G4int globalId = localI * fNumBlocksPerSide + localJ;
+            const G4int globalId = (localI * fNumBlocksPerSide) + localJ;
 
             new G4PVPlacement(
                 nullptr,
@@ -330,7 +323,7 @@ DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const
     // DD4hep formula: position = index * pitch + offset
     const G4double pixelX = Constants::IndexToPosition(i, fPixelSpacing, fGridOffset);
     const G4double pixelY = Constants::IndexToPosition(j, fPixelSpacing, fGridOffset);
-    const G4double pixelZ = detectorPos.z() + fDetWidth / 2 + fPixelWidth / 2;
+    const G4double pixelZ = detectorPos.z() + (fDetWidth / 2) + (fPixelWidth / 2);
 
     result.center = {pixelX, pixelY, pixelZ};
     result.indexI = i;

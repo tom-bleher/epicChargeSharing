@@ -189,7 +189,7 @@ bool ExecuteBatchMode(G4RunManager* runManager, const ProgramOptions& opts)
     G4UImanager* uiManager = G4UImanager::GetUIpointer();
     G4cout << "[Batch] Executing macro '" << opts.macroFile << "'" << G4endl;
     G4String command = "/control/execute " + opts.macroFile;
-    G4int status = uiManager->ApplyCommand(command);
+    const G4int status = uiManager->ApplyCommand(command);
     if (status != 0) {
         G4cerr << "[Batch] Macro execution failed: " << opts.macroFile << G4endl;
         return false;

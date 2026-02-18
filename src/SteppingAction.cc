@@ -24,12 +24,9 @@
 namespace ECS {
 
 SteppingAction::SteppingAction(EventAction* eventAction)
-    : G4UserSteppingAction(),
-      fEventAction(eventAction),
-      fFirstContactType(FirstContactType::None),
-      fLogicBlock(nullptr),
-      fLogicCube(nullptr),
-      fVolumesCached(false)
+    : 
+      fEventAction(eventAction)
+      
 {}
 
 void SteppingAction::Reset()
@@ -60,7 +57,7 @@ void SteppingAction::TrackVolumeInteractions(const G4Step* step)
         return;
     }
 
-    G4StepPoint* postPoint = step->GetPostStepPoint();
+    const G4StepPoint* postPoint = step->GetPostStepPoint();
     if (!postPoint || postPoint->GetStepStatus() != fGeomBoundary) {
         return; // Only care about boundary crossings
     }

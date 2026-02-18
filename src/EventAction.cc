@@ -50,23 +50,14 @@ void EventAction::SetComputeFullFractions(G4bool enabled)
 }
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
-    : G4UserEventAction(),
+    : 
       fRunAction(runAction),
       fDetector(detector),
-      fSteppingAction(nullptr),
-      fNeighborhoodRadius(Constants::NEIGHBORHOOD_RADIUS),
+      
       fFirstContactPos(0., 0., 0.),
-      fPixelIndexI(-1),
-      fPixelIndexJ(-1),
-      fPixelTrueDeltaX(0.),
-      fPixelTrueDeltaY(0.),
-      fIonizationEnergy(Constants::IONIZATION_ENERGY),
-      fGain(Constants::GAIN),
-      fD0(Constants::D0),
-      fElementaryCharge(Constants::ELEMENTARY_CHARGE),
-      fScorerEnergyDeposit(0.0),
+      
       fChargeSharing(detector),
-      fNearestPixelGlobalId(-1),
+      
       fNeighborhoodLayout(detector ? detector->GetNeighborhoodRadius()
                                    : Constants::NEIGHBORHOOD_RADIUS),
       fEmitDistanceAlphaOutputs(true),
@@ -289,7 +280,7 @@ void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& resu
     fPixelTrueDeltaY = std::abs(result.nearestPixelCenter.y() - hitPos.y());
     const G4int numBlocks = fDetector ? fDetector->GetNumBlocksPerSide() : 0;
     if (numBlocks > 0 && fPixelIndexI >= 0 && fPixelIndexJ >= 0) {
-        fNearestPixelGlobalId = fPixelIndexI * numBlocks + fPixelIndexJ;
+        fNearestPixelGlobalId = (fPixelIndexI * numBlocks) + fPixelIndexJ;
     } else {
         fNearestPixelGlobalId = -1;
     }
@@ -384,7 +375,7 @@ void EventAction::CollectScorerData(const G4Event* event)
 {
     fScorerEnergyDeposit = 0.0;
 
-    G4HCofThisEvent* hce = event->GetHCofThisEvent();
+    G4HCofThisEvent* const hce = event->GetHCofThisEvent();
     if (!hce) {
         return;
     }
@@ -509,8 +500,8 @@ bool EventAction::ReconstructDPC(const ChargeSharingCalculator::Result& result)
     const G4double Sx = (qRight - qLeft) / qTotal;
     const G4double Sy = (qTop - qBottom) / qTotal;
 
-    fReconDPCX = cx + dpcK * Sx;
-    fReconDPCY = cy + dpcK * Sy;
+    fReconDPCX = cx + (dpcK * Sx);
+    fReconDPCY = cy + (dpcK * Sy);
 
     return true;
 }

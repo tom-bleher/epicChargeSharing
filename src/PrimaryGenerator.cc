@@ -27,7 +27,7 @@ const G4ThreeVector kDefaultMomentumDirection(0.0, 0.0, -1.0);
 
 G4ParticleDefinition* ResolveDefaultParticle()
 {
-    G4ParticleTable* particleTable = G4ParticleTable::GetParticleTable();
+    G4ParticleTable* const particleTable = G4ParticleTable::GetParticleTable();
     if (!particleTable) {
         G4Exception("PrimaryGenerator::ResolveDefaultParticle",
                     "MissingParticleTable",
@@ -49,12 +49,12 @@ G4ParticleDefinition* ResolveDefaultParticle()
 
 PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     : fParticleGun(std::make_unique<G4ParticleGun>(1)),
-      fDetector(detector)
+      fDetector(detector),
+      fFixedX(-150.0 * um)
 {
     ConfigureParticleGun();
     ConfigureMessenger();
 
-    fFixedX = -150.0*um;
     if (fDetector) {
         fFixedY = 0.0;  // Center of pad row (red line), not gap row
     }
@@ -80,7 +80,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event* event)
 
 void PrimaryGenerator::ConfigureParticleGun()
 {
-    G4ParticleDefinition* particle = ResolveDefaultParticle();
+    G4ParticleDefinition* const particle = ResolveDefaultParticle();
 
     if (particle) {
         fParticleGun->SetParticleDefinition(particle);
@@ -137,8 +137,8 @@ G4double PrimaryGenerator::CalculateSafeMargin() const
     const G4int radius = fDetector->GetNeighborhoodRadius();
     // For DD4hep-style centered grid, margin is based on neighborhood radius
     // to ensure all neighbor pixels stay within detector bounds
-    const G4double margin = 0.5 * fDetector->GetPixelSize() +
-                            radius * fDetector->GetPixelSpacing();
+    const G4double margin = (0.5 * fDetector->GetPixelSize()) +
+                            (radius * fDetector->GetPixelSpacing());
 
     const G4double detHalfSize = fDetector->GetDetSize() / 2.0;
     if (margin >= detHalfSize) {
@@ -156,7 +156,7 @@ void PrimaryGenerator::RecalculateSamplingWindow() const
     SamplingWindow window{};
     if (fDetector) {
         const G4double margin = CalculateSafeMargin();
-        const G4double halfExtent = fDetector->GetDetSize() / 2.0 - margin;
+        const G4double halfExtent = (fDetector->GetDetSize() / 2.0) - margin;
         window.margin = margin;
         window.halfExtent = std::max(0.0, halfExtent);
     }

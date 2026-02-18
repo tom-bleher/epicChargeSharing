@@ -202,7 +202,7 @@ void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
         return;
     }
 
-    PatchInfo info{row0, col0, nRows, nCols};
+    const PatchInfo info{row0, col0, nRows, nCols};
     fResult.patch.Resize(info);
     fResult.patch.charges.Zero();
 
@@ -308,7 +308,7 @@ using Cell = ChargeSharingCalculator::Result::NeighborCell;
 void ChargeSharingCalculator::ReserveBuffers()
 {
     const G4int gridRadius = std::max(0, fNeighborhoodRadius);
-    const G4int newGridDim = 2 * gridRadius + 1;
+    const G4int newGridDim = (2 * gridRadius) + 1;
     const G4int totalCells = newGridDim * newGridDim;
     const std::size_t newSize = static_cast<std::size_t>(totalCells);
 
@@ -468,7 +468,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
             return 0.0;
         }
         // Find cell with matching grid position
-        const int targetIdx = (di + gridRadiusLocal) * gridDimLocal + (dj + gridRadiusLocal);
+        const int targetIdx = ((di + gridRadiusLocal) * gridDimLocal) + (dj + gridRadiusLocal);
         for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
             if (fResult.cells[i].gridIndex == targetIdx) {
                 return fWeightScratch[i].original;
@@ -500,7 +500,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     // For 3x3: center on the highest F_i pixel
     // For 2x2: find the 2x2 square containing the highest F_i pixel with maximum total F_i
     int blockCornerDi = 0, blockCornerDj = 0;  // Upper-left corner of the block in (di, dj) coords
-    int blockSize = use3x3Block ? 3 : 2;
+    const int blockSize = use3x3Block ? 3 : 2;
 
     // For both 2x2 and 3x3: find the block containing the highest F_i pixel with maximum total F_i
     // 2x2: max F_i pixel can be at any of 4 positions, so try 4 possible squares
@@ -640,7 +640,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
         }
     }
 
-    const int gridDimForBounds = 2 * gridRadiusLocal + 1;
+    const int gridDimForBounds = (2 * gridRadiusLocal) + 1;
     const bool useRowColMode = (activePixelMode == Constants::ActivePixelMode::RowCol ||
                                 activePixelMode == Constants::ActivePixelMode::RowCol3x3);
 
@@ -688,14 +688,14 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 void ChargeSharingCalculator::BuildOffsets()
 {
     const int gridRadius = std::max(0, fNeighborhoodRadius);
-    const int gridDimLocal = 2 * gridRadius + 1;
+    const int gridDimLocal = (2 * gridRadius) + 1;
     const int totalOffsets = gridDimLocal * gridDimLocal;
 
     fOffsets.clear();
     fOffsets.reserve(totalOffsets);
     for (int di = -gridRadius; di <= gridRadius; ++di) {
         for (int dj = -gridRadius; dj <= gridRadius; ++dj) {
-            const int idx = (di + gridRadius) * gridDimLocal + (dj + gridRadius);
+            const int idx = ((di + gridRadius) * gridDimLocal) + (dj + gridRadius);
             fOffsets.push_back(Offset{di, dj, idx});
         }
     }
@@ -795,8 +795,8 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
             const G4int gridJ = localJ + minIndexY;
             const G4int dj = gridJ - fResult.pixelIndexJ;
 
-            const G4double dxToCenter = baseDx - di * pixelSpacing;
-            const G4double dyToCenter = baseDy - dj * pixelSpacing;
+            const G4double dxToCenter = baseDx - (di * pixelSpacing);
+            const G4double dyToCenter = baseDy - (dj * pixelSpacing);
             const G4double distanceToCenter = CalcDistanceToCenter(dxToCenter, dyToCenter);
             const G4double alpha = CalcPadViewAngleApprox(distanceToCenter, pixelSize, pixelSize);
 
@@ -997,7 +997,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
     for (G4int i = 0; i < rows; ++i) {
         for (G4int j = 0; j < cols; ++j) {
-            const auto idx = static_cast<std::size_t>(i) * static_cast<std::size_t>(cols) +
+            const auto idx = (static_cast<std::size_t>(i) * static_cast<std::size_t>(cols)) +
                              static_cast<std::size_t>(j);
             // Fractions already computed via Eigen above
             const G4double fraction = fResult.full.signalFraction(i, j);
@@ -1026,8 +1026,8 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
             // Apply noise to all modes
             auto applyNoise = [gainFactor, additiveNoise](G4double base) {
-                G4double noisy = base * gainFactor;
-                G4double final = noisy + additiveNoise;
+                const G4double noisy = base * gainFactor;
+                const G4double final = noisy + additiveNoise;
                 return std::make_tuple(base, noisy, std::max(0.0, final));
             };
 
