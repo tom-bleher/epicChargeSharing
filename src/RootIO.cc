@@ -441,7 +441,7 @@ std::string MetadataPublisher::SignalModelToString(Config::SignalModel model) {
     }
 }
 
-std::string ActivePixelModeToString(Config::ActivePixelMode mode) {
+static std::string ActivePixelModeToString(Config::ActivePixelMode mode) {
     switch (mode) {
         case Config::ActivePixelMode::Neighborhood: return "Neighborhood";
         case Config::ActivePixelMode::ChargeBlock2x2: return "ChargeBlock2x2";

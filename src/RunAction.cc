@@ -47,32 +47,17 @@ namespace support = ECS;
 // Anonymous namespace for internal helpers removed - functionality moved to ECS::IO::MetadataPublisher
 
 RunAction::RunAction()
-    : G4UserRunAction(),
+    : 
       fRootWriter(std::make_unique<ECS::RootFileWriter>()),
-      fTrueX(0.0),
-      fTrueY(0.0),
-      fPixelX(0.0),
-      fPixelY(0.0),
-      fEdep(0.0),
-      fPixelTrueDeltaX(0.0),
-      fPixelTrueDeltaY(0.0),
+      
       fNeighborhoodLayout(Constants::NEIGHBORHOOD_RADIUS),
-      fGridPixelSize(0.0),
-      fGridPixelSpacing(0.0),
-      fGridOffset(0.0),
-      fGridDetSize(0.0),
-      fGridNumBlocksPerSide(0),
-      fGridNeighborhoodRadius(0),
-      fPosReconModel(Constants::POS_RECON_MODEL),
+      
       fChargeSharingBeta(std::numeric_limits<G4double>::quiet_NaN()),
-      fChargeSharingPitch(0.0),
-      fEmitDistanceAlphaMeta(false),
+      
       fStoreFullFractions(Constants::STORE_FULL_GRID),
-      fNearestPixelI(-1),
-      fNearestPixelJ(-1),
-      fNearestPixelGlobalId(-1),
-      fEDM4hepWriter(IO::MakeEDM4hepWriter()),
-      fWriteEDM4hep(false)
+      
+      fEDM4hepWriter(IO::MakeEDM4hepWriter())
+      
 {
     if (fEDM4hepWriter && fEDM4hepWriter->IsEnabled()) {
         fWriteEDM4hep = true;
@@ -369,13 +354,13 @@ void RunAction::ConfigureCoreBranches(TTree* tree)
     }
 
     // Build buffer structures for BranchConfigurator
-    IO::BranchConfigurator::ScalarBuffers scalars{
+    const IO::BranchConfigurator::ScalarBuffers scalars{
         &fTrueX, &fTrueY, &fPixelX, &fPixelY, &fEdep,
         &fPixelTrueDeltaX, &fPixelTrueDeltaY,
         &fReconDPCX, &fReconDPCY, &fReconDPCTrueDeltaX, &fReconDPCTrueDeltaY
     };
 
-    IO::BranchConfigurator::ClassificationBuffers classification{
+    const IO::BranchConfigurator::ClassificationBuffers classification{
         &fIsPixelHit, &fNeighborhoodActiveCells,
         &fNearestPixelI, &fNearestPixelJ, &fNearestPixelGlobalId
     };
@@ -980,7 +965,7 @@ void RunAction::WriteMetadataToTree(TTree* tree) const
         return;
     }
 
-    IO::MetadataPublisher publisher = BuildMetadataPublisher();
+    const IO::MetadataPublisher publisher = BuildMetadataPublisher();
     std::mutex& ioMutex = ECS::RootIOMutex();
     publisher.WriteToTree(tree, &ioMutex);
 }

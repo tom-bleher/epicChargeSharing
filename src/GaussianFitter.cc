@@ -110,12 +110,12 @@ namespace Config {
 // ============================================================================
 namespace detail {
 
-inline bool IsFinite(double v) { return std::isfinite(v); }
+static inline bool IsFinite(double v) { return std::isfinite(v); }
 
 // Helper to get TParameter<double> from tree's UserInfo
-inline double GetDoubleMetadata(TTree* tree, const char* key) {
+static inline double GetDoubleMetadata(TTree* tree, const char* key) {
     if (tree) {
-        TList* info = tree->GetUserInfo();
+        const TList* info = tree->GetUserInfo();
         if (info) {
             if (auto* param = dynamic_cast<TParameter<double>*>(info->FindObject(key))) {
                 return param->GetVal();
@@ -125,9 +125,9 @@ inline double GetDoubleMetadata(TTree* tree, const char* key) {
     return std::numeric_limits<double>::quiet_NaN();
 }
 
-inline int GetIntMetadata(TTree* tree, const char* key) {
+static inline int GetIntMetadata(TTree* tree, const char* key) {
     if (tree) {
-        TList* info = tree->GetUserInfo();
+        const TList* info = tree->GetUserInfo();
         if (info) {
             if (auto* param = dynamic_cast<TParameter<int>*>(info->FindObject(key))) {
                 return param->GetVal();
@@ -138,7 +138,7 @@ inline int GetIntMetadata(TTree* tree, const char* key) {
 }
 
 // 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
-double GaussPlusB(double* x, double* p) {
+static double GaussPlusB(double* x, double* p) {
     const double A     = p[0];
     const double mu    = p[1];
     const double sigma = p[2];
@@ -149,7 +149,7 @@ double GaussPlusB(double* x, double* p) {
 
 // 2D Gaussian with constant offset:
 // A * exp(-0.5 * ((x-mux)^2/sigx^2 + (y-muy)^2/sigy^2)) + B
-double Gauss2DPlusB(double* xy, double* p) {
+static double Gauss2DPlusB(double* xy, double* p) {
     const double A   = p[0];
     const double mux = p[1];
     const double muy = p[2];
@@ -161,12 +161,12 @@ double Gauss2DPlusB(double* xy, double* p) {
     return A * std::exp(-0.5 * (dx*dx + dy*dy)) + B;
 }
 
-int InferRadiusFromTree(TTree* tree, const std::string& preferredBranch) {
+static int InferRadiusFromTree(TTree* tree, const std::string& preferredBranch) {
     if (!tree) return -1;
     std::vector<double>* charges = nullptr;
     auto bind = [&](const char* branch) -> bool {
         if (!branch || tree->GetBranch(branch) == nullptr) return false;
-        tree->SetBranchStatus(branch, 1);
+        tree->SetBranchStatus(branch, true);
         tree->SetBranchAddress(branch, &charges);
         return true;
     };
@@ -198,7 +198,7 @@ int InferRadiusFromTree(TTree* tree, const std::string& preferredBranch) {
     return inferredRadius;
 }
 
-std::string ResolveChargeBranch(TTree* tree, const std::string& requestedBranch) {
+static std::string ResolveChargeBranch(TTree* tree, const std::string& requestedBranch) {
     auto hasBranch = [&](const std::string& name) {
         return !name.empty() && tree->GetBranch(name.c_str()) != nullptr;
     };
@@ -213,7 +213,7 @@ std::string ResolveChargeBranch(TTree* tree, const std::string& requestedBranch)
 }
 
 // Branch helper to ensure branch exists and reset if necessary
-TBranch* EnsureAndResetBranch(TTree* tree, const char* name, double* addr) {
+static TBranch* EnsureAndResetBranch(TTree* tree, const char* name, double* addr) {
     TBranch* br = tree->GetBranch(name);
     if (!br) {
         br = tree->Branch(name, addr);
@@ -252,11 +252,11 @@ struct GaussFitConfig {
     double seedB;
 };
 
-inline double ComputeUniformSigma(double errorPercentOfMax, double qmax) {
+static inline double ComputeUniformSigma(double errorPercentOfMax, double qmax) {
     return charge_uncert::UniformPercentOfMax(errorPercentOfMax, qmax);
 }
 
-inline std::pair<double, bool> WeightedCentroid(const std::vector<double>& positions,
+static inline std::pair<double, bool> WeightedCentroid(const std::vector<double>& positions,
                                                 const std::vector<double>& charges,
                                                 double baseline) {
     if (positions.size() != charges.size() || positions.empty()) {
@@ -276,7 +276,7 @@ inline std::pair<double, bool> WeightedCentroid(const std::vector<double>& posit
     return {weightedSum / weightTotal, true};
 }
 
-inline double SeedSigma(const std::vector<double>& positions,
+static inline double SeedSigma(const std::vector<double>& positions,
                         const std::vector<double>& charges,
                         double baseline,
                         double pixelSpacing,
@@ -311,7 +311,7 @@ inline double SeedSigma(const std::vector<double>& positions,
     return sigma;
 }
 
-GaussFitResult RunGaussianFit1D(const std::vector<double>& positions,
+static GaussFitResult RunGaussianFit1D(const std::vector<double>& positions,
                                 const std::vector<double>& charges,
                                 const std::vector<double>* sigmaCandidates,
                                 double uniformSigma,
@@ -490,12 +490,12 @@ int FitGaussian1D(const char* filename) {
     Bool_t is_pixel_hit = kFALSE;
     std::vector<double>* Q = nullptr;
 
-    tree->SetBranchStatus("*", 0);
-    tree->SetBranchStatus("TrueX", 1);
-    tree->SetBranchStatus("TrueY", 1);
-    tree->SetBranchStatus("PixelX", 1);
-    tree->SetBranchStatus("PixelY", 1);
-    tree->SetBranchStatus("isPixelHit", 1);
+    tree->SetBranchStatus("*", false);
+    tree->SetBranchStatus("TrueX", true);
+    tree->SetBranchStatus("TrueY", true);
+    tree->SetBranchStatus("PixelX", true);
+    tree->SetBranchStatus("PixelY", true);
+    tree->SetBranchStatus("isPixelHit", true);
     tree->SetBranchStatus(chosenCharge.c_str(), 1);
 
     tree->SetBranchAddress("TrueX", &x_hit);
@@ -549,7 +549,7 @@ int FitGaussian1D(const char* filename) {
     std::vector<int> v_gridDim(nEntries, 0);
 
     FlatVectorStore chargeStore;
-    const int approxNeighborSide = (neighborhoodRadiusMeta > 0) ? (2 * neighborhoodRadiusMeta + 1) : 5;
+    const int approxNeighborSide = (neighborhoodRadiusMeta > 0) ? ((2 * neighborhoodRadiusMeta) + 1) : 5;
     chargeStore.Initialize(static_cast<size_t>(nEntries), approxNeighborSide * approxNeighborSide);
 
     for (Long64_t i = 0; i < nEntries; ++i) {
@@ -615,16 +615,16 @@ int FitGaussian1D(const char* filename) {
         double qmaxNeighborhood = -1e300;
         for (int di = -R; di <= R; ++di) {
             for (int dj = -R; dj <= R; ++dj) {
-                const int idx = (di + R) * N + (dj + R);
+                const int idx = ((di + R) * N) + (dj + R);
                 const double q = QLoc[idx];
                 if (!IsFinite(q) || q < 0) continue;
                 if (q > qmaxNeighborhood) qmaxNeighborhood = q;
                 if (dj == 0) {
-                    x_row.push_back(x_px_loc + di * pixelSpacing);
+                    x_row.push_back(x_px_loc + (di * pixelSpacing));
                     q_row.push_back(q);
                 }
                 if (di == 0) {
-                    y_col.push_back(y_px_loc + dj * pixelSpacing);
+                    y_col.push_back(y_px_loc + (dj * pixelSpacing));
                     q_col.push_back(q);
                 }
             }
@@ -654,17 +654,17 @@ int FitGaussian1D(const char* filename) {
         const double sigInitRow = SeedSigma(x_row, q_row, B0_row, pixelSpacing, sigLoBound, sigHiBound);
         const double sigInitCol = SeedSigma(y_col, q_col, B0_col, pixelSpacing, sigLoBound, sigHiBound);
 
-        const double muXLo = x_px_loc - 1.0 * pixelSpacing;
-        const double muXHi = x_px_loc + 1.0 * pixelSpacing;
-        const double muYLo = y_px_loc - 1.0 * pixelSpacing;
-        const double muYHi = y_px_loc + 1.0 * pixelSpacing;
+        const double muXLo = x_px_loc - (1.0 * pixelSpacing);
+        const double muXHi = x_px_loc + (1.0 * pixelSpacing);
+        const double muYLo = y_px_loc - (1.0 * pixelSpacing);
+        const double muYHi = y_px_loc + (1.0 * pixelSpacing);
 
-        GaussFitConfig rowConfig{muXLo, muXHi, sigLoBound, sigHiBound,
-                                 qmaxNeighborhood, pixelSpacing, A0_row,
-                                 mu0_row, sigInitRow, B0_row};
-        GaussFitConfig colConfig{muYLo, muYHi, sigLoBound, sigHiBound,
-                                 qmaxNeighborhood, pixelSpacing, A0_col,
-                                 mu0_col, sigInitCol, B0_col};
+        const GaussFitConfig rowConfig{muXLo, muXHi, sigLoBound, sigHiBound,
+                                       qmaxNeighborhood, pixelSpacing, A0_row,
+                                       mu0_row, sigInitRow, B0_row};
+        const GaussFitConfig colConfig{muYLo, muYHi, sigLoBound, sigHiBound,
+                                       qmaxNeighborhood, pixelSpacing, A0_col,
+                                       mu0_col, sigInitCol, B0_col};
 
         GaussFitResult rowFit = RunGaussianFit1D(x_row, q_row, nullptr, uniformSigma, rowConfig);
         GaussFitResult colFit = RunGaussianFit1D(y_col, q_col, nullptr, uniformSigma, colConfig);
@@ -745,7 +745,7 @@ int FitGaussian1D(const char* filename) {
         nProcessed++;
     }
 
-    tree->SetBranchStatus("*", 1);
+    tree->SetBranchStatus("*", true);
     fileHandle->cd();
     tree->Write("", TObject::kOverwrite);
     fileHandle->Flush();
@@ -818,12 +818,12 @@ int FitGaussian2D(const char* filename) {
     Bool_t is_pixel_hit = kFALSE;
     std::vector<double>* Q = nullptr;
 
-    tree->SetBranchStatus("*", 0);
-    tree->SetBranchStatus("TrueX", 1);
-    tree->SetBranchStatus("TrueY", 1);
-    tree->SetBranchStatus("PixelX", 1);
-    tree->SetBranchStatus("PixelY", 1);
-    tree->SetBranchStatus("isPixelHit", 1);
+    tree->SetBranchStatus("*", false);
+    tree->SetBranchStatus("TrueX", true);
+    tree->SetBranchStatus("TrueY", true);
+    tree->SetBranchStatus("PixelX", true);
+    tree->SetBranchStatus("PixelY", true);
+    tree->SetBranchStatus("isPixelHit", true);
     tree->SetBranchStatus(chosenCharge.c_str(), 1);
 
     tree->SetBranchAddress("TrueX", &x_hit);
@@ -864,7 +864,7 @@ int FitGaussian2D(const char* filename) {
     std::vector<char> v_is_pixel(nEntries);
 
     FlatVectorStore chargeStore;
-    const int approxNeighborSide = (neighborhoodRadiusMeta > 0) ? (2 * neighborhoodRadiusMeta + 1) : 5;
+    const int approxNeighborSide = (neighborhoodRadiusMeta > 0) ? ((2 * neighborhoodRadiusMeta) + 1) : 5;
     chargeStore.Initialize(static_cast<size_t>(nEntries), approxNeighborSide * approxNeighborSide);
 
     for (Long64_t i = 0; i < nEntries; ++i) {
@@ -916,11 +916,11 @@ int FitGaussian2D(const char* filename) {
 
         for (int di = -R; di <= R; ++di) {
             for (int dj = -R; dj <= R; ++dj) {
-                const int idx = (di + R) * N + (dj + R);
+                const int idx = ((di + R) * N) + (dj + R);
                 const double q = QLoc[idx];
                 if (!IsFinite(q) || q < 0) continue;
-                const double x = x_px_loc + di * pixelSpacing;
-                const double y = y_px_loc + dj * pixelSpacing;
+                const double x = x_px_loc + (di * pixelSpacing);
+                const double y = y_px_loc + (dj * pixelSpacing);
                 g2d.SetPoint(p++, x, y, q);
                 if (q > qmaxNeighborhood) qmaxNeighborhood = q;
             }
@@ -936,8 +936,8 @@ int FitGaussian2D(const char* filename) {
         }
         double A0 = std::max(1e-18, zmax - zmin);
         double B0 = zmin;
-        double mux0 = g2d.GetX()[idxMax];
-        double muy0 = g2d.GetY()[idxMax];
+        const double mux0 = g2d.GetX()[idxMax];
+        const double muy0 = g2d.GetY()[idxMax];
 
         const double uniformSigma = verticalErrorsEnabled
             ? charge_uncert::UniformPercentOfMax(errorPercentOfMax, qmaxNeighborhood)
@@ -968,8 +968,8 @@ int FitGaussian2D(const char* filename) {
             var = (wsum > 0.0) ? (var / wsum) : 0.0;
             return std::clamp(std::sqrt(std::max(var, 1e-12)), sigLoBound, sigHiBound);
         };
-        double sxInit = sigmaSeed2D(true);
-        double syInit = sigmaSeed2D(false);
+        const double sxInit = sigmaSeed2D(true);
+        const double syInit = sigmaSeed2D(false);
 
         std::vector<double> Xf, Yf, Zf;
         Xf.reserve(g2d.GetN());
@@ -1055,8 +1055,8 @@ int FitGaussian2D(const char* filename) {
                 const double pull = (Zf[k] - model) / uniformSigma;
                 chi2Calc += pull * pull;
             }
-            int nFree = fitRes.NFreeParameters();
-            if (nFree <= 0) nFree = fitRes.NPar();
+            int nFree = static_cast<int>(fitRes.NFreeParameters());
+            if (nFree <= 0) nFree = static_cast<int>(fitRes.NPar());
             int ndfCalc = nPts - nFree;
             if (ndfCalc < 0) ndfCalc = 0;
 
@@ -1129,7 +1129,7 @@ int FitGaussian2D(const char* filename) {
         nProcessed++;
     }
 
-    tree->SetBranchStatus("*", 1);
+    tree->SetBranchStatus("*", true);
     file->cd();
     tree->Write("", TObject::kOverwrite);
     file->Flush();
