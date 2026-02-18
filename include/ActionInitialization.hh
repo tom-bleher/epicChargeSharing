@@ -47,7 +47,7 @@ public:
 
 private:
     DetectorConstruction* fDetector;
-    RunAction* CreateRunAction() const;
+    [[nodiscard]] RunAction* CreateRunAction() const;
 };
 
 } // namespace ECS

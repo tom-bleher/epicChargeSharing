@@ -68,7 +68,7 @@ public:
         fNeighborhoodLayout.SetRadius(radius);
         EnsureNeighborhoodBuffers(fNeighborhoodLayout.TotalCells());
     }
-    G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
+    [[nodiscard]] G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
 
     void CollectScorerData(const G4Event* event);
 
@@ -76,7 +76,7 @@ public:
     void SetComputeFullFractions(G4bool enabled);
 
 private:
-    const G4ThreeVector& DetermineHitPosition() const;
+    [[nodiscard]] const G4ThreeVector& DetermineHitPosition() const;
     void UpdatePixelAndHitClassification(const G4ThreeVector& hitPos,
                                          G4ThreeVector& nearestPixel,
                                          G4bool& firstContactIsPixel,
@@ -103,7 +103,7 @@ private:
     bool ReconstructDPC(const ChargeSharingCalculator::Result& result);
 
     /// \brief Build EventSummaryData from current event state.
-    IO::EventSummaryData BuildEventSummary(G4double edep,
+    [[nodiscard]] IO::EventSummaryData BuildEventSummary(G4double edep,
                                             const G4ThreeVector& hitPos,
                                             const G4ThreeVector& nearestPixel,
                                             G4bool firstContactIsPixel,
@@ -115,41 +115,41 @@ private:
                                         const ChargeSharingCalculator::Result& result) const;
 
     /// \brief Build default grid geometry when charge sharing was not computed.
-    ChargeSharingCalculator::PixelGridGeometry BuildDefaultGridGeometry() const;
+    [[nodiscard]] ChargeSharingCalculator::PixelGridGeometry BuildDefaultGridGeometry() const;
 
     struct NeighborContext
     {
         G4double sigmaNoise{0.0};
     };
 
-    NeighborContext MakeNeighborContext() const;
+    [[nodiscard]] NeighborContext MakeNeighborContext() const;
     void PopulateNeighborCharges(const ChargeSharingCalculator::Result& result,
                                  const NeighborContext& context);
 
-    RunAction* fRunAction;
-    DetectorConstruction* fDetector;
-    SteppingAction* fSteppingAction;
+    RunAction* fRunAction{nullptr};
+    DetectorConstruction* fDetector{nullptr};
+    SteppingAction* fSteppingAction{nullptr};
 
-    G4int fNeighborhoodRadius;
+    G4int fNeighborhoodRadius{Constants::NEIGHBORHOOD_RADIUS};
 
     G4ThreeVector fFirstContactPos;
     G4bool fHasFirstContactPos{false};
 
-    G4int fPixelIndexI;
-    G4int fPixelIndexJ;
-    G4double fPixelTrueDeltaX;
-    G4double fPixelTrueDeltaY;
+    G4int fPixelIndexI{-1};
+    G4int fPixelIndexJ{-1};
+    G4double fPixelTrueDeltaX{0.};
+    G4double fPixelTrueDeltaY{0.};
     G4double fReconDPCX{0.0};
     G4double fReconDPCY{0.0};
     G4double fReconDPCTrueDeltaX{0.0};
     G4double fReconDPCTrueDeltaY{0.0};
 
-    G4double fIonizationEnergy;
-    G4double fGain;
-    G4double fD0;
-    G4double fElementaryCharge;
+    G4double fIonizationEnergy{Constants::IONIZATION_ENERGY};
+    G4double fGain{Constants::GAIN};
+    G4double fD0{Constants::D0};
+    G4double fElementaryCharge{Constants::ELEMENTARY_CHARGE};
 
-    G4double fScorerEnergyDeposit;
+    G4double fScorerEnergyDeposit{0.0};
 
     ChargeSharingCalculator fChargeSharing;
     G4int fNearestPixelGlobalId{-1};

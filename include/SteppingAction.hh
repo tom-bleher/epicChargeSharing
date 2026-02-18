@@ -63,11 +63,11 @@ public:
 
     /// \brief Check if first contact was with a pixel.
     /// \return true if first boundary entry was into pixel aluminum
-    G4bool FirstContactIsPixel() const { return fFirstContactType == FirstContactType::Pixel; }
+    [[nodiscard]] G4bool FirstContactIsPixel() const { return fFirstContactType == FirstContactType::Pixel; }
 
     /// \brief Get the first contact type.
     /// \return The type of volume first contacted
-    FirstContactType GetFirstContactType() const { return fFirstContactType; }
+    [[nodiscard]] FirstContactType GetFirstContactType() const { return fFirstContactType; }
 
 private:
     /// \brief Cache volume pointers for fast lookup.

@@ -115,21 +115,21 @@ public:
             std::fill(data.begin(), data.end(), value);
         }
 
-        std::size_t Size() const { return data.size(); }
-        bool Empty() const { return data.empty(); }
-        G4int Rows() const { return nRows; }
-        G4int Cols() const { return nCols; }
+        [[nodiscard]] std::size_t Size() const { return data.size(); }
+        [[nodiscard]] bool Empty() const { return data.empty(); }
+        [[nodiscard]] G4int Rows() const { return nRows; }
+        [[nodiscard]] G4int Cols() const { return nCols; }
 
         T& operator()(G4int row, G4int col)
         {
-            const auto idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(nCols) +
+            const auto idx = (static_cast<std::size_t>(row) * static_cast<std::size_t>(nCols)) +
                              static_cast<std::size_t>(col);
             return data[idx];
         }
 
         const T& operator()(G4int row, G4int col) const
         {
-            const auto idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(nCols) +
+            const auto idx = (static_cast<std::size_t>(row) * static_cast<std::size_t>(nCols)) +
                              static_cast<std::size_t>(col);
             return data[idx];
         }
@@ -151,7 +151,7 @@ public:
 
         /// \brief Get a const Eigen::Map view of the grid data for vectorized operations.
         /// \return Const Eigen::Map view of the underlying data.
-        ConstEigenMap AsEigen() const
+        [[nodiscard]] ConstEigenMap AsEigen() const
         {
             return ConstEigenMap(data.data(), nRows, nCols);
         }
@@ -166,7 +166,7 @@ public:
 
         /// \brief Compute row-wise sums using Eigen's vectorized operations.
         /// \return Vector of row sums (one per row).
-        Eigen::Matrix<T, Eigen::Dynamic, 1> RowSums() const
+        [[nodiscard]] Eigen::Matrix<T, Eigen::Dynamic, 1> RowSums() const
         {
             if (data.empty()) return Eigen::Matrix<T, Eigen::Dynamic, 1>();
             return AsEigen().rowwise().sum();
@@ -174,7 +174,7 @@ public:
 
         /// \brief Compute column-wise sums using Eigen's vectorized operations.
         /// \return Vector of column sums (one per column).
-        Eigen::Matrix<T, 1, Eigen::Dynamic> ColSums() const
+        [[nodiscard]] Eigen::Matrix<T, 1, Eigen::Dynamic> ColSums() const
         {
             if (data.empty()) return Eigen::Matrix<T, 1, Eigen::Dynamic>();
             return AsEigen().colwise().sum();
@@ -254,9 +254,9 @@ public:
             if (!chargeFinalBlock.Empty()) chargeFinalBlock.Fill(0.0);
         }
 
-        G4int Rows() const { return signalFraction.Rows(); }
-        G4int Cols() const { return signalFraction.Cols(); }
-        bool Empty() const { return signalFraction.Empty(); }
+        [[nodiscard]] G4int Rows() const { return signalFraction.Rows(); }
+        [[nodiscard]] G4int Cols() const { return signalFraction.Cols(); }
+        [[nodiscard]] bool Empty() const { return signalFraction.Empty(); }
 
         Grid2D<G4double> signalFraction;      ///< F_i: fraction of total signal
         Grid2D<G4double> signalFractionRow;   ///< F_i normalized by row sum (for 1D row fits)
@@ -326,9 +326,9 @@ public:
         G4int nRows{0};
         G4int nCols{0};
 
-        G4int Row1() const { return row0 + nRows; }
-        G4int Col1() const { return col0 + nCols; }
-        bool Valid() const { return row0 >= 0 && col0 >= 0 && nRows > 0 && nCols > 0; }
+        [[nodiscard]] G4int Row1() const { return row0 + nRows; }
+        [[nodiscard]] G4int Col1() const { return col0 + nCols; }
+        [[nodiscard]] bool Valid() const { return row0 >= 0 && col0 >= 0 && nRows > 0 && nCols > 0; }
     };
 
     struct PatchGridCharges
@@ -345,7 +345,7 @@ public:
             charges.Resize(info.nRows, info.nCols);
         }
 
-        bool Empty() const { return charges.Empty(); }
+        [[nodiscard]] bool Empty() const { return charges.Empty(); }
 
         PatchInfo patch;
         ChargeMatrixSet charges;
@@ -417,11 +417,11 @@ public:
 
     void SetDetector(const DetectorConstruction* detector);
     void SetNeighborhoodRadius(G4int radius);
-    G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
+    [[nodiscard]] G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
     void SetEmitDistanceAlpha(G4bool enabled) { fEmitDistanceAlpha = enabled; }
-    G4bool GetEmitDistanceAlpha() const { return fEmitDistanceAlpha; }
+    [[nodiscard]] G4bool GetEmitDistanceAlpha() const { return fEmitDistanceAlpha; }
     void SetComputeFullGridFractions(G4bool enabled);
-    G4bool GetComputeFullGridFractions() const { return fComputeFullGridFractions; }
+    [[nodiscard]] G4bool GetComputeFullGridFractions() const { return fComputeFullGridFractions; }
 
     void ResetForEvent();
 
@@ -438,10 +438,10 @@ private:
     /// Contains pre-computed values derived from the D0 reference distance,
     /// ensuring numerical stability in the charge sharing model.
     struct D0Params {
-        G4double length;           ///< Validated D0 length (clamped to minimum)
-        G4double invLength;        ///< 1.0 / length for efficient division
-        G4double minSafeDistance;  ///< Minimum distance to avoid singularities
-        G4bool isValid;            ///< True if original D0 was valid
+        G4double length{0.0};           ///< Validated D0 length (clamped to minimum)
+        G4double invLength{0.0};        ///< 1.0 / length for efficient division
+        G4double minSafeDistance{0.0};  ///< Minimum distance to avoid singularities
+        G4bool isValid{false};            ///< True if original D0 was valid
 
         static constexpr G4double kMinD0 = 1e-6;  ///< Minimum D0 in micrometers
         static constexpr G4double kGuardFactor = 1.0 + 1e-6;
@@ -449,20 +449,20 @@ private:
 
     /// \brief Validated charge model parameters.
     struct ChargeModelParams {
-        G4bool useLinear;   ///< True for Linear/DPC models
-        G4double beta;      ///< Attenuation coefficient (Linear/DPC only)
-        G4double invMicron; ///< 1.0 / micrometer for unit conversion
+        G4bool useLinear{false};   ///< True for Linear/DPC models
+        G4double beta{0.0};      ///< Attenuation coefficient (Linear/DPC only)
+        G4double invMicron{0.0}; ///< 1.0 / micrometer for unit conversion
     };
 
     D0Params ValidateD0(G4double d0Raw, const char* callerName) const;
-    ChargeModelParams GetChargeModelParams(G4double pixelSpacing) const;
+    [[nodiscard]] ChargeModelParams GetChargeModelParams(G4double pixelSpacing) const;
 
     void ReserveBuffers();
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
-    G4double CalcDistanceToCenter(G4double dxToCenter,
+    [[nodiscard]] G4double CalcDistanceToCenter(G4double dxToCenter,
                                    G4double dyToCenter) const;
 
-    G4double CalcPadViewAngleApprox(G4double distanceToCenter,
+    [[nodiscard]] G4double CalcPadViewAngleApprox(G4double distanceToCenter,
                                     G4double padWidth,
                                     G4double padHeight) const;
     void ComputeChargeFractions(const G4ThreeVector& hitPos,
@@ -478,11 +478,11 @@ private:
                                   G4int numBlocksPerSide,
                                   G4double totalChargeElectrons,
                                   G4double elementaryCharge);
-    PixelGridGeometry BuildGridGeometry() const;
+    [[nodiscard]] PixelGridGeometry BuildGridGeometry() const;
     void PopulatePatchFromNeighbors(G4int numBlocksPerSide);
 
-    const DetectorConstruction* fDetector;
-    G4int fNeighborhoodRadius;
+    const DetectorConstruction* fDetector{nullptr};
+    G4int fNeighborhoodRadius{0};
     Result fResult;
 
     /// \brief Stores both original and potentially modified weights to avoid recomputation.
@@ -490,13 +490,13 @@ private:
     /// The original weight is preserved for row/col/block fraction calculations,
     /// while the modified weight may be zeroed by DenominatorMode logic.
     struct WeightPair {
-        G4double original;   ///< Original computed weight (never modified)
-        G4double modified;   ///< Weight after DenominatorMode adjustments
+        G4double original{0.0};   ///< Original computed weight (never modified)
+        G4double modified{0.0};   ///< Weight after DenominatorMode adjustments
     };
     std::vector<WeightPair> fWeightScratch;
     Grid2D<G4double> fNeighborhoodWeights;  ///< Neighborhood weights for Eigen-based row/col sums
     Grid2D<G4double> fFullGridWeights;
-    struct Offset { int di; int dj; int idx; };
+    struct Offset { int di{0}; int dj{0}; int idx{0}; };
     std::vector<Offset> fOffsets;
     int fGridDim{0};
     int fOffsetsDim{0};

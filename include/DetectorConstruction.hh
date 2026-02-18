@@ -68,44 +68,44 @@ public:
     void SetPixelSpacing(G4double spacing);
     void SetNeighborhoodRadius(G4int radius);
 
-    G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
+    [[nodiscard]] G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
 
-    G4double GetPixelSize() const { return fPixelSize; }
-    G4double GetPixelSpacing() const { return fPixelSpacing; }
-    G4double GetPixelPitch() const { return fPixelSpacing; }
-    G4double GetLinearChargeModelBeta() const { return Constants::LINEAR_CHARGE_MODEL_BETA; }
-    G4double GetGridOffset() const { return fGridOffset; }
-    G4double GetDetSize() const { return fDetSize; }
-    G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
+    [[nodiscard]] G4double GetPixelSize() const { return fPixelSize; }
+    [[nodiscard]] G4double GetPixelSpacing() const { return fPixelSpacing; }
+    [[nodiscard]] G4double GetPixelPitch() const { return fPixelSpacing; }
+    [[nodiscard]] G4double GetLinearChargeModelBeta() const { return Constants::LINEAR_CHARGE_MODEL_BETA; }
+    [[nodiscard]] G4double GetGridOffset() const { return fGridOffset; }
+    [[nodiscard]] G4double GetDetSize() const { return fDetSize; }
+    [[nodiscard]] G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
 
     /// @brief Get minimum pixel index (DD4hep-style, can be negative for centered grid).
-    G4int GetMinIndexX() const { return fMinIndexX; }
-    G4int GetMinIndexY() const { return fMinIndexY; }
-    G4int GetMaxIndexX() const { return fMaxIndexX; }
-    G4int GetMaxIndexY() const { return fMaxIndexY; }
-    const G4ThreeVector& GetDetectorPos() const { return fDetectorPos; }
-    PixelLocation FindNearestPixel(const G4ThreeVector& pos) const;
-    const std::vector<G4ThreeVector>& GetPixelCenters() const { return fPixelCenters; }
-    const G4ThreeVector& GetPixelCenter(G4int globalPixelId) const;
+    [[nodiscard]] G4int GetMinIndexX() const { return fMinIndexX; }
+    [[nodiscard]] G4int GetMinIndexY() const { return fMinIndexY; }
+    [[nodiscard]] G4int GetMaxIndexX() const { return fMaxIndexX; }
+    [[nodiscard]] G4int GetMaxIndexY() const { return fMaxIndexY; }
+    [[nodiscard]] const G4ThreeVector& GetDetectorPos() const { return fDetectorPos; }
+    [[nodiscard]] PixelLocation FindNearestPixel(const G4ThreeVector& pos) const;
+    [[nodiscard]] const std::vector<G4ThreeVector>& GetPixelCenters() const { return fPixelCenters; }
+    [[nodiscard]] const G4ThreeVector& GetPixelCenter(G4int globalPixelId) const;
     // Noise sigma accessors (row-major global pixel id = i*N + j)
-    G4double GetPixelGainSigma(G4int globalPixelId) const { return (globalPixelId >= 0 && globalPixelId < (G4int)fPixelGainSigmas.size()) ? fPixelGainSigmas[globalPixelId] : 0.0; }
-    const std::vector<G4double>& GetPixelGainSigmas() const { return fPixelGainSigmas; }
+    [[nodiscard]] G4double GetPixelGainSigma(G4int globalPixelId) const { return (globalPixelId >= 0 && globalPixelId < (G4int)fPixelGainSigmas.size()) ? fPixelGainSigmas[globalPixelId] : 0.0; }
+    [[nodiscard]] const std::vector<G4double>& GetPixelGainSigmas() const { return fPixelGainSigmas; }
     
     
 private:
     struct MaterialSet {
-        G4Material* world;
-        G4Material* silicon;
-        G4Material* aluminum;
+        G4Material* world{nullptr};
+        G4Material* silicon{nullptr};
+        G4Material* aluminum{nullptr};
     };
 
     struct PixelGridStats {
-        G4double totalPixelArea;
-        G4double detectorArea;
-        G4double coverage;
+        G4double totalPixelArea{0.0};
+        G4double detectorArea{0.0};
+        G4double coverage{0.0};
     };
 
-    MaterialSet PrepareMaterials() const;
+    [[nodiscard]] MaterialSet PrepareMaterials() const;
     G4VPhysicalVolume* BuildWorld(const MaterialSet& mats, G4bool checkOverlaps, G4LogicalVolume*& logicWorld);
     G4LogicalVolume* BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats, G4bool checkOverlaps, G4double originalDetSize);
     PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical, const MaterialSet& mats, G4bool checkOverlaps);
@@ -113,14 +113,14 @@ private:
     void SyncRunMetadata();
     void SetupMessenger();
 
-    G4double fPixelSize;
-    G4double fPixelWidth;
-    G4double fPixelSpacing;
-    G4double fGridOffset;  ///< DD4hep-style grid offset (0 = centered grid)
+    G4double fPixelSize{0.0};
+    G4double fPixelWidth{0.0};
+    G4double fPixelSpacing{0.0};
+    G4double fGridOffset{0.0};  ///< DD4hep-style grid offset (0 = centered grid)
 
-    G4double fDetSize;
-    G4double fDetWidth;
-    G4int fNumBlocksPerSide;
+    G4double fDetSize{0.0};
+    G4double fDetWidth{0.0};
+    G4int fNumBlocksPerSide{0};
     G4ThreeVector fDetectorPos;
 
     /// DD4hep-style index ranges (can be negative for centered grid)
@@ -129,12 +129,12 @@ private:
     G4int fMaxIndexX{0};
     G4int fMaxIndexY{0};
 
-    EventAction* fEventAction;
+    EventAction* fEventAction{nullptr};
     RunAction* fRunAction{nullptr};
     
-    G4int fNeighborhoodRadius;
+    G4int fNeighborhoodRadius{Constants::NEIGHBORHOOD_RADIUS};
 
-    G4LogicalVolume* fLogicSilicon;
+    G4LogicalVolume* fLogicSilicon{nullptr};
 
     // Per-pixel multiplicative noise sigma table (initialized once during construction)
     std::vector<G4double> fPixelGainSigmas;

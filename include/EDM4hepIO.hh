@@ -159,14 +159,14 @@ public:
     ~EDM4hepWriter() = default;
 
     void Configure(const EDM4hepConfig&) {}
-    const EDM4hepConfig& GetConfig() const { return m_config; }
+    [[nodiscard]] const EDM4hepConfig& GetConfig() const { return m_config; }
     bool Open(const std::string&) { return false; }
     bool WriteEvent(const EventRecord&, std::uint64_t, int) { return false; }
     void WriteRunMetadata(const MetadataPublisher&) {}
     void Close() {}
-    bool IsOpen() const { return false; }
-    bool IsEnabled() const { return false; }
-    std::uint64_t EventsWritten() const { return 0; }
+    [[nodiscard]] bool IsOpen() const { return false; }
+    [[nodiscard]] bool IsEnabled() const { return false; }
+    [[nodiscard]] std::uint64_t EventsWritten() const { return 0; }
 
 private:
     EDM4hepConfig m_config;

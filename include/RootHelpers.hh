@@ -36,10 +36,10 @@ namespace ECS {
 namespace RootUtils {
 
 struct BranchInfo {
-    const char* name;
-    double* value;
-    bool enabled;
-    TBranch** handle;
+    const char* name{nullptr};
+    double* value{nullptr};
+    bool enabled{false};
+    TBranch** handle{nullptr};
     const char* leaflist = nullptr;
 };
 
@@ -62,7 +62,7 @@ inline TBranch* EnsureAndResetBranch(TTree* tree, const BranchInfo& info) {
             branch->DropBaskets();  // Drop old baskets to avoid mixing
         }
     }
-    tree->SetBranchStatus(info.name, 1);
+    tree->SetBranchStatus(info.name, true);
     return branch;
 }
 
@@ -102,8 +102,8 @@ public:
     ~RootFileWriter();
 
     void Attach(TFile* file, TTree* tree, bool ownsObjects);
-    TFile* File() const;
-    TTree* Tree() const;
+    [[nodiscard]] TFile* File() const;
+    [[nodiscard]] TTree* Tree() const;
 
     bool SafeWrite(bool isMultithreaded, bool isWorker);
     bool Validate(const G4String& filename, bool* hasEntries);

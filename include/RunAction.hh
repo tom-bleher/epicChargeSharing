@@ -63,8 +63,8 @@ public:
     void BeginOfRunAction(const G4Run*) override;
     void EndOfRunAction(const G4Run*) override;
 
-    TFile* GetRootFile() const;
-    TTree* GetTree() const;
+    [[nodiscard]] TFile* GetRootFile() const;
+    [[nodiscard]] TTree* GetTree() const;
 
     static void WaitForAllWorkersToComplete();
     static void SignalWorkerCompletion();
@@ -95,7 +95,7 @@ public:
 
     // EDM4hep output control
     void SetEDM4hepEnabled(G4bool enabled);
-    G4bool IsEDM4hepEnabled() const;
+    [[nodiscard]] G4bool IsEDM4hepEnabled() const;
 
 private:
     struct ThreadContext
@@ -110,14 +110,14 @@ private:
 
     ThreadContext BuildThreadContext(const G4Run* run) const;
     void LogBeginRun(const ThreadContext& context) const;
-    G4String DetermineOutputFileName(const ThreadContext& context) const;
+    [[nodiscard]] G4String DetermineOutputFileName(const ThreadContext& context) const;
     void InitializeRootOutputs(const ThreadContext& context, const G4String& fileName);
     void ConfigureCoreBranches(TTree* tree);
 
     void HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run);
     void HandleMasterEndOfRun(const ThreadContext& context, const G4Run* run);
-    std::vector<G4String> CollectWorkerFileNames(G4int totalWorkers) const;
-    std::vector<G4String> FilterExistingWorkerFiles(const std::vector<G4String>& workerFiles) const;
+    [[nodiscard]] std::vector<G4String> CollectWorkerFileNames(G4int totalWorkers) const;
+    [[nodiscard]] std::vector<G4String> FilterExistingWorkerFiles(const std::vector<G4String>& workerFiles) const;
     bool MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& existingFiles);
 
     void UpdateSummaryScalars(const EventRecord& record);
@@ -130,8 +130,8 @@ private:
     bool EnsureFullFractionBuffer(G4int gridSide = -1);
     std::unique_lock<std::mutex> MakeTreeLock();
     void WriteMetadataToTree(TTree* tree) const;
-    ECS::IO::MetadataPublisher::EntryList CollectMetadataEntries() const;
-    IO::MetadataPublisher BuildMetadataPublisher() const;
+    [[nodiscard]] ECS::IO::MetadataPublisher::EntryList CollectMetadataEntries() const;
+    [[nodiscard]] IO::MetadataPublisher BuildMetadataPublisher() const;
 
     std::unique_ptr<RootFileWriter> fRootWriter;
     std::mutex fTreeMutex;
@@ -141,13 +141,13 @@ private:
     IO::MetadataPublisher fMetadataPublisher;
     IO::PostProcessingRunner fPostProcessingRunner;
 
-    G4double fTrueX;
-    G4double fTrueY;
-    G4double fPixelX;
-    G4double fPixelY;
-    G4double fEdep;
-    G4double fPixelTrueDeltaX;
-    G4double fPixelTrueDeltaY;
+    G4double fTrueX{0.0};
+    G4double fTrueY{0.0};
+    G4double fPixelX{0.0};
+    G4double fPixelY{0.0};
+    G4double fEdep{0.0};
+    G4double fPixelTrueDeltaX{0.0};
+    G4double fPixelTrueDeltaY{0.0};
     G4double fReconDPCX{0.0};
     G4double fReconDPCY{0.0};
     G4double fReconDPCTrueDeltaX{0.0};
@@ -190,17 +190,17 @@ private:
     std::size_t fNeighborhoodCapacity{0};
     G4int fNeighborhoodActiveCells{0};
 
-    G4double fGridPixelSize;
-    G4double fGridPixelSpacing;
-    G4double fGridOffset;  ///< DD4hep-style grid offset
-    G4double fGridDetSize;
-    G4int fGridNumBlocksPerSide;
+    G4double fGridPixelSize{0.0};
+    G4double fGridPixelSpacing{0.0};
+    G4double fGridOffset{0.0};  ///< DD4hep-style grid offset
+    G4double fGridDetSize{0.0};
+    G4int fGridNumBlocksPerSide{0};
     G4int fGridNeighborhoodRadius{0};
 
-    Constants::PosReconModel fPosReconModel;
+    Constants::PosReconModel fPosReconModel{Constants::POS_RECON_MODEL};
     Constants::ActivePixelMode fActivePixelMode{Constants::ACTIVE_PIXEL_MODE};
-    G4double fChargeSharingBeta;
-    G4double fChargeSharingPitch;
+    G4double fChargeSharingBeta{0.0};
+    G4double fChargeSharingPitch{0.0};
     G4bool fEmitDistanceAlphaMeta{false};
     G4bool fStoreFullFractions{false};
     G4bool fFullFractionsBranchInitialized{false};

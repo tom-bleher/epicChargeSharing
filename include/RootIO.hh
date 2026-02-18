@@ -418,7 +418,7 @@ public:
     void SetNoiseMetadata(const NoiseMetadata& m) { fNoise = m; }
     void SetSimulationMetadata(const SimulationMetadata& m) { fSimulation = m; }
 
-    EntryList CollectEntries() const;
+    [[nodiscard]] EntryList CollectEntries() const;
 
     /// \brief Write metadata entries to TTree UserInfo.
     ///
@@ -456,7 +456,7 @@ public:
     };
 
     void SetConfig(const Config& config) { fConfig = config; }
-    const Config& GetConfig() const { return fConfig; }
+    [[nodiscard]] const Config& GetConfig() const { return fConfig; }
 
     bool Run();
     bool RunMacro(const std::string& macroPath, const std::string& entryPoint,
