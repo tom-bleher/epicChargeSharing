@@ -192,7 +192,9 @@ set(epicChargeSharing_sources
     ${PROJECT_SOURCE_DIR}/src/RootHelpers.cc
     ${PROJECT_SOURCE_DIR}/src/RootIO.cc
     ${PROJECT_SOURCE_DIR}/src/EDM4hepIO.cc
-    # ${PROJECT_SOURCE_DIR}/src/RNTupleIO.cc  # Disabled due to ROOT version incompatibility
+    # NOTE: RNTuple I/O support is planned for when ROOT's RNTuple API stabilizes
+    # (requires ROOT >= 6.34). The source files were removed to avoid carrying dead code.
+    # See https://root.cern/doc/master/group__tutorial__ntuple.html for RNTuple status.
 )
 
 # Create the executable with enhanced performance settings
@@ -299,6 +301,7 @@ message(STATUS "===================================")
 option(BUILD_TESTING "Build unit tests" OFF)
 
 if(BUILD_TESTING)
+    enable_testing()
     message(STATUS "Building with tests enabled")
     add_subdirectory(tests)
 endif()
