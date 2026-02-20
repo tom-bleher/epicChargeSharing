@@ -36,7 +36,6 @@ class DetectorConstruction;
 /// The calculator supports the terminology of Tornago et al.:
 /// - **LogA**: Logarithmic attenuation model (paper Eq. (\ref{eq:masterformula}))
 /// - **LinA**: Linear attenuation model (paper Eq. (\ref{eq:LA}))
-/// - **DPC**: Discretized Positioning Circuit reconstruction (paper Section 3.4)
 ///
 /// For each event, the calculator:
 /// 1. Finds the nearest pad to the hit position
@@ -449,8 +448,8 @@ private:
 
     /// \brief Validated charge model parameters.
     struct ChargeModelParams {
-        G4bool useLinear{false};   ///< True for Linear/DPC models
-        G4double beta{0.0};      ///< Attenuation coefficient (Linear/DPC only)
+        G4bool useLinear{false};   ///< True for Linear model
+        G4double beta{0.0};      ///< Attenuation coefficient (Linear only)
         G4double invMicron{0.0}; ///< 1.0 / micrometer for unit conversion
     };
 

@@ -19,7 +19,7 @@ positions:
   - 175
   - -175
 
-# Charge sharing model: LogA, LinA, or DPC
+# Charge sharing model: LogA or LinA
 # Set to null to use current Config.hh setting
 charge_model: LogA
 
@@ -27,7 +27,7 @@ charge_model: LogA
 # Set to null to use current Config.hh setting
 denominator_mode: Neighborhood
 
-# Beta coefficient for linear model (only used with LinA/DPC)
+# Beta coefficient for linear model (only used with LinA)
 # Set to null to use current Config.hh setting
 beta: null
 

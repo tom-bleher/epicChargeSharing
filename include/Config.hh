@@ -17,16 +17,12 @@ namespace Constants {
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
 // ─────────────────────────────── Mode Selection ─────────────────────────────
-// Choose reconstruction mode: LogA, LinA, or DPC
+// Choose reconstruction mode: LogA or LinA
 //   LogA - Logarithmic attenuation model (paper Eq. (\ref{eq:masterformula}))
 //   LinA - Linear attenuation model (paper Eq. (\ref{eq:LA}))
-//   DPC  - Discretized Positioning Circuit (paper Section 3.4; fast, no fitting)
-enum class Mode { LogA, LinA, DPC };
+enum class Mode { LogA, LinA };
 
 inline constexpr Mode ACTIVE_MODE = Mode::LogA;
-
-// For DPC mode only: which signal sharing model to use for charge calculation
-inline constexpr Mode DPC_CHARGE_MODEL = Mode::LogA;
 
 // ───────────────────────────── Detector Geometry ────────────────────────────
 inline const G4double DETECTOR_SIZE        = 30.0 * mm;    // Sensor side length
@@ -50,9 +46,6 @@ inline constexpr G4double D0                = 1.0;         // LogA reference dis
 inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010;    // Min gain noise (1%)
 inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050;    // Max gain noise (5%)
 inline constexpr G4double NOISE_ELECTRON_COUNT = 500.0;    // Electronic noise (e-)
-
-// ────────────────────────────── DPC Tuning ──────────────────────────────────
-inline constexpr G4double DPC_K_CALIBRATION = 1.2;         // Empirical calibration constant from DPC reconstruction tuning (k = interpad * this)
 
 // ───────────────────────────── Linear Model ─────────────────────────────────
 // LinA attenuation coefficient beta in 1/um (paper Eq. (\ref{eq:LA})).
@@ -155,7 +148,7 @@ inline constexpr G4double FIT_2D_DIST_CAP_PERCENT   = 50.0;
 // ═══════════════════════════════════════════════════════════════════════════
 
 enum class SignalModel { LogA, LinA };
-enum class ReconMethod { LogA, LinA, DPC };
+enum class ReconMethod { LogA, LinA };
 
 // Unified enum for runtime use (combines both 1D and 2D modes)
 enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3 };
@@ -166,16 +159,11 @@ using PosReconModel = ReconMethod;  // Legacy alias
 // Derived Settings (computed from ACTIVE_MODE)
 // ═══════════════════════════════════════════════════════════════════════════
 
-inline constexpr G4bool IS_DPC_MODE = (ACTIVE_MODE == Mode::DPC);
-
 inline constexpr ReconMethod RECON_METHOD =
-    (ACTIVE_MODE == Mode::LogA) ? ReconMethod::LogA :
-    (ACTIVE_MODE == Mode::LinA) ? ReconMethod::LinA :
-                                    ReconMethod::DPC;
+    (ACTIVE_MODE == Mode::LogA) ? ReconMethod::LogA : ReconMethod::LinA;
 
 inline constexpr SignalModel SIGNAL_MODEL =
-    IS_DPC_MODE ? (DPC_CHARGE_MODEL == Mode::LinA ? SignalModel::LinA : SignalModel::LogA)
-                : (ACTIVE_MODE == Mode::LinA ? SignalModel::LinA : SignalModel::LogA);
+    (ACTIVE_MODE == Mode::LinA) ? SignalModel::LinA : SignalModel::LogA;
 
 inline constexpr G4bool USES_LINEAR_SIGNAL = (SIGNAL_MODEL == SignalModel::LinA);
 
@@ -198,17 +186,12 @@ constexpr ActivePixelMode ActivePixelModeFrom2D(ActivePixelMode2D m) {
 // The active pixel mode used at runtime
 // When FIT_GAUS_2D is enabled, use the 2D mode; otherwise use the 1D mode
 inline constexpr ActivePixelMode ACTIVE_PIXEL_MODE =
-    IS_DPC_MODE ? ActivePixelMode::Neighborhood
-                : (FIT_GAUS_2D ? ActivePixelModeFrom2D(ACTIVE_PIXEL_MODE_2D)
-                              : ActivePixelModeFrom1D(ACTIVE_PIXEL_MODE_1D));
+    FIT_GAUS_2D ? ActivePixelModeFrom2D(ACTIVE_PIXEL_MODE_2D)
+                : ActivePixelModeFrom1D(ACTIVE_PIXEL_MODE_1D);
 
 // Full grid storage: disabled by default (saves only neighborhood/block/strip data)
 // Set to true if you need per-event full-detector charge fractions
 inline constexpr G4bool STORE_FULL_GRID = false;
-
-// DPC uses the 4 closest pads (paper Section 3.4)
-inline constexpr G4int DPC_TOP_N_PADS = 4;
-inline constexpr G4int DPC_TOP_N_PIXELS = DPC_TOP_N_PADS;  // Backward-compatible alias
 
 // ChargeBlock modes (2x2, 3x3) require 2D fitting to be enabled
 inline constexpr G4bool IS_CHARGE_BLOCK_MODE =

@@ -356,8 +356,7 @@ void RunAction::ConfigureCoreBranches(TTree* tree)
     // Build buffer structures for BranchConfigurator
     const IO::BranchConfigurator::ScalarBuffers scalars{
         &fTrueX, &fTrueY, &fPixelX, &fPixelY, &fEdep,
-        &fPixelTrueDeltaX, &fPixelTrueDeltaY,
-        &fReconDPCX, &fReconDPCY, &fReconDPCTrueDeltaX, &fReconDPCTrueDeltaY
+        &fPixelTrueDeltaX, &fPixelTrueDeltaY
     };
 
     const IO::BranchConfigurator::ClassificationBuffers classification{
@@ -577,10 +576,6 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record)
     fPixelY = record.summary.nearestPixelY;
     fPixelTrueDeltaX = record.summary.pixelTrueDeltaX;
     fPixelTrueDeltaY = record.summary.pixelTrueDeltaY;
-    fReconDPCX = record.summary.reconDPCX;
-    fReconDPCY = record.summary.reconDPCY;
-    fReconDPCTrueDeltaX = record.summary.reconDPCTrueDeltaX;
-    fReconDPCTrueDeltaY = record.summary.reconDPCTrueDeltaY;
     fFirstContactIsPixel = record.summary.firstContactIsPixel;
     fGeometricIsPixel = record.summary.geometricIsPixel;
     fIsPixelHit = record.summary.isPixelHitCombined;

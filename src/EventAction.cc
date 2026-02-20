@@ -104,10 +104,6 @@ void EventAction::BeginOfEventAction(const G4Event* /*event*/)
     fPixelIndexJ = -1;
     fPixelTrueDeltaX = 0.;
     fPixelTrueDeltaY = 0.;
-    fReconDPCX = 0.;
-    fReconDPCY = 0.;
-    fReconDPCTrueDeltaX = 0.;
-    fReconDPCTrueDeltaY = 0.;
     fScorerEnergyDeposit = 0.0;
     fFirstContactPos = G4ThreeVector(0., 0., 0.);
     fHasFirstContactPos = false;
@@ -396,114 +392,11 @@ void EventAction::CollectScorerData(const G4Event* event)
     }
 }
 
-void EventAction::ReconstructPosition(const ChargeSharingCalculator::Result& result,
-                                      const G4ThreeVector& hitPos)
+void EventAction::ReconstructPosition(const ChargeSharingCalculator::Result& /*result*/,
+                                      const G4ThreeVector& /*hitPos*/)
 {
-    // DPC reconstruction is only performed when DPC mode is active.
-    // For other modes (LogA, LinA), position reconstruction is done via
-    // post-processing Gaussian fits (ReconRowX/ColY or ReconX_2D/Y_2D).
-    if (Constants::POS_RECON_MODEL == Constants::PosReconModel::DPC) {
-        // Initialize to nearest pixel center as fallback
-        fReconDPCX = result.nearestPixelCenter.x();
-        fReconDPCY = result.nearestPixelCenter.y();
-
-        ReconstructDPC(result);
-
-        fReconDPCTrueDeltaX = std::abs(fReconDPCX - hitPos.x());
-        fReconDPCTrueDeltaY = std::abs(fReconDPCY - hitPos.y());
-    }
-    // For non-DPC modes, fReconDPC* remain at 0 (initialized in BeginOfEventAction)
-}
-
-bool EventAction::ReconstructDPC(const ChargeSharingCalculator::Result& result)
-{
-    // DPC uses the 4 closest pads, as per Tornago et al. Section 3.4:
-    // "It requires only the measurement of the charge on the 4 closest pads to the hit.".
-    //
-    // Here we interpret "closest" using d_i (distance to pixel center).
-    const auto topN = static_cast<std::size_t>(Constants::DPC_TOP_N_PADS);
-    if (result.cells.size() < topN) {
-        return false;
-    }
-
-    // Select the topN pads with smallest d_i.
-    using NeighborCell = ChargeSharingCalculator::Result::NeighborCell;
-    std::vector<const NeighborCell*> closest;
-    closest.reserve(result.cells.size());
-    for (const auto& cell : result.cells) {
-        if (cell.globalPixelId < 0) {
-            continue;
-        }
-        closest.push_back(&cell);
-    }
-    if (closest.size() < topN) {
-        return false;
-    }
-    if (closest.size() > topN) {
-        std::nth_element(closest.begin(), closest.begin() + topN, closest.end(),
-                         [](const NeighborCell* a, const NeighborCell* b) {
-                             return a->distance < b->distance;
-                         });
-        closest.resize(topN);
-    }
-
-    // Compute DPC k coefficient from geometry (Tornago et al. Figure 8, Figure 12)
-    // k = interpad × calibration_factor, where interpad = pitch - pixel_size
-    // The k coefficient has logarithmic dependence on interpad distance.
-    const G4double pitch = fDetector ? fDetector->GetPixelSpacing() : Constants::PIXEL_PITCH;
-    const G4double pixelSize = fDetector ? fDetector->GetPixelSize() : Constants::PIXEL_SIZE;
-    const G4double interpad = pitch - pixelSize;
-    const G4double dpcK = interpad * Constants::DPC_K_CALIBRATION;
-
-    // Compute geometric centroid of the 4 closest pads (X_0, Y_0 in paper)
-    G4double cx = 0.0, cy = 0.0;
-    for (std::size_t k = 0; k < topN; ++k) {
-        cx += closest[k]->center.x();
-        cy += closest[k]->center.y();
-    }
-    cx /= static_cast<G4double>(topN);
-    cy /= static_cast<G4double>(topN);
-
-    // Calculate charge imbalance in each direction using the measured pad charges.
-    //
-    // The paper defines DPC in terms of the measured charge on the 4 closest pads,
-    // so we use the final (noisy) charge when available.
-    // Paper Figure 8: x = X_0 + k * ((Q_A + Q_B) - (Q_C + Q_D)) / Q_total
-    //                 y = Y_0 + k * ((Q_A + Q_C) - (Q_B + Q_D)) / Q_total
-    // Where A=top-right, B=bottom-right, C=top-left, D=bottom-left
-    G4double qTotal = 0.0;
-    G4double qRight = 0.0, qLeft = 0.0;
-    G4double qTop = 0.0, qBottom = 0.0;
-
-    for (std::size_t k = 0; k < topN; ++k) {
-        const auto& cell = *closest[k];
-        const G4double q = [&]() {
-            const auto gridIdx = static_cast<std::size_t>(cell.gridIndex);
-            if (gridIdx < fNeighborhoodChargeFinal.size()) {
-                return fNeighborhoodChargeFinal[gridIdx];
-            }
-            return cell.charge;
-        }();
-        qTotal += q;
-
-        // Classify pad position relative to centroid
-        if (cell.center.x() >= cx) { qRight += q; } else { qLeft += q; }
-        if (cell.center.y() >= cy) { qTop += q; } else { qBottom += q; }
-    }
-
-    if (qTotal <= 0.0) {
-        return false;
-    }
-
-    // Compute signal imbalance ratios and apply k coefficient
-    // Per Tornago et al. Figure 8: position = centroid + k × imbalance_ratio
-    const G4double Sx = (qRight - qLeft) / qTotal;
-    const G4double Sy = (qTop - qBottom) / qTotal;
-
-    fReconDPCX = cx + (dpcK * Sx);
-    fReconDPCY = cy + (dpcK * Sy);
-
-    return true;
+    // Position reconstruction is done via post-processing Gaussian fits
+    // (ReconRowX/ColY or ReconX_2D/Y_2D).
 }
 
 ECS::IO::EventSummaryData EventAction::BuildEventSummary(G4double edep,
@@ -522,10 +415,6 @@ ECS::IO::EventSummaryData EventAction::BuildEventSummary(G4double edep,
     summary.nearestPixelY = nearestPixel.y();
     summary.pixelTrueDeltaX = fPixelTrueDeltaX;
     summary.pixelTrueDeltaY = fPixelTrueDeltaY;
-    summary.reconDPCX = fReconDPCX;
-    summary.reconDPCY = fReconDPCY;
-    summary.reconDPCTrueDeltaX = fReconDPCTrueDeltaX;
-    summary.reconDPCTrueDeltaY = fReconDPCTrueDeltaY;
     summary.firstContactIsPixel = firstContactIsPixel;
     summary.geometricIsPixel = geometricIsPixel;
     summary.isPixelHitCombined = isPixelHitCombined;

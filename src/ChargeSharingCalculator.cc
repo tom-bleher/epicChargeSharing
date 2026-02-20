@@ -115,8 +115,7 @@ ChargeSharingCalculator::GetChargeModelParams(G4double /*pixelSpacing*/) const
 {
     ChargeModelParams params{};
 
-    // Signal model (LogA or LinA) is now independent of reconstruction method.
-    // This allows using DPC reconstruction with either signal model.
+    // Signal model (LogA or LinA) determines the charge sharing calculation.
     params.useLinear = Constants::USES_LINEAR_SIGNAL;
     params.beta = params.useLinear && fDetector
                       ? fDetector->GetLinearChargeModelBeta()

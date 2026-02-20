@@ -10,7 +10,7 @@ epicChargeSharing simulates charge sharing in AC-LGAD sensors to provide reconst
 
 ### Key Features
 
-- **Analytical charge sharing models**: LogA (logarithmic attenuation), LinA (linear attenuation), and DPC (Discretized Positioning Circuit)
+- **Analytical charge sharing models**: LogA (logarithmic attenuation) and LinA (linear attenuation)
 - **Noise simulation**: Per-pixel gain variations and additive electronic noise
 - **Position reconstruction**: Built-in 1D and 2D Gaussian fitting
 - **Multiple active pixel modes**: Neighborhood, row/column, and charge block configurations
@@ -64,7 +64,7 @@ Optional: EDM4hep for EIC integration (`-DWITH_EDM4HEP=ON`)
 Edit `include/Config.hh` to customize:
 - Detector geometry (pixel size, pitch, neighborhood radius)
 - Physics parameters (gain, ionization energy, hit size)
-- Charge sharing model (LogA, LinA, DPC)
+- Charge sharing model (LogA, LinA)
 - Noise model (gain spread, electronic noise)
 - Fitting options (1D/2D Gaussian, uncertainty models)
 

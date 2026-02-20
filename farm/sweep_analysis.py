@@ -25,7 +25,7 @@ Workflow per position:
 8. Extract F_i values
 
 Simulation configuration options:
-- Charge sharing model: LogA (logarithmic, Tornago Eq.4), LinA (linear, Tornago Eq.6), DPC
+- Charge sharing model: LogA (logarithmic, Tornago Eq.4), LinA (linear, Tornago Eq.6)
 - Active pixel mode: Neighborhood (all pixels), ChargeBlock2x2/3x3 (highest F_i), RowCol/RowCol3x3 (cross pattern)
 - Beta attenuation coefficient for linear model
 
@@ -107,7 +107,7 @@ NEIGHBORHOOD_MACRO_PATH = REPO_ROOT / "proc" / "grid" / "plotChargeNeighborhood.
 DEFAULT_CONFIG_FILE = FARM_DIR / "sweep_config.yaml"
 
 # Charge sharing model options
-CHARGE_MODELS = ["LogA", "LinA", "DPC"]
+CHARGE_MODELS = ["LogA", "LinA"]
 ACTIVE_PIXEL_MODES = ["Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", "RowCol3x3"]
 
 # Default beta value for linear model
@@ -331,7 +331,7 @@ def update_config_hh(
 
     Args:
         source_text: Current content of Config.hh
-        charge_model: One of "LogA", "LinA", "DPC" (or None to keep current)
+        charge_model: One of "LogA", "LinA" (or None to keep current)
         active_pixel_mode: One of "Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", "RowCol3x3" (or None to keep current)
         beta: Beta attenuation coefficient for linear model (or None to keep current)
 
@@ -1927,7 +1927,7 @@ def run_full_pipeline(
         skip_gaussian_fits: Skip generating Gaussian fits PDFs
         skip_sigma_f: Skip sigma_f extraction
         skip_fi: Skip F_i extraction
-        charge_model: Charge sharing model ("LogA", "LinA", or "DPC")
+        charge_model: Charge sharing model ("LogA" or "LinA")
         active_pixel_mode: Signal fraction mode ("Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", or "RowCol3x3")
         beta: Beta attenuation coefficient for linear model
     """
@@ -2402,8 +2402,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=str,
         choices=CHARGE_MODELS,
         default=None,
-        help="Charge sharing model: LogA (logarithmic attenuation, Tornago Eq.4), "
-             "LinA (linear attenuation, Tornago Eq.6), or DPC (discretized positioning circuit). "
+        help="Charge sharing model: LogA (logarithmic attenuation, Tornago Eq.4) "
+             "or LinA (linear attenuation, Tornago Eq.6). "
              "If not specified, uses current Config.hh setting.",
     )
     full_parser.add_argument(
@@ -2420,7 +2420,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Beta attenuation coefficient for linear charge model. "
-             "Only used when --charge-model=LinA or DPC. "
+             "Only used when --charge-model=LinA. "
              "If not specified, uses current Config.hh setting.",
     )
 

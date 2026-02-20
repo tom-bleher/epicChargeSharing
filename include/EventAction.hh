@@ -37,7 +37,7 @@ class SteppingAction;
 /// - Determines hit position from first contact or geometric center
 /// - Classifies hits as pixel or silicon based on contact volume
 /// - Computes charge sharing fractions across pixel neighborhood
-/// - Reconstructs position using configured model (LogA/LinA/DPC)
+/// - Reconstructs position using configured model (LogA/LinA)
 /// - Populates ROOT tree branches via RunAction
 ///
 /// The charge sharing computation uses the ChargeSharingCalculator
@@ -90,18 +90,6 @@ private:
     void ReconstructPosition(const ChargeSharingCalculator::Result& result,
                              const G4ThreeVector& hitPos);
 
-    /// \brief DPC position reconstruction using the closest pads.
-    ///
-    /// Implements the Discretized Positioning Circuit algorithm:
-    /// 1. Select the N closest pads to the hit (paper Section 3.4)
-    /// 2. Compute geometric centroid of selected pads
-    /// 3. Calculate signal imbalance ratios (Sx, Sy)
-    /// 4. Apply calibration constants (Kx, Ky) for final position
-    ///
-    /// \param result Charge sharing calculation result
-    /// \return true if reconstruction succeeded, false if insufficient pads
-    bool ReconstructDPC(const ChargeSharingCalculator::Result& result);
-
     /// \brief Build EventSummaryData from current event state.
     [[nodiscard]] IO::EventSummaryData BuildEventSummary(G4double edep,
                                             const G4ThreeVector& hitPos,
@@ -139,10 +127,6 @@ private:
     G4int fPixelIndexJ{-1};
     G4double fPixelTrueDeltaX{0.};
     G4double fPixelTrueDeltaY{0.};
-    G4double fReconDPCX{0.0};
-    G4double fReconDPCY{0.0};
-    G4double fReconDPCTrueDeltaX{0.0};
-    G4double fReconDPCTrueDeltaY{0.0};
 
     G4double fIonizationEnergy{Constants::IONIZATION_ENERGY};
     G4double fGain{Constants::GAIN};

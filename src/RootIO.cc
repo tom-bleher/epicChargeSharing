@@ -61,19 +61,6 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
         if (def.addr) tree->Branch(def.name, def.addr, def.leaf);
     }
 
-    // DPC branches (only when DPC model is selected)
-    if (reconModel == Config::PosReconModel::DPC) {
-        const std::array<BranchDef, 4> dpcBranches{{
-            {"ReconDPCX", buffers.reconDPCX, "ReconDPCX/D"},
-            {"ReconDPCY", buffers.reconDPCY, "ReconDPCY/D"},
-            {"ReconDPCTrueDeltaX", buffers.reconDPCTrueDeltaX, "ReconDPCTrueDeltaX/D"},
-            {"ReconDPCTrueDeltaY", buffers.reconDPCTrueDeltaY, "ReconDPCTrueDeltaY/D"},
-        }};
-
-        for (const auto& def : dpcBranches) {
-            if (def.addr) tree->Branch(def.name, def.addr, def.leaf);
-        }
-    }
 }
 
 void BranchConfigurator::ConfigureClassificationBranches(TTree* tree,
@@ -238,10 +225,6 @@ void TreeFiller::UpdateSummaryScalars(const EventRecord& record) {
     fPixelY = record.summary.nearestPixelY;
     fPixelTrueDeltaX = record.summary.pixelTrueDeltaX;
     fPixelTrueDeltaY = record.summary.pixelTrueDeltaY;
-    fReconDPCX = record.summary.reconDPCX;
-    fReconDPCY = record.summary.reconDPCY;
-    fReconDPCTrueDeltaX = record.summary.reconDPCTrueDeltaX;
-    fReconDPCTrueDeltaY = record.summary.reconDPCTrueDeltaY;
     fIsPixelHit = record.summary.isPixelHitCombined;
     fNearestPixelI = record.nearestPixelI;
     fNearestPixelJ = record.nearestPixelJ;
@@ -427,7 +410,6 @@ bool TreeFiller::EnsureFullFractionBuffer(G4int gridSide) {
 std::string MetadataPublisher::ModelToString(Config::PosReconModel model) {
     switch (model) {
         case Config::PosReconModel::LinA: return "LinA";
-        case Config::PosReconModel::DPC: return "DPC";
         case Config::PosReconModel::LogA:
         default: return "LogA";
     }

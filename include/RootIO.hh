@@ -45,10 +45,6 @@ struct EventSummaryData {
     G4double nearestPixelY{0.0};
     G4double pixelTrueDeltaX{0.0};
     G4double pixelTrueDeltaY{0.0};
-    G4double reconDPCX{0.0};
-    G4double reconDPCY{0.0};
-    G4double reconDPCTrueDeltaX{0.0};
-    G4double reconDPCTrueDeltaY{0.0};
     G4bool firstContactIsPixel{false};
     G4bool geometricIsPixel{false};
     G4bool isPixelHitCombined{false};
@@ -124,10 +120,6 @@ public:
         G4double* edep{nullptr};
         G4double* pixelTrueDeltaX{nullptr};
         G4double* pixelTrueDeltaY{nullptr};
-        G4double* reconDPCX{nullptr};
-        G4double* reconDPCY{nullptr};
-        G4double* reconDPCTrueDeltaX{nullptr};
-        G4double* reconDPCTrueDeltaY{nullptr};
     };
 
     struct ClassificationBuffers {
@@ -242,10 +234,6 @@ public:
     G4double& Edep() { return fEdep; }
     G4double& PixelTrueDeltaX() { return fPixelTrueDeltaX; }
     G4double& PixelTrueDeltaY() { return fPixelTrueDeltaY; }
-    G4double& ReconDPCX() { return fReconDPCX; }
-    G4double& ReconDPCY() { return fReconDPCY; }
-    G4double& ReconDPCTrueDeltaX() { return fReconDPCTrueDeltaX; }
-    G4double& ReconDPCTrueDeltaY() { return fReconDPCTrueDeltaY; }
     G4bool& IsPixelHit() { return fIsPixelHit; }
     G4int& NeighborhoodActiveCells() { return fNeighborhoodActiveCells; }
     G4int& NearestPixelI() { return fNearestPixelI; }
@@ -315,8 +303,6 @@ private:
     G4double fPixelX{0.0}, fPixelY{0.0};
     G4double fEdep{0.0};
     G4double fPixelTrueDeltaX{0.0}, fPixelTrueDeltaY{0.0};
-    G4double fReconDPCX{0.0}, fReconDPCY{0.0};
-    G4double fReconDPCTrueDeltaX{0.0}, fReconDPCTrueDeltaY{0.0};
     G4bool fIsPixelHit{false};
     G4int fNeighborhoodActiveCells{0};
     G4int fNearestPixelI{-1}, fNearestPixelJ{-1}, fNearestPixelGlobalId{-1};
@@ -389,7 +375,7 @@ public:
 
     struct ModelMetadata {
         Config::SignalModel signalModel{Config::SignalModel::LogA};  ///< Signal sharing model
-        Config::PosReconModel model{Config::PosReconModel::DPC};     ///< Reconstruction method
+        Config::PosReconModel model{Config::PosReconModel::LogA};     ///< Reconstruction method
         Config::ActivePixelMode activePixelMode{Config::ActivePixelMode::Neighborhood};
         G4double beta{0.0};  ///< Linear signal model beta parameter (per micron)
     };
