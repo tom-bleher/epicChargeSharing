@@ -90,39 +90,16 @@ inline constexpr G4double FIT_ERROR_PERCENT_OF_MAX = 5.0;      // Base uncertain
 inline constexpr G4bool FIT_USE_VERTICAL_UNCERTAINTIES = true; // Enable weighted fits
 inline constexpr G4bool FIT_USE_QN_QI_ERRORS = false;          // Use Q_n/Q_i scaling
 
-// Distance-weighted errors (pixels farther from hit center have different weights)
-inline constexpr G4bool FIT_USE_DISTANCE_WEIGHTED_ERRORS = false; // Master switch
-inline constexpr G4double FIT_DISTANCE_SCALE_PIXELS = 1.0;        // Scale in pixel units
-inline constexpr G4double FIT_DISTANCE_EXPONENT = 1.0;            // Power law exponent
-inline constexpr G4double FIT_DISTANCE_FLOOR_PERCENT = 1.0;       // Min sigma (% of Q_max)
-inline constexpr G4double FIT_DISTANCE_CAP_PERCENT = 50.0;        // Max sigma (% of Q_max)
-inline constexpr G4bool FIT_DISTANCE_PREFER_TRUTH_CENTER = true;  // Use true hit position
-inline constexpr G4bool FIT_DISTANCE_POWER_INVERSE = true;        // Inverse power model
-
 // Input charge branch for fitting
 inline constexpr const char* FIT_CHARGE_BRANCH_1D = "Qf";
 inline constexpr const char* FIT_CHARGE_BRANCH_2D = "Qf";
 
 // ─────────────────────────────── 1D Fit Options ──────────────────────────────
-inline constexpr G4bool FIT_1D_DIAGONALS = false;       // Also fit diagonal slices
 inline constexpr G4bool FIT_1D_SAVE_A = true;           // Save amplitude
 inline constexpr G4bool FIT_1D_SAVE_MU = true;          // Save mean position
 inline constexpr G4bool FIT_1D_SAVE_SIGMA = true;       // Save width
 inline constexpr G4bool FIT_1D_SAVE_B = true;           // Save baseline offset
 inline constexpr G4bool FIT_1D_SAVE_LINE_MEANS = false; // Save weighted mean positions
-
-// 1D diagonal fit parameter saving (when FIT_1D_DIAGONALS = true)
-inline constexpr G4bool FIT_1D_SAVE_DIAG_A = true;
-inline constexpr G4bool FIT_1D_SAVE_DIAG_MU = true;
-inline constexpr G4bool FIT_1D_SAVE_DIAG_SIGMA = true;
-inline constexpr G4bool FIT_1D_SAVE_DIAG_B = true;
-
-// 1D distance model tuning (can differ from 2D)
-inline constexpr G4bool FIT_1D_DIST_ENABLED = true;
-inline constexpr G4double FIT_1D_DIST_SCALE_PIXELS = 1.5;
-inline constexpr G4double FIT_1D_DIST_EXPONENT = 1.5;
-inline constexpr G4double FIT_1D_DIST_FLOOR_PERCENT = 4.0;
-inline constexpr G4double FIT_1D_DIST_CAP_PERCENT = 10.0;
 
 // ─────────────────────────────── 2D Fit Options ──────────────────────────────
 inline constexpr G4bool FIT_2D_SAVE_A = true;    // Save amplitude
@@ -131,13 +108,6 @@ inline constexpr G4bool FIT_2D_SAVE_MUY = true;  // Save mean Y position
 inline constexpr G4bool FIT_2D_SAVE_SIGX = true; // Save width in X
 inline constexpr G4bool FIT_2D_SAVE_SIGY = true; // Save width in Y
 inline constexpr G4bool FIT_2D_SAVE_B = true;    // Save baseline offset
-
-// 2D distance model tuning (can differ from 1D)
-inline constexpr G4bool FIT_2D_DIST_ENABLED = false;
-inline constexpr G4double FIT_2D_DIST_SCALE_PIXELS = 1.0;
-inline constexpr G4double FIT_2D_DIST_EXPONENT = 1.0;
-inline constexpr G4double FIT_2D_DIST_FLOOR_PERCENT = 1.0;
-inline constexpr G4double FIT_2D_DIST_CAP_PERCENT = 50.0;
 
 // ╔═══════════════════════════════════════════════════════════════════════════╗
 // ║                    END USER SETTINGS - Internal Below                     ║

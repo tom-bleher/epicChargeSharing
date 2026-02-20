@@ -58,3 +58,15 @@ cmake_install.cmake
 *.swp
 *~
 *.mdcpaper/
+
+# macOS metadata
+.DS_Store
+
+# Cache directories
+.cache/
+
+# Project notes (not for version control)
+main.md
+
+# CMake user presets (per-developer local config)
+CMakeUserPresets.json

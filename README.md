@@ -70,6 +70,29 @@ Edit `include/Config.hh` to customize:
 
 See the [documentation](https://tom-bleher.github.io/epicChargeSharing/) for details.
 
+## EDM4hep Output (Standalone)
+
+The standalone simulation can optionally write EDM4hep output files for validation and standalone analysis:
+
+```bash
+cmake -DWITH_EDM4HEP=ON -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+./epicChargeSharing -m ../macros/run.mac
+# Produces: epicChargeSharing.edm4hep.root
+```
+
+**Important**: This output uses a simplified CellID encoding (`system:8|layer:4|x:16|y:16`) that is **not** identical to the DD4hep `BitFieldCoder` encoding used by `npsim`/`ddsim` in the EIC production pipeline. The standalone EDM4hep output is suitable for:
+
+- Validating charge sharing algorithms independently
+- Comparing standalone results with ROOT TTree output
+- Prototyping analysis workflows
+
+**For the EIC pipeline**, use the standard workflow instead:
+1. **Simulation**: `npsim` (which produces DD4hep-compatible CellIDs)
+2. **Reconstruction**: `eicrecon` with the `chargeSharingRecon` plugin (see below)
+
+The standalone EDM4hep output should not be fed directly into `eicrecon` without accounting for the different CellID encoding.
+
 ## EICrecon Plugin
 
 The `chargeSharingRecon` plugin integrates charge-sharing reconstruction into the EIC software stack. It processes `edm4hep::SimTrackerHit` collections and outputs reconstructed `edm4eic::TrackerHit` positions with improved spatial resolution.

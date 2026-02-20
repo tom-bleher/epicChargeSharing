@@ -7,10 +7,6 @@ Configurations:
 2. 2D LogA with 5% max vertical uncertainty
 3. 1D without vertical uncertainty
 4. 2D without vertical uncertainty
-5. 1D with distance-based vertical uncertainty
-6. 2D with distance-based vertical uncertainty
-7. 1D with inverse distance vertical uncertainty
-8. 2D with inverse distance vertical uncertainty
 
 Each configuration modifies Config.hh, rebuilds, and runs the full sweep.
 Results are saved to separate timestamped directories.
@@ -18,8 +14,6 @@ Results are saved to separate timestamped directories.
 After all runs, generates comparison plots overlaying 1D vs 2D:
 - 5% max vertical uncertainty
 - No vertical uncertainty
-- Distance-based vertical uncertainty
-- Inverse distance vertical uncertainty
 """
 
 import argparse
@@ -54,91 +48,47 @@ class FitConfig(NamedTuple):
     fit_gaus_1d: bool                   # FIT_GAUS_1D setting
     fit_gaus_2d: bool                   # FIT_GAUS_2D setting
     use_vertical_uncertainties: bool   # FIT_USE_VERTICAL_UNCERTAINTIES
-    use_distance_weighted: bool        # FIT_USE_DISTANCE_WEIGHTED_ERRORS
-    distance_power_inverse: bool = True # FIT_DISTANCE_POWER_INVERSE (inverse vs direct)
     error_percent: float = 5.0         # FIT_ERROR_PERCENT_OF_MAX
 
 
 # Define all configurations to run
 CONFIGURATIONS = [
-    #FitConfig(
-        #name="1D_LogA_5pct_vert",
-        #description="1D LogA with 5% max vertical uncertainty",
-        #fit_gaus_1d=True,
-        #fit_gaus_2d=False,
-        #use_vertical_uncertainties=True,
-        #use_distance_weighted=False,
-        #error_percent=5.0,
-    #),
-    #FitConfig(
-        #name="2D_LogA_5pct_vert",
-        #description="2D LogA with 5% max vertical uncertainty",
-        #fit_gaus_1d=False,
-        #fit_gaus_2d=True,
-        #use_vertical_uncertainties=True,
-        #use_distance_weighted=False,
-        #error_percent=5.0,
-    #),
-    #FitConfig(
-        #name="1D_LogA_no_vert",
-        #description="1D LogA without vertical uncertainty",
-        #fit_gaus_1d=True,
-        #fit_gaus_2d=False,
-        #use_vertical_uncertainties=False,
-        #use_distance_weighted=False,
-    #),
-    #FitConfig(
-        #name="2D_LogA_no_vert",
-        #description="2D LogA without vertical uncertainty",
-        #fit_gaus_1d=False,
-        #fit_gaus_2d=True,
-        #use_vertical_uncertainties=False,
-        #use_distance_weighted=False,
-    #),
     FitConfig(
-        name="1D_LogA_dist_vert",
-        description="1D LogA with distance-based vertical uncertainty",
+        name="1D_LogA_5pct_vert",
+        description="1D LogA with 5% max vertical uncertainty",
         fit_gaus_1d=True,
         fit_gaus_2d=False,
         use_vertical_uncertainties=True,
-        use_distance_weighted=True,
-        distance_power_inverse=False,
+        error_percent=5.0,
     ),
     FitConfig(
-        name="2D_LogA_dist_vert",
-        description="2D LogA with distance-based vertical uncertainty",
+        name="2D_LogA_5pct_vert",
+        description="2D LogA with 5% max vertical uncertainty",
         fit_gaus_1d=False,
         fit_gaus_2d=True,
         use_vertical_uncertainties=True,
-        use_distance_weighted=True,
-        distance_power_inverse=False,
+        error_percent=5.0,
     ),
     FitConfig(
-        name="1D_LogA_inv_dist_vert",
-        description="1D LogA with inverse distance vertical uncertainty",
+        name="1D_LogA_no_vert",
+        description="1D LogA without vertical uncertainty",
         fit_gaus_1d=True,
         fit_gaus_2d=False,
-        use_vertical_uncertainties=True,
-        use_distance_weighted=True,
-        distance_power_inverse=True,
+        use_vertical_uncertainties=False,
     ),
     FitConfig(
-        name="2D_LogA_inv_dist_vert",
-        description="2D LogA with inverse distance vertical uncertainty",
+        name="2D_LogA_no_vert",
+        description="2D LogA without vertical uncertainty",
         fit_gaus_1d=False,
         fit_gaus_2d=True,
-        use_vertical_uncertainties=True,
-        use_distance_weighted=True,
-        distance_power_inverse=True,
+        use_vertical_uncertainties=False,
     ),
 ]
 
 # Comparison groups: (plot_name, title, 1D_config_name, 2D_config_name)
 COMPARISON_GROUPS = [
-    #("5pct_vert", "5% Max Vertical Uncertainty", "1D_LogA_5pct_vert", "2D_LogA_5pct_vert"),
-    #("no_vert", "No Vertical Uncertainty", "1D_LogA_no_vert", "2D_LogA_no_vert"),
-    ("dist_vert", "Distance-Based Vertical Uncertainty", "1D_LogA_dist_vert", "2D_LogA_dist_vert"),
-    ("inv_dist_vert", "Inverse Distance Vertical Uncertainty", "1D_LogA_inv_dist_vert", "2D_LogA_inv_dist_vert"),
+    ("5pct_vert", "5% Max Vertical Uncertainty", "1D_LogA_5pct_vert", "2D_LogA_5pct_vert"),
+    ("no_vert", "No Vertical Uncertainty", "1D_LogA_no_vert", "2D_LogA_no_vert"),
 ]
 
 # Branch to use for sigma_f comparison (primary reconstruction method)
@@ -351,8 +301,6 @@ def apply_config(cfg: FitConfig) -> str:
     modified = modify_bool_constant(modified, "FIT_GAUS_1D", cfg.fit_gaus_1d)
     modified = modify_bool_constant(modified, "FIT_GAUS_2D", cfg.fit_gaus_2d)
     modified = modify_bool_constant(modified, "FIT_USE_VERTICAL_UNCERTAINTIES", cfg.use_vertical_uncertainties)
-    modified = modify_bool_constant(modified, "FIT_USE_DISTANCE_WEIGHTED_ERRORS", cfg.use_distance_weighted)
-    modified = modify_bool_constant(modified, "FIT_DISTANCE_POWER_INVERSE", cfg.distance_power_inverse)
     modified = modify_double_constant(modified, "FIT_ERROR_PERCENT_OF_MAX", cfg.error_percent)
 
     write_config(modified)
@@ -464,8 +412,6 @@ def main():
             print(f"    FIT_GAUS_1D = {cfg.fit_gaus_1d}")
             print(f"    FIT_GAUS_2D = {cfg.fit_gaus_2d}")
             print(f"    FIT_USE_VERTICAL_UNCERTAINTIES = {cfg.use_vertical_uncertainties}")
-            print(f"    FIT_USE_DISTANCE_WEIGHTED_ERRORS = {cfg.use_distance_weighted}")
-            print(f"    FIT_DISTANCE_POWER_INVERSE = {cfg.distance_power_inverse}")
             print(f"    FIT_ERROR_PERCENT_OF_MAX = {cfg.error_percent}")
         return 0
 
@@ -483,8 +429,6 @@ def main():
             print(f"  FIT_GAUS_1D = {cfg.fit_gaus_1d}")
             print(f"  FIT_GAUS_2D = {cfg.fit_gaus_2d}")
             print(f"  FIT_USE_VERTICAL_UNCERTAINTIES = {cfg.use_vertical_uncertainties}")
-            print(f"  FIT_USE_DISTANCE_WEIGHTED_ERRORS = {cfg.use_distance_weighted}")
-            print(f"  FIT_DISTANCE_POWER_INVERSE = {cfg.distance_power_inverse}")
             print(f"  FIT_ERROR_PERCENT_OF_MAX = {cfg.error_percent}")
             apply_config(cfg)
 

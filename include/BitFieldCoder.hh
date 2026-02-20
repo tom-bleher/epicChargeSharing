@@ -19,7 +19,7 @@
 #define ECS_BITFIELDCODER_HH
 
 #include <cstdint>
-#include <cstdlib>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -138,13 +138,13 @@ private:
 
             if (parts.size() == 2) {
                 name = parts[0];
-                width = std::atoi(parts[1].c_str());
+                width = std::stoi(parts[1]);
                 thisOffset = offset;
                 offset += static_cast<unsigned>(std::abs(width));
             } else if (parts.size() == 3) {
                 name = parts[0];
-                thisOffset = static_cast<unsigned>(std::atoi(parts[1].c_str()));
-                width = std::atoi(parts[2].c_str());
+                thisOffset = static_cast<unsigned>(std::stoi(parts[1]));
+                width = std::stoi(parts[2]);
                 offset = thisOffset + static_cast<unsigned>(std::abs(width));
             } else {
                 throw std::runtime_error("BitFieldCoder: invalid descriptor '" + desc + "'");

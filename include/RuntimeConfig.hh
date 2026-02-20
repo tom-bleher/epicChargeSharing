@@ -84,6 +84,7 @@ private:
     std::unique_ptr<G4GenericMessenger> fPhysicsMessenger;
     std::unique_ptr<G4GenericMessenger> fNoiseMessenger;
     std::unique_ptr<G4GenericMessenger> fFitMessenger;
+    std::unique_ptr<G4GenericMessenger> fGunMessenger;
 };
 
 } // namespace ECS

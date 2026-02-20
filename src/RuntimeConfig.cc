@@ -41,6 +41,11 @@ void RuntimeConfig::DefineCommands() {
 
     fFitMessenger->DeclareProperty("errorPercentOfMax", fitErrorPercentOfMax, "Fit uncertainty (% of max charge)")
         .SetRange("errorPercentOfMax > 0");
+
+    // Gun commands
+    fGunMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/gun/", "Particle gun configuration");
+
+    fGunMessenger->DeclareProperty("useFixedPosition", useFixedPosition, "Use fixed position (true) or random sampling (false)");
 }
 
 } // namespace ECS
