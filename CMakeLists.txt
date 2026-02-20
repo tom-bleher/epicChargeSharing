@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
-project(epicChargeSharing LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.16...3.31)
+project(epicChargeSharing VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,19 +14,15 @@ endif()
 # ============================================================================
 # Options
 # ============================================================================
-option(WITH_EDM4HEP  "Enable EDM4hep output format"               OFF)
+option(WITH_EDM4HEP  "Enable EDM4hep output format"               ON)
 option(BUILD_TESTING "Build unit tests"                            OFF)
-option(EC_FAST_MATH  "Enable -ffast-math and architecture tuning"  OFF)
-option(EC_PROFILE    "Enable profiling flags (-pg, frame pointers)" OFF)
-
-set(EC_MARCH "native" CACHE STRING "Target CPU architecture (native, znver4, skylake, ...)")
 
 # ============================================================================
 # Dependencies
 # ============================================================================
 find_package(Geant4 REQUIRED ui_all vis_all)
 find_package(ROOT CONFIG REQUIRED COMPONENTS Core RIO Hist Tree Graf Minuit MathCore Matrix)
-find_package(Eigen3 3.3 REQUIRED CONFIG)
+find_package(Eigen3 REQUIRED CONFIG)
 find_package(Threads REQUIRED)
 
 if(WITH_EDM4HEP)
@@ -78,20 +74,12 @@ target_compile_definitions(epicChargeSharing
 # Warnings
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(epicChargeSharing PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-# Optional: fast-math / architecture tuning
-if(EC_FAST_MATH AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(epicChargeSharing PRIVATE
-        -ffast-math -fno-math-errno -ffp-contract=fast
-        -march=${EC_MARCH} -mtune=${EC_MARCH}
-    )
-endif()
-
-# Optional: profiling
-if(EC_PROFILE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(epicChargeSharing PRIVATE -pg -fno-omit-frame-pointer)
-    target_link_options(epicChargeSharing PRIVATE -pg)
+    # Suppress #warning directives from ROOT headers (C++ standard mismatch)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(epicChargeSharing PRIVATE -Wno-\#warnings)
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(epicChargeSharing PRIVATE -Wno-cpp)
+    endif()
 endif()
 
 # LTO for Release builds
@@ -164,6 +152,4 @@ message(STATUS "epicChargeSharing configuration:")
 message(STATUS "  Build type : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Geant4 MT  : ${Geant4_multithreaded_FOUND}")
 message(STATUS "  EDM4hep    : ${WITH_EDM4HEP}")
-message(STATUS "  Fast-math  : ${EC_FAST_MATH}")
-message(STATUS "  Profiling  : ${EC_PROFILE}")
 message(STATUS "  Testing    : ${BUILD_TESTING}")
