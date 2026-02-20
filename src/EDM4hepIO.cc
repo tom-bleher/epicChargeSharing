@@ -1,8 +1,9 @@
 /// \file EDM4hepIO.cc
 /// \brief Implementation of EDM4hep output writer.
 ///
-/// Converts GEANT4 simulation data to EDM4hep format for use with
-/// EICrecon and the EIC software ecosystem.
+/// Converts GEANT4 simulation data to EDM4hep format. CellIDs are encoded
+/// using a standalone reimplementation of DD4hep's BitFieldCoder algorithm,
+/// producing bit-identical results for the same descriptor string.
 
 #include "EDM4hepIO.hh"
 
@@ -23,7 +24,8 @@ namespace ECS::IO {
 // Construction / Destruction
 // ============================================================================
 
-EDM4hepWriter::EDM4hepWriter() = default;
+EDM4hepWriter::EDM4hepWriter()
+    : m_coder(m_config.cellIDEncoding) {}
 
 EDM4hepWriter::~EDM4hepWriter() {
     if (m_isOpen) {
@@ -34,6 +36,7 @@ EDM4hepWriter::~EDM4hepWriter() {
 EDM4hepWriter::EDM4hepWriter(EDM4hepWriter&& other) noexcept
     : m_writer(std::move(other.m_writer)),
       m_config(std::move(other.m_config)),
+      m_coder(std::move(other.m_coder)),
       m_isOpen(other.m_isOpen),
       m_eventsWritten(other.m_eventsWritten) {
     other.m_isOpen = false;
@@ -47,6 +50,7 @@ EDM4hepWriter& EDM4hepWriter::operator=(EDM4hepWriter&& other) noexcept {
         }
         m_writer = std::move(other.m_writer);
         m_config = std::move(other.m_config);
+        m_coder = std::move(other.m_coder);
         m_isOpen = other.m_isOpen;
         m_eventsWritten = other.m_eventsWritten;
         other.m_isOpen = false;
@@ -61,6 +65,7 @@ EDM4hepWriter& EDM4hepWriter::operator=(EDM4hepWriter&& other) noexcept {
 
 void EDM4hepWriter::Configure(const EDM4hepConfig& config) {
     m_config = config;
+    m_coder = BitFieldCoder(config.cellIDEncoding);
 }
 
 // ============================================================================
@@ -92,6 +97,8 @@ bool EDM4hepWriter::Open(const std::string& filename) {
         m_isOpen = true;
         m_eventsWritten = 0;
         G4cout << "[EDM4hepWriter] Opened " << filename << " for writing" << G4endl;
+        G4cout << "[EDM4hepWriter] CellID encoding: "
+               << m_config.cellIDEncoding << G4endl;
         return true;
     } catch (const std::exception& e) {
         G4cerr << "[EDM4hepWriter] Failed to open " << filename
@@ -149,6 +156,10 @@ bool EDM4hepWriter::WriteEvent(const EventRecord& record,
         frame.put(std::move(mcParticles), m_config.mcParticleCollection);
         frame.put(std::move(eventHeaders), "EventHeader");
 
+        // Store CellID encoding so downstream tools can decode
+        frame.putParameter(m_config.simHitCollection + "__CellIDEncoding",
+                           m_config.cellIDEncoding);
+
         // Write the frame
         m_writer->writeFrame(frame, "events");
 
@@ -191,13 +202,15 @@ edm4hep::MutableMCParticle EDM4hepWriter::FillMCParticle(
                         record.summary.hitY,
                         record.summary.hitZ});
 
-    // Momentum: placeholder direction (would come from PrimaryGenerator)
-    // Default: 10 GeV electron in -Z direction (typical beam direction)
-    particle.setMomentum({0.0f, 0.0f, -10.0f});
+    // Primary particle momentum (converted from Geant4 MeV to EDM4hep GeV)
+    particle.setMomentum({
+        static_cast<float>(record.summary.primaryMomentumX / CLHEP::GeV),
+        static_cast<float>(record.summary.primaryMomentumY / CLHEP::GeV),
+        static_cast<float>(record.summary.primaryMomentumZ / CLHEP::GeV)});
 
     particle.setMass(0.000511f);  // Electron mass in GeV
     particle.setCharge(-1.0f);
-    particle.setTime(0.0f);
+    particle.setTime(0.0f);  // Creation time of primary (always 0 for gun-generated particles)
 
     return particle;
 }
@@ -220,14 +233,17 @@ void EDM4hepWriter::FillSimTrackerHit(edm4hep::SimTrackerHitCollection& hits,
     const float edep_GeV = static_cast<float>(record.summary.edep / CLHEP::GeV);
     hit.setEDep(edep_GeV);
 
-    // Time (proper time in lab frame) - would come from GEANT4 step
-    hit.setTime(0.0f);
+    // Global time at first contact in the sensitive volume (ns)
+    hit.setTime(static_cast<float>(record.summary.hitTime));
 
-    // Path length in sensitive material
-    hit.setPathLength(0.0f);
+    // Path length accumulated through the sensitive volume (mm)
+    hit.setPathLength(static_cast<float>(record.summary.pathLength));
 
-    // Momentum at hit position (placeholder)
-    hit.setMomentum({0.0f, 0.0f, -10.0f});
+    // Primary particle momentum at hit position (converted from Geant4 MeV to EDM4hep GeV)
+    hit.setMomentum({
+        static_cast<float>(record.summary.primaryMomentumX / CLHEP::GeV),
+        static_cast<float>(record.summary.primaryMomentumY / CLHEP::GeV),
+        static_cast<float>(record.summary.primaryMomentumZ / CLHEP::GeV)});
 
     // Quality flag (0 = normal hit)
     hit.setQuality(0);
@@ -236,22 +252,19 @@ void EDM4hepWriter::FillSimTrackerHit(edm4hep::SimTrackerHitCollection& hits,
     hit.setParticle(particle);
 }
 
+/// @brief Encode pixel indices into a CellID using DD4hep BitFieldCoder format.
+///
+/// Sets all geometry fields from EDM4hepConfig::geoFields, then the two
+/// pixel coordinate fields. The field names and layout are determined by
+/// the cellIDEncoding descriptor string.
 std::uint64_t EDM4hepWriter::EncodeCellID(int pixelI, int pixelJ) const {
-    // CellID encoding compatible with DD4hep CartesianGridXY
-    // Format: system:8,layer:4,x:16,y:16 (total 44 bits used)
-    //
-    // This allows indices from -32768 to 32767 for x/y
-    // which accommodates typical pixel grids (e.g., 60x60)
-
-    const std::uint64_t system = static_cast<std::uint64_t>(m_config.systemID) & 0xFF;
-    const std::uint64_t layer = static_cast<std::uint64_t>(m_config.layerID) & 0xF;
-
-    // Handle negative indices by treating as unsigned 16-bit
-    // This maintains compatibility with DD4hep's signed index handling
-    const std::uint64_t xBits = static_cast<std::uint64_t>(static_cast<std::uint16_t>(pixelI));
-    const std::uint64_t yBits = static_cast<std::uint64_t>(static_cast<std::uint16_t>(pixelJ));
-
-    return (system << 36) | (layer << 32) | (xBits << 16) | yBits;
+    CellID cellid = 0;
+    for (const auto& [name, value] : m_config.geoFields) {
+        m_coder.set(cellid, name, value);
+    }
+    m_coder.set(cellid, m_config.pixelFieldX, pixelI);
+    m_coder.set(cellid, m_config.pixelFieldY, pixelJ);
+    return cellid;
 }
 
 // ============================================================================

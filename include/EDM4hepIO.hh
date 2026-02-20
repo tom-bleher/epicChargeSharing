@@ -1,8 +1,10 @@
 /// \file EDM4hepIO.hh
-/// \brief EDM4hep output writer for GEANT4 simulation data.
+/// \brief EDM4hep output writer for standalone GEANT4 simulation data.
 ///
-/// This module writes simulation data in EDM4hep format for compatibility
-/// with the EIC reconstruction software stack (EICrecon, JANA2).
+/// This module writes simulation data in EDM4hep format with CellID encoding
+/// compatible with DD4hep's BitFieldCoder. The encoding descriptor string
+/// is configurable via EDM4hepConfig::cellIDEncoding and defaults to the
+/// ePIC silicon tracker layout.
 ///
 /// Enable with CMake option: -DWITH_EDM4HEP=ON
 ///
@@ -14,10 +16,14 @@
 
 #include "RootIO.hh"
 
+#include "BitFieldCoder.hh"
+
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
+#include <vector>
 
 #ifdef WITH_EDM4HEP
 
@@ -34,16 +40,57 @@ struct EDM4hepConfig {
     std::string filename{"epicChargeSharing.edm4hep.root"};
     std::string simHitCollection{"ChargeSharingSimHits"};
     std::string mcParticleCollection{"MCParticles"};
-    int systemID{0};        ///< Detector system identifier
-    int layerID{0};         ///< Detector layer identifier
+
+    /// CellID encoding descriptor (DD4hep BitFieldCoder format).
+    std::string cellIDEncoding{"system:8,layer:4,module:12,sensor:2,x:32:-16,y:-16"};
+
+    /// Field names in cellIDEncoding that correspond to pixel column/row indices.
+    std::string pixelFieldX{"x"};
+    std::string pixelFieldY{"y"};
+
+    /// Non-pixel CellID fields and their values.
+    /// Keys must match field names in cellIDEncoding.
+    /// Different detectors use different field layouts, e.g.:
+    ///   B0:   {system, layer, module, sensor}
+    ///   Lumi: {system, sector, module}
+    std::vector<std::pair<std::string, int>> geoFields{
+        {"system", 0}, {"layer", 0}, {"module", 0}, {"sensor", 0}
+    };
+
     bool writeMetadata{true};
     bool enabled{true};
+
+    // ---- ePIC detector presets ----
+
+    /// B0 Tracker (far-forward, CartesianGridXZ, 70 um pixels)
+    static EDM4hepConfig B0Tracker(int layer = 1) {
+        EDM4hepConfig cfg;
+        cfg.simHitCollection = "B0TrackerHits";
+        cfg.cellIDEncoding = "system:8,layer:4,module:12,sensor:2,x:32:-16,z:-16";
+        cfg.pixelFieldX = "x";
+        cfg.pixelFieldY = "z";
+        cfg.geoFields = {{"system", 150}, {"layer", layer}, {"module", 0}, {"sensor", 0}};
+        return cfg;
+    }
+
+    /// Luminosity Spectrometer Tracker (far-backward, CartesianGridXY, 100 um pixels)
+    static EDM4hepConfig LumiSpecTracker(int sector = 0, int module = 0) {
+        EDM4hepConfig cfg;
+        cfg.simHitCollection = "LumiSpecTrackerHits";
+        cfg.cellIDEncoding = "system:8,sector:8,module:8,x:32:-16,y:-16";
+        cfg.pixelFieldX = "x";
+        cfg.pixelFieldY = "y";
+        cfg.geoFields = {{"system", 193}, {"sector", sector}, {"module", module}};
+        return cfg;
+    }
 };
 
 /// \brief Writes simulation output in EDM4hep format.
 ///
 /// This class converts EventRecord data to EDM4hep collections
-/// and writes them using PODIO's ROOTWriter.
+/// and writes them using PODIO's ROOTWriter. CellIDs are encoded
+/// using a standalone reimplementation of DD4hep's BitFieldCoder,
+/// producing bit-identical CellIDs for the same descriptor string.
 ///
 /// Thread Safety:
 /// - One instance per worker thread in MT mode
@@ -107,8 +154,7 @@ public:
     std::uint64_t EventsWritten() const { return m_eventsWritten; }
 
 private:
-    /// \brief Encode pixel indices into a cellID.
-    /// Format: system:8,layer:4,x:16,y:16
+    /// \brief Encode pixel indices into a CellID (DD4hep BitFieldCoder format).
     std::uint64_t EncodeCellID(int pixelI, int pixelJ) const;
 
     /// \brief Create SimTrackerHit from EventRecord.
@@ -127,6 +173,7 @@ private:
 
     std::unique_ptr<podio::ROOTWriter> m_writer;
     EDM4hepConfig m_config;
+    BitFieldCoder m_coder;
     bool m_isOpen{false};
     std::uint64_t m_eventsWritten{0};
     mutable std::mutex m_mutex;
@@ -147,10 +194,34 @@ struct EDM4hepConfig {
     std::string filename{"epicChargeSharing.edm4hep.root"};
     std::string simHitCollection{"ChargeSharingSimHits"};
     std::string mcParticleCollection{"MCParticles"};
-    int systemID{0};
-    int layerID{0};
+    std::string cellIDEncoding{"system:8,layer:4,module:12,sensor:2,x:32:-16,y:-16"};
+    std::string pixelFieldX{"x"};
+    std::string pixelFieldY{"y"};
+    std::vector<std::pair<std::string, int>> geoFields{
+        {"system", 0}, {"layer", 0}, {"module", 0}, {"sensor", 0}
+    };
     bool writeMetadata{true};
     bool enabled{false};  // Disabled by default when not compiled
+
+    static EDM4hepConfig B0Tracker(int layer = 1) {
+        EDM4hepConfig cfg;
+        cfg.simHitCollection = "B0TrackerHits";
+        cfg.cellIDEncoding = "system:8,layer:4,module:12,sensor:2,x:32:-16,z:-16";
+        cfg.pixelFieldX = "x";
+        cfg.pixelFieldY = "z";
+        cfg.geoFields = {{"system", 150}, {"layer", layer}, {"module", 0}, {"sensor", 0}};
+        return cfg;
+    }
+
+    static EDM4hepConfig LumiSpecTracker(int sector = 0, int module = 0) {
+        EDM4hepConfig cfg;
+        cfg.simHitCollection = "LumiSpecTrackerHits";
+        cfg.cellIDEncoding = "system:8,sector:8,module:8,x:32:-16,y:-16";
+        cfg.pixelFieldX = "x";
+        cfg.pixelFieldY = "y";
+        cfg.geoFields = {{"system", 193}, {"sector", sector}, {"module", module}};
+        return cfg;
+    }
 };
 
 class EDM4hepWriter {
