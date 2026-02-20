@@ -141,6 +141,11 @@ private:
     G4double fEdep{0.0};
     G4double fPixelTrueDeltaX{0.0};
     G4double fPixelTrueDeltaY{0.0};
+    G4double fPrimaryMomentumX{0.0};
+    G4double fPrimaryMomentumY{0.0};
+    G4double fPrimaryMomentumZ{0.0};
+    G4double fHitTime{0.0};
+    G4double fPathLength{0.0};
 
     G4bool fFirstContactIsPixel{false};
     G4bool fGeometricIsPixel{false};

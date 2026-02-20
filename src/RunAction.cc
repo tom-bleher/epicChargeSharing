@@ -356,7 +356,12 @@ void RunAction::ConfigureCoreBranches(TTree* tree) {
                                                         .pixelY = &fPixelY,
                                                         .edep = &fEdep,
                                                         .pixelTrueDeltaX = &fPixelTrueDeltaX,
-                                                        .pixelTrueDeltaY = &fPixelTrueDeltaY};
+                                                        .pixelTrueDeltaY = &fPixelTrueDeltaY,
+                                                        .primaryMomentumX = &fPrimaryMomentumX,
+                                                        .primaryMomentumY = &fPrimaryMomentumY,
+                                                        .primaryMomentumZ = &fPrimaryMomentumZ,
+                                                        .hitTime = &fHitTime,
+                                                        .pathLength = &fPathLength};
 
     const IO::BranchConfigurator::ClassificationBuffers classification{.isPixelHit = &fIsPixelHit,
                                                                        .neighborhoodActiveCells =
@@ -560,6 +565,11 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record) {
     fPixelY = record.summary.nearestPixelY;
     fPixelTrueDeltaX = record.summary.pixelTrueDeltaX;
     fPixelTrueDeltaY = record.summary.pixelTrueDeltaY;
+    fPrimaryMomentumX = record.summary.primaryMomentumX;
+    fPrimaryMomentumY = record.summary.primaryMomentumY;
+    fPrimaryMomentumZ = record.summary.primaryMomentumZ;
+    fHitTime = record.summary.hitTime;
+    fPathLength = record.summary.pathLength;
     fFirstContactIsPixel = record.summary.firstContactIsPixel;
     fGeometricIsPixel = record.summary.geometricIsPixel;
     fIsPixelHit = record.summary.isPixelHitCombined;

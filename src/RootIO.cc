@@ -52,7 +52,7 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
     };
 
     // Core branches (always present)
-    const std::array<BranchDef, 7> coreBranches{{
+    const std::array<BranchDef, 12> coreBranches{{
         {.name = "TrueX", .addr = buffers.trueX, .leaf = "TrueX/D"},
         {.name = "TrueY", .addr = buffers.trueY, .leaf = "TrueY/D"},
         {.name = "PixelX", .addr = buffers.pixelX, .leaf = "PixelX/D"},
@@ -60,6 +60,11 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
         {.name = "Edep", .addr = buffers.edep, .leaf = "Edep/D"},
         {.name = "PixelTrueDeltaX", .addr = buffers.pixelTrueDeltaX, .leaf = "PixelTrueDeltaX/D"},
         {.name = "PixelTrueDeltaY", .addr = buffers.pixelTrueDeltaY, .leaf = "PixelTrueDeltaY/D"},
+        {.name = "PrimaryMomentumX", .addr = buffers.primaryMomentumX, .leaf = "PrimaryMomentumX/D"},
+        {.name = "PrimaryMomentumY", .addr = buffers.primaryMomentumY, .leaf = "PrimaryMomentumY/D"},
+        {.name = "PrimaryMomentumZ", .addr = buffers.primaryMomentumZ, .leaf = "PrimaryMomentumZ/D"},
+        {.name = "HitTime", .addr = buffers.hitTime, .leaf = "HitTime/D"},
+        {.name = "PathLength", .addr = buffers.pathLength, .leaf = "PathLength/D"},
     }};
 
     for (const auto& def : coreBranches) {
@@ -237,6 +242,11 @@ void TreeFiller::UpdateSummaryScalars(const EventRecord& record) {
     fPixelY = record.summary.nearestPixelY;
     fPixelTrueDeltaX = record.summary.pixelTrueDeltaX;
     fPixelTrueDeltaY = record.summary.pixelTrueDeltaY;
+    fPrimaryMomentumX = record.summary.primaryMomentumX;
+    fPrimaryMomentumY = record.summary.primaryMomentumY;
+    fPrimaryMomentumZ = record.summary.primaryMomentumZ;
+    fHitTime = record.summary.hitTime;
+    fPathLength = record.summary.pathLength;
     fIsPixelHit = record.summary.isPixelHitCombined;
     fNearestPixelI = record.nearestPixelI;
     fNearestPixelJ = record.nearestPixelJ;

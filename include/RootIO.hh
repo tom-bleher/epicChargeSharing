@@ -125,6 +125,11 @@ public:
         G4double* edep{nullptr};
         G4double* pixelTrueDeltaX{nullptr};
         G4double* pixelTrueDeltaY{nullptr};
+        G4double* primaryMomentumX{nullptr};
+        G4double* primaryMomentumY{nullptr};
+        G4double* primaryMomentumZ{nullptr};
+        G4double* hitTime{nullptr};
+        G4double* pathLength{nullptr};
     };
 
     struct ClassificationBuffers {
@@ -238,6 +243,11 @@ public:
     G4double& Edep() { return fEdep; }
     G4double& PixelTrueDeltaX() { return fPixelTrueDeltaX; }
     G4double& PixelTrueDeltaY() { return fPixelTrueDeltaY; }
+    G4double& PrimaryMomentumX() { return fPrimaryMomentumX; }
+    G4double& PrimaryMomentumY() { return fPrimaryMomentumY; }
+    G4double& PrimaryMomentumZ() { return fPrimaryMomentumZ; }
+    G4double& HitTime() { return fHitTime; }
+    G4double& PathLength() { return fPathLength; }
     G4bool& IsPixelHit() { return fIsPixelHit; }
     G4int& NeighborhoodActiveCells() { return fNeighborhoodActiveCells; }
     G4int& NearestPixelI() { return fNearestPixelI; }
@@ -307,6 +317,9 @@ private:
     G4double fPixelX{0.0}, fPixelY{0.0};
     G4double fEdep{0.0};
     G4double fPixelTrueDeltaX{0.0}, fPixelTrueDeltaY{0.0};
+    G4double fPrimaryMomentumX{0.0}, fPrimaryMomentumY{0.0}, fPrimaryMomentumZ{0.0};
+    G4double fHitTime{0.0};
+    G4double fPathLength{0.0};
     G4bool fIsPixelHit{false};
     G4int fNeighborhoodActiveCells{0};
     G4int fNearestPixelI{-1}, fNearestPixelJ{-1}, fNearestPixelGlobalId{-1};
