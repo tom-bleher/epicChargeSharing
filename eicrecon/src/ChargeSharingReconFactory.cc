@@ -463,6 +463,14 @@ void ChargeSharingReconFactory::Process(int32_t /*runNumber*/, uint64_t /*eventN
   const auto& cfg = m_reconstructor.config();
   const bool useXZ = cfg.segmentation.useXZCoordinates;
 
+  // Position error defaults: pitch^2/12 (uniform distribution), computed once per event
+  const double pitchX = cfg.pixelSpacingMM;
+  const double pitchY = cfg.effectivePixelSpacingYMM();
+  const double defaultVarX = (pitchX * pitchX) / 12.0;
+  const double defaultVarY = (pitchY * pitchY) / 12.0;
+  const double sensorT = cfg.detectorThicknessMM;
+  const double varZ = (sensorT * sensorT) / 12.0;
+
   for (const auto& hit : *simhits) {
     const double edep = hit.getEDep();
     if (edep < static_cast<double>(m_minEDep())) {
@@ -517,11 +525,54 @@ void ChargeSharingReconFactory::Process(int32_t /*runNumber*/, uint64_t /*eventN
       };
     }
 
+    // Compute position error (variance) from fit results.
+    // CovDiag3f stores variances (sigma^2), matching the EICrecon convention.
+    // Fallback: pitch^2/12 (uniform distribution over pixel), as in TrackerHitReconstruction.
+    double varLocalX = defaultVarX;
+    double varLocalY = defaultVarY;
+
+    // 1D fit results (populated when reconMethod == Gaussian1D)
+    if (result.fitRowX.converged &&
+        std::isfinite(result.fitRowX.muError) && result.fitRowX.muError > 0.0) {
+      varLocalX = result.fitRowX.muError * result.fitRowX.muError;
+    }
+    if (result.fitColY.converged &&
+        std::isfinite(result.fitColY.muError) && result.fitColY.muError > 0.0) {
+      varLocalY = result.fitColY.muError * result.fitColY.muError;
+    }
+
+    // 2D fit results (populated when reconMethod == Gaussian2D)
+    if (result.fit2D.converged) {
+      if (std::isfinite(result.fit2D.muXError) && result.fit2D.muXError > 0.0) {
+        varLocalX = result.fit2D.muXError * result.fit2D.muXError;
+      }
+      if (std::isfinite(result.fit2D.muYError) && result.fit2D.muYError > 0.0) {
+        varLocalY = result.fit2D.muYError * result.fit2D.muYError;
+      }
+    }
+
+    // Map covariance to global coordinates (must match position mapping above)
+    edm4eic::CovDiag3f posError;
+    if (useXZ) {
+      // Local X->Global X, Local Y->Global Z, Local Z->Global Y
+      posError = edm4eic::CovDiag3f{
+          static_cast<float>(varLocalX),   // xx: Global X (from local X fit)
+          static_cast<float>(varZ),        // yy: Global Y (= local Z, through-sensor)
+          static_cast<float>(varLocalY)    // zz: Global Z (= local Y fit)
+      };
+    } else {
+      posError = edm4eic::CovDiag3f{
+          static_cast<float>(varLocalX),   // xx: Global X
+          static_cast<float>(varLocalY),   // yy: Global Y
+          static_cast<float>(varZ)         // zz: Global Z (through-sensor)
+      };
+    }
+
     // Create the output TrackerHit using the collection's create() method
     output->create(
         hit.getCellID(),                                                          // cellID
         reconPosition,                                                            // position
-        edm4eic::CovDiag3f{0.0f, 0.0f, 0.0f},                                      // positionError (TODO: compute from fit)
+        posError,                                                                 // positionError
         hit.getTime(),                                                             // time
         0.0f,                                                                      // timeError
         static_cast<float>(edep),                                                  // edep
