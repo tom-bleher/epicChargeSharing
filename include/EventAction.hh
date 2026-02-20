@@ -53,9 +53,10 @@ public:
 
     void SetSteppingAction(SteppingAction* steppingAction) { fSteppingAction = steppingAction; }
 
-    void RegisterFirstContact(const G4ThreeVector& pos)
+    void RegisterFirstContact(const G4ThreeVector& pos, G4double time)
     {
         fFirstContactPos = pos;
+        fFirstContactTime = time;
         fHasFirstContactPos = true;
     }
 
@@ -121,6 +122,7 @@ private:
     G4int fNeighborhoodRadius{Constants::NEIGHBORHOOD_RADIUS};
 
     G4ThreeVector fFirstContactPos;
+    G4double fFirstContactTime{0.0};
     G4bool fHasFirstContactPos{false};
 
     G4int fPixelIndexI{-1};

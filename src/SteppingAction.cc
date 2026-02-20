@@ -32,6 +32,7 @@ SteppingAction::SteppingAction(EventAction* eventAction)
 void SteppingAction::Reset()
 {
     fFirstContactType = FirstContactType::None;
+    fPathLengthInSensitive = 0.0;
 }
 
 void SteppingAction::CacheVolumes()
@@ -77,20 +78,39 @@ void SteppingAction::TrackVolumeInteractions(const G4Step* step)
     if (lv == fLogicBlock) {
         fFirstContactType = FirstContactType::Pixel;
         if (fEventAction) {
-            fEventAction->RegisterFirstContact(postPoint->GetPosition());
+            fEventAction->RegisterFirstContact(postPoint->GetPosition(),
+                                               postPoint->GetGlobalTime());
         }
     }
     else if (lv == fLogicCube) {
         fFirstContactType = FirstContactType::Silicon;
         if (fEventAction) {
-            fEventAction->RegisterFirstContact(postPoint->GetPosition());
+            fEventAction->RegisterFirstContact(postPoint->GetPosition(),
+                                               postPoint->GetGlobalTime());
         }
+    }
+}
+
+void SteppingAction::AccumulatePathLength(const G4Step* step)
+{
+    CacheVolumes();
+
+    const G4StepPoint* prePoint = step->GetPreStepPoint();
+    if (!prePoint) return;
+
+    G4VPhysicalVolume* preVol = prePoint->GetTouchableHandle()->GetVolume();
+    if (!preVol) return;
+
+    const G4LogicalVolume* lv = preVol->GetLogicalVolume();
+    if (lv == fLogicCube || lv == fLogicBlock) {
+        fPathLengthInSensitive += step->GetStepLength();
     }
 }
 
 void SteppingAction::UserSteppingAction(const G4Step* step)
 {
     TrackVolumeInteractions(step);
+    AccumulatePathLength(step);
 }
 
 } // namespace ECS

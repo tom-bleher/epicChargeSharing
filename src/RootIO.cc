@@ -41,7 +41,7 @@ void BranchConfigurator::ConfigureCoreBranches(TTree* tree, const ScalarBuffers&
 }
 
 void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers,
-                                                  Config::PosReconModel reconModel) {
+                                                  [[maybe_unused]] Config::PosReconModel reconModel) {
     if (!tree) return;
 
     struct BranchDef { const char* name; G4double* addr; const char* leaf; };

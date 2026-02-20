@@ -45,6 +45,11 @@ struct EventSummaryData {
     G4double nearestPixelY{0.0};
     G4double pixelTrueDeltaX{0.0};
     G4double pixelTrueDeltaY{0.0};
+    G4double primaryMomentumX{0.0};  ///< Primary particle px (Geant4 units: MeV)
+    G4double primaryMomentumY{0.0};  ///< Primary particle py (Geant4 units: MeV)
+    G4double primaryMomentumZ{0.0};  ///< Primary particle pz (Geant4 units: MeV)
+    G4double hitTime{0.0};           ///< Global time at first contact (Geant4 units: ns)
+    G4double pathLength{0.0};        ///< Path length through sensitive volume (Geant4 units: mm)
     G4bool firstContactIsPixel{false};
     G4bool geometricIsPixel{false};
     G4bool isPixelHitCombined{false};

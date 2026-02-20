@@ -113,6 +113,7 @@ void EventAction::BeginOfEventAction(const G4Event* /*event*/)
     fPixelTrueDeltaY = 0.;
     fScorerEnergyDeposit = 0.0;
     fFirstContactPos = G4ThreeVector(0., 0., 0.);
+    fFirstContactTime = 0.0;
     fHasFirstContactPos = false;
     fNearestPixelGlobalId = -1;
 
@@ -148,10 +149,27 @@ void EventAction::EndOfEventAction(const G4Event* event)
         EnsureNeighborhoodBuffers(fNeighborhoodLayout.TotalCells());
     }
 
+    // Extract primary particle momentum from the G4Event
+    G4ThreeVector primaryMomentum(0., 0., 0.);
+    if (event && event->GetPrimaryVertex()) {
+        const auto* primary = event->GetPrimaryVertex()->GetPrimary();
+        if (primary) {
+            primaryMomentum = primary->GetMomentum();
+        }
+    }
+
+    // Get path length accumulated by SteppingAction
+    const G4double pathLength = fSteppingAction ? fSteppingAction->GetPathLength() : 0.0;
+
     // Build event record
     ECS::IO::EventRecord record{};
     record.summary = BuildEventSummary(finalEdep, hitPos, nearestPixel,
                                        firstContactIsPixel, geometricIsPixel, isPixelHitCombined);
+    record.summary.primaryMomentumX = primaryMomentum.x();
+    record.summary.primaryMomentumY = primaryMomentum.y();
+    record.summary.primaryMomentumZ = primaryMomentum.z();
+    record.summary.hitTime = fFirstContactTime;
+    record.summary.pathLength = pathLength;
     record.nearestPixelI = fPixelIndexI;
     record.nearestPixelJ = fPixelIndexJ;
     record.nearestPixelGlobalId = fNearestPixelGlobalId;

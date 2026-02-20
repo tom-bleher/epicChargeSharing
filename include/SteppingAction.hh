@@ -69,6 +69,9 @@ public:
     /// \return The type of volume first contacted
     [[nodiscard]] FirstContactType GetFirstContactType() const { return fFirstContactType; }
 
+    /// \brief Get accumulated path length through sensitive volume.
+    [[nodiscard]] G4double GetPathLength() const { return fPathLengthInSensitive; }
+
 private:
     /// \brief Cache volume pointers for fast lookup.
     ///
@@ -77,8 +80,12 @@ private:
     /// expensive string comparisons in the hot stepping action path.
     void CacheVolumes();
 
+    /// \brief Accumulate step length when inside sensitive volume.
+    void AccumulatePathLength(const G4Step* step);
+
     EventAction* fEventAction;
     FirstContactType fFirstContactType = FirstContactType::None;
+    G4double fPathLengthInSensitive{0.0};  ///< Accumulated path in sensitive volume
 
     // Cached volume pointers for fast comparison (initialized lazily)
     const G4LogicalVolume* fLogicBlock = nullptr;   ///< Pixel aluminum volume
