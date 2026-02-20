@@ -434,23 +434,20 @@ public:
 private:
     /// \brief Validated D0 parameters for charge sharing calculations.
     ///
-    /// Contains pre-computed values derived from the D0 reference distance,
-    /// ensuring numerical stability in the charge sharing model.
+    /// Contains validated D0 values in both mm and micron units.
+    /// The core library handles guard logic internally.
     struct D0Params {
-        G4double length{0.0};           ///< Validated D0 length (clamped to minimum)
-        G4double invLength{0.0};        ///< 1.0 / length for efficient division
-        G4double minSafeDistance{0.0};  ///< Minimum distance to avoid singularities
-        G4bool isValid{false};            ///< True if original D0 was valid
+        G4double lengthMM{0.0};         ///< Validated D0 in mm
+        G4double micron{0.0};           ///< Validated D0 in microns (for core config)
+        G4bool isValid{false};          ///< True if original D0 was valid
 
         static constexpr G4double kMinD0 = 1e-6;  ///< Minimum D0 in micrometers
-        static constexpr G4double kGuardFactor = 1.0 + 1e-6;
     };
 
     /// \brief Validated charge model parameters.
     struct ChargeModelParams {
         G4bool useLinear{false};   ///< True for Linear model
-        G4double beta{0.0};      ///< Attenuation coefficient (Linear only)
-        G4double invMicron{0.0}; ///< 1.0 / micrometer for unit conversion
+        G4double beta{0.0};       ///< Attenuation coefficient in 1/um (Linear only)
     };
 
     D0Params ValidateD0(G4double d0Raw, const char* callerName) const;
@@ -458,17 +455,10 @@ private:
 
     void ReserveBuffers();
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
-    [[nodiscard]] G4double CalcDistanceToCenter(G4double dxToCenter,
-                                   G4double dyToCenter) const;
-
-    [[nodiscard]] G4double CalcPadViewAngleApprox(G4double distanceToCenter,
-                                    G4double padWidth,
-                                    G4double padHeight) const;
     void ComputeChargeFractions(const G4ThreeVector& hitPos,
                                 G4double totalChargeElectrons,
                                 G4double d0,
                                 G4double elementaryCharge);
-    void BuildOffsets();
     void EnsureFullGridBuffer();
     void ComputeFullGridFractions(const G4ThreeVector& hitPos,
                                   G4double d0,
@@ -484,21 +474,9 @@ private:
     G4int fNeighborhoodRadius{0};
     Result fResult;
 
-    /// \brief Stores both original and potentially modified weights to avoid recomputation.
-    ///
-    /// The original weight is preserved for row/col/block fraction calculations,
-    /// while the modified weight may be zeroed by DenominatorMode logic.
-    struct WeightPair {
-        G4double original{0.0};   ///< Original computed weight (never modified)
-        G4double modified{0.0};   ///< Weight after DenominatorMode adjustments
-    };
-    std::vector<WeightPair> fWeightScratch;
     Grid2D<G4double> fNeighborhoodWeights;  ///< Neighborhood weights for Eigen-based row/col sums
     Grid2D<G4double> fFullGridWeights;
-    struct Offset { int di{0}; int dj{0}; int idx{0}; };
-    std::vector<Offset> fOffsets;
     int fGridDim{0};
-    int fOffsetsDim{0};
     G4bool fEmitDistanceAlpha{false};
     G4bool fComputeFullGridFractions{false};
     G4bool fNeedsReset{true};

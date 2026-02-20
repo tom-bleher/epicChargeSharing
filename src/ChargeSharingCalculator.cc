@@ -48,8 +48,10 @@
  * @date 2025
  */
 #include "ChargeSharingCalculator.hh"
+#include "ChargeSharingCore.hh"
 
 #include "Config.hh"
+#include "RuntimeConfig.hh"
 #include "DetectorConstruction.hh"
 
 #include "G4Exception.hh"
@@ -61,10 +63,31 @@
 #include <limits>
 #include <mutex>
 
+namespace csc = epic::chargesharing::core;
+
 namespace
 {
 std::once_flag gInvalidD0WarningFlag;
+
+/// Map standalone signal model flag to core enum
+csc::SignalModel mapSignalModel(bool useLinear)
+{
+    return useLinear ? csc::SignalModel::LinA : csc::SignalModel::LogA;
 }
+
+/// Map standalone ActivePixelMode to core enum
+csc::ActivePixelMode mapActivePixelMode(Constants::ActivePixelMode mode)
+{
+    switch (mode) {
+        case Constants::ActivePixelMode::Neighborhood:   return csc::ActivePixelMode::Neighborhood;
+        case Constants::ActivePixelMode::RowCol:         return csc::ActivePixelMode::RowCol;
+        case Constants::ActivePixelMode::RowCol3x3:      return csc::ActivePixelMode::RowCol3x3;
+        case Constants::ActivePixelMode::ChargeBlock2x2: return csc::ActivePixelMode::ChargeBlock2x2;
+        case Constants::ActivePixelMode::ChargeBlock3x3: return csc::ActivePixelMode::ChargeBlock3x3;
+    }
+    return csc::ActivePixelMode::Neighborhood;
+}
+} // anonymous namespace
 
 // ============================================================================
 // D0 Validation and Charge Model Parameter Helpers
@@ -83,30 +106,25 @@ std::once_flag gInvalidD0WarningFlag;
 /// @brief Validate and prepare D0 parameters for charge sharing calculation.
 ///
 /// Ensures D0 is positive and finite. If invalid, clamps to minimum value
-/// and issues a one-time warning. Pre-computes derived values (inverse,
-/// minimum safe distance) for efficient use in inner loops.
+/// and issues a one-time warning. Returns both mm and micron values.
+/// The core library handles guard logic (min safe distance) internally.
 ChargeSharingCalculator::D0Params
 ChargeSharingCalculator::ValidateD0(G4double d0Raw, const char* callerName) const
 {
     D0Params params{};
-    const G4double rawLength = d0Raw * micrometer;
-    const G4double minLength = D0Params::kMinD0 * micrometer;
-
-    params.isValid = std::isfinite(rawLength) && rawLength > 0.0;
+    params.isValid = std::isfinite(d0Raw) && d0Raw > 0.0;
 
     if (!params.isValid) {
         std::call_once(gInvalidD0WarningFlag, [callerName]() {
             G4Exception(callerName, "InvalidD0", JustWarning,
                         "d0 parameter is non-positive; clamping to minimum value.");
         });
-        params.length = minLength;
+        params.micron = D0Params::kMinD0;
     } else {
-        params.length = std::max(rawLength, minLength);
+        params.micron = std::max(d0Raw, D0Params::kMinD0);
     }
 
-    params.invLength = 1.0 / params.length;
-    params.minSafeDistance = params.length * D0Params::kGuardFactor;
-
+    params.lengthMM = params.micron * micrometer;
     return params;
 }
 
@@ -114,14 +132,10 @@ ChargeSharingCalculator::ChargeModelParams
 ChargeSharingCalculator::GetChargeModelParams(G4double /*pixelSpacing*/) const
 {
     ChargeModelParams params{};
-
-    // Signal model (LogA or LinA) determines the charge sharing calculation.
     params.useLinear = Constants::USES_LINEAR_SIGNAL;
     params.beta = params.useLinear && fDetector
                       ? fDetector->GetLinearChargeModelBeta()
                       : 0.0;
-    params.invMicron = 1.0 / micrometer;
-
     return params;
 }
 
@@ -229,7 +243,6 @@ void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
 void ChargeSharingCalculator::ResetForEvent()
 {
     fResult.Reset();
-    fWeightScratch.clear();
     if (!fNeighborhoodWeights.Empty()) {
         fNeighborhoodWeights.Fill(0.0);
     }
@@ -265,7 +278,6 @@ const ChargeSharingCalculator::Result& ChargeSharingCalculator::Compute(
     fResult.gridSide = fGridDim;
     fResult.totalCells = static_cast<std::size_t>(fGridDim) * static_cast<std::size_t>(fGridDim);
     fResult.cells.clear();
-    fWeightScratch.clear();
     fResult.nearestPixelCenter = CalcNearestPixel(hitPos);
     fResult.hit.trueX = hitPos.x();
     fResult.hit.trueY = hitPos.y();
@@ -308,24 +320,15 @@ void ChargeSharingCalculator::ReserveBuffers()
 {
     const G4int gridRadius = std::max(0, fNeighborhoodRadius);
     const G4int newGridDim = (2 * gridRadius) + 1;
-    const G4int totalCells = newGridDim * newGridDim;
-    const std::size_t newSize = static_cast<std::size_t>(totalCells);
+    const std::size_t newSize = static_cast<std::size_t>(newGridDim) * static_cast<std::size_t>(newGridDim);
 
     if (newGridDim != fGridDim) {
         fGridDim = newGridDim;
-        // Resize neighborhood weights grid for Eigen-based row/col sums
         fNeighborhoodWeights.Resize(newGridDim, newGridDim, 0.0);
     }
 
     if (fResult.cells.capacity() < newSize) {
         fResult.cells.reserve(newSize);
-    }
-    if (fWeightScratch.capacity() < newSize) {
-        fWeightScratch.reserve(newSize);
-    }
-
-    if (fOffsets.empty() || fOffsetsDim != fGridDim) {
-        BuildOffsets();
     }
 }
 
@@ -337,33 +340,6 @@ G4ThreeVector ChargeSharingCalculator::CalcNearestPixel(const G4ThreeVector& pos
     return location.center;
 }
 
-G4double ChargeSharingCalculator::CalcDistanceToCenter(G4double dxToCenter,
-                                                        G4double dyToCenter) const
-{
-    // Compute d_i: Euclidean distance from the hit point to the pixel center.
-    return std::hypot(dxToCenter, dyToCenter);
-}
-
-G4double ChargeSharingCalculator::CalcPadViewAngleApprox(G4double distanceToCenter,
-                                                         G4double padWidth,
-                                                         G4double padHeight) const
-{
-    // Approximate alpha_i (paper notation): pad angle of view.
-    //
-    // The paper defines alpha_i as the angular span of a pad as seen from the
-    // hit point. For simplicity we use a compact approximation that depends on
-    // an effective pad size (average of width/height) and the distance to the
-    // pixel center.
-    const G4double l = (padWidth + padHeight) / 2.0;
-
-    const G4double numerator = (l / 2.0) * std::sqrt(2.0);
-    const G4double denominator = numerator + distanceToCenter;
-    if (distanceToCenter == 0.0) {
-        // atan(1) = pi/4 when distance == 0
-        return std::atan(1.0);
-    }
-    return std::atan(numerator / denominator);
-}
 
 void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos,
                                                      G4double totalChargeElectrons,
@@ -373,333 +349,154 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const G4double pixelSize = fDetector->GetPixelSize();
     const G4double pixelSpacing = fDetector->GetPixelSpacing();
     const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
+    const G4double totalChargeCoulomb = totalChargeElectrons * elementaryCharge;
 
-    // Use validated D0 and charge model parameters
     const D0Params d0p = ValidateD0(d0, "ChargeSharingCalculator::ComputeChargeFractions");
     const ChargeModelParams model = GetChargeModelParams(pixelSpacing);
 
-    const G4double hitX = hitPos.x();
-    const G4double hitY = hitPos.y();
-    const G4double nearestX = fResult.nearestPixelCenter.x();
-    const G4double nearestY = fResult.nearestPixelCenter.y();
-    const G4double baseDx = hitX - nearestX;
-    const G4double baseDy = hitY - nearestY;
+    const int radius = std::max(0, fNeighborhoodRadius);
+    const int gridDim = (2 * radius) + 1;
     const G4bool recordDistanceAlpha = fEmitDistanceAlpha;
+    const auto activePixelMode = Constants::ACTIVE_PIXEL_MODE;
+    const bool useRowColMode = (activePixelMode == Constants::ActivePixelMode::RowCol ||
+                                activePixelMode == Constants::ActivePixelMode::RowCol3x3);
 
-    G4double totalWeight = 0.0;
+    // Build core neighborhood config and delegate physics computation
+    csc::NeighborhoodConfig coreConfig;
+    coreConfig.signalModel = mapSignalModel(model.useLinear);
+    coreConfig.activeMode = mapActivePixelMode(activePixelMode);
+    coreConfig.radius = radius;
+    coreConfig.pixelSizeMM = pixelSize;
+    coreConfig.pixelSizeYMM = pixelSize;
+    coreConfig.pixelSpacingMM = pixelSpacing;
+    coreConfig.pixelSpacingYMM = pixelSpacing;
+    coreConfig.d0Micron = d0p.micron;
+    coreConfig.betaPerMicron = model.beta;
+    coreConfig.numPixelsX = numBlocksPerSide;
+    coreConfig.numPixelsY = numBlocksPerSide;
 
-    fResult.cells.clear();
-    fWeightScratch.clear();
+    const auto coreResult = csc::calculateNeighborhood(
+        hitPos.x(), hitPos.y(),
+        fResult.pixelIndexI, fResult.pixelIndexJ,
+        fResult.nearestPixelCenter.x(), fResult.nearestPixelCenter.y(),
+        coreConfig);
 
-    // Ensure neighborhood weights grid is properly sized and zeroed for Eigen operations
-    const int gridDimLocal = 2 * std::max(0, fNeighborhoodRadius) + 1;
-    if (fNeighborhoodWeights.Rows() != gridDimLocal || fNeighborhoodWeights.Cols() != gridDimLocal) {
-        fNeighborhoodWeights.Resize(gridDimLocal, gridDimLocal, 0.0);
+    // Build Eigen weight grid from core result for per-row/per-col normalization
+    if (fNeighborhoodWeights.Rows() != gridDim || fNeighborhoodWeights.Cols() != gridDim) {
+        fNeighborhoodWeights.Resize(gridDim, gridDim, 0.0);
     } else {
         fNeighborhoodWeights.Fill(0.0);
     }
 
-    for (const auto& off : fOffsets) {
-        const G4int di = off.di;
-        const G4int dj = off.dj;
-        const G4int idx = off.idx;
-
-        const G4int gridPixelI = fResult.pixelIndexI + di;
-        const G4int gridPixelJ = fResult.pixelIndexJ + dj;
-
-        if (gridPixelI < 0 || gridPixelI >= numBlocksPerSide || gridPixelJ < 0 ||
-            gridPixelJ >= numBlocksPerSide) {
-            // Keep defaults for out-of-bounds (NaNs/-1 set in ResetForEvent)
-            continue;
-        }
-
-        const G4double pixelCenterX = nearestX + di * pixelSpacing;
-        const G4double pixelCenterY = nearestY + dj * pixelSpacing;
-        const G4int globalId = gridPixelI * numBlocksPerSide + gridPixelJ;
-
-        const G4double dxToCenter = baseDx - di * pixelSpacing;
-        const G4double dyToCenter = baseDy - dj * pixelSpacing;
-        const G4double distanceToCenter = CalcDistanceToCenter(dxToCenter, dyToCenter);
-        const G4double alpha = CalcPadViewAngleApprox(distanceToCenter, pixelSize, pixelSize);
-
-        const G4double safeDistance = std::max(distanceToCenter, d0p.minSafeDistance);
-        const G4double logValue = std::log(safeDistance * d0p.invLength);
-        const G4double logWeight = (logValue > 0.0 && std::isfinite(logValue)) ? (alpha / logValue) : 0.0;
-
-        G4double weight = logWeight;
-        if (model.useLinear) {
-            const G4double attenuation =
-                std::max(0.0, 1.0 - model.beta * distanceToCenter * model.invMicron);
-            weight = attenuation * alpha;
-        }
-
-        Cell cell;
-        cell.gridIndex = idx;
-        cell.globalPixelId = globalId;
-        cell.center = {pixelCenterX, pixelCenterY, fResult.nearestPixelCenter.z()};
-        // d_i: distance to pixel center
-        cell.distance = distanceToCenter;
-        if (recordDistanceAlpha) {
-            cell.alpha = alpha;
-        }
-        fResult.cells.push_back(cell);
-        fWeightScratch.push_back({weight, weight});  // Store original and modified (initially same)
-
-        // Store weight in neighborhood grid for Eigen-based row/col sums
-        const int gridRow = di + std::max(0, fNeighborhoodRadius);
-        const int gridCol = dj + std::max(0, fNeighborhoodRadius);
-        fNeighborhoodWeights(gridRow, gridCol) = weight;
-
-        // Total weight is accumulated here, but if ChargeBlock mode is active, it will be recomputed below.
-        totalWeight += weight;
-    }
-
-    const auto activePixelMode = Constants::ACTIVE_PIXEL_MODE;
-
-    // Build a 2D weight grid for finding contiguous blocks
-    // Note: gridDimLocal was declared earlier at the start of this function
-    const int gridRadiusLocal = std::max(0, fNeighborhoodRadius);
-
-    // Helper to get weight at grid position (di, dj) relative to center
-    // Returns 0.0 if out of bounds or no cell exists at that position
-    auto getWeightAt = [&](int di, int dj) -> G4double {
-        if (di < -gridRadiusLocal || di > gridRadiusLocal || dj < -gridRadiusLocal || dj > gridRadiusLocal) {
-            return 0.0;
-        }
-        // Find cell with matching grid position
-        const int targetIdx = ((di + gridRadiusLocal) * gridDimLocal) + (dj + gridRadiusLocal);
-        for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-            if (fResult.cells[i].gridIndex == targetIdx) {
-                return fWeightScratch[i].original;
-            }
-        }
-        return 0.0;
-    };
-
-    // Find the pixel with highest F_i
-    std::size_t maxWeightIdx = 0;
-    G4double maxWeight = 0.0;
-    for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-        if (fWeightScratch[i].original > maxWeight) {
-            maxWeight = fWeightScratch[i].original;
-            maxWeightIdx = i;
+    for (const auto& pixel : coreResult.pixels) {
+        if (pixel.inBounds) {
+            fNeighborhoodWeights(pixel.di + radius, pixel.dj + radius) = pixel.weight;
         }
     }
 
-    // Get grid coordinates of the highest F_i pixel
-    const int maxIdx = fResult.cells[maxWeightIdx].gridIndex;
-    const int maxRow = maxIdx / gridDimLocal;  // di + gridRadiusLocal
-    const int maxCol = maxIdx % gridDimLocal;  // dj + gridRadiusLocal
-    const int maxDi = maxRow - gridRadiusLocal;
-    const int maxDj = maxCol - gridRadiusLocal;
-
-    // Identify chargeBlock as a contiguous square containing the highest F_i pixel
-    const bool use3x3Block = (activePixelMode == Constants::ActivePixelMode::ChargeBlock3x3);
-
-    // For 3x3: center on the highest F_i pixel
-    // For 2x2: find the 2x2 square containing the highest F_i pixel with maximum total F_i
-    int blockCornerDi = 0, blockCornerDj = 0;  // Upper-left corner of the block in (di, dj) coords
-    const int blockSize = use3x3Block ? 3 : 2;
-
-    // For both 2x2 and 3x3: find the block containing the highest F_i pixel with maximum total F_i
-    // 2x2: max F_i pixel can be at any of 4 positions, so try 4 possible squares
-    // 3x3: max F_i pixel can be at any of 9 positions, so try 9 possible squares
-    {
-        G4double bestSum = -1.0;
-        int bestCornerDi = maxDi, bestCornerDj = maxDj;
-        const int maxOffset = use3x3Block ? -2 : -1;  // -2 to 0 for 3x3, -1 to 0 for 2x2
-
-        for (int cornerOffsetI = maxOffset; cornerOffsetI <= 0; ++cornerOffsetI) {
-            for (int cornerOffsetJ = maxOffset; cornerOffsetJ <= 0; ++cornerOffsetJ) {
-                const int testCornerDi = maxDi + cornerOffsetI;
-                const int testCornerDj = maxDj + cornerOffsetJ;
-
-                // Compute sum of this block
-                G4double sum = 0.0;
-                for (int bi = 0; bi < blockSize; ++bi) {
-                    for (int bj = 0; bj < blockSize; ++bj) {
-                        sum += getWeightAt(testCornerDi + bi, testCornerDj + bj);
-                    }
-                }
-
-                if (sum > bestSum) {
-                    bestSum = sum;
-                    bestCornerDi = testCornerDi;
-                    bestCornerDj = testCornerDj;
-                }
-            }
-        }
-        blockCornerDi = bestCornerDi;
-        blockCornerDj = bestCornerDj;
-    }
-
-    // Collect cells that are in the selected block
-    fResult.chargeBlock.clear();
-    fResult.chargeBlock.reserve(static_cast<std::size_t>(blockSize * blockSize));
-
-    for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-        const int idx = fResult.cells[i].gridIndex;
-        const int row = idx / gridDimLocal;
-        const int col = idx % gridDimLocal;
-        const int di = row - gridRadiusLocal;
-        const int dj = col - gridRadiusLocal;
-
-        // Check if this cell is within the block
-        if (di >= blockCornerDi && di < blockCornerDi + blockSize &&
-            dj >= blockCornerDj && dj < blockCornerDj + blockSize) {
-            fResult.chargeBlock.push_back(fResult.cells[i]);
-        }
-    }
-
-    // If using ChargeBlock2x2 or ChargeBlock3x3 for denominator, recompute totalWeight and zero out others.
-    if (activePixelMode == Constants::ActivePixelMode::ChargeBlock2x2 ||
-        activePixelMode == Constants::ActivePixelMode::ChargeBlock3x3) {
-        // ChargeBlock2x2: contiguous 2x2 block containing highest F_i pixel
-        // ChargeBlock3x3: contiguous 3x3 block centered on highest F_i pixel
-
-        // Build a set of block member indices for O(1) lookup using chargeBlock
-        std::vector<bool> isBlockMemberForDenom(fResult.cells.size(), false);
-        for (const auto& blockCell : fResult.chargeBlock) {
-            for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-                if (fResult.cells[i].gridIndex == blockCell.gridIndex) {
-                    isBlockMemberForDenom[i] = true;
-                    break;
-                }
-            }
-        }
-
-        totalWeight = 0.0;
-
-        // Recompute totalWeight using only block members (this becomes the new denominator)
-        for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-             if (isBlockMemberForDenom[i]) {
-                 totalWeight += fWeightScratch[i].modified;
-             } else {
-                 // Zero out modified weight for non-block members to exclude them from sharing
-                 fWeightScratch[i].modified = 0.0;
-             }
-        }
-    }
-    else if (activePixelMode == Constants::ActivePixelMode::RowCol ||
-             activePixelMode == Constants::ActivePixelMode::RowCol3x3) {
-        // RowCol mode: the denominator is the sum over the "main cross" of the neighborhood.
-        // RowCol3x3 mode: the cross PLUS the center 3x3 block (cross + 4 corner pixels of 3x3).
-        //
-        // The main cross consists of:
-        //   - Center row (di = 0, all dj values): horizontal arm
-        //   - Center column (dj = 0, all di values): vertical arm
-        // A pixel is in the cross if di == 0 OR dj == 0.
-        //
-        // The 3x3 block adds pixels where |di| <= 1 AND |dj| <= 1.
-
-        const bool include3x3 = (activePixelMode == Constants::ActivePixelMode::RowCol3x3);
-
-        totalWeight = 0.0;
-        for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-            const int idx = fResult.cells[i].gridIndex;
-            // idx = (di + gridRadiusLocal) * gridDimLocal + (dj + gridRadiusLocal)
-            // center is at (gridRadiusLocal, gridRadiusLocal)
-
-            const int row = idx / gridDimLocal; // this is (di + gridRadiusLocal)
-            const int col = idx % gridDimLocal; // this is (dj + gridRadiusLocal)
-
-            // di = row - gridRadiusLocal, dj = col - gridRadiusLocal
-            const int di = row - gridRadiusLocal;
-            const int dj = col - gridRadiusLocal;
-
-            // Check if in the cross: di == 0 OR dj == 0
-            const bool inCross = (di == 0) || (dj == 0);
-            // Check if in the 3x3 block: |di| <= 1 AND |dj| <= 1
-            const bool in3x3 = (std::abs(di) <= 1) && (std::abs(dj) <= 1);
-
-            const bool included = inCross || (include3x3 && in3x3);
-            if (included) {
-                totalWeight += fWeightScratch[i].modified;
-            } else {
-                 fWeightScratch[i].modified = 0.0;
-            }
-        }
-    }
-
-    // Use Eigen for vectorized row and column sum computation
     const Eigen::VectorXd rowWeightSums = fNeighborhoodWeights.RowSums();
     const Eigen::RowVectorXd colWeightSums = fNeighborhoodWeights.ColSums();
 
-    // Compute block sum (sum of the 4 or 9 highest-weight pads)
-    G4double blockWeightSum = 0.0;
-    std::vector<bool> isBlockMember(fResult.cells.size(), false);
-    for (std::size_t k = 0; k < fResult.chargeBlock.size(); ++k) {
-        // Find which cell index corresponds to this chargeBlock member
-        for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-            if (fResult.cells[i].gridIndex == fResult.chargeBlock[k].gridIndex) {
-                isBlockMember[i] = true;
-                blockWeightSum += fWeightScratch[i].original;
-                break;
+    // Compute block fractions from core weights.
+    // The core always computes a 2x2 block for fractionBlock diagnostics, but the
+    // standalone uses 3x3 when in ChargeBlock3x3 mode. Rebuild the block here to
+    // match the standalone's original behavior.
+    const bool use3x3Block = (activePixelMode == Constants::ActivePixelMode::ChargeBlock3x3);
+    const int blockSize = use3x3Block ? 3 : 2;
+
+    // Find pixel with highest weight
+    int maxDi = 0, maxDj = 0;
+    G4double maxWeight = -1.0;
+    for (const auto& pixel : coreResult.pixels) {
+        if (pixel.inBounds && pixel.weight > maxWeight) {
+            maxWeight = pixel.weight;
+            maxDi = pixel.di;
+            maxDj = pixel.dj;
+        }
+    }
+
+    // Find best block containing max-weight pixel
+    int blockCornerDi = maxDi, blockCornerDj = maxDj;
+    G4double bestBlockSum = -1.0;
+    const int maxOffset = use3x3Block ? -2 : -1;
+
+    for (int oi = maxOffset; oi <= 0; ++oi) {
+        for (int oj = maxOffset; oj <= 0; ++oj) {
+            const int testDi = maxDi + oi;
+            const int testDj = maxDj + oj;
+
+            G4double sum = 0.0;
+            for (const auto& p : coreResult.pixels) {
+                if (p.inBounds &&
+                    p.di >= testDi && p.di < testDi + blockSize &&
+                    p.dj >= testDj && p.dj < testDj + blockSize) {
+                    sum += p.weight;
+                }
+            }
+
+            if (sum > bestBlockSum) {
+                bestBlockSum = sum;
+                blockCornerDi = testDi;
+                blockCornerDj = testDj;
             }
         }
     }
 
-    const int gridDimForBounds = (2 * gridRadiusLocal) + 1;
-    const bool useRowColMode = (activePixelMode == Constants::ActivePixelMode::RowCol ||
-                                activePixelMode == Constants::ActivePixelMode::RowCol3x3);
+    const G4double invBlockSum = (bestBlockSum > 0.0) ? (1.0 / bestBlockSum) : 0.0;
 
-    for (std::size_t i = 0; i < fResult.cells.size(); ++i) {
-        auto& cell = fResult.cells[i];
-        const G4double modifiedWeight = fWeightScratch[i].modified;
-        const G4double fraction =
-            (totalWeight > 0.0) ? (modifiedWeight / totalWeight) : 0.0;
-        cell.fraction = fraction;
-        cell.charge = fraction * totalChargeElectrons * elementaryCharge;
+    // Map core result to standalone cells
+    fResult.cells.clear();
+    fResult.chargeBlock.clear();
 
-        // Compute row/column/block fractions
-        const int idx = cell.gridIndex;
-        if (idx >= 0 && idx < gridDimForBounds * gridDimForBounds) {
-            const int row = idx / gridDimForBounds;
-            const int col = idx % gridDimForBounds;
+    for (const auto& pixel : coreResult.pixels) {
+        if (!pixel.inBounds) {
+            continue;
+        }
 
-            const G4double origWeight = fWeightScratch[i].original;
+        Cell cell;
+        cell.gridIndex = ((pixel.di + radius) * gridDim) + (pixel.dj + radius);
+        cell.globalPixelId = pixel.globalIndex;
+        cell.center = {pixel.centerX, pixel.centerY, fResult.nearestPixelCenter.z()};
+        cell.distance = pixel.distance;
+        if (recordDistanceAlpha) {
+            cell.alpha = pixel.alpha;
+        }
 
-            if (useRowColMode) {
-                // RowCol/RowCol3x3 mode: fractionRow and fractionCol are the same as fraction
-                // The region (cross or cross+3x3) sums to 1, and we use the same values for row/col reconstruction
-                cell.fractionRow = cell.fraction;
-                cell.fractionCol = cell.fraction;
-            } else {
-                // Neighborhood or ChargeBlock mode: use full row/column sums
-                const G4double rowSum = rowWeightSums(row);
-                const G4double colSum = colWeightSums(col);
-                cell.fractionRow = (rowSum > 0.0) ? (origWeight / rowSum) : 0.0;
-                cell.fractionCol = (colSum > 0.0) ? (origWeight / colSum) : 0.0;
-            }
+        // Main fraction from core (handles active pixel mode denominator)
+        cell.fraction = pixel.fraction;
+        cell.charge = pixel.fraction * totalChargeCoulomb;
 
-            // Block fraction: only non-zero for block members
-            cell.fractionBlock = (isBlockMember[i] && blockWeightSum > 0.0) ? (origWeight / blockWeightSum) : 0.0;
+        // Per-row/per-col fractions via Eigen normalization (backward-compatible)
+        const int gridRow = pixel.di + radius;
+        const int gridCol = pixel.dj + radius;
 
-            // Compute mode-specific charges based on their respective fractions
-            const G4double totalChargeCoulomb = totalChargeElectrons * elementaryCharge;
-            cell.chargeRow = cell.fractionRow * totalChargeCoulomb;
-            cell.chargeCol = cell.fractionCol * totalChargeCoulomb;
-            cell.chargeBlock = cell.fractionBlock * totalChargeCoulomb;
+        if (useRowColMode) {
+            cell.fractionRow = cell.fraction;
+            cell.fractionCol = cell.fraction;
+        } else {
+            const G4double rowSum = rowWeightSums(gridRow);
+            const G4double colSum = colWeightSums(gridCol);
+            cell.fractionRow = (rowSum > 0.0) ? (pixel.weight / rowSum) : 0.0;
+            cell.fractionCol = (colSum > 0.0) ? (pixel.weight / colSum) : 0.0;
+        }
+
+        // Block fraction: only non-zero for block members
+        const bool inBlock = (pixel.di >= blockCornerDi && pixel.di < blockCornerDi + blockSize &&
+                              pixel.dj >= blockCornerDj && pixel.dj < blockCornerDj + blockSize);
+        cell.fractionBlock = inBlock ? (pixel.weight * invBlockSum) : 0.0;
+
+        cell.chargeRow = cell.fractionRow * totalChargeCoulomb;
+        cell.chargeCol = cell.fractionCol * totalChargeCoulomb;
+        cell.chargeBlock = cell.fractionBlock * totalChargeCoulomb;
+
+        fResult.cells.push_back(cell);
+
+        if (inBlock) {
+            fResult.chargeBlock.push_back(cell);
         }
     }
 }
 
-void ChargeSharingCalculator::BuildOffsets()
-{
-    const int gridRadius = std::max(0, fNeighborhoodRadius);
-    const int gridDimLocal = (2 * gridRadius) + 1;
-    const int totalOffsets = gridDimLocal * gridDimLocal;
-
-    fOffsets.clear();
-    fOffsets.reserve(totalOffsets);
-    for (int di = -gridRadius; di <= gridRadius; ++di) {
-        for (int dj = -gridRadius; dj <= gridRadius; ++dj) {
-            const int idx = ((di + gridRadius) * gridDimLocal) + (dj + gridRadius);
-            fOffsets.push_back(Offset{di, dj, idx});
-        }
-    }
-    fOffsetsDim = gridDimLocal;
-}
 
 void ChargeSharingCalculator::EnsureFullGridBuffer()
 {
@@ -762,7 +559,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
     fResult.geometry.pitchX = pixelSpacing;
     fResult.geometry.pitchY = pixelSpacing;
 
-    // Use validated D0 and charge model parameters
+    // Validated D0 and charge model parameters
     const D0Params d0p = ValidateD0(d0, "ChargeSharingCalculator::ComputeFullGridFractions");
     const ChargeModelParams chargeModel = GetChargeModelParams(pixelSpacing);
 
@@ -776,7 +573,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
     const auto& gainSigmas = fDetector->GetPixelGainSigmas();
     const std::size_t gainCount = gainSigmas.size();
     const bool hasGainNoise = gainCount > 0;
-    const G4double sigmaNoise = Constants::NOISE_ELECTRON_COUNT * elementaryCharge;
+    const G4double sigmaNoise = ECS::RuntimeConfig::Instance().noiseElectronCount * elementaryCharge;
     const bool hasAdditiveNoise = sigmaNoise > 0.0;
     const G4double totalChargeCoulomb = totalChargeElectrons * elementaryCharge;
 
@@ -786,7 +583,6 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
     const G4int minIndexY = fDetector->GetMinIndexY();
 
     for (G4int localI = 0; localI < rows; ++localI) {
-        // Convert local array index to DD4hep grid index
         const G4int gridI = localI + minIndexX;
         const G4int di = gridI - fResult.pixelIndexI;
 
@@ -796,16 +592,15 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
             const G4double dxToCenter = baseDx - (di * pixelSpacing);
             const G4double dyToCenter = baseDy - (dj * pixelSpacing);
-            const G4double distanceToCenter = CalcDistanceToCenter(dxToCenter, dyToCenter);
-            const G4double alpha = CalcPadViewAngleApprox(distanceToCenter, pixelSize, pixelSize);
+            const G4double distanceToCenter = csc::calcDistanceToCenter(dxToCenter, dyToCenter);
+            const G4double alpha = csc::calcPadViewAngle(distanceToCenter, pixelSize, pixelSize);
 
-            const G4double safeDistance = std::max(distanceToCenter, d0p.minSafeDistance);
-            const G4double logValue = std::log(safeDistance * d0p.invLength);
-            G4double weight = (logValue > 0.0 && std::isfinite(logValue)) ? (alpha / logValue) : 0.0;
+            // Delegate weight calculation to core (handles guard logic internally)
+            G4double weight;
             if (chargeModel.useLinear) {
-                const G4double attenuation =
-                    std::max(0.0, 1.0 - chargeModel.beta * distanceToCenter * chargeModel.invMicron);
-                weight = attenuation * alpha;
+                weight = csc::calcWeightLinA(distanceToCenter, alpha, chargeModel.beta);
+            } else {
+                weight = csc::calcWeightLogA(distanceToCenter, alpha, d0p.lengthMM);
             }
 
             // DD4hep formula: position = index * pitch + offset
