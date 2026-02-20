@@ -54,6 +54,8 @@ target_include_directories(epicChargeSharing PRIVATE include core)
 
 target_link_libraries(epicChargeSharing
     PRIVATE
+        # Geant4_LIBRARIES is already a list of Geant4::* imported targets
+        # assembled by find_package() for the specific ui/vis drivers available.
         ${Geant4_LIBRARIES}
         ROOT::Core ROOT::RIO ROOT::Hist ROOT::Tree
         ROOT::Graf ROOT::Minuit ROOT::MathCore ROOT::Matrix
