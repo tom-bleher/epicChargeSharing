@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build plugin
-        shell: bash
+        shell: bash -l {0}
         run: |
           # The jug_xl container provides all EIC software (EICrecon, JANA2,
           # DD4hep, EDM4hep, EDM4eic, ROOT, fmt).  Sourcing thisepic.sh sets
@@ -35,7 +35,7 @@ jobs:
           cmake --install build/eicrecon
 
       - name: Verify plugin
-        shell: bash
+        shell: bash -l {0}
         run: |
           source /opt/detector/epic-main/bin/thisepic.sh
 
