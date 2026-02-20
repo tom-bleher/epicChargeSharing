@@ -181,6 +181,7 @@ struct GaussFit1DResult {
   double B{constants::kInvalidValue};       ///< Baseline offset
   double chi2{constants::kInvalidValue};
   double ndf{constants::kInvalidValue};
+  double muError{constants::kInvalidValue}; ///< Error on mu from fit covariance matrix
 };
 
 /// Result of 2D Gaussian fit
@@ -194,6 +195,8 @@ struct GaussFit2DResult {
   double B{constants::kInvalidValue};       ///< Baseline offset
   double chi2{constants::kInvalidValue};
   double ndf{constants::kInvalidValue};
+  double muXError{constants::kInvalidValue}; ///< Error on muX from fit covariance matrix
+  double muYError{constants::kInvalidValue}; ///< Error on muY from fit covariance matrix
 };
 
 /// Combined reconstruction result
@@ -438,6 +441,7 @@ inline GaussFit1DResult fitGaussian1D(
     result.B = fitter.Result().Parameter(3);
     result.chi2 = fitter.Result().Chi2();
     result.ndf = fitter.Result().Ndf();
+    result.muError = fitter.Result().Error(1);
   }
 
   return result;
@@ -599,6 +603,8 @@ inline GaussFit2DResult fitGaussian2D(
     result.B = fitter.Result().Parameter(5);
     result.chi2 = fitter.Result().Chi2();
     result.ndf = fitter.Result().Ndf();
+    result.muXError = fitter.Result().Error(1);
+    result.muYError = fitter.Result().Error(2);
   }
 
   return result;

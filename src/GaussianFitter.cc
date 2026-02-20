@@ -55,39 +55,16 @@ namespace Config {
     // Uncertainty model
     constexpr double ERROR_PERCENT_OF_MAX       = Constants::FIT_ERROR_PERCENT_OF_MAX;
     constexpr bool   USE_VERTICAL_UNCERTAINTIES = Constants::FIT_USE_VERTICAL_UNCERTAINTIES;
-    constexpr bool   USE_QN_QI_ERRORS           = Constants::FIT_USE_QN_QI_ERRORS;
-
-    // Distance-weighted errors
-    constexpr bool   USE_DISTANCE_WEIGHTED_ERRORS   = Constants::FIT_USE_DISTANCE_WEIGHTED_ERRORS;
-    constexpr double DISTANCE_SCALE_PIXELS          = Constants::FIT_DISTANCE_SCALE_PIXELS;
-    constexpr double DISTANCE_EXPONENT              = Constants::FIT_DISTANCE_EXPONENT;
-    constexpr double DISTANCE_FLOOR_PERCENT         = Constants::FIT_DISTANCE_FLOOR_PERCENT;
-    constexpr double DISTANCE_CAP_PERCENT           = Constants::FIT_DISTANCE_CAP_PERCENT;
-    constexpr bool   DISTANCE_PREFER_TRUTH_CENTER   = Constants::FIT_DISTANCE_PREFER_TRUTH_CENTER;
-    constexpr bool   DISTANCE_POWER_INVERSE         = Constants::FIT_DISTANCE_POWER_INVERSE;
 
     // Charge branches
     constexpr const char* CHARGE_BRANCH_1D = Constants::FIT_CHARGE_BRANCH_1D;
     constexpr const char* CHARGE_BRANCH_2D = Constants::FIT_CHARGE_BRANCH_2D;
 
     // 1D fit options
-    constexpr bool FIT_DIAGONALS       = Constants::FIT_1D_DIAGONALS;
     constexpr bool SAVE_1D_A           = Constants::FIT_1D_SAVE_A;
     constexpr bool SAVE_1D_MU          = Constants::FIT_1D_SAVE_MU;
     constexpr bool SAVE_1D_SIGMA       = Constants::FIT_1D_SAVE_SIGMA;
     constexpr bool SAVE_1D_B           = Constants::FIT_1D_SAVE_B;
-    constexpr bool SAVE_LINE_MEANS     = Constants::FIT_1D_SAVE_LINE_MEANS;
-    constexpr bool SAVE_DIAG_A         = Constants::FIT_1D_SAVE_DIAG_A;
-    constexpr bool SAVE_DIAG_MU        = Constants::FIT_1D_SAVE_DIAG_MU;
-    constexpr bool SAVE_DIAG_SIGMA     = Constants::FIT_1D_SAVE_DIAG_SIGMA;
-    constexpr bool SAVE_DIAG_B         = Constants::FIT_1D_SAVE_DIAG_B;
-
-    // 1D distance model
-    constexpr bool   DIST_1D_ENABLED       = Constants::FIT_1D_DIST_ENABLED;
-    constexpr double DIST_1D_SCALE_PIXELS  = Constants::FIT_1D_DIST_SCALE_PIXELS;
-    constexpr double DIST_1D_EXPONENT      = Constants::FIT_1D_DIST_EXPONENT;
-    constexpr double DIST_1D_FLOOR_PERCENT = Constants::FIT_1D_DIST_FLOOR_PERCENT;
-    constexpr double DIST_1D_CAP_PERCENT   = Constants::FIT_1D_DIST_CAP_PERCENT;
 
     // 2D fit options
     constexpr bool SAVE_2D_A    = Constants::FIT_2D_SAVE_A;
@@ -96,13 +73,6 @@ namespace Config {
     constexpr bool SAVE_2D_SIGX = Constants::FIT_2D_SAVE_SIGX;
     constexpr bool SAVE_2D_SIGY = Constants::FIT_2D_SAVE_SIGY;
     constexpr bool SAVE_2D_B    = Constants::FIT_2D_SAVE_B;
-
-    // 2D distance model
-    constexpr bool   DIST_2D_ENABLED       = Constants::FIT_2D_DIST_ENABLED;
-    constexpr double DIST_2D_SCALE_PIXELS  = Constants::FIT_2D_DIST_SCALE_PIXELS;
-    constexpr double DIST_2D_EXPONENT      = Constants::FIT_2D_DIST_EXPONENT;
-    constexpr double DIST_2D_FLOOR_PERCENT = Constants::FIT_2D_DIST_FLOOR_PERCENT;
-    constexpr double DIST_2D_CAP_PERCENT   = Constants::FIT_2D_DIST_CAP_PERCENT;
 }
 
 // ============================================================================
