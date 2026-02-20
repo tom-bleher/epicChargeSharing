@@ -7,14 +7,8 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <vector>
-
-namespace dd4hep {
-namespace DDSegmentation {
-class BitFieldCoder;
-class CartesianGridXY;
-}  // namespace DDSegmentation
-}  // namespace dd4hep
 
 namespace epic::chargesharing {
 
@@ -29,6 +23,7 @@ class ChargeSharingReconstructor {
   struct Input {
     std::array<double, 3> hitPositionMM{};                 ///< Truth position in mm
     std::optional<std::array<double, 3>> pixelHintMM{};    ///< Optional center of seed pixel (mm)
+    std::optional<std::pair<int,int>> pixelIndexHint{};    ///< Pre-decoded grid indices (i,j) from factory
     double energyDepositGeV{0.0};                          ///< Energy in GeV
     std::uint64_t cellID{0};
   };
@@ -85,9 +80,7 @@ class ChargeSharingReconstructor {
     int neighborhoodGridSize{0};                ///< Total grid size (2*r+1)^2
   };
 
-  void configure(const ChargeSharingConfig& cfg,
-                 const dd4hep::DDSegmentation::CartesianGridXY* segmentation = nullptr,
-                 const dd4hep::DDSegmentation::BitFieldCoder* decoder = nullptr);
+  void configure(const ChargeSharingConfig& cfg);
   const ChargeSharingConfig& config() const { return m_cfg; }
 
   Result process(const Input& input);
@@ -108,7 +101,6 @@ class ChargeSharingReconstructor {
   };
 
   PixelLocation findNearestPixelFallback(const std::array<double, 3>& positionMM) const;
-  PixelLocation findPixelFromSegmentation(std::uint64_t cellID) const;
   PixelLocation pixelLocationFromIndices(int indexI, int indexJ) const;
   bool isPixelIndexInBounds(int indexI, int indexJ) const;
 
@@ -139,9 +131,6 @@ class ChargeSharingReconstructor {
       fit::GaussFit2DResult& fit2D) const;
 
   ChargeSharingConfig m_cfg{};
-  const dd4hep::DDSegmentation::CartesianGridXY* m_segmentation{nullptr};
-  const dd4hep::DDSegmentation::BitFieldCoder* m_decoder{nullptr};
-  bool m_haveSegmentation{false};
   IndexBounds m_boundsX{};
   IndexBounds m_boundsY{};
   /// Noise model for realistic charge simulation.

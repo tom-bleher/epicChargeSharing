@@ -5,6 +5,7 @@
 
 #include <JANA/JApplication.h>
 #include <services/rootfile/RootFile_service.h>
+#include <services/log/Log_service.h>
 
 #include <TDirectory.h>
 #include <TFile.h>
@@ -237,7 +238,7 @@ void ChargeSharingMonitor::FillData(const std::string& detectorName,
 void ChargeSharingMonitor::FinishWithGlobalRootLock() {
   // Calculate and print summary statistics
   auto app = GetApplication();
-  auto log = app->GetJLogger("ChargeSharingMonitor");
+  auto log = app->GetService<Log_service>()->logger("ChargeSharingMonitor");
 
   for (const auto& [detName, hists] : m_histograms) {
     if (hists.hResidualX->GetEntries() > 0) {

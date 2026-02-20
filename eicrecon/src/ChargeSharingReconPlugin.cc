@@ -2,6 +2,7 @@
 
 #include "ChargeSharingReconFactory.h"
 #include "ChargeSharingConfig.h"
+#include "ChargeSharingMonitor.h"
 
 #include "extensions/jana/JOmniFactoryGeneratorT.h"
 
@@ -40,7 +41,10 @@ void InitPlugin(JApplication* app) {
       app
   ));
 
-  // Note: ChargeSharingMonitor not included - requires JANA ROOT integration
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Monitoring processor (optional, for validation)
+  // ═══════════════════════════════════════════════════════════════════════════
+  app->Add(new epic::chargesharing::ChargeSharingMonitor());
 }
 }
 

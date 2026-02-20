@@ -443,7 +443,14 @@ void ChargeSharingReconFactory::Configure() {
               cfg.detectorSizeMM, cfg.detectorThicknessMM, cfg.pixelThicknessMM);
   }
 
-  m_reconstructor.configure(cfg, segImplXY, decoder);
+  // Store decoder and field names for CellID decoding in Process()
+  m_decoder = decoder;
+  if (cfg.segmentation.valid) {
+    m_fieldNameX = cfg.segmentation.fieldNameX;
+    m_fieldNameY = cfg.segmentation.fieldNameY;
+  }
+
+  m_reconstructor.configure(cfg);
 }
 
 void ChargeSharingReconFactory::Process(int32_t /*runNumber*/, uint64_t /*eventNumber*/) {
@@ -476,7 +483,13 @@ void ChargeSharingReconFactory::Process(int32_t /*runNumber*/, uint64_t /*eventN
     input.energyDepositGeV = edep;
     input.cellID = hit.getCellID();
 
-    if (converter) {
+    // Decode CellID to grid indices directly (preferred path)
+    if (m_decoder != nullptr) {
+      const int idxI = static_cast<int>(m_decoder->get(hit.getCellID(), m_fieldNameX));
+      const int idxJ = static_cast<int>(m_decoder->get(hit.getCellID(), m_fieldNameY));
+      input.pixelIndexHint = std::pair<int,int>{idxI, idxJ};
+    } else if (converter) {
+      // Fallback: use converter position as pixel hint
       const auto center = converter->position(hit.getCellID());
       if (useXZ) {
         input.pixelHintMM = std::array<double, 3>{center.x(), center.z(), center.y()};

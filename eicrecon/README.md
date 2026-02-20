@@ -69,11 +69,13 @@ eicrecon -Pplugins=chargeSharingRecon \
 | `readout` | string | - | DD4hep readout name for segmentation lookup |
 | `minEDep` | float | 0 | Energy deposition threshold (GeV) |
 | `neighborhoodRadius` | int | 2 | Neighborhood half-width (2 = 5×5 grid) |
-| `pixelSpacingMM` | float | - | Manual pixel pitch override (mm) |
-| `pixelSizeMM` | float | - | Manual pixel size override (mm) |
+| `pixelSpacingMM` | float | 0.5 | Center-to-center pixel pitch (mm) |
+| `pixelSizeMM` | float | 0.15 | Pixel pad size (mm) |
 | `ionizationEnergyEV` | float | 3.6 | Energy per e-h pair in silicon (eV) |
-| `amplificationFactor` | float | 1.0 | Gain factor |
-| `d0Micron` | float | 10 | Transverse charge cloud size (µm) |
+| `amplificationFactor` | float | 20.0 | AC-LGAD gain factor (typical range 8-25) |
+| `d0Micron` | float | 1.0 | Transverse charge cloud size d0 (µm) |
+| `noiseEnabled` | bool | true | Enable per-pixel gain variation and electronic noise |
+| `noiseElectronCount` | float | 500 | Electronic noise RMS (electrons) |
 | `emitNeighborDiagnostics` | bool | false | Output diagnostic neighbor data |
 
 Geometry values are auto-populated from DD4hep `CartesianGridXY` segmentation when available.
@@ -106,7 +108,7 @@ For each SimTrackerHit, the plugin:
 
 ## Monitoring Output
 
-The `ChargeSharingMonitor` processor compares reconstructed positions to truth and produces validation output. Note: monitoring is not yet included in the default build.
+The `ChargeSharingMonitor` processor compares reconstructed positions to truth and produces validation output.
 
 ### Histograms (per detector)
 

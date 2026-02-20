@@ -9,6 +9,12 @@
 #include <edm4hep/SimTrackerHitCollection.h>
 #include <edm4eic/TrackerHitCollection.h>
 
+#include <string>
+
+namespace dd4hep::DDSegmentation {
+class BitFieldCoder;
+}  // namespace dd4hep::DDSegmentation
+
 namespace epic::chargesharing {
 
 class ChargeSharingReconFactory : public JOmniFactory<ChargeSharingReconFactory, ChargeSharingConfig> {
@@ -104,6 +110,11 @@ class ChargeSharingReconFactory : public JOmniFactory<ChargeSharingReconFactory,
   // ────────────────────────────── Diagnostics ─────────────────────────────────
   ParameterRef<bool> m_emitNeighborDiagnostics{this, "emitNeighborDiagnostics",
       config().emitNeighborDiagnostics, "Record per-neighbor distances/angles"};
+
+  // Stored from Configure() for CellID decoding in Process()
+  const dd4hep::DDSegmentation::BitFieldCoder* m_decoder{nullptr};
+  std::string m_fieldNameX{"x"};
+  std::string m_fieldNameY{"y"};
 
   ChargeSharingReconstructor m_reconstructor;
 };

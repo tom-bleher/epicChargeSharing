@@ -1,21 +1,13 @@
 #include "ChargeSharingReconstructor.h"
 
-#include <DDSegmentation/BitFieldCoder.h>
-#include <DDSegmentation/CartesianGridXY.h>
-
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
 namespace epic::chargesharing {
 
-void ChargeSharingReconstructor::configure(const ChargeSharingConfig& cfg,
-                                           const dd4hep::DDSegmentation::CartesianGridXY* segmentation,
-                                           const dd4hep::DDSegmentation::BitFieldCoder* decoder) {
+void ChargeSharingReconstructor::configure(const ChargeSharingConfig& cfg) {
   m_cfg = cfg;
-  m_segmentation = segmentation;
-  m_decoder = decoder;
-  m_haveSegmentation = cfg.segmentation.valid && (segmentation != nullptr) && (decoder != nullptr);
 
   if (m_cfg.neighborhoodRadius < 0) {
     m_cfg.neighborhoodRadius = 0;
@@ -41,8 +33,8 @@ void ChargeSharingReconstructor::configure(const ChargeSharingConfig& cfg,
     m_noiseModel.setSeed(m_cfg.noiseSeed);
   }
 
-  // Set up bounds from segmentation
-  if (m_haveSegmentation) {
+  // Set up bounds from segmentation config (populated by factory from DD4hep)
+  if (m_cfg.segmentation.valid) {
     m_boundsX.minIndex = m_cfg.segmentation.minIndexX;
     m_boundsX.maxIndex = m_cfg.segmentation.maxIndexX;
     m_boundsY.minIndex = m_cfg.segmentation.minIndexY;
@@ -62,8 +54,7 @@ void ChargeSharingReconstructor::configure(const ChargeSharingConfig& cfg,
       m_cfg.pixelsPerSide = m_cfg.segmentation.numCellsX;
     }
   } else {
-    // DD4hep-style centered grid: indices centered around 0
-    // Compute index bounds from detector size and pitch
+    // No DD4hep segmentation: compute bounds from detector size and pitch
     if (m_cfg.pixelsPerSide <= 0 && m_cfg.pixelSpacingMM > 0.0) {
       const double approxPixels = m_cfg.detectorSizeMM / m_cfg.pixelSpacingMM;
       m_cfg.pixelsPerSide = static_cast<int>(std::round(approxPixels));
@@ -72,7 +63,7 @@ void ChargeSharingReconstructor::configure(const ChargeSharingConfig& cfg,
       }
     }
 
-    // For DD4hep-style centered grid, compute symmetric bounds around 0
+    // DD4hep-style centered grid: compute symmetric bounds around 0
     const int halfGrid = m_cfg.pixelsPerSide / 2;
     const int minIndex = -halfGrid;
     const int maxIndex = m_cfg.pixelsPerSide - halfGrid - 1;
@@ -86,8 +77,10 @@ ChargeSharingReconstructor::Result ChargeSharingReconstructor::process(const Inp
 
   // Find the center pixel
   PixelLocation nearest{};
-  if (m_haveSegmentation) {
-    nearest = findPixelFromSegmentation(input.cellID);
+  if (input.pixelIndexHint.has_value()) {
+    // Pre-decoded grid indices from factory (fastest path)
+    const auto& [idxI, idxJ] = *input.pixelIndexHint;
+    nearest = pixelLocationFromIndices(idxI, idxJ);
   } else if (input.pixelHintMM.has_value()) {
     nearest = findNearestPixelFallback(*input.pixelHintMM);
   } else {
@@ -447,17 +440,6 @@ ChargeSharingReconstructor::PixelLocation ChargeSharingReconstructor::findNeares
   j = std::clamp(j, minJ, maxJ);
 
   return pixelLocationFromIndices(i, j);
-}
-
-ChargeSharingReconstructor::PixelLocation ChargeSharingReconstructor::findPixelFromSegmentation(
-    std::uint64_t cellID) const {
-  if (!m_haveSegmentation || m_decoder == nullptr) {
-    return pixelLocationFromIndices(0, 0);
-  }
-
-  const int indexI = static_cast<int>(m_decoder->get(cellID, m_cfg.segmentation.fieldNameX));
-  const int indexJ = static_cast<int>(m_decoder->get(cellID, m_cfg.segmentation.fieldNameY));
-  return pixelLocationFromIndices(indexI, indexJ);
 }
 
 ChargeSharingReconstructor::PixelLocation ChargeSharingReconstructor::pixelLocationFromIndices(
