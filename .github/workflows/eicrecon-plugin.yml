@@ -1,0 +1,51 @@
+name: EICrecon Plugin Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'eicrecon/**'
+      - 'core/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'eicrecon/**'
+      - 'core/**'
+
+jobs:
+  build:
+    name: Build EICrecon Plugin
+    runs-on: ubuntu-latest
+    container:
+      image: eicweb/jug_xl:nightly
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build plugin
+        shell: bash
+        run: |
+          # The jug_xl container provides all EIC software (EICrecon, JANA2,
+          # DD4hep, EDM4hep, EDM4eic, ROOT, fmt).  Sourcing thisepic.sh sets
+          # up the full environment including detector geometry paths.
+          source /opt/detector/epic-main/bin/thisepic.sh
+
+          cmake -S eicrecon -B build/eicrecon \
+                -DCMAKE_INSTALL_PREFIX="$(pwd)/eicrecon-install"
+          cmake --build build/eicrecon -j"$(nproc)"
+          cmake --install build/eicrecon
+
+      - name: Verify plugin
+        shell: bash
+        run: |
+          source /opt/detector/epic-main/bin/thisepic.sh
+
+          # Verify the shared library was built and installed
+          echo "Checking installed plugin..."
+          ls -la eicrecon-install/plugins/chargeSharingRecon.so
+
+          # Basic sanity: ensure the .so has the expected symbols
+          echo "Checking for expected symbols..."
+          nm -DC eicrecon-install/plugins/chargeSharingRecon.so \
+            | grep -q "InitPlugin" \
+            && echo "InitPlugin symbol found" \
+            || { echo "ERROR: InitPlugin symbol not found"; exit 1; }

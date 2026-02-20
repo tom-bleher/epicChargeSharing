@@ -1,0 +1,58 @@
+name: Standalone Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'eicrecon/**'
+      - '*.md'
+      - 'farm/**'
+      - 'proc/**'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'eicrecon/**'
+      - '*.md'
+      - 'farm/**'
+      - 'proc/**'
+
+jobs:
+  unit-tests:
+    name: Core Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate CI CMakeLists
+        run: |
+          # The unit tests (test_charge_sharing_core) depend only on the
+          # header-only ChargeSharingCore.hh (in core/) and the C++ STL.
+          # No external libraries (ROOT, Geant4, Eigen) are needed.
+          #
+          # The top-level CMakeLists.txt requires Geant4 (too expensive to
+          # install in CI), so we create a minimal CMake project that builds
+          # just the test executable, mirroring tests/CMakeLists.txt.
+          mkdir -p build-ci
+          cat > build-ci/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.16)
+          project(epicChargeSharing_tests LANGUAGES CXX)
+          enable_testing()
+          set(SRC_ROOT "" CACHE PATH "Root of the epicChargeSharing source tree")
+          add_executable(test_charge_sharing_core "${SRC_ROOT}/tests/test_charge_sharing_core.cpp")
+          target_include_directories(test_charge_sharing_core PRIVATE "${SRC_ROOT}/core")
+          target_compile_features(test_charge_sharing_core PRIVATE cxx_std_20)
+          target_compile_options(test_charge_sharing_core PRIVATE -Wall -Wextra -Wpedantic)
+          add_test(NAME ChargeSharingCore COMMAND test_charge_sharing_core)
+          EOF
+
+      - name: Configure
+        run: |
+          cmake -B build-ci/build -S build-ci \
+                -DSRC_ROOT="${GITHUB_WORKSPACE}" \
+                -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build-ci/build -j"$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build-ci/build --output-on-failure
