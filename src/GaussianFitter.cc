@@ -1,31 +1,22 @@
 /// @file GaussianFitter.cc
 /// @brief Compiled Gaussian fitting routines for position reconstruction.
 ///
-/// This is a compiled version of FitGaussian1D.C and FitGaussian2D.C.
+/// This file orchestrates parallel Gaussian fitting over TTree entries,
+/// delegating the actual fitting algorithms to core/GaussianFit.hh.
+/// This follows the same delegation pattern as ChargeSharingCalculator.cc
+/// delegating to core/ChargeSharingCore.hh.
+///
 /// Configuration is read from Config.hh at compile time for better performance.
 
 #include "GaussianFitter.hh"
 #include "Config.hh"
-#include "FitUncertainty.hh"
+#include "GaussianFit.hh"
 
-#include <Fit/BinData.h>
-#include <Fit/Chi2FCN.h>
-#include <Fit/Fitter.h>
-#include <Math/Factory.h>
-#include <Math/Functor.h>
-#include <Math/Minimizer.h>
 #include <Math/MinimizerOptions.h>
-#include <Math/WrappedMultiTF1.h>
 #include <ROOT/TThreadExecutor.hxx>
 #include <TBranch.h>
 #include <TError.h>
-#include <TF1.h>
-#include <TF2.h>
 #include <TFile.h>
-#include <TGraph.h>
-#include <TGraph2D.h>
-#include <TGraph2DErrors.h>
-#include <TGraphErrors.h>
 #include <TList.h>
 #include <TMath.h>
 #include <TNamed.h>
@@ -40,13 +31,13 @@
 #include <limits>
 #include <memory>
 #include <numeric>
-#include <optional>
 #include <span>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace ECS::Fit {
+
+namespace cfit = epic::chargesharing::fit;
 
 // ============================================================================
 // Configuration from Config.hh (compile-time constants)
@@ -76,7 +67,7 @@ constexpr bool SAVE_2D_B = Constants::FIT_2D_SAVE_B;
 } // namespace Config
 
 // ============================================================================
-// Internal utilities
+// Internal utilities (I/O and parallelism helpers only)
 // ============================================================================
 namespace detail {
 
@@ -107,30 +98,6 @@ static inline int GetIntMetadata(TTree* tree, const char* key) {
         }
     }
     return -1;
-}
-
-// 1D Gaussian with constant offset: A * exp(-0.5*((x-mu)/sigma)^2) + B
-static double GaussPlusB(const double* x, const double* p) {
-    const double A = p[0];
-    const double mu = p[1];
-    const double sigma = p[2];
-    const double B = p[3];
-    const double dx = (x[0] - mu) / sigma;
-    return (A * std::exp(-0.5 * dx * dx)) + B;
-}
-
-// 2D Gaussian with constant offset:
-// A * exp(-0.5 * ((x-mux)^2/sigx^2 + (y-muy)^2/sigy^2)) + B
-static double Gauss2DPlusB(const double* xy, const double* p) {
-    const double A = p[0];
-    const double mux = p[1];
-    const double muy = p[2];
-    const double sx = p[3];
-    const double sy = p[4];
-    const double B = p[5];
-    const double dx = (xy[0] - mux) / sx;
-    const double dy = (xy[1] - muy) / sy;
-    return (A * std::exp(-0.5 * (dx * dx + dy * dy))) + B;
 }
 
 static int InferRadiusFromTree(TTree* tree, const std::string& preferredBranch) {
@@ -203,168 +170,6 @@ static TBranch* EnsureAndResetBranch(TTree* tree, const char* name, double* addr
         }
     }
     return br;
-}
-
-struct GaussFitResult {
-    bool converged = false;
-    double A = std::numeric_limits<double>::quiet_NaN();
-    double mu = std::numeric_limits<double>::quiet_NaN();
-    double sigma = std::numeric_limits<double>::quiet_NaN();
-    double B = std::numeric_limits<double>::quiet_NaN();
-    double chi2 = std::numeric_limits<double>::quiet_NaN();
-    double ndf = std::numeric_limits<double>::quiet_NaN();
-    double prob = std::numeric_limits<double>::quiet_NaN();
-};
-
-struct GaussFitConfig {
-    double muLo;
-    double muHi;
-    double sigmaLo;
-    double sigmaHi;
-    double qmax;
-    double pixelSpacing;
-    double seedA;
-    double seedMu;
-    double seedSigma;
-    double seedB;
-};
-
-static inline double ComputeUniformSigma(double errorPercentOfMax, double qmax) {
-    return charge_uncert::UniformPercentOfMax(errorPercentOfMax, qmax);
-}
-
-static inline std::pair<double, bool> WeightedCentroid(const std::vector<double>& positions,
-                                                       const std::vector<double>& charges, double baseline) {
-    if (positions.size() != charges.size() || positions.empty()) {
-        return {std::numeric_limits<double>::quiet_NaN(), false};
-    }
-    double weightedSum = 0.0;
-    double weightTotal = 0.0;
-    for (size_t i = 0; i < positions.size(); ++i) {
-        const double weight = std::max(0.0, charges[i] - baseline);
-        if (weight <= 0.0)
-            continue;
-        weightTotal += weight;
-        weightedSum += weight * positions[i];
-    }
-    if (weightTotal <= 0.0) {
-        return {std::numeric_limits<double>::quiet_NaN(), false};
-    }
-    return {weightedSum / weightTotal, true};
-}
-
-static inline double SeedSigma(const std::vector<double>& positions, const std::vector<double>& charges,
-                               double baseline, double pixelSpacing, double sigmaLo, double sigmaHi) {
-    double weightedSum = 0.0;
-    double weightTotal = 0.0;
-    for (size_t i = 0; i < positions.size(); ++i) {
-        const double weight = std::max(0.0, charges[i] - baseline);
-        if (weight <= 0.0)
-            continue;
-        weightTotal += weight;
-        weightedSum += weight * positions[i];
-    }
-    double sigma = std::numeric_limits<double>::quiet_NaN();
-    if (weightTotal > 0.0) {
-        const double mean = weightedSum / weightTotal;
-        double variance = 0.0;
-        for (size_t i = 0; i < positions.size(); ++i) {
-            const double weight = std::max(0.0, charges[i] - baseline);
-            if (weight <= 0.0)
-                continue;
-            const double dx = positions[i] - mean;
-            variance += weight * dx * dx;
-        }
-        variance = (weightTotal > 0.0) ? (variance / weightTotal) : 0.0;
-        sigma = std::sqrt(std::max(variance, 1e-12));
-    }
-    if (!IsFinite(sigma) || sigma <= 0.0) {
-        sigma = std::max(0.25 * pixelSpacing, 1e-6);
-    }
-    sigma = std::max(sigma, sigmaLo);
-    sigma = std::min(sigma, sigmaHi);
-    return sigma;
-}
-
-static GaussFitResult RunGaussianFit1D(const std::vector<double>& positions, const std::vector<double>& charges,
-                                       const std::vector<double>* sigmaCandidates, double uniformSigma,
-                                       const GaussFitConfig& cfg) {
-    GaussFitResult result;
-    if (positions.size() != charges.size() || positions.size() < 3) {
-        return result;
-    }
-
-    thread_local TF1 fLoc("fGauss1D_helper", GaussPlusB, -1e9, 1e9, 4);
-    auto [minPos, maxPos] = std::ranges::minmax_element(positions);
-    if (minPos != positions.end()) {
-        const double margin = 0.5 * cfg.pixelSpacing;
-        const double rangeLo = (*minPos) - margin;
-        const double rangeHi = (*maxPos) + margin;
-        fLoc.SetRange(rangeLo, rangeHi);
-    }
-    const double qmax = IsFinite(cfg.qmax) ? std::max(cfg.qmax, 0.0) : 0.0;
-    const double amplitudeMax = std::max(1e-18, 2.0 * qmax);
-    const double baselineMax = std::max(1e-18, qmax);
-    fLoc.SetParameters(cfg.seedA, cfg.seedMu, cfg.seedSigma, cfg.seedB);
-    fLoc.SetParLimits(0, 1e-18, amplitudeMax);
-    fLoc.SetParLimits(1, cfg.muLo, cfg.muHi);
-    fLoc.SetParLimits(2, cfg.sigmaLo, cfg.sigmaHi);
-    fLoc.SetParLimits(3, -baselineMax, baselineMax);
-
-    ROOT::Math::WrappedMultiTF1 const wrapped(fLoc, 1);
-    ROOT::Fit::BinData data(static_cast<int>(positions.size()), 1);
-    const bool hasSigmaCandidates = sigmaCandidates && !sigmaCandidates->empty();
-    for (size_t i = 0; i < positions.size(); ++i) {
-        double candidate = std::numeric_limits<double>::quiet_NaN();
-        if (hasSigmaCandidates && i < sigmaCandidates->size()) {
-            candidate = (*sigmaCandidates)[i];
-        }
-        const double sigmaY = charge_uncert::SelectVerticalSigma(candidate, uniformSigma);
-        data.Add(positions[i], charges[i], sigmaY);
-    }
-
-    thread_local ROOT::Fit::Fitter fitter;
-    fitter.Config().SetMinimizer("Minuit2", "Fumili2");
-    fitter.Config().MinimizerOptions().SetStrategy(0);
-    fitter.Config().MinimizerOptions().SetTolerance(1e-4);
-    fitter.Config().MinimizerOptions().SetPrintLevel(0);
-    fitter.SetFunction(wrapped);
-    fitter.Config().ParSettings(0).SetLimits(1e-18, amplitudeMax);
-    fitter.Config().ParSettings(1).SetLimits(cfg.muLo, cfg.muHi);
-    fitter.Config().ParSettings(2).SetLimits(cfg.sigmaLo, cfg.sigmaHi);
-    fitter.Config().ParSettings(3).SetLimits(-baselineMax, baselineMax);
-    const double stepA = std::max(1e-18, 0.01 * cfg.seedA);
-    const double stepB = std::max(1e-18, 0.01 * std::max(std::abs(cfg.seedB), cfg.seedA));
-    fitter.Config().ParSettings(0).SetStepSize(stepA);
-    fitter.Config().ParSettings(1).SetStepSize(1e-4 * cfg.pixelSpacing);
-    fitter.Config().ParSettings(2).SetStepSize(1e-4 * cfg.pixelSpacing);
-    fitter.Config().ParSettings(3).SetStepSize(stepB);
-    fitter.Config().ParSettings(0).SetValue(cfg.seedA);
-    fitter.Config().ParSettings(1).SetValue(cfg.seedMu);
-    fitter.Config().ParSettings(2).SetValue(cfg.seedSigma);
-    fitter.Config().ParSettings(3).SetValue(cfg.seedB);
-
-    bool ok = fitter.Fit(data);
-    if (!ok) {
-        fitter.Config().SetMinimizer("Minuit2", "Migrad");
-        fitter.Config().MinimizerOptions().SetStrategy(1);
-        fitter.Config().MinimizerOptions().SetTolerance(1e-3);
-        fitter.Config().MinimizerOptions().SetPrintLevel(0);
-        ok = fitter.Fit(data);
-    }
-    if (!ok)
-        return result;
-
-    result.converged = true;
-    result.A = fitter.Result().Parameter(0);
-    result.mu = fitter.Result().Parameter(1);
-    result.sigma = fitter.Result().Parameter(2);
-    result.B = fitter.Result().Parameter(3);
-    result.chi2 = fitter.Result().Chi2();
-    result.ndf = fitter.Result().Ndf();
-    result.prob = (fitter.Result().Ndf() > 0) ? TMath::Prob(fitter.Result().Chi2(), fitter.Result().Ndf())
-                                              : std::numeric_limits<double>::quiet_NaN();
-    return result;
 }
 
 struct FlatVectorStore {
@@ -579,7 +384,7 @@ int FitGaussian1D(const char* filename) {
     std::vector<double> out_col_ndf(nEntries, INVALID_VALUE);
     std::vector<double> out_col_prob(nEntries, INVALID_VALUE);
 
-    // Parallel fitting
+    // Parallel fitting (delegates to core/GaussianFit.hh)
     std::vector<int> indices(nEntries);
     std::iota(indices.begin(), indices.end(), 0);
     ROOT::TThreadExecutor exec;
@@ -602,6 +407,7 @@ int FitGaussian1D(const char* filename) {
             const double x_px_loc = v_x_px[i];
             const double y_px_loc = v_y_px[i];
 
+            // Build row/col slices from charge grid
             thread_local std::vector<double> x_row;
             thread_local std::vector<double> q_row;
             thread_local std::vector<double> y_col;
@@ -633,58 +439,40 @@ int FitGaussian1D(const char* filename) {
             if (x_row.size() < 3 || y_col.size() < 3)
                 return;
 
-            const double uniformSigma = ComputeUniformSigma(errorPercentOfMax, qmaxNeighborhood);
+            // Centroid fallback (using core utility)
+            const double qMinRow = *std::ranges::min_element(q_row);
+            const double qMinCol = *std::ranges::min_element(q_col);
+            const auto [rowCentroid, rowCentroidOk] = cfit::weightedCentroid(x_row, q_row, qMinRow);
+            const auto [colCentroid, colCentroidOk] = cfit::weightedCentroid(y_col, q_col, qMinCol);
 
-            auto [minRow, maxRow] = std::ranges::minmax_element(q_row);
-            auto [minCol, maxCol] = std::ranges::minmax_element(q_col);
-            double const A0_row = std::max(1e-18, *maxRow - *minRow);
-            double const B0_row = *minRow;
-            double const A0_col = std::max(1e-18, *maxCol - *minCol);
-            double const B0_col = *minCol;
-
-            const auto [rowCentroid, rowCentroidOk] = WeightedCentroid(x_row, q_row, B0_row);
-            const auto [colCentroid, colCentroidOk] = WeightedCentroid(y_col, q_col, B0_col);
-
-            int const idxMaxRow = std::distance(q_row.begin(), std::ranges::max_element(q_row));
-            int const idxMaxCol = std::distance(q_col.begin(), std::ranges::max_element(q_col));
-            double const mu0_row = x_row[idxMaxRow];
-            double const mu0_col = y_col[idxMaxCol];
-
+            // Fit bounds
             const double sigLoBound = pixelSize;
             const double sigHiBound =
                 std::max(sigLoBound,
                          static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
-            const double sigInitRow = SeedSigma(x_row, q_row, B0_row, pixelSpacing, sigLoBound, sigHiBound);
-            const double sigInitCol = SeedSigma(y_col, q_col, B0_col, pixelSpacing, sigLoBound, sigHiBound);
-
             const double muXLo = x_px_loc - (1.0 * pixelSpacing);
             const double muXHi = x_px_loc + (1.0 * pixelSpacing);
             const double muYLo = y_px_loc - (1.0 * pixelSpacing);
             const double muYHi = y_px_loc + (1.0 * pixelSpacing);
 
-            const GaussFitConfig rowConfig{.muLo = muXLo,
-                                           .muHi = muXHi,
-                                           .sigmaLo = sigLoBound,
-                                           .sigmaHi = sigHiBound,
-                                           .qmax = qmaxNeighborhood,
-                                           .pixelSpacing = pixelSpacing,
-                                           .seedA = A0_row,
-                                           .seedMu = mu0_row,
-                                           .seedSigma = sigInitRow,
-                                           .seedB = B0_row};
-            const GaussFitConfig colConfig{.muLo = muYLo,
-                                           .muHi = muYHi,
-                                           .sigmaLo = sigLoBound,
-                                           .sigmaHi = sigHiBound,
-                                           .qmax = qmaxNeighborhood,
-                                           .pixelSpacing = pixelSpacing,
-                                           .seedA = A0_col,
-                                           .seedMu = mu0_col,
-                                           .seedSigma = sigInitCol,
-                                           .seedB = B0_col};
+            // Delegate fitting to core library
+            const cfit::GaussFit1DConfig rowCfg{.muLo = muXLo,
+                                                .muHi = muXHi,
+                                                .sigmaLo = sigLoBound,
+                                                .sigmaHi = sigHiBound,
+                                                .qMax = qmaxNeighborhood,
+                                                .pixelSpacing = pixelSpacing,
+                                                .errorPercent = errorPercentOfMax};
+            const cfit::GaussFit1DConfig colCfg{.muLo = muYLo,
+                                                .muHi = muYHi,
+                                                .sigmaLo = sigLoBound,
+                                                .sigmaHi = sigHiBound,
+                                                .qMax = qmaxNeighborhood,
+                                                .pixelSpacing = pixelSpacing,
+                                                .errorPercent = errorPercentOfMax};
 
-            GaussFitResult const rowFit = RunGaussianFit1D(x_row, q_row, nullptr, uniformSigma, rowConfig);
-            GaussFitResult const colFit = RunGaussianFit1D(y_col, q_col, nullptr, uniformSigma, colConfig);
+            const auto rowFit = cfit::fitGaussian1D(x_row, q_row, rowCfg);
+            const auto colFit = cfit::fitGaussian1D(y_col, q_col, colCfg);
 
             if (rowFit.converged) {
                 out_row_A[i] = rowFit.A;
@@ -693,7 +481,8 @@ int FitGaussian1D(const char* filename) {
                 out_row_B[i] = rowFit.B;
                 out_row_chi2[i] = rowFit.chi2;
                 out_row_ndf[i] = rowFit.ndf;
-                out_row_prob[i] = rowFit.prob;
+                out_row_prob[i] = (rowFit.ndf > 0) ? TMath::Prob(rowFit.chi2, static_cast<int>(rowFit.ndf))
+                                                    : INVALID_VALUE;
             }
             if (colFit.converged) {
                 out_col_A[i] = colFit.A;
@@ -702,7 +491,8 @@ int FitGaussian1D(const char* filename) {
                 out_col_B[i] = colFit.B;
                 out_col_chi2[i] = colFit.chi2;
                 out_col_ndf[i] = colFit.ndf;
-                out_col_prob[i] = colFit.prob;
+                out_col_prob[i] = (colFit.ndf > 0) ? TMath::Prob(colFit.chi2, static_cast<int>(colFit.ndf))
+                                                    : INVALID_VALUE;
             }
 
             double const muX = rowFit.converged ? rowFit.mu : (rowCentroidOk ? rowCentroid : INVALID_VALUE);
@@ -951,8 +741,14 @@ int FitGaussian2D(const char* filename) {
                 return;
             const int R = (N - 1) / 2;
 
-            TGraph2D g2d;
-            int p = 0;
+            // Collect points directly into vectors (no TGraph2D intermediate)
+            thread_local std::vector<double> Xf;
+            thread_local std::vector<double> Yf;
+            thread_local std::vector<double> Zf;
+            Xf.clear();
+            Yf.clear();
+            Zf.clear();
+
             double qmaxNeighborhood = -1e300;
             const double x_px_loc = v_x_px[i];
             const double y_px_loc = v_y_px[i];
@@ -963,178 +759,69 @@ int FitGaussian2D(const char* filename) {
                     const double q = QLoc[idx];
                     if (!IsFinite(q) || q < 0)
                         continue;
-                    const double x = x_px_loc + (di * pixelSpacing);
-                    const double y = y_px_loc + (dj * pixelSpacing);
-                    g2d.SetPoint(p++, x, y, q);
+                    Xf.push_back(x_px_loc + (di * pixelSpacing));
+                    Yf.push_back(y_px_loc + (dj * pixelSpacing));
+                    Zf.push_back(q);
                     qmaxNeighborhood = std::max(q, qmaxNeighborhood);
                 }
             }
-            if (g2d.GetN() < 5)
+            if (Zf.size() < 5)
                 return;
 
-            double zmin = 1e300;
-            double zmax = -1e300;
-            int idxMax = 0;
-            for (int k = 0; k < g2d.GetN(); ++k) {
-                const double z = g2d.GetZ()[k];
-                zmin = std::min(z, zmin);
-                if (z > zmax) {
-                    zmax = z;
-                    idxMax = k;
-                }
-            }
-            double const A0 = std::max(1e-18, zmax - zmin);
-            double B0 = zmin;
-            const double mux0 = g2d.GetX()[idxMax];
-            const double muy0 = g2d.GetY()[idxMax];
-
-            const double uniformSigma =
-                verticalErrorsEnabled ? charge_uncert::UniformPercentOfMax(errorPercentOfMax, qmaxNeighborhood) : 1.0;
             const double sigLoBound = pixelSize;
             const double sigHiBound =
                 std::max(sigLoBound,
                          static_cast<double>(neighborhoodRadiusMeta > 0 ? neighborhoodRadiusMeta : R) * pixelSpacing);
-
-            // Sigma seeds from weighted variance
-            auto sigmaSeed2D = [&](bool forX) -> double {
-                double wsum = 0.0;
-                double m = 0.0;
-                const int n = g2d.GetN();
-                if (n <= 0)
-                    return std::clamp(std::max(0.25 * pixelSpacing, 1e-6), sigLoBound, sigHiBound);
-                for (int k = 0; k < n; ++k) {
-                    const double w = std::max(0.0, g2d.GetZ()[k] - B0);
-                    const double c = forX ? g2d.GetX()[k] : g2d.GetY()[k];
-                    wsum += w;
-                    m += w * c;
-                }
-                if (wsum <= 0.0)
-                    return std::clamp(std::max(0.25 * pixelSpacing, 1e-6), sigLoBound, sigHiBound);
-                m /= wsum;
-                double var = 0.0;
-                for (int k = 0; k < n; ++k) {
-                    const double w = std::max(0.0, g2d.GetZ()[k] - B0);
-                    const double c = forX ? g2d.GetX()[k] : g2d.GetY()[k];
-                    const double d = c - m;
-                    var += w * d * d;
-                }
-                var = (wsum > 0.0) ? (var / wsum) : 0.0;
-                return std::clamp(std::sqrt(std::max(var, 1e-12)), sigLoBound, sigHiBound);
-            };
-            const double sxInit = sigmaSeed2D(true);
-            const double syInit = sigmaSeed2D(false);
-
-            std::vector<double> Xf;
-            std::vector<double> Yf;
-            std::vector<double> Zf;
-            Xf.reserve(g2d.GetN());
-            Yf.reserve(g2d.GetN());
-            Zf.reserve(g2d.GetN());
-            for (int k = 0; k < g2d.GetN(); ++k) {
-                Xf.push_back(g2d.GetX()[k]);
-                Yf.push_back(g2d.GetY()[k]);
-                Zf.push_back(g2d.GetZ()[k]);
-            }
-
-            double xMinR = 1e300;
-            double xMaxR = -1e300;
-            double yMinR = 1e300;
-            double yMaxR = -1e300;
-            for (int k = 0; k < g2d.GetN(); ++k) {
-                xMinR = std::min(xMinR, g2d.GetX()[k]);
-                xMaxR = std::max(xMaxR, g2d.GetX()[k]);
-                yMinR = std::min(yMinR, g2d.GetY()[k]);
-                yMaxR = std::max(yMaxR, g2d.GetY()[k]);
-            }
-            xMinR -= 0.5 * pixelSpacing;
-            xMaxR += 0.5 * pixelSpacing;
-            yMinR -= 0.5 * pixelSpacing;
-            yMaxR += 0.5 * pixelSpacing;
             const double muXLo = v_x_px[i] - (1.0 * pixelSpacing);
             const double muXHi = v_x_px[i] + (1.0 * pixelSpacing);
             const double muYLo = v_y_px[i] - (1.0 * pixelSpacing);
             const double muYHi = v_y_px[i] + (1.0 * pixelSpacing);
 
-            thread_local TF2 fModel("fModel2D", Gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
-            fModel.SetRange(xMinR, yMinR, xMaxR, yMaxR);
-            const double AHi = std::max(1e-18, 2.0 * qmaxNeighborhood);
-            const double BHi = std::max(1e-18, qmaxNeighborhood);
+            // Map error model to core config.
+            // When verticalErrorsEnabled=false, standalone used uniformSigma=1.0;
+            // replicate by setting errorPercent such that qMax * errorPercent / 100 = 1.0.
+            const double effectiveErrorPercent =
+                verticalErrorsEnabled ? errorPercentOfMax
+                                      : (qmaxNeighborhood > 0 ? 100.0 / qmaxNeighborhood : errorPercentOfMax);
 
-            ROOT::Math::WrappedMultiTF1 const wModel(fModel, 2);
-            const int nPts = static_cast<int>(Xf.size());
-            ROOT::Fit::BinData data2D(nPts, 2);
-            for (int k = 0; k < nPts; ++k) {
-                double xy[2] = {Xf[k], Yf[k]};
-                data2D.Add(xy, Zf[k], uniformSigma);
-            }
+            // Delegate fitting to core library
+            const cfit::GaussFit2DConfig cfg2D{.muXLo = muXLo,
+                                               .muXHi = muXHi,
+                                               .muYLo = muYLo,
+                                               .muYHi = muYHi,
+                                               .sigmaLo = sigLoBound,
+                                               .sigmaHi = sigHiBound,
+                                               .qMax = qmaxNeighborhood,
+                                               .pixelSpacing = pixelSpacing,
+                                               .errorPercent = effectiveErrorPercent};
 
-            ROOT::Fit::Fitter fitter;
-            fitter.Config().SetMinimizer("Minuit2", "Fumili2");
-            fitter.Config().MinimizerOptions().SetStrategy(0);
-            fitter.Config().MinimizerOptions().SetTolerance(1e-4);
-            fitter.Config().MinimizerOptions().SetPrintLevel(0);
-            fitter.SetFunction(wModel);
-            fitter.Config().ParSettings(0).SetLimits(1e-18, AHi);
-            fitter.Config().ParSettings(1).SetLimits(muXLo, muXHi);
-            fitter.Config().ParSettings(2).SetLimits(muYLo, muYHi);
-            fitter.Config().ParSettings(3).SetLimits(sigLoBound, sigHiBound);
-            fitter.Config().ParSettings(4).SetLimits(sigLoBound, sigHiBound);
-            fitter.Config().ParSettings(5).SetLimits(-BHi, BHi);
-            fitter.Config().ParSettings(0).SetValue(A0);
-            fitter.Config().ParSettings(1).SetValue(mux0);
-            fitter.Config().ParSettings(2).SetValue(muy0);
-            fitter.Config().ParSettings(3).SetValue(sxInit);
-            fitter.Config().ParSettings(4).SetValue(syInit);
-            fitter.Config().ParSettings(5).SetValue(B0);
+            const auto fitResult = cfit::fitGaussian2D(Xf, Yf, Zf, cfg2D);
 
-            bool okFit = fitter.Fit(data2D);
-            if (!okFit) {
-                fitter.Config().SetMinimizer("Minuit2", "Migrad");
-                fitter.Config().MinimizerOptions().SetStrategy(1);
-                fitter.Config().MinimizerOptions().SetTolerance(1e-3);
-                okFit = fitter.Fit(data2D);
-            }
+            if (fitResult.converged) {
+                out_A[i] = fitResult.A;
+                out_mux[i] = fitResult.muX;
+                out_muy[i] = fitResult.muY;
+                out_sigx[i] = fitResult.sigmaX;
+                out_sigy[i] = fitResult.sigmaY;
+                out_B[i] = fitResult.B;
+                out_chi2[i] = fitResult.chi2;
+                out_ndf[i] = (fitResult.ndf > 0) ? fitResult.ndf : INVALID_VALUE;
+                out_prob[i] = (fitResult.ndf > 0)
+                                  ? TMath::Prob(fitResult.chi2, static_cast<int>(fitResult.ndf))
+                                  : INVALID_VALUE;
 
-            if (okFit) {
-                const auto& fitRes = fitter.Result();
-                out_A[i] = fitRes.Parameter(0);
-                out_mux[i] = fitRes.Parameter(1);
-                out_muy[i] = fitRes.Parameter(2);
-                out_sigx[i] = fitRes.Parameter(3);
-                out_sigy[i] = fitRes.Parameter(4);
-                out_B[i] = fitRes.Parameter(5);
-
-                double chi2Calc = 0.0;
-                double params[6];
-                for (int ip = 0; ip < 6; ++ip)
-                    params[ip] = fitRes.Parameter(ip);
-                for (int k = 0; k < nPts; ++k) {
-                    double xyVals[2] = {Xf[k], Yf[k]};
-                    const double model = Gauss2DPlusB(xyVals, params);
-                    const double pull = (Zf[k] - model) / uniformSigma;
-                    chi2Calc += pull * pull;
-                }
-                int nFree = static_cast<int>(fitRes.NFreeParameters());
-                if (nFree <= 0)
-                    nFree = static_cast<int>(fitRes.NPar());
-                int ndfCalc = nPts - nFree;
-                ndfCalc = std::max(ndfCalc, 0);
-
-                out_chi2[i] = chi2Calc;
-                out_ndf[i] = ndfCalc > 0 ? static_cast<double>(ndfCalc) : INVALID_VALUE;
-                out_prob[i] = ndfCalc > 0 ? TMath::Prob(chi2Calc, ndfCalc) : INVALID_VALUE;
-
-                out_x_rec[i] = out_mux[i];
-                out_y_rec[i] = out_muy[i];
-                out_dx_s[i] = v_x_hit[i] - out_mux[i];
-                out_dy_s[i] = v_y_hit[i] - out_muy[i];
+                out_x_rec[i] = fitResult.muX;
+                out_y_rec[i] = fitResult.muY;
+                out_dx_s[i] = v_x_hit[i] - fitResult.muX;
+                out_dy_s[i] = v_y_hit[i] - fitResult.muY;
                 nFitted.fetch_add(1, std::memory_order_relaxed);
             } else {
-                // Fallback to centroid
+                // Centroid fallback
+                const double B0 = *std::ranges::min_element(Zf);
                 double wsum = 0.0;
                 double xw = 0.0;
                 double yw = 0.0;
-                for (int k = 0; k < nPts; ++k) {
+                for (size_t k = 0; k < Zf.size(); ++k) {
                     double const w = std::max(0.0, Zf[k] - B0);
                     wsum += w;
                     xw += w * Xf[k];
@@ -1145,11 +832,11 @@ int FitGaussian2D(const char* filename) {
                     out_y_rec[i] = yw / wsum;
                     out_dx_s[i] = v_x_hit[i] - out_x_rec[i];
                     out_dy_s[i] = v_y_hit[i] - out_y_rec[i];
-                    out_A[i] = A0;
+                    out_A[i] = std::max(1e-18, *std::ranges::max_element(Zf) - B0);
                     out_mux[i] = out_x_rec[i];
                     out_muy[i] = out_y_rec[i];
-                    out_sigx[i] = sxInit;
-                    out_sigy[i] = syInit;
+                    out_sigx[i] = cfit::estimateSigma(Xf, Zf, B0, pixelSpacing, sigLoBound, sigHiBound);
+                    out_sigy[i] = cfit::estimateSigma(Yf, Zf, B0, pixelSpacing, sigLoBound, sigHiBound);
                     out_B[i] = B0;
                     nFitted.fetch_add(1, std::memory_order_relaxed);
                 }
