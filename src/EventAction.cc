@@ -5,6 +5,7 @@
 #include "EventAction.hh"
 
 #include "Config.hh"
+#include "RuntimeConfig.hh"
 #include "DetectorConstruction.hh"
 #include "RunAction.hh"
 #include "SteppingAction.hh"
@@ -50,19 +51,25 @@ void EventAction::SetComputeFullFractions(G4bool enabled)
 }
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
-    : 
+    :
       fRunAction(runAction),
       fDetector(detector),
-      
+
       fFirstContactPos(0., 0., 0.),
-      
+
       fChargeSharing(detector),
-      
+
       fNeighborhoodLayout(detector ? detector->GetNeighborhoodRadius()
                                    : Constants::NEIGHBORHOOD_RADIUS),
       fEmitDistanceAlphaOutputs(true),
       fComputeFullFractions(Constants::STORE_FULL_GRID)
 {
+    // Override physics parameters from runtime config
+    const auto& rtConfig = ECS::RuntimeConfig::Instance();
+    fIonizationEnergy = rtConfig.ionizationEnergy;
+    fGain = rtConfig.gain;
+    fD0 = rtConfig.d0;
+
     if (detector) {
         fChargeSharing.SetNeighborhoodRadius(detector->GetNeighborhoodRadius());
     }
@@ -285,7 +292,7 @@ void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& resu
 EventAction::NeighborContext EventAction::MakeNeighborContext() const
 {
     NeighborContext context{};
-    context.sigmaNoise = Constants::NOISE_ELECTRON_COUNT * fElementaryCharge;
+    context.sigmaNoise = ECS::RuntimeConfig::Instance().noiseElectronCount * fElementaryCharge;
     return context;
 }
 

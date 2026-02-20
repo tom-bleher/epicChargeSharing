@@ -73,7 +73,7 @@ public:
     [[nodiscard]] G4double GetPixelSize() const { return fPixelSize; }
     [[nodiscard]] G4double GetPixelSpacing() const { return fPixelSpacing; }
     [[nodiscard]] G4double GetPixelPitch() const { return fPixelSpacing; }
-    [[nodiscard]] G4double GetLinearChargeModelBeta() const { return Constants::LINEAR_CHARGE_MODEL_BETA; }
+    [[nodiscard]] G4double GetLinearChargeModelBeta() const { return fLinearChargeModelBeta; }
     [[nodiscard]] G4double GetGridOffset() const { return fGridOffset; }
     [[nodiscard]] G4double GetDetSize() const { return fDetSize; }
     [[nodiscard]] G4int GetNumBlocksPerSide() const { return fNumBlocksPerSide; }
@@ -117,6 +117,8 @@ private:
     G4double fPixelWidth{0.0};
     G4double fPixelSpacing{0.0};
     G4double fGridOffset{0.0};  ///< DD4hep-style grid offset (0 = centered grid)
+
+    G4double fLinearChargeModelBeta{Constants::LINEAR_CHARGE_MODEL_BETA};
 
     G4double fDetSize{0.0};
     G4double fDetWidth{0.0};

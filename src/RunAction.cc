@@ -5,6 +5,7 @@
 #include "RunAction.hh"
 
 #include "Config.hh"
+#include "RuntimeConfig.hh"
 #include "DetectorConstruction.hh"
 #include "RootHelpers.hh"
 
@@ -901,6 +902,7 @@ void RunAction::ConfigureFullFractionBranch(G4bool enable)
 ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
 {
     ECS::IO::MetadataPublisher publisher;
+    const auto& rtConfig = ECS::RuntimeConfig::Instance();
 
     // Simulation info (timestamp and versions)
     ECS::IO::MetadataPublisher::SimulationMetadata sim;
@@ -921,7 +923,7 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
     grid.pixelSpacing = fGridPixelSpacing;
     grid.gridOffset = fGridOffset;
     grid.detectorSize = fGridDetSize;
-    grid.detectorThickness = Constants::DETECTOR_WIDTH / CLHEP::mm;
+    grid.detectorThickness = rtConfig.detectorWidth / CLHEP::mm;
     grid.interpadGap = (fGridPixelSpacing - fGridPixelSize);
     grid.numBlocksPerSide = fGridNumBlocksPerSide;
     grid.neighborhoodRadius = fGridNeighborhoodRadius;
@@ -937,18 +939,18 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
     model.beta = fChargeSharingBeta;
     publisher.SetModelMetadata(model);
 
-    // Physics constants metadata
+    // Physics constants metadata (from runtime config for sweep support)
     ECS::IO::MetadataPublisher::PhysicsMetadata physics;
-    physics.d0 = Constants::D0;
-    physics.ionizationEnergy = Constants::IONIZATION_ENERGY;
-    physics.gain = Constants::GAIN;
+    physics.d0 = rtConfig.d0;
+    physics.ionizationEnergy = rtConfig.ionizationEnergy;
+    physics.gain = rtConfig.gain;
     publisher.SetPhysicsMetadata(physics);
 
-    // Noise model metadata
+    // Noise model metadata (from runtime config for sweep support)
     ECS::IO::MetadataPublisher::NoiseMetadata noise;
-    noise.gainSigmaMin = Constants::PIXEL_GAIN_SIGMA_MIN;
-    noise.gainSigmaMax = Constants::PIXEL_GAIN_SIGMA_MAX;
-    noise.electronCount = Constants::NOISE_ELECTRON_COUNT;
+    noise.gainSigmaMin = rtConfig.pixelGainSigmaMin;
+    noise.gainSigmaMax = rtConfig.pixelGainSigmaMax;
+    noise.electronCount = rtConfig.noiseElectronCount;
     publisher.SetNoiseMetadata(noise);
 
     return publisher;

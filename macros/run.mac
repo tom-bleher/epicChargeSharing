@@ -1,3 +1,20 @@
+# ===============================================================
+# Runtime configuration (override compile-time defaults from Config.hh)
+# These must be set BEFORE /run/initialize
+# ===============================================================
+# /ecs/detector/pixelSize 0.15 mm
+# /ecs/detector/pixelSpacing 0.5 mm
+# /ecs/detector/gridOffset 0.0 mm
+# /ecs/detector/neighborhoodRadius 2
+# /ecs/physics/d0 1.0
+# /ecs/physics/gain 20.0
+# /ecs/physics/ionizationEnergy 3.6
+# /ecs/physics/linearBeta 0.002
+# /ecs/noise/electronCount 500
+# /ecs/noise/gainSigmaMin 0.01
+# /ecs/noise/gainSigmaMax 0.05
+# /ecs/fit/errorPercentOfMax 5.0
+
 # Set verbosity
 /control/verbose 0
 /run/verbose 0

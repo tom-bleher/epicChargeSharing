@@ -37,6 +37,7 @@ site/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
+CMakeUserPresets.json
 *.cmake
 !CMakeLists.txt
 

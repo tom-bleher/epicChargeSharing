@@ -16,6 +16,7 @@
 #include "ActionInitialization.hh"
 #include "DetectorConstruction.hh"
 #include "PhysicsList.hh"
+#include "RuntimeConfig.hh"
 
 #include <filesystem>
 
@@ -238,6 +239,12 @@ int main(int argc, char** argv)
         } else {
             uiGuard.Apply("EPIC_INTERACTIVE_UI", "1");
         }
+
+        // Initialize runtime configuration (registers /ecs/ macro commands).
+        // Must be created before RunManager so macro commands are available
+        // when macros are parsed.
+        auto& runtimeConfig = ECS::RuntimeConfig::Instance();
+        (void)runtimeConfig;  // Suppress unused variable warning
 
         auto* detector = new DetectorConstruction();
         std::unique_ptr<G4RunManager> runManager(CreateRunManager(opts));

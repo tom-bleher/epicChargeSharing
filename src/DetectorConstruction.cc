@@ -5,6 +5,7 @@
 #include "DetectorConstruction.hh"
 
 #include "Config.hh"
+#include "RuntimeConfig.hh"
 #include "EventAction.hh"
 #include "RunAction.hh"
 
@@ -34,17 +35,21 @@
 #include <sstream>
 
 DetectorConstruction::DetectorConstruction()
-    : 
-      fPixelSize(Constants::PIXEL_SIZE),
-      fPixelWidth(Constants::PIXEL_THICKNESS),
-      fPixelSpacing(Constants::PIXEL_PITCH),
-      fGridOffset(Constants::GRID_OFFSET),
-      fDetSize(Constants::DETECTOR_SIZE),
-      fDetWidth(Constants::DETECTOR_WIDTH),
-      
+    :
+      fPixelSize(ECS::RuntimeConfig::Instance().pixelSize),
+      fPixelWidth(ECS::RuntimeConfig::Instance().pixelThickness),
+      fPixelSpacing(ECS::RuntimeConfig::Instance().pixelPitch),
+      fGridOffset(ECS::RuntimeConfig::Instance().gridOffset),
+      fDetSize(ECS::RuntimeConfig::Instance().detectorSize),
+      fDetWidth(ECS::RuntimeConfig::Instance().detectorWidth),
+
       fDetectorPos(0., 0., Constants::DETECTOR_Z_POSITION)
-      
+
 {
+    // Override defaults from runtime config
+    const auto& rtConfig = ECS::RuntimeConfig::Instance();
+    fNeighborhoodRadius = rtConfig.neighborhoodRadius;
+    fLinearChargeModelBeta = rtConfig.linearBeta;
     SetupMessenger();
 }
 
@@ -266,8 +271,9 @@ void DetectorConstruction::InitializePixelGainSigmas()
     const G4int total = n * n;
     fPixelGainSigmas.clear();
     fPixelGainSigmas.reserve(total);
-    const G4double minSigma = Constants::PIXEL_GAIN_SIGMA_MIN;
-    const G4double maxSigma = Constants::PIXEL_GAIN_SIGMA_MAX;
+    const auto& rtConfig = ECS::RuntimeConfig::Instance();
+    const G4double minSigma = rtConfig.pixelGainSigmaMin;
+    const G4double maxSigma = rtConfig.pixelGainSigmaMax;
 
     for (G4int idx = 0; idx < total; ++idx) {
         const G4double u = G4UniformRand();

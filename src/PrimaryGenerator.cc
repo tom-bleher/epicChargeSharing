@@ -5,6 +5,7 @@
 #include "PrimaryGenerator.hh"
 
 #include "Config.hh"
+#include "RuntimeConfig.hh"
 #include "DetectorConstruction.hh"
 
 #include "G4Event.hh"
@@ -52,6 +53,9 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
       fDetector(detector),
       fFixedX(-150.0 * um)
 {
+    // Override from runtime config
+    fUseFixedPosition = ECS::RuntimeConfig::Instance().useFixedPosition;
+
     ConfigureParticleGun();
     ConfigureMessenger();
 
