@@ -37,8 +37,7 @@ namespace ECS::Analysis {
 /// auto h = df.Histo1D({"h_dx", "Delta X", 100, -0.5, 0.5}, "ReconTrueDeltaX");
 /// h->Draw();
 /// \endcode
-inline ROOT::RDataFrame CreateDataFrame(const std::string& filename,
-                                          const std::string& treeName = "Hits") {
+inline ROOT::RDataFrame CreateDataFrame(const std::string& filename, const std::string& treeName = "Hits") {
     return ROOT::RDataFrame(treeName, filename);
 }
 
@@ -82,8 +81,14 @@ inline ROOT::RDF::TH1DModel ErrorMagnitudeModel(int nbins = 100, double max = 1.
 
 /// \brief Create a 2D histogram model for true vs reconstructed position.
 inline ROOT::RDF::TH2DModel TrueVsReconModel(int nbins = 100, double range = 0.5) {
-    return {"h2_true_vs_recon", "True vs Recon Position;True X (mm);Recon X (mm)",
-            nbins, -range, range, nbins, -range, range};
+    return {"h2_true_vs_recon",
+            "True vs Recon Position;True X (mm);Recon X (mm)",
+            nbins,
+            -range,
+            range,
+            nbins,
+            -range,
+            range};
 }
 
 // ============================================================================
@@ -98,16 +103,15 @@ inline ROOT::RDF::TH2DModel TrueVsReconModel(int nbins = 100, double range = 0.5
 /// auto processed = StandardPreprocess(df);
 /// auto h = processed.Histo1D(ErrorMagnitudeModel(), "ReconError");
 /// \endcode
-template<typename T>
+template <typename T>
 auto StandardPreprocess(T& df) {
-    return df.Filter(GapHitsFilter())
-             .Define("ReconError", DefineReconError());
+    return df.Filter(GapHitsFilter()).Define("ReconError", DefineReconError());
 }
 
 /// \brief Compute resolution statistics from a filtered dataframe.
 ///
 /// Returns mean and RMS of ReconError column.
-template<typename T>
+template <typename T>
 std::pair<double, double> ComputeResolution(T& df) {
     auto mean = df.Mean("ReconError");
     auto stddev = df.StdDev("ReconError");
@@ -128,7 +132,7 @@ std::pair<double, double> ComputeResolution(T& df) {
 ///              .Histo1D({"h", "DX", 100, -0.5, 0.5}, "ReconTrueDeltaX");
 /// });
 /// \endcode
-template<typename Func>
+template <typename Func>
 auto AnalyzeFiles(const std::vector<std::string>& files, Func&& analyzer) {
     std::vector<decltype(analyzer(std::declval<ROOT::RDataFrame&>()))> results;
     results.reserve(files.size());
@@ -191,8 +195,7 @@ inline ResolutionAnalysisResult RunResolutionAnalysis(const std::string& filenam
     ResolutionAnalysisResult result;
 
     auto df = CreateDataFrame(filename);
-    auto filtered = df.Filter(GapHitsFilter())
-                      .Define("ReconError", DefineReconError());
+    auto filtered = df.Filter(GapHitsFilter()).Define("ReconError", DefineReconError());
 
     result.histoDeltaX = filtered.Histo1D(DeltaXModel(), "ReconTrueDeltaX");
     result.histoDeltaY = filtered.Histo1D(DeltaYModel(), "ReconTrueDeltaY");

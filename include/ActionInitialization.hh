@@ -31,8 +31,7 @@ class DetectorConstruction;
 ///
 /// For multithreaded operation, BuildForMaster() creates a master
 /// RunAction while Build() creates per-worker instances.
-class ActionInitialization : public G4VUserActionInitialization
-{
+class ActionInitialization : public G4VUserActionInitialization {
 public:
     /// \brief Construct with detector reference.
     /// \param detector Pointer to the detector construction (must outlive this object)

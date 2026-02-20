@@ -22,20 +22,19 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ECS {
 
-using CellID  = std::uint64_t;
+using CellID = std::uint64_t;
 using FieldID = std::int64_t;
 
 /// \brief A single named bit field within a 64-bit CellID.
 class BitFieldElement {
 public:
-    BitFieldElement(const std::string& name, unsigned offset, int signedWidth)
-        : m_name(name),
-          m_offset(offset),
-          m_width(static_cast<unsigned>(std::abs(signedWidth))),
+    BitFieldElement(std::string name, unsigned offset, int signedWidth)
+        : m_name(std::move(name)), m_offset(offset), m_width(static_cast<unsigned>(std::abs(signedWidth))),
           m_isSigned(signedWidth < 0) {
 
         if (m_offset > 63 || m_offset + m_width > 64)
@@ -47,7 +46,7 @@ public:
 
         if (m_isSigned) {
             m_minVal = -(FieldID{1} << (m_width - 1));
-            m_maxVal =  (FieldID{1} << (m_width - 1)) - 1;
+            m_maxVal = (FieldID{1} << (m_width - 1)) - 1;
         } else {
             m_minVal = 0;
             m_maxVal = (FieldID{1} << m_width) - 1;
@@ -58,16 +57,16 @@ public:
     [[nodiscard]] FieldID value(CellID id) const {
         auto val = static_cast<FieldID>((id & m_mask) >> m_offset);
         if (m_isSigned && (val & (FieldID{1} << (m_width - 1))) != 0)
-            val -= (FieldID{1} << m_width);  // two's complement sign extension
+            val -= (FieldID{1} << m_width); // two's complement sign extension
         return val;
     }
 
     /// Set this field's value in a CellID.
     void set(CellID& field, FieldID in) const {
         if (in < m_minVal || in > m_maxVal)
-            throw std::runtime_error("BitFieldElement '" + m_name
-                + "': value " + std::to_string(in) + " out of range ["
-                + std::to_string(m_minVal) + ", " + std::to_string(m_maxVal) + "]");
+            throw std::runtime_error("BitFieldElement '" + m_name + "': value " + std::to_string(in) +
+                                     " out of range [" + std::to_string(m_minVal) + ", " + std::to_string(m_maxVal) +
+                                     "]");
         field &= ~m_mask;
         field |= (static_cast<CellID>(in) << m_offset) & m_mask;
     }
@@ -79,12 +78,12 @@ public:
 
 private:
     std::string m_name;
-    CellID      m_mask{};
-    unsigned    m_offset{};
-    unsigned    m_width{};
-    FieldID     m_minVal{};
-    FieldID     m_maxVal{};
-    bool        m_isSigned{};
+    CellID m_mask{};
+    unsigned m_offset{};
+    unsigned m_width{};
+    FieldID m_minVal{};
+    FieldID m_maxVal{};
+    bool m_isSigned{};
 };
 
 /// \brief Encodes/decodes named fields in a 64-bit CellID.
@@ -120,7 +119,8 @@ public:
 private:
     [[nodiscard]] std::size_t index(const std::string& name) const {
         for (std::size_t i = 0; i < m_fields.size(); ++i)
-            if (m_fields[i].name() == name) return i;
+            if (m_fields[i].name() == name)
+                return i;
         throw std::runtime_error("BitFieldCoder: unknown field '" + name + "'");
     }
 
@@ -133,8 +133,8 @@ private:
             auto parts = tokenize(desc, ':');
 
             std::string name;
-            int width;
-            unsigned thisOffset;
+            int width = 0;
+            unsigned thisOffset = 0;
 
             if (parts.size() == 2) {
                 name = parts[0];
@@ -147,16 +147,14 @@ private:
                 width = std::atoi(parts[2].c_str());
                 offset = thisOffset + static_cast<unsigned>(std::abs(width));
             } else {
-                throw std::runtime_error(
-                    "BitFieldCoder: invalid descriptor '" + desc + "'");
+                throw std::runtime_error("BitFieldCoder: invalid descriptor '" + desc + "'");
             }
 
             m_fields.emplace_back(name, thisOffset, width);
 
-            CellID fieldMask = ((uint64_t{1} << static_cast<unsigned>(std::abs(width))) - 1) << thisOffset;
+            CellID const fieldMask = ((uint64_t{1} << static_cast<unsigned>(std::abs(width))) - 1) << thisOffset;
             if (usedBits & fieldMask)
-                throw std::runtime_error(
-                    "BitFieldCoder: overlapping bits for field '" + name + "'");
+                throw std::runtime_error("BitFieldCoder: overlapping bits for field '" + name + "'");
             usedBits |= fieldMask;
         }
     }
@@ -164,14 +162,18 @@ private:
     static std::vector<std::string> tokenize(const std::string& s, char delim) {
         std::vector<std::string> tokens;
         std::string token;
-        for (char c : s) {
+        for (char const c : s) {
             if (c == delim) {
-                if (!token.empty()) { tokens.push_back(token); token.clear(); }
+                if (!token.empty()) {
+                    tokens.push_back(token);
+                    token.clear();
+                }
             } else if (c != ' ') {
                 token += c;
             }
         }
-        if (!token.empty()) tokens.push_back(token);
+        if (!token.empty())
+            tokens.push_back(token);
         return tokens;
     }
 

@@ -35,7 +35,7 @@ RootFileWriter::~RootFileWriter() {
 }
 
 void RootFileWriter::Attach(TFile* file, TTree* tree, bool ownsObjects) {
-    std::lock_guard<std::mutex> lock(fMutex);
+    std::lock_guard<std::mutex> const lock(fMutex);
     fRootFile = file;
     fTree = tree;
     fOwnsObjects = ownsObjects;
@@ -50,7 +50,7 @@ TTree* RootFileWriter::Tree() const {
 }
 
 bool RootFileWriter::SafeWrite(bool /*isMultithreaded*/, bool isWorker) {
-    std::lock_guard<std::mutex> globalLock(RootIOMutex());
+    std::lock_guard<std::mutex> const globalLock(RootIOMutex());
     std::unique_lock<std::mutex> lock(fMutex, std::defer_lock);
     if (!isWorker) {
         lock.lock();
@@ -75,7 +75,7 @@ bool RootFileWriter::SafeWrite(bool /*isMultithreaded*/, bool isWorker) {
 }
 
 bool RootFileWriter::Validate(const G4String& filename, bool* hasEntries) {
-    std::lock_guard<std::mutex> globalLock(RootIOMutex());
+    std::lock_guard<std::mutex> const globalLock(RootIOMutex());
     if (filename.empty()) {
         G4Exception("RootFileWriter::Validate", "EmptyFilename", FatalException,
                     "Empty filename provided for validation.");
@@ -118,8 +118,8 @@ bool RootFileWriter::Validate(const G4String& filename, bool* hasEntries) {
 }
 
 void RootFileWriter::Cleanup() {
-    std::lock_guard<std::mutex> globalLock(RootIOMutex());
-    std::lock_guard<std::mutex> lock(fMutex);
+    std::lock_guard<std::mutex> const globalLock(RootIOMutex());
+    std::lock_guard<std::mutex> const lock(fMutex);
     if (fRootFile) {
         if (fRootFile->IsOpen()) {
             fRootFile->Close();
@@ -133,11 +133,10 @@ void RootFileWriter::Cleanup() {
     fOwnsObjects = false;
 }
 
-void RootFileWriter::WriteMetadataSingleThread(G4double pixelSize, G4double pixelSpacing,
-                                                G4double gridOffset, G4double detSize,
-                                                G4int numBlocksPerSide, G4int neighborhoodRadius) {
-    std::lock_guard<std::mutex> globalLock(RootIOMutex());
-    std::lock_guard<std::mutex> lock(fMutex);
+void RootFileWriter::WriteMetadataSingleThread(G4double pixelSize, G4double pixelSpacing, G4double gridOffset,
+                                               G4double detSize, G4int numBlocksPerSide, G4int neighborhoodRadius) {
+    std::lock_guard<std::mutex> const globalLock(RootIOMutex());
+    std::lock_guard<std::mutex> const lock(fMutex);
     if (!fRootFile || fRootFile->IsZombie()) {
         return;
     }
@@ -168,7 +167,7 @@ WorkerSync& WorkerSync::Instance() {
 }
 
 void WorkerSync::Reset(G4int totalWorkers) {
-    std::lock_guard<std::mutex> lock(fMutex);
+    std::lock_guard<std::mutex> const lock(fMutex);
     fCompleted.store(0);
     fTotal = std::max(0, totalWorkers);
     fAllDone = (fTotal == 0);

@@ -29,11 +29,11 @@ namespace ECS::IO {
 // ============================================================================
 
 void BranchConfigurator::ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars,
-                                                const ClassificationBuffers& classification,
-                                                const VectorBuffers& vectors,
-                                                Config::ActivePixelMode mode,
-                                                Config::PosReconModel reconModel) {
-    if (!tree) return;
+                                               const ClassificationBuffers& classification,
+                                               const VectorBuffers& vectors, Config::ActivePixelMode mode,
+                                               Config::PosReconModel reconModel) {
+    if (!tree)
+        return;
     ConfigureScalarBranches(tree, scalars, reconModel);
     ConfigureClassificationBranches(tree, classification);
     ConfigureVectorBranches(tree, vectors, mode);
@@ -41,31 +41,36 @@ void BranchConfigurator::ConfigureCoreBranches(TTree* tree, const ScalarBuffers&
 }
 
 void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers,
-                                                  [[maybe_unused]] Config::PosReconModel reconModel) {
-    if (!tree) return;
+                                                 [[maybe_unused]] Config::PosReconModel reconModel) {
+    if (!tree)
+        return;
 
-    struct BranchDef { const char* name; G4double* addr; const char* leaf; };
+    struct BranchDef {
+        const char* name;
+        G4double* addr;
+        const char* leaf;
+    };
 
     // Core branches (always present)
     const std::array<BranchDef, 7> coreBranches{{
-        {"TrueX", buffers.trueX, "TrueX/D"},
-        {"TrueY", buffers.trueY, "TrueY/D"},
-        {"PixelX", buffers.pixelX, "PixelX/D"},
-        {"PixelY", buffers.pixelY, "PixelY/D"},
-        {"Edep", buffers.edep, "Edep/D"},
-        {"PixelTrueDeltaX", buffers.pixelTrueDeltaX, "PixelTrueDeltaX/D"},
-        {"PixelTrueDeltaY", buffers.pixelTrueDeltaY, "PixelTrueDeltaY/D"},
+        {.name = "TrueX", .addr = buffers.trueX, .leaf = "TrueX/D"},
+        {.name = "TrueY", .addr = buffers.trueY, .leaf = "TrueY/D"},
+        {.name = "PixelX", .addr = buffers.pixelX, .leaf = "PixelX/D"},
+        {.name = "PixelY", .addr = buffers.pixelY, .leaf = "PixelY/D"},
+        {.name = "Edep", .addr = buffers.edep, .leaf = "Edep/D"},
+        {.name = "PixelTrueDeltaX", .addr = buffers.pixelTrueDeltaX, .leaf = "PixelTrueDeltaX/D"},
+        {.name = "PixelTrueDeltaY", .addr = buffers.pixelTrueDeltaY, .leaf = "PixelTrueDeltaY/D"},
     }};
 
     for (const auto& def : coreBranches) {
-        if (def.addr) tree->Branch(def.name, def.addr, def.leaf);
+        if (def.addr)
+            tree->Branch(def.name, def.addr, def.leaf);
     }
-
 }
 
-void BranchConfigurator::ConfigureClassificationBranches(TTree* tree,
-                                                          const ClassificationBuffers& buffers) {
-    if (!tree) return;
+void BranchConfigurator::ConfigureClassificationBranches(TTree* tree, const ClassificationBuffers& buffers) {
+    if (!tree)
+        return;
     if (buffers.isPixelHit)
         tree->Branch("isPixelHit", buffers.isPixelHit, "isPixelHit/O");
     if (buffers.neighborhoodActiveCells)
@@ -79,11 +84,13 @@ void BranchConfigurator::ConfigureClassificationBranches(TTree* tree,
 }
 
 void BranchConfigurator::ConfigureVectorBranches(TTree* tree, const VectorBuffers& buffers,
-                                                  Config::ActivePixelMode mode) {
-    if (!tree) return;
+                                                 Config::ActivePixelMode mode) {
+    if (!tree)
+        return;
 
     auto addBranch = [&](const char* name, std::vector<G4double>* vec) {
-        if (vec) tree->Branch(name, vec, kDefaultBufferSize, kSplitLevel);
+        if (vec)
+            tree->Branch(name, vec, kDefaultBufferSize, kSplitLevel);
     };
 
     // Common branches (always saved)
@@ -130,14 +137,18 @@ void BranchConfigurator::ConfigureNeighborhoodBranches(TTree* tree, std::vector<
 }
 
 bool BranchConfigurator::ConfigureFullGridBranches(TTree* tree, const FullGridBuffers& buffers,
-                                                    Config::ActivePixelMode mode) {
-    if (!tree) return false;
+                                                   Config::ActivePixelMode mode) {
+    if (!tree)
+        return false;
     bool configured = false;
 
     // Use larger basket size for full grid branches which can have >10KB per entry
     // (e.g., 100x100 grid = 10000 doubles = 80KB per entry)
     auto addBranch = [&](const char* name, auto* vec) {
-        if (vec) { tree->Branch(name, vec, kLargeVectorBufferSize, kSplitLevel); configured = true; }
+        if (vec) {
+            tree->Branch(name, vec, kLargeVectorBufferSize, kSplitLevel);
+            configured = true;
+        }
     };
 
     // Common branches (always saved)
@@ -194,24 +205,25 @@ void TreeFiller::SetNeighborhoodRadius(G4int radius) {
 }
 
 bool TreeFiller::Fill(TTree* tree, const EventRecord& record, std::mutex* treeMutex) {
-    if (!tree) return false;
+    if (!tree)
+        return false;
 
     std::unique_lock<std::mutex> lock;
-    if (treeMutex) lock = std::unique_lock<std::mutex>(*treeMutex);
+    if (treeMutex)
+        lock = std::unique_lock<std::mutex>(*treeMutex);
 
     UpdateSummaryScalars(record);
 
     const std::size_t requestedCells = record.totalGridCells > 0
-        ? static_cast<std::size_t>(record.totalGridCells)
-        : std::max<std::size_t>(1, fNeighborhoodLayout.TotalCells());
+                                           ? static_cast<std::size_t>(record.totalGridCells)
+                                           : std::max<std::size_t>(1, fNeighborhoodLayout.TotalCells());
 
     PrepareNeighborhoodStorage(requestedCells);
     PopulateNeighborhoodFromRecord(record);
     PopulateFullFractionsFromRecord(record);
 
     if (tree->Fill() < 0) {
-        G4Exception("TreeFiller::Fill", "TreeFillFailure", FatalException,
-                    "TTree::Fill() reported an error.");
+        G4Exception("TreeFiller::Fill", "TreeFillFailure", FatalException, "TTree::Fill() reported an error.");
         return false;
     }
     return true;
@@ -269,7 +281,8 @@ void TreeFiller::PrepareNeighborhoodStorage(std::size_t requestedCells) {
 void TreeFiller::PopulateNeighborhoodFromRecord(const EventRecord& record) {
     auto copySpan = [](const auto& source, auto& target) {
         const std::size_t n = std::min(target.size(), source.size());
-        if (n > 0) std::copy_n(source.begin(), n, target.begin());
+        if (n > 0)
+            std::copy_n(source.begin(), n, target.begin());
     };
 
     copySpan(record.neighborChargesNew, fNeighborhoodChargeNew);
@@ -284,9 +297,11 @@ void TreeFiller::PopulateNeighborhoodFromRecord(const EventRecord& record) {
 
     std::size_t activeCells = 0;
     for (const auto& cell : record.neighborCells) {
-        if (cell.gridIndex < 0) continue;
+        if (cell.gridIndex < 0)
+            continue;
         const auto idx = static_cast<std::size_t>(cell.gridIndex);
-        if (idx >= fNeighborhoodCapacity) continue;
+        if (idx >= fNeighborhoodCapacity)
+            continue;
 
         // Fractions
         fNeighborhoodChargeFractions[idx] = cell.fraction;
@@ -315,18 +330,26 @@ void TreeFiller::PopulateNeighborhoodFromRecord(const EventRecord& record) {
 }
 
 void TreeFiller::PopulateFullFractionsFromRecord(const EventRecord& record) {
-    if (!fStoreFullFractions) return;
+    if (!fStoreFullFractions)
+        return;
 
     const G4int gridSide = (record.fullGridCols > 0) ? record.fullGridCols : fGridNumBlocksPerSide;
-    if (!EnsureFullFractionBuffer(gridSide)) return;
-    if (record.fullGridCols > 0) fFullGridSide = record.fullGridCols;
+    if (!EnsureFullFractionBuffer(gridSide))
+        return;
+    if (record.fullGridCols > 0)
+        fFullGridSide = record.fullGridCols;
 
     auto copyOrZero = [](const std::span<const G4double>& src, std::vector<G4double>& dst) {
-        if (dst.empty()) return;
-        if (src.empty()) { std::fill(dst.begin(), dst.end(), 0.0); return; }
+        if (dst.empty())
+            return;
+        if (src.empty()) {
+            std::ranges::fill(dst, 0.0);
+            return;
+        }
         const std::size_t n = std::min(dst.size(), src.size());
         std::copy_n(src.begin(), n, dst.begin());
-        if (n < dst.size()) std::fill(dst.begin() + n, dst.end(), 0.0);
+        if (n < dst.size())
+            std::fill(dst.begin() + n, dst.end(), 0.0);
     };
 
     // Fractions
@@ -358,48 +381,77 @@ void TreeFiller::PopulateFullFractionsFromRecord(const EventRecord& record) {
 }
 
 bool TreeFiller::EnsureFullFractionBuffer(G4int gridSide) {
-    if (gridSide >= 0) fFullGridSide = gridSide;
+    if (gridSide >= 0)
+        fFullGridSide = gridSide;
     const G4int side = (fFullGridSide > 0) ? fFullGridSide : fGridNumBlocksPerSide;
     const G4int numBlocks = std::max(0, side);
     const std::size_t totalPixels = static_cast<std::size_t>(numBlocks) * numBlocks;
 
     if (totalPixels == 0) {
         // Fractions
-        fFullFi.clear(); fFullFiRow.clear(); fFullFiCol.clear(); fFullFiBlock.clear();
+        fFullFi.clear();
+        fFullFiRow.clear();
+        fFullFiCol.clear();
+        fFullFiBlock.clear();
         // Neighborhood charges
-        fFullQi.clear(); fFullQn.clear(); fFullQf.clear();
+        fFullQi.clear();
+        fFullQn.clear();
+        fFullQf.clear();
         // Row-mode charges
-        fFullQiRow.clear(); fFullQnRow.clear(); fFullQfRow.clear();
+        fFullQiRow.clear();
+        fFullQnRow.clear();
+        fFullQfRow.clear();
         // Col-mode charges
-        fFullQiCol.clear(); fFullQnCol.clear(); fFullQfCol.clear();
+        fFullQiCol.clear();
+        fFullQnCol.clear();
+        fFullQfCol.clear();
         // Block-mode charges
-        fFullQiBlock.clear(); fFullQnBlock.clear(); fFullQfBlock.clear();
+        fFullQiBlock.clear();
+        fFullQnBlock.clear();
+        fFullQfBlock.clear();
         // Geometry
-        fFullDistance.clear(); fFullAlpha.clear();
-        fFullPixelXGrid.clear(); fFullPixelYGrid.clear();
+        fFullDistance.clear();
+        fFullAlpha.clear();
+        fFullPixelXGrid.clear();
+        fFullPixelYGrid.clear();
         fFullGridSide = 0;
         return false;
     }
 
     fFullGridSide = numBlocks;
     auto ensure = [totalPixels](auto& vec) {
-        if (vec.size() != totalPixels) vec.assign(totalPixels, 0.0);
-        else std::fill(vec.begin(), vec.end(), 0.0);
+        if (vec.size() != totalPixels)
+            vec.assign(totalPixels, 0.0);
+        else
+            std::fill(vec.begin(), vec.end(), 0.0);
     };
 
     // Fractions
-    ensure(fFullFi); ensure(fFullFiRow); ensure(fFullFiCol); ensure(fFullFiBlock);
+    ensure(fFullFi);
+    ensure(fFullFiRow);
+    ensure(fFullFiCol);
+    ensure(fFullFiBlock);
     // Neighborhood charges
-    ensure(fFullQi); ensure(fFullQn); ensure(fFullQf);
+    ensure(fFullQi);
+    ensure(fFullQn);
+    ensure(fFullQf);
     // Row-mode charges
-    ensure(fFullQiRow); ensure(fFullQnRow); ensure(fFullQfRow);
+    ensure(fFullQiRow);
+    ensure(fFullQnRow);
+    ensure(fFullQfRow);
     // Col-mode charges
-    ensure(fFullQiCol); ensure(fFullQnCol); ensure(fFullQfCol);
+    ensure(fFullQiCol);
+    ensure(fFullQnCol);
+    ensure(fFullQfCol);
     // Block-mode charges
-    ensure(fFullQiBlock); ensure(fFullQnBlock); ensure(fFullQfBlock);
+    ensure(fFullQiBlock);
+    ensure(fFullQnBlock);
+    ensure(fFullQfBlock);
     // Geometry
-    ensure(fFullDistance); ensure(fFullAlpha);
-    ensure(fFullPixelXGrid); ensure(fFullPixelYGrid);
+    ensure(fFullDistance);
+    ensure(fFullAlpha);
+    ensure(fFullPixelXGrid);
+    ensure(fFullPixelYGrid);
     return true;
 }
 
@@ -409,28 +461,38 @@ bool TreeFiller::EnsureFullFractionBuffer(G4int gridSide) {
 
 std::string MetadataPublisher::ModelToString(Config::PosReconModel model) {
     switch (model) {
-        case Config::PosReconModel::LinA: return "LinA";
+        case Config::PosReconModel::LinA:
+            return "LinA";
         case Config::PosReconModel::LogA:
-        default: return "LogA";
+        default:
+            return "LogA";
     }
 }
 
 std::string MetadataPublisher::SignalModelToString(Config::SignalModel model) {
     switch (model) {
-        case Config::SignalModel::LinA: return "LinA";
+        case Config::SignalModel::LinA:
+            return "LinA";
         case Config::SignalModel::LogA:
-        default: return "LogA";
+        default:
+            return "LogA";
     }
 }
 
 static std::string ActivePixelModeToString(Config::ActivePixelMode mode) {
     switch (mode) {
-        case Config::ActivePixelMode::Neighborhood: return "Neighborhood";
-        case Config::ActivePixelMode::ChargeBlock2x2: return "ChargeBlock2x2";
-        case Config::ActivePixelMode::ChargeBlock3x3: return "ChargeBlock3x3";
-        case Config::ActivePixelMode::RowCol: return "RowCol";
-        case Config::ActivePixelMode::RowCol3x3: return "RowCol3x3";
-        default: return "Neighborhood";
+        case Config::ActivePixelMode::Neighborhood:
+            return "Neighborhood";
+        case Config::ActivePixelMode::ChargeBlock2x2:
+            return "ChargeBlock2x2";
+        case Config::ActivePixelMode::ChargeBlock3x3:
+            return "ChargeBlock3x3";
+        case Config::ActivePixelMode::RowCol:
+            return "RowCol";
+        case Config::ActivePixelMode::RowCol3x3:
+            return "RowCol3x3";
+        default:
+            return "Neighborhood";
     }
 }
 
@@ -450,20 +512,31 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
     };
 
     // Simulation info (timestamp and versions)
-    if (!fSimulation.timestamp.empty()) addString("SimulationTimestamp", fSimulation.timestamp);
-    if (!fSimulation.geant4Version.empty()) addString("Geant4Version", fSimulation.geant4Version);
-    if (!fSimulation.rootVersion.empty()) addString("ROOTVersion", fSimulation.rootVersion);
+    if (!fSimulation.timestamp.empty())
+        addString("SimulationTimestamp", fSimulation.timestamp);
+    if (!fSimulation.geant4Version.empty())
+        addString("Geant4Version", fSimulation.geant4Version);
+    if (!fSimulation.rootVersion.empty())
+        addString("ROOTVersion", fSimulation.rootVersion);
 
     // Grid parameters (doubles and ints)
-    if (fGrid.pixelSize > 0.0) addDouble("GridPixelSize_mm", fGrid.pixelSize);
-    if (fGrid.pixelSpacing > 0.0) addDouble("GridPixelSpacing_mm", fGrid.pixelSpacing);
-    addDouble("GridOffset_mm", fGrid.gridOffset);  // DD4hep-style grid offset
-    if (fGrid.detectorSize > 0.0) addDouble("GridDetectorSize_mm", fGrid.detectorSize);
-    if (fGrid.detectorThickness > 0.0) addDouble("DetectorThickness_mm", fGrid.detectorThickness);
-    if (fGrid.interpadGap > 0.0) addDouble("InterpadGap_mm", fGrid.interpadGap);
-    if (fGrid.numBlocksPerSide > 0) addInt("GridNumBlocksPerSide", fGrid.numBlocksPerSide);
-    if (fGrid.storeFullFractions && fGrid.fullGridSide > 0) addInt("FullGridSide", fGrid.fullGridSide);
-    if (fGrid.neighborhoodRadius >= 0) addInt("NeighborhoodRadius", fGrid.neighborhoodRadius);
+    if (fGrid.pixelSize > 0.0)
+        addDouble("GridPixelSize_mm", fGrid.pixelSize);
+    if (fGrid.pixelSpacing > 0.0)
+        addDouble("GridPixelSpacing_mm", fGrid.pixelSpacing);
+    addDouble("GridOffset_mm", fGrid.gridOffset); // DD4hep-style grid offset
+    if (fGrid.detectorSize > 0.0)
+        addDouble("GridDetectorSize_mm", fGrid.detectorSize);
+    if (fGrid.detectorThickness > 0.0)
+        addDouble("DetectorThickness_mm", fGrid.detectorThickness);
+    if (fGrid.interpadGap > 0.0)
+        addDouble("InterpadGap_mm", fGrid.interpadGap);
+    if (fGrid.numBlocksPerSide > 0)
+        addInt("GridNumBlocksPerSide", fGrid.numBlocksPerSide);
+    if (fGrid.storeFullFractions && fGrid.fullGridSide > 0)
+        addInt("FullGridSide", fGrid.fullGridSide);
+    if (fGrid.neighborhoodRadius >= 0)
+        addInt("NeighborhoodRadius", fGrid.neighborhoodRadius);
 
     // Model parameters (strings for enums, doubles for numeric)
     addString("SignalModel", SignalModelToString(fModel.signalModel));
@@ -496,30 +569,34 @@ void MetadataPublisher::WriteEntriesToUserInfo(TTree* tree, const EntryList& ent
 
     TList* userInfo = tree->GetUserInfo();
     for (const auto& [key, value] : entries) {
-        std::visit([&key, userInfo](auto&& val) {
-            using T = std::decay_t<decltype(val)>;
-            // Objects must be heap-allocated - TTree takes ownership
-            if constexpr (std::is_same_v<T, G4double>) {
-                userInfo->Add(new TParameter<double>(key.c_str(), val));
-            } else if constexpr (std::is_same_v<T, G4int>) {
-                userInfo->Add(new TParameter<int>(key.c_str(), val));
-            } else if constexpr (std::is_same_v<T, G4bool>) {
-                userInfo->Add(new TParameter<bool>(key.c_str(), val));
-            } else if constexpr (std::is_same_v<T, std::string>) {
-                userInfo->Add(new TNamed(key.c_str(), val.c_str()));
-            }
-        }, value);
+        std::visit(
+            [&key, userInfo](auto&& val) {
+                using T = std::decay_t<decltype(val)>;
+                // Objects must be heap-allocated - TTree takes ownership
+                if constexpr (std::is_same_v<T, G4double>) {
+                    userInfo->Add(new TParameter<double>(key.c_str(), val));
+                } else if constexpr (std::is_same_v<T, G4int>) {
+                    userInfo->Add(new TParameter<int>(key.c_str(), val));
+                } else if constexpr (std::is_same_v<T, G4bool>) {
+                    userInfo->Add(new TParameter<bool>(key.c_str(), val));
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    userInfo->Add(new TNamed(key.c_str(), val.c_str()));
+                }
+            },
+            value);
     }
 }
 
 void MetadataPublisher::WriteToTree(TTree* tree, std::mutex* ioMutex) const {
-    if (!tree) return;
+    if (!tree)
+        return;
 
-    EntryList entries = CollectEntries();
-    if (entries.empty()) return;
+    EntryList const entries = CollectEntries();
+    if (entries.empty())
+        return;
 
     if (ioMutex) {
-        std::lock_guard<std::mutex> lock(*ioMutex);
+        std::lock_guard<std::mutex> const lock(*ioMutex);
         WriteEntriesToUserInfo(tree, entries);
     } else {
         WriteEntriesToUserInfo(tree, entries);
@@ -532,7 +609,7 @@ void MetadataPublisher::WriteToTree(TTree* tree, std::mutex* ioMutex) const {
 
 std::string PostProcessingRunner::NormalizePath(const std::string& path) {
     std::string normalized = path;
-    std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    std::ranges::replace(normalized, '\\', '/');
     return normalized;
 }
 
@@ -544,21 +621,22 @@ void PostProcessingRunner::EnsureBatchMode() {
 }
 
 void PostProcessingRunner::ConfigureIncludePaths() {
-    if (fIncludePathsConfigured || fConfig.sourceDir.empty()) return;
+    if (fIncludePathsConfigured || fConfig.sourceDir.empty())
+        return;
 
-    TString sourceDir = TString(NormalizePath(fConfig.sourceDir).c_str());
+    TString const sourceDir = TString(NormalizePath(fConfig.sourceDir).c_str());
     gROOT->ProcessLine(TString::Format(".include %s/include", sourceDir.Data()));
     gROOT->ProcessLine(TString::Format(".include %s/src", sourceDir.Data()));
     fIncludePathsConfigured = true;
 }
 
 bool PostProcessingRunner::RunMacro(const std::string& macroPath, const std::string& entryPoint,
-                                     const std::string& rootFile) {
+                                    const std::string& rootFile) {
     EnsureBatchMode();
     ConfigureIncludePaths();
 
-    TString normalizedMacro = TString(NormalizePath(macroPath).c_str());
-    TString normalizedRoot = TString(NormalizePath(rootFile).c_str());
+    TString const normalizedMacro = TString(NormalizePath(macroPath).c_str());
+    TString const normalizedRoot = TString(NormalizePath(rootFile).c_str());
 
     G4cout << "[PostProcessingRunner] Running macro " << entryPoint << "..." << G4endl;
 
@@ -569,7 +647,8 @@ bool PostProcessingRunner::RunMacro(const std::string& macroPath, const std::str
 }
 
 bool PostProcessingRunner::Run() {
-    if (!fConfig.runFitGaus1D && !fConfig.runFitGaus2D) return false;
+    if (!fConfig.runFitGaus1D && !fConfig.runFitGaus2D)
+        return false;
 
     EnsureBatchMode();
 

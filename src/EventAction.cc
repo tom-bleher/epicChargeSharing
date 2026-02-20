@@ -5,18 +5,18 @@
 #include "EventAction.hh"
 
 #include "Config.hh"
-#include "RuntimeConfig.hh"
 #include "DetectorConstruction.hh"
 #include "RunAction.hh"
+#include "RuntimeConfig.hh"
 #include "SteppingAction.hh"
 
 #include "G4Event.hh"
 #include "G4GenericMessenger.hh"
+#include "G4HCofThisEvent.hh"
 #include "G4Run.hh"
 #include "G4RunManager.hh"
-#include "G4StateManager.hh"
-#include "G4HCofThisEvent.hh"
 #include "G4SDManager.hh"
+#include "G4StateManager.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4THitsMap.hh"
 
@@ -27,13 +27,11 @@
 #include <limits>
 #include <span>
 
-namespace
-{
+namespace {
 const std::vector<G4double> kEmptyDoubleVector;
 }
 
-void EventAction::SetEmitDistanceAlpha(G4bool enabled)
-{
+void EventAction::SetEmitDistanceAlpha(G4bool enabled) {
     fEmitDistanceAlphaOutputs = enabled;
     fChargeSharing.SetEmitDistanceAlpha(enabled);
     if (fRunAction) {
@@ -41,8 +39,7 @@ void EventAction::SetEmitDistanceAlpha(G4bool enabled)
     }
 }
 
-void EventAction::SetComputeFullFractions(G4bool enabled)
-{
+void EventAction::SetComputeFullFractions(G4bool enabled) {
     fComputeFullFractions = enabled;
     fChargeSharing.SetComputeFullGridFractions(enabled);
     if (fRunAction) {
@@ -51,19 +48,14 @@ void EventAction::SetComputeFullFractions(G4bool enabled)
 }
 
 EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
-    :
-      fRunAction(runAction),
-      fDetector(detector),
+    : fRunAction(runAction), fDetector(detector),
 
       fFirstContactPos(0., 0., 0.),
 
       fChargeSharing(detector),
 
-      fNeighborhoodLayout(detector ? detector->GetNeighborhoodRadius()
-                                   : Constants::NEIGHBORHOOD_RADIUS),
-      fEmitDistanceAlphaOutputs(true),
-      fComputeFullFractions(Constants::STORE_FULL_GRID)
-{
+      fNeighborhoodLayout(detector ? detector->GetNeighborhoodRadius() : Constants::NEIGHBORHOOD_RADIUS),
+      fEmitDistanceAlphaOutputs(true), fComputeFullFractions(Constants::STORE_FULL_GRID) {
     // Override physics parameters from runtime config
     const auto& rtConfig = ECS::RuntimeConfig::Instance();
     fIonizationEnergy = rtConfig.ionizationEnergy;
@@ -80,23 +72,18 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
         fRunAction->ConfigureFullFractionBranch(fComputeFullFractions);
     }
 
-    fMessenger = std::make_unique<G4GenericMessenger>(this,
-                                                      "/epic/chargeSharing/",
-                                                      "Charge sharing configuration");
-    auto& cmd = fMessenger->DeclareProperty("computeDistanceAlpha",
-                                            fEmitDistanceAlphaOutputs,
+    fMessenger = std::make_unique<G4GenericMessenger>(this, "/epic/chargeSharing/", "Charge sharing configuration");
+    auto& cmd = fMessenger->DeclareProperty("computeDistanceAlpha", fEmitDistanceAlphaOutputs,
                                             "Enable per-neighbor distance and alpha outputs");
     cmd.SetStates(G4State_PreInit, G4State_Idle);
     cmd.SetToBeBroadcasted(true);
-    auto& fullCmd = fMessenger->DeclareProperty("computeFullFractions",
-                                                fComputeFullFractions,
+    auto& fullCmd = fMessenger->DeclareProperty("computeFullFractions", fComputeFullFractions,
                                                 "Enable per-event full-detector charge fractions (F_i)");
     fullCmd.SetStates(G4State_PreInit, G4State_Idle);
     fullCmd.SetToBeBroadcasted(true);
 }
 
-void EventAction::BeginOfEventAction(const G4Event* /*event*/)
-{
+void EventAction::BeginOfEventAction(const G4Event* /*event*/) {
     fChargeSharing.SetEmitDistanceAlpha(fEmitDistanceAlphaOutputs);
     fChargeSharing.SetComputeFullGridFractions(fComputeFullFractions);
     if (fRunAction) {
@@ -121,8 +108,7 @@ void EventAction::BeginOfEventAction(const G4Event* /*event*/)
     EnsureNeighborhoodBuffers(fNeighborhoodLayout.TotalCells());
 }
 
-void EventAction::EndOfEventAction(const G4Event* event)
-{
+void EventAction::EndOfEventAction(const G4Event* event) {
     CollectScorerData(event);
 
     const G4double finalEdep = fScorerEnergyDeposit;
@@ -132,11 +118,7 @@ void EventAction::EndOfEventAction(const G4Event* event)
     G4bool firstContactIsPixel = false;
     G4bool geometricIsPixel = false;
     G4bool isPixelHitCombined = false;
-    UpdatePixelAndHitClassification(hitPos,
-                                    nearestPixel,
-                                    firstContactIsPixel,
-                                    geometricIsPixel,
-                                    isPixelHitCombined);
+    UpdatePixelAndHitClassification(hitPos, nearestPixel, firstContactIsPixel, geometricIsPixel, isPixelHitCombined);
 
     // Compute charge sharing if applicable
     const G4bool computeChargeSharing = (!isPixelHitCombined) && (finalEdep > 0.0);
@@ -163,8 +145,8 @@ void EventAction::EndOfEventAction(const G4Event* event)
 
     // Build event record
     ECS::IO::EventRecord record{};
-    record.summary = BuildEventSummary(finalEdep, hitPos, nearestPixel,
-                                       firstContactIsPixel, geometricIsPixel, isPixelHitCombined);
+    record.summary =
+        BuildEventSummary(finalEdep, hitPos, nearestPixel, firstContactIsPixel, geometricIsPixel, isPixelHitCombined);
     record.summary.primaryMomentumX = primaryMomentum.x();
     record.summary.primaryMomentumY = primaryMomentum.y();
     record.summary.primaryMomentumZ = primaryMomentum.z();
@@ -179,23 +161,23 @@ void EventAction::EndOfEventAction(const G4Event* event)
     } else {
         // No charge sharing computed - use default values
         record.totalGridCells = static_cast<G4int>(fNeighborhoodLayout.TotalCells());
-        record.neighborChargesNew = std::span<const G4double>(fNeighborhoodChargeNew.data(),
-                                                              fNeighborhoodChargeNew.size());
-        record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
-                                                                fNeighborhoodChargeFinal.size());
+        record.neighborChargesNew =
+            std::span<const G4double>(fNeighborhoodChargeNew.data(), fNeighborhoodChargeNew.size());
+        record.neighborChargesFinal =
+            std::span<const G4double>(fNeighborhoodChargeFinal.data(), fNeighborhoodChargeFinal.size());
         // Row/Col/Block mode noisy charges (default case)
-        record.neighborChargesNewRow = std::span<const G4double>(fNeighborhoodChargeNewRow.data(),
-                                                                  fNeighborhoodChargeNewRow.size());
-        record.neighborChargesFinalRow = std::span<const G4double>(fNeighborhoodChargeFinalRow.data(),
-                                                                    fNeighborhoodChargeFinalRow.size());
-        record.neighborChargesNewCol = std::span<const G4double>(fNeighborhoodChargeNewCol.data(),
-                                                                  fNeighborhoodChargeNewCol.size());
-        record.neighborChargesFinalCol = std::span<const G4double>(fNeighborhoodChargeFinalCol.data(),
-                                                                    fNeighborhoodChargeFinalCol.size());
-        record.neighborChargesNewBlock = std::span<const G4double>(fNeighborhoodChargeNewBlock.data(),
-                                                                    fNeighborhoodChargeNewBlock.size());
-        record.neighborChargesFinalBlock = std::span<const G4double>(fNeighborhoodChargeFinalBlock.data(),
-                                                                      fNeighborhoodChargeFinalBlock.size());
+        record.neighborChargesNewRow =
+            std::span<const G4double>(fNeighborhoodChargeNewRow.data(), fNeighborhoodChargeNewRow.size());
+        record.neighborChargesFinalRow =
+            std::span<const G4double>(fNeighborhoodChargeFinalRow.data(), fNeighborhoodChargeFinalRow.size());
+        record.neighborChargesNewCol =
+            std::span<const G4double>(fNeighborhoodChargeNewCol.data(), fNeighborhoodChargeNewCol.size());
+        record.neighborChargesFinalCol =
+            std::span<const G4double>(fNeighborhoodChargeFinalCol.data(), fNeighborhoodChargeFinalCol.size());
+        record.neighborChargesNewBlock =
+            std::span<const G4double>(fNeighborhoodChargeNewBlock.data(), fNeighborhoodChargeNewBlock.size());
+        record.neighborChargesFinalBlock =
+            std::span<const G4double>(fNeighborhoodChargeFinalBlock.data(), fNeighborhoodChargeFinalBlock.size());
         record.includeDistanceAlpha = false;
         record.mode = ChargeSharingCalculator::ChargeMode::Patch;
         record.geometry = BuildDefaultGridGeometry();
@@ -205,15 +187,13 @@ void EventAction::EndOfEventAction(const G4Event* event)
 
     // Get event and run IDs for EDM4hep output
     const std::uint64_t eventId = event ? static_cast<std::uint64_t>(event->GetEventID()) : 0;
-    const G4int runId = G4RunManager::GetRunManager()->GetCurrentRun()
-                            ? G4RunManager::GetRunManager()->GetCurrentRun()->GetRunID()
-                            : 0;
+    const G4int runId =
+        G4RunManager::GetRunManager()->GetCurrentRun() ? G4RunManager::GetRunManager()->GetCurrentRun()->GetRunID() : 0;
 
     fRunAction->FillTree(record, eventId, runId);
 }
 
-const G4ThreeVector& EventAction::DetermineHitPosition() const
-{
+const G4ThreeVector& EventAction::DetermineHitPosition() const {
     if (fHasFirstContactPos) {
         return fFirstContactPos;
     }
@@ -221,8 +201,7 @@ const G4ThreeVector& EventAction::DetermineHitPosition() const
     return zero;
 }
 
-G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
-{
+G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos) {
     const auto location = fDetector->FindNearestPixel(pos);
 
     fPixelIndexI = location.indexI;
@@ -239,12 +218,9 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos)
     return location.center;
 }
 
-void EventAction::UpdatePixelAndHitClassification(const G4ThreeVector& hitPos,
-                                                  G4ThreeVector& nearestPixel,
-                                                  G4bool& firstContactIsPixel,
-                                                  G4bool& geometricIsPixel,
-                                                  G4bool& isPixelHitCombined)
-{
+void EventAction::UpdatePixelAndHitClassification(const G4ThreeVector& hitPos, G4ThreeVector& nearestPixel,
+                                                  G4bool& firstContactIsPixel, G4bool& geometricIsPixel,
+                                                  G4bool& isPixelHitCombined) {
     firstContactIsPixel = fSteppingAction ? fSteppingAction->FirstContactIsPixel() : false;
 
     nearestPixel = CalcNearestPixel(hitPos);
@@ -261,14 +237,9 @@ void EventAction::UpdatePixelAndHitClassification(const G4ThreeVector& hitPos,
 }
 
 const ChargeSharingCalculator::Result& EventAction::ComputeChargeSharingForEvent(const G4ThreeVector& hitPos,
-                                                                                G4double energyDeposit)
-{
-    const ChargeSharingCalculator::Result& result = fChargeSharing.Compute(hitPos,
-                                                                           energyDeposit,
-                                                                           fIonizationEnergy,
-                                                                           fGain,
-                                                                           fD0,
-                                                                           fElementaryCharge);
+                                                                                 G4double energyDeposit) {
+    const ChargeSharingCalculator::Result& result =
+        fChargeSharing.Compute(hitPos, energyDeposit, fIonizationEnergy, fGain, fD0, fElementaryCharge);
 
     UpdatePixelIndices(result, hitPos);
     fNeighborhoodLayout.SetRadius(result.gridRadius);
@@ -279,8 +250,7 @@ const ChargeSharingCalculator::Result& EventAction::ComputeChargeSharingForEvent
     return result;
 }
 
-void EventAction::EnsureNeighborhoodBuffers(std::size_t totalCells)
-{
+void EventAction::EnsureNeighborhoodBuffers(std::size_t totalCells) {
     neighbor::ResizeAndFill(fNeighborhoodChargeNew, totalCells, 0.0);
     neighbor::ResizeAndFill(fNeighborhoodChargeFinal, totalCells, 0.0);
     // Row/Col/Block mode noisy charges
@@ -292,9 +262,7 @@ void EventAction::EnsureNeighborhoodBuffers(std::size_t totalCells)
     neighbor::ResizeAndFill(fNeighborhoodChargeFinalBlock, totalCells, 0.0);
 }
 
-void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& result,
-                                     const G4ThreeVector& hitPos)
-{
+void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& result, const G4ThreeVector& hitPos) {
     fPixelIndexI = result.pixelIndexI;
     fPixelIndexJ = result.pixelIndexJ;
     fPixelTrueDeltaX = std::abs(result.nearestPixelCenter.x() - hitPos.x());
@@ -307,16 +275,14 @@ void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& resu
     }
 }
 
-EventAction::NeighborContext EventAction::MakeNeighborContext() const
-{
+EventAction::NeighborContext EventAction::MakeNeighborContext() const {
     NeighborContext context{};
     context.sigmaNoise = ECS::RuntimeConfig::Instance().noiseElectronCount * fElementaryCharge;
     return context;
 }
 
 void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result& result,
-                                          const NeighborContext& context)
-{
+                                          const NeighborContext& context) {
     const auto targetCells = std::max<std::size_t>(1, result.totalCells);
     if (fNeighborhoodChargeNew.size() != targetCells) {
         EnsureNeighborhoodBuffers(targetCells);
@@ -392,8 +358,7 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
     }
 }
 
-void EventAction::CollectScorerData(const G4Event* event)
-{
+void EventAction::CollectScorerData(const G4Event* event) {
     fScorerEnergyDeposit = 0.0;
 
     G4HCofThisEvent* const hce = event->GetHCofThisEvent();
@@ -418,19 +383,14 @@ void EventAction::CollectScorerData(const G4Event* event)
 }
 
 void EventAction::ReconstructPosition(const ChargeSharingCalculator::Result& /*result*/,
-                                      const G4ThreeVector& /*hitPos*/)
-{
+                                      const G4ThreeVector& /*hitPos*/) {
     // Position reconstruction is done via post-processing Gaussian fits
     // (ReconRowX/ColY or ReconX_2D/Y_2D).
 }
 
-ECS::IO::EventSummaryData EventAction::BuildEventSummary(G4double edep,
-                                                            const G4ThreeVector& hitPos,
-                                                            const G4ThreeVector& nearestPixel,
-                                                            G4bool firstContactIsPixel,
-                                                            G4bool geometricIsPixel,
-                                                            G4bool isPixelHitCombined) const
-{
+ECS::IO::EventSummaryData EventAction::BuildEventSummary(G4double edep, const G4ThreeVector& hitPos,
+                                                         const G4ThreeVector& nearestPixel, G4bool firstContactIsPixel,
+                                                         G4bool geometricIsPixel, G4bool isPixelHitCombined) const {
     ECS::IO::EventSummaryData summary{};
     summary.edep = edep;
     summary.hitX = hitPos.x();
@@ -447,30 +407,28 @@ ECS::IO::EventSummaryData EventAction::BuildEventSummary(G4double edep,
 }
 
 void EventAction::PopulateRecordFromChargeResult(ECS::IO::EventRecord& record,
-                                                  const ChargeSharingCalculator::Result& result) const
-{
+                                                 const ChargeSharingCalculator::Result& result) const {
     record.totalGridCells = static_cast<G4int>(result.totalCells);
-    record.neighborCells = std::span<const ChargeSharingCalculator::Result::NeighborCell>(
-        result.cells.data(), result.cells.size());
-    record.chargeBlock = std::span<const ChargeSharingCalculator::Result::NeighborCell>(
-        result.chargeBlock.data(), result.chargeBlock.size());
-    record.neighborChargesNew = std::span<const G4double>(fNeighborhoodChargeNew.data(),
-                                                          fNeighborhoodChargeNew.size());
-    record.neighborChargesFinal = std::span<const G4double>(fNeighborhoodChargeFinal.data(),
-                                                            fNeighborhoodChargeFinal.size());
+    record.neighborCells =
+        std::span<const ChargeSharingCalculator::Result::NeighborCell>(result.cells.data(), result.cells.size());
+    record.chargeBlock = std::span<const ChargeSharingCalculator::Result::NeighborCell>(result.chargeBlock.data(),
+                                                                                        result.chargeBlock.size());
+    record.neighborChargesNew = std::span<const G4double>(fNeighborhoodChargeNew.data(), fNeighborhoodChargeNew.size());
+    record.neighborChargesFinal =
+        std::span<const G4double>(fNeighborhoodChargeFinal.data(), fNeighborhoodChargeFinal.size());
     // Row/Col/Block mode noisy charges
-    record.neighborChargesNewRow = std::span<const G4double>(fNeighborhoodChargeNewRow.data(),
-                                                              fNeighborhoodChargeNewRow.size());
-    record.neighborChargesFinalRow = std::span<const G4double>(fNeighborhoodChargeFinalRow.data(),
-                                                                fNeighborhoodChargeFinalRow.size());
-    record.neighborChargesNewCol = std::span<const G4double>(fNeighborhoodChargeNewCol.data(),
-                                                              fNeighborhoodChargeNewCol.size());
-    record.neighborChargesFinalCol = std::span<const G4double>(fNeighborhoodChargeFinalCol.data(),
-                                                                fNeighborhoodChargeFinalCol.size());
-    record.neighborChargesNewBlock = std::span<const G4double>(fNeighborhoodChargeNewBlock.data(),
-                                                                fNeighborhoodChargeNewBlock.size());
-    record.neighborChargesFinalBlock = std::span<const G4double>(fNeighborhoodChargeFinalBlock.data(),
-                                                                  fNeighborhoodChargeFinalBlock.size());
+    record.neighborChargesNewRow =
+        std::span<const G4double>(fNeighborhoodChargeNewRow.data(), fNeighborhoodChargeNewRow.size());
+    record.neighborChargesFinalRow =
+        std::span<const G4double>(fNeighborhoodChargeFinalRow.data(), fNeighborhoodChargeFinalRow.size());
+    record.neighborChargesNewCol =
+        std::span<const G4double>(fNeighborhoodChargeNewCol.data(), fNeighborhoodChargeNewCol.size());
+    record.neighborChargesFinalCol =
+        std::span<const G4double>(fNeighborhoodChargeFinalCol.data(), fNeighborhoodChargeFinalCol.size());
+    record.neighborChargesNewBlock =
+        std::span<const G4double>(fNeighborhoodChargeNewBlock.data(), fNeighborhoodChargeNewBlock.size());
+    record.neighborChargesFinalBlock =
+        std::span<const G4double>(fNeighborhoodChargeFinalBlock.data(), fNeighborhoodChargeFinalBlock.size());
     record.includeDistanceAlpha = fEmitDistanceAlphaOutputs;
     record.mode = result.mode;
     record.geometry = result.geometry;
@@ -483,8 +441,7 @@ void EventAction::PopulateRecordFromChargeResult(ECS::IO::EventRecord& record,
     record.fullGridCols = full.Cols();
 
     auto makeSpan = [](const auto& grid) {
-        return grid.Empty() ? std::span<const G4double>{}
-                            : std::span<const G4double>(grid.Data(), grid.Size());
+        return grid.Empty() ? std::span<const G4double>{} : std::span<const G4double>(grid.Data(), grid.Size());
     };
 
     // Fractions
@@ -515,8 +472,7 @@ void EventAction::PopulateRecordFromChargeResult(ECS::IO::EventRecord& record,
     record.fullPixelY = makeSpan(full.pixelY);
 }
 
-ChargeSharingCalculator::PixelGridGeometry EventAction::BuildDefaultGridGeometry() const
-{
+ChargeSharingCalculator::PixelGridGeometry EventAction::BuildDefaultGridGeometry() const {
     ChargeSharingCalculator::PixelGridGeometry geom{};
     if (!fDetector) {
         return geom;

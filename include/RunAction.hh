@@ -13,11 +13,11 @@
 #include "ChargeSharingCalculator.hh"
 #include "Config.hh"
 #include "EDM4hepIO.hh"
-#include "NeighborhoodUtils.hh"
-#include "RootIO.hh"
 #include "G4Run.hh"
 #include "G4UserRunAction.hh"
 #include "globals.hh"
+#include "NeighborhoodUtils.hh"
+#include "RootIO.hh"
 
 #include <cstdint>
 #include <memory>
@@ -54,8 +54,7 @@ namespace ECS {
 /// 3. Vector: Neighborhood charge arrays
 /// 4. Classification: Pixel hit flags
 /// 5. Full grid: Complete detector charge map (optional)
-class RunAction : public G4UserRunAction
-{
+class RunAction : public G4UserRunAction {
 public:
     RunAction();
     ~RunAction() override;
@@ -78,15 +77,10 @@ public:
     using EventSummaryData = IO::EventSummaryData;
     using EventRecord = IO::EventRecord;
 
-    void SetDetectorGridParameters(G4double pixelSize,
-                                   G4double pixelSpacing,
-                                   G4double gridOffset,
-                                   G4double detSize,
+    void SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, G4double gridOffset, G4double detSize,
                                    G4int numBlocksPerSide);
     void SetNeighborhoodRadiusMeta(G4int radius);
-    void SetPosReconMetadata(Constants::PosReconModel model,
-                                  G4double betaPerMicron,
-                                  G4double pitch);
+    void SetPosReconMetadata(Constants::PosReconModel model, G4double betaPerMicron, G4double pitch);
     void SetChargeSharingDistanceAlphaMeta(G4bool enabled);
     void SetGridPixelCenters(const std::vector<G4ThreeVector>& centers);
     void ConfigureFullFractionBranch(G4bool enable);
@@ -98,8 +92,7 @@ public:
     [[nodiscard]] G4bool IsEDM4hepEnabled() const;
 
 private:
-    struct ThreadContext
-    {
+    struct ThreadContext {
         G4bool multithreaded{false};
         G4bool worker{false};
         G4bool master{false};
@@ -108,16 +101,16 @@ private:
         G4int totalWorkers{0};
     };
 
-    ThreadContext BuildThreadContext(const G4Run* run) const;
-    void LogBeginRun(const ThreadContext& context) const;
-    [[nodiscard]] G4String DetermineOutputFileName(const ThreadContext& context) const;
+    static ThreadContext BuildThreadContext(const G4Run* run);
+    static void LogBeginRun(const ThreadContext& context);
+    [[nodiscard]] static G4String DetermineOutputFileName(const ThreadContext& context);
     void InitializeRootOutputs(const ThreadContext& context, const G4String& fileName);
     void ConfigureCoreBranches(TTree* tree);
 
     void HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run);
     void HandleMasterEndOfRun(const ThreadContext& context, const G4Run* run);
-    [[nodiscard]] std::vector<G4String> CollectWorkerFileNames(G4int totalWorkers) const;
-    [[nodiscard]] std::vector<G4String> FilterExistingWorkerFiles(const std::vector<G4String>& workerFiles) const;
+    [[nodiscard]] static std::vector<G4String> CollectWorkerFileNames(G4int totalWorkers);
+    [[nodiscard]] static std::vector<G4String> FilterExistingWorkerFiles(const std::vector<G4String>& workerFiles);
     bool MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& existingFiles);
 
     void UpdateSummaryScalars(const EventRecord& record);
@@ -188,7 +181,7 @@ private:
 
     G4double fGridPixelSize{0.0};
     G4double fGridPixelSpacing{0.0};
-    G4double fGridOffset{0.0};  ///< DD4hep-style grid offset
+    G4double fGridOffset{0.0}; ///< DD4hep-style grid offset
     G4double fGridDetSize{0.0};
     G4int fGridNumBlocksPerSide{0};
     G4int fGridNeighborhoodRadius{0};

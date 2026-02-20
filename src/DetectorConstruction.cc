@@ -5,43 +5,39 @@
 #include "DetectorConstruction.hh"
 
 #include "Config.hh"
-#include "RuntimeConfig.hh"
 #include "EventAction.hh"
 #include "RunAction.hh"
+#include "RuntimeConfig.hh"
 
-#include "G4RunManager.hh"
-#include "G4NistManager.hh"
-#include "G4Material.hh"
 #include "G4Box.hh"
-#include "G4PVPlacement.hh"
-#include "G4LogicalVolume.hh"
-#include "G4VisAttributes.hh"
 #include "G4Colour.hh"
-#include "G4UserLimits.hh"
-#include "G4SDManager.hh"
-#include "G4MultiFunctionalDetector.hh"
-#include "G4PSEnergyDeposit.hh"
-#include "G4VSensitiveDetector.hh"
 #include "G4GenericMessenger.hh"
+#include "G4LogicalVolume.hh"
+#include "G4Material.hh"
+#include "G4MultiFunctionalDetector.hh"
+#include "G4NistManager.hh"
+#include "G4PSEnergyDeposit.hh"
+#include "G4PVPlacement.hh"
+#include "G4RunManager.hh"
+#include "G4SDManager.hh"
+#include "G4UserLimits.hh"
+#include "G4VisAttributes.hh"
+#include "G4VSensitiveDetector.hh"
 #include <G4ScoringManager.hh>
 
 #include "Randomize.hh"
 
 #include <algorithm>
 #include <cmath>
-#include <string>
 #include <limits>
 #include <mutex>
 #include <sstream>
+#include <string>
 
 DetectorConstruction::DetectorConstruction()
-    :
-      fPixelSize(ECS::RuntimeConfig::Instance().pixelSize),
-      fPixelWidth(ECS::RuntimeConfig::Instance().pixelThickness),
-      fPixelSpacing(ECS::RuntimeConfig::Instance().pixelPitch),
-      fGridOffset(ECS::RuntimeConfig::Instance().gridOffset),
-      fDetSize(ECS::RuntimeConfig::Instance().detectorSize),
-      fDetWidth(ECS::RuntimeConfig::Instance().detectorWidth),
+    : fPixelSize(ECS::RuntimeConfig::Instance().pixelSize), fPixelWidth(ECS::RuntimeConfig::Instance().pixelThickness),
+      fPixelSpacing(ECS::RuntimeConfig::Instance().pixelPitch), fGridOffset(ECS::RuntimeConfig::Instance().gridOffset),
+      fDetSize(ECS::RuntimeConfig::Instance().detectorSize), fDetWidth(ECS::RuntimeConfig::Instance().detectorWidth),
 
       fDetectorPos(0., 0., Constants::DETECTOR_Z_POSITION)
 
@@ -55,16 +51,14 @@ DetectorConstruction::DetectorConstruction()
 
 DetectorConstruction::~DetectorConstruction() = default;
 
-void DetectorConstruction::SetRunAction(RunAction* runAction)
-{
+void DetectorConstruction::SetRunAction(RunAction* runAction) {
     fRunAction = runAction;
     if (fRunAction) {
         SyncRunMetadata();
     }
 }
 
-void DetectorConstruction::SetGridOffset(G4double offset)
-{
+void DetectorConstruction::SetGridOffset(G4double offset) {
     G4cout << "[Detector] Grid offset set to " << offset / mm << " mm" << G4endl;
     fGridOffset = offset;
 
@@ -73,8 +67,7 @@ void DetectorConstruction::SetGridOffset(G4double offset)
     }
 }
 
-G4VPhysicalVolume* DetectorConstruction::Construct()
-{
+G4VPhysicalVolume* DetectorConstruction::Construct() {
     const G4bool checkOverlaps = true;
     const G4double originalDetSize = fDetSize;
 
@@ -83,27 +76,24 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     G4LogicalVolume* logicWorld = nullptr;
     G4VPhysicalVolume* const physWorld = BuildWorld(materials, checkOverlaps, logicWorld);
 
-    G4LogicalVolume* siliconLogical =
-        BuildSiliconDetector(logicWorld, materials, checkOverlaps, originalDetSize);
+    G4LogicalVolume* siliconLogical = BuildSiliconDetector(logicWorld, materials, checkOverlaps, originalDetSize);
 
-    const PixelGridStats gridStats =
-        ConfigurePixels(logicWorld, siliconLogical, materials, checkOverlaps);
+    const PixelGridStats gridStats = ConfigurePixels(logicWorld, siliconLogical, materials, checkOverlaps);
 
     SyncRunMetadata();
 
     static std::once_flag summaryFlag;
     std::call_once(summaryFlag, [&]() {
         const G4double coveragePercent = gridStats.coverage * 100.0;
-        G4cout << "[Detector] Geometry prepared: size " << fDetSize / mm << " mm, pixels "
-               << fNumBlocksPerSide << "x" << fNumBlocksPerSide << ", spacing "
-               << fPixelSpacing / mm << " mm, coverage " << coveragePercent << "%" << G4endl;
+        G4cout << "[Detector] Geometry prepared: size " << fDetSize / mm << " mm, pixels " << fNumBlocksPerSide << "x"
+               << fNumBlocksPerSide << ", spacing " << fPixelSpacing / mm << " mm, coverage " << coveragePercent << "%"
+               << G4endl;
     });
 
     return physWorld;
 }
 
-DetectorConstruction::MaterialSet DetectorConstruction::PrepareMaterials() const
-{
+DetectorConstruction::MaterialSet DetectorConstruction::PrepareMaterials() {
     MaterialSet mats{};
     G4NistManager* const nist = G4NistManager::Instance();
     mats.world = nist->FindOrBuildMaterial("G4_Galactic");
@@ -112,33 +102,20 @@ DetectorConstruction::MaterialSet DetectorConstruction::PrepareMaterials() const
     return mats;
 }
 
-G4VPhysicalVolume* DetectorConstruction::BuildWorld(const MaterialSet& mats,
-                                                    G4bool checkOverlaps,
-                                                    G4LogicalVolume*& logicWorld)
-{
-    auto* solidWorld =
-        new G4Box("solidWorld", Constants::WORLD_SIZE, Constants::WORLD_SIZE, Constants::WORLD_SIZE);
+G4VPhysicalVolume* DetectorConstruction::BuildWorld(const MaterialSet& mats, G4bool checkOverlaps,
+                                                    G4LogicalVolume*& logicWorld) {
+    auto* solidWorld = new G4Box("solidWorld", Constants::WORLD_SIZE, Constants::WORLD_SIZE, Constants::WORLD_SIZE);
     logicWorld = new G4LogicalVolume(solidWorld, mats.world, "logicWorld");
 
-    auto* physWorld = new G4PVPlacement(
-        nullptr,
-        G4ThreeVector(0., 0., 0.),
-        logicWorld,
-        "physWorld",
-        nullptr,
-        false,
-        0,
-        checkOverlaps);
+    auto* physWorld = new G4PVPlacement(nullptr, G4ThreeVector(0., 0., 0.), logicWorld, "physWorld", nullptr, false, 0,
+                                        checkOverlaps);
 
     logicWorld->SetVisAttributes(G4VisAttributes::GetInvisible());
     return physWorld;
 }
 
-G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* logicWorld,
-                                                            const MaterialSet& mats,
-                                                            G4bool checkOverlaps,
-                                                            G4double originalDetSize)
-{
+G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats,
+                                                            G4bool checkOverlaps, G4double originalDetSize) {
     (void)originalDetSize;
 
     const G4ThreeVector& detectorPos = GetDetectorPos();
@@ -146,7 +123,7 @@ G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* log
     auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7));
     cubeVisAtt->SetForceSolid(true);
 
-    G4Box* detCube = new G4Box("detCube", fDetSize / 2, fDetSize / 2, fDetWidth / 2);
+    auto* detCube = new G4Box("detCube", fDetSize / 2, fDetSize / 2, fDetWidth / 2);
     auto* logicCube = new G4LogicalVolume(detCube, mats.silicon, "logicCube");
     logicCube->SetVisAttributes(cubeVisAtt);
 
@@ -168,30 +145,20 @@ G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* log
     // Ensure pixels fit within detector bounds
     fMinIndexX = Constants::PositionToIndex(-halfDet + halfPad, fPixelSpacing, fGridOffset);
     fMaxIndexX = Constants::PositionToIndex(+halfDet - halfPad, fPixelSpacing, fGridOffset);
-    fMinIndexY = fMinIndexX;  // Square detector
+    fMinIndexY = fMinIndexX; // Square detector
     fMaxIndexY = fMaxIndexX;
 
     fNumBlocksPerSide = fMaxIndexX - fMinIndexX + 1;
 
-    new G4PVPlacement(
-        nullptr,
-        detectorPos,
-        logicCube,
-        "physCube",
-        logicWorld,
-        false,
-        0,
-        checkOverlaps);
+    new G4PVPlacement(nullptr, detectorPos, logicCube, "physCube", logicWorld, false, 0, checkOverlaps);
 
     return logicCube;
 }
 
-DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
-    G4LogicalVolume* logicWorld,
-    G4LogicalVolume* siliconLogical,
-    const MaterialSet& mats,
-    G4bool checkOverlaps)
-{
+DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(G4LogicalVolume* logicWorld,
+                                                                           G4LogicalVolume* siliconLogical,
+                                                                           const MaterialSet& mats,
+                                                                           G4bool checkOverlaps) {
     PixelGridStats stats{};
 
     auto* pixelBlock = new G4Box("pixelBlock", fPixelSize / 2, fPixelSize / 2, fPixelWidth / 2);
@@ -210,8 +177,7 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
 
     // DD4hep-style grid: iterate over index range (can include negative indices)
     const G4int totalPixels = fNumBlocksPerSide * fNumBlocksPerSide;
-    fPixelCenters.assign(static_cast<std::size_t>(std::max(0, totalPixels)),
-                         G4ThreeVector(0., 0., 0.));
+    fPixelCenters.assign(static_cast<std::size_t>(std::max(0, totalPixels)), G4ThreeVector(0., 0., 0.));
 
     G4int copyNo = 0;
     for (G4int i = fMinIndexX; i <= fMaxIndexX; ++i) {
@@ -226,15 +192,8 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
             const G4int localJ = j - fMinIndexY;
             const G4int globalId = (localI * fNumBlocksPerSide) + localJ;
 
-            new G4PVPlacement(
-                nullptr,
-                G4ThreeVector(pixelX, pixelY, pixelZ),
-                logicBlock,
-                "physBlock",
-                logicWorld,
-                false,
-                copyNo++,
-                checkOverlaps);
+            new G4PVPlacement(nullptr, G4ThreeVector(pixelX, pixelY, pixelZ), logicBlock, "physBlock", logicWorld,
+                              false, copyNo++, checkOverlaps);
 
             if (globalId >= 0 && globalId < totalPixels) {
                 const auto idx = static_cast<std::size_t>(globalId);
@@ -245,28 +204,24 @@ DetectorConstruction::PixelGridStats DetectorConstruction::ConfigurePixels(
         }
     }
 
-    if (G4VSensitiveDetector* pixelSensitiveDetector = logicBlock->GetSensitiveDetector()) {
-        std::string message = "Aluminum pixels unexpectedly have sensitive detector '" +
-                              pixelSensitiveDetector->GetName() + "' attached.";
-        G4Exception("DetectorConstruction::ConfigurePixels",
-                    "PixelSensitivityViolation",
-                    FatalException,
+    if (G4VSensitiveDetector const* pixelSensitiveDetector = logicBlock->GetSensitiveDetector()) {
+        std::string const message = "Aluminum pixels unexpectedly have sensitive detector '" +
+                                    pixelSensitiveDetector->GetName() + "' attached.";
+        G4Exception("DetectorConstruction::ConfigurePixels", "PixelSensitivityViolation", FatalException,
                     message.c_str());
     }
 
-    G4cout << "[Detector] Configured " << copyNo << " aluminum pixel pads (indices "
-           << fMinIndexX << " to " << fMaxIndexX << ")" << G4endl;
+    G4cout << "[Detector] Configured " << copyNo << " aluminum pixel pads (indices " << fMinIndexX << " to "
+           << fMaxIndexX << ")" << G4endl;
 
-    stats.totalPixelArea =
-        static_cast<G4double>(fNumBlocksPerSide) * fNumBlocksPerSide * fPixelSize * fPixelSize;
+    stats.totalPixelArea = static_cast<G4double>(fNumBlocksPerSide) * fNumBlocksPerSide * fPixelSize * fPixelSize;
     stats.detectorArea = fDetSize * fDetSize;
     stats.coverage = stats.totalPixelArea / stats.detectorArea;
 
     return stats;
 }
 
-void DetectorConstruction::InitializePixelGainSigmas()
-{
+void DetectorConstruction::InitializePixelGainSigmas() {
     const G4int n = fNumBlocksPerSide;
     const G4int total = n * n;
     fPixelGainSigmas.clear();
@@ -277,24 +232,17 @@ void DetectorConstruction::InitializePixelGainSigmas()
 
     for (G4int idx = 0; idx < total; ++idx) {
         const G4double u = G4UniformRand();
-        const G4double sigma = minSigma + (maxSigma - minSigma) * u;
+        const G4double sigma = minSigma + ((maxSigma - minSigma) * u);
         fPixelGainSigmas.push_back(sigma);
     }
-
 }
 
-void DetectorConstruction::SyncRunMetadata()
-{
+void DetectorConstruction::SyncRunMetadata() {
     if (!fRunAction) {
         return;
     }
 
-    fRunAction->SetDetectorGridParameters(
-        fPixelSize,
-        fPixelSpacing,
-        fGridOffset,
-        fDetSize,
-        fNumBlocksPerSide);
+    fRunAction->SetDetectorGridParameters(fPixelSize, fPixelSpacing, fGridOffset, fDetSize, fNumBlocksPerSide);
     fRunAction->SetGridPixelCenters(fPixelCenters);
     fRunAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
 
@@ -307,8 +255,7 @@ void DetectorConstruction::SyncRunMetadata()
     fRunAction->SetPosReconMetadata(reconMethod, linearBeta, fPixelSpacing);
 }
 
-DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const G4ThreeVector& pos) const
-{
+DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const G4ThreeVector& pos) const {
     PixelLocation result{};
 
     const G4ThreeVector& detectorPos = GetDetectorPos();
@@ -319,8 +266,7 @@ DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const
     G4int j = Constants::PositionToIndex(relativePos.y(), fPixelSpacing, fGridOffset);
 
     // Check if within valid index range
-    result.withinDetector =
-        (i >= fMinIndexX && i <= fMaxIndexX && j >= fMinIndexY && j <= fMaxIndexY);
+    result.withinDetector = (i >= fMinIndexX && i <= fMaxIndexX && j >= fMinIndexY && j <= fMaxIndexY);
 
     // Clamp to valid range
     i = std::max(fMinIndexX, std::min(i, fMaxIndexX));
@@ -337,8 +283,7 @@ DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const
     return result;
 }
 
-const G4ThreeVector& DetectorConstruction::GetPixelCenter(G4int globalPixelId) const
-{
+const G4ThreeVector& DetectorConstruction::GetPixelCenter(G4int globalPixelId) const {
     static const G4ThreeVector zero(0., 0., 0.);
     if (globalPixelId < 0) {
         return zero;
@@ -350,8 +295,7 @@ const G4ThreeVector& DetectorConstruction::GetPixelCenter(G4int globalPixelId) c
     return fPixelCenters[idx];
 }
 
-void DetectorConstruction::ConstructSDandField()
-{
+void DetectorConstruction::ConstructSDandField() {
     G4ScoringManager::GetScoringManager();
 
     auto* mfd = new G4MultiFunctionalDetector("SiliconDetector");
@@ -362,20 +306,16 @@ void DetectorConstruction::ConstructSDandField()
 
     SetSensitiveDetector("logicCube", mfd);
 
-    G4VSensitiveDetector* attachedDetector =
-        fLogicSilicon ? fLogicSilicon->GetSensitiveDetector() : nullptr;
+    G4VSensitiveDetector const* attachedDetector = fLogicSilicon ? fLogicSilicon->GetSensitiveDetector() : nullptr;
     if (attachedDetector != mfd) {
-        G4Exception("DetectorConstruction::ConstructSDandField",
-                    "SensitiveDetectorAttachmentFailed",
-                    FatalException,
+        G4Exception("DetectorConstruction::ConstructSDandField", "SensitiveDetectorAttachmentFailed", FatalException,
                     "Failed to attach Multi-Functional Detector to silicon volume.");
     }
 }
 
-void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
-{
-    G4cout << "[Detector] Neighborhood radius set to " << radius << " ("
-           << (2 * radius + 1) << "x" << (2 * radius + 1) << ")" << G4endl;
+void DetectorConstruction::SetNeighborhoodRadius(G4int radius) {
+    G4cout << "[Detector] Neighborhood radius set to " << radius << " (" << ((2 * radius) + 1) << "x"
+           << ((2 * radius) + 1) << ")" << G4endl;
     fNeighborhoodRadius = radius;
 
     if (fEventAction) {
@@ -387,8 +327,7 @@ void DetectorConstruction::SetNeighborhoodRadius(G4int radius)
     }
 }
 
-void DetectorConstruction::SetPixelSize(G4double size)
-{
+void DetectorConstruction::SetPixelSize(G4double size) {
     G4cout << "[Detector] Pixel size set to " << size / mm << " mm" << G4endl;
     fPixelSize = size;
 
@@ -397,8 +336,7 @@ void DetectorConstruction::SetPixelSize(G4double size)
     }
 }
 
-void DetectorConstruction::SetPixelSpacing(G4double spacing)
-{
+void DetectorConstruction::SetPixelSpacing(G4double spacing) {
     G4cout << "[Detector] Pixel spacing (pitch) set to " << spacing / mm << " mm" << G4endl;
     fPixelSpacing = spacing;
 
@@ -407,33 +345,27 @@ void DetectorConstruction::SetPixelSpacing(G4double spacing)
     }
 }
 
-void DetectorConstruction::SetupMessenger()
-{
-    fMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/detector/",
-                                                       "Detector geometry configuration");
+void DetectorConstruction::SetupMessenger() {
+    fMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/detector/", "Detector geometry configuration");
 
-    fMessenger->DeclareMethodWithUnit("pixelSize", "mm",
-                                       &DetectorConstruction::SetPixelSize)
+    fMessenger->DeclareMethodWithUnit("pixelSize", "mm", &DetectorConstruction::SetPixelSize)
         .SetGuidance("Set the pixel pad size")
         .SetParameterName("size", false)
         .SetRange("size > 0")
         .SetStates(G4State_PreInit, G4State_Idle);
 
-    fMessenger->DeclareMethodWithUnit("pixelSpacing", "mm",
-                                       &DetectorConstruction::SetPixelSpacing)
+    fMessenger->DeclareMethodWithUnit("pixelSpacing", "mm", &DetectorConstruction::SetPixelSpacing)
         .SetGuidance("Set pixel center-to-center spacing (pitch)")
         .SetParameterName("spacing", false)
         .SetRange("spacing > 0")
         .SetStates(G4State_PreInit, G4State_Idle);
 
-    fMessenger->DeclareMethodWithUnit("gridOffset", "mm",
-                                       &DetectorConstruction::SetGridOffset)
+    fMessenger->DeclareMethodWithUnit("gridOffset", "mm", &DetectorConstruction::SetGridOffset)
         .SetGuidance("Set grid origin offset (DD4hep-style, 0 = centered)")
         .SetParameterName("offset", false)
         .SetStates(G4State_PreInit, G4State_Idle);
 
-    fMessenger->DeclareMethod("neighborhoodRadius",
-                               &DetectorConstruction::SetNeighborhoodRadius)
+    fMessenger->DeclareMethod("neighborhoodRadius", &DetectorConstruction::SetNeighborhoodRadius)
         .SetGuidance("Set neighborhood radius for charge sharing (pixels)")
         .SetParameterName("radius", false)
         .SetRange("radius >= 0 && radius <= 10")

@@ -51,12 +51,14 @@
 #include "ChargeSharingCore.hh"
 
 #include "Config.hh"
-#include "RuntimeConfig.hh"
 #include "DetectorConstruction.hh"
+#include "RuntimeConfig.hh"
 
 #include "G4Exception.hh"
 #include "G4SystemOfUnits.hh"
 #include "Randomize.hh"
+
+#include <math.h>
 
 #include <algorithm>
 #include <cmath>
@@ -65,25 +67,27 @@
 
 namespace csc = epic::chargesharing::core;
 
-namespace
-{
+namespace {
 std::once_flag gInvalidD0WarningFlag;
 
 /// Map standalone signal model flag to core enum
-csc::SignalModel mapSignalModel(bool useLinear)
-{
+csc::SignalModel mapSignalModel(bool useLinear) {
     return useLinear ? csc::SignalModel::LinA : csc::SignalModel::LogA;
 }
 
 /// Map standalone ActivePixelMode to core enum
-csc::ActivePixelMode mapActivePixelMode(Constants::ActivePixelMode mode)
-{
+csc::ActivePixelMode mapActivePixelMode(Constants::ActivePixelMode mode) {
     switch (mode) {
-        case Constants::ActivePixelMode::Neighborhood:   return csc::ActivePixelMode::Neighborhood;
-        case Constants::ActivePixelMode::RowCol:         return csc::ActivePixelMode::RowCol;
-        case Constants::ActivePixelMode::RowCol3x3:      return csc::ActivePixelMode::RowCol3x3;
-        case Constants::ActivePixelMode::ChargeBlock2x2: return csc::ActivePixelMode::ChargeBlock2x2;
-        case Constants::ActivePixelMode::ChargeBlock3x3: return csc::ActivePixelMode::ChargeBlock3x3;
+        case Constants::ActivePixelMode::Neighborhood:
+            return csc::ActivePixelMode::Neighborhood;
+        case Constants::ActivePixelMode::RowCol:
+            return csc::ActivePixelMode::RowCol;
+        case Constants::ActivePixelMode::RowCol3x3:
+            return csc::ActivePixelMode::RowCol3x3;
+        case Constants::ActivePixelMode::ChargeBlock2x2:
+            return csc::ActivePixelMode::ChargeBlock2x2;
+        case Constants::ActivePixelMode::ChargeBlock3x3:
+            return csc::ActivePixelMode::ChargeBlock3x3;
     }
     return csc::ActivePixelMode::Neighborhood;
 }
@@ -108,9 +112,7 @@ csc::ActivePixelMode mapActivePixelMode(Constants::ActivePixelMode mode)
 /// Ensures D0 is positive and finite. If invalid, clamps to minimum value
 /// and issues a one-time warning. Returns both mm and micron values.
 /// The core library handles guard logic (min safe distance) internally.
-ChargeSharingCalculator::D0Params
-ChargeSharingCalculator::ValidateD0(G4double d0Raw, const char* callerName) const
-{
+ChargeSharingCalculator::D0Params ChargeSharingCalculator::ValidateD0(G4double d0Raw, const char* callerName) {
     D0Params params{};
     params.isValid = std::isfinite(d0Raw) && d0Raw > 0.0;
 
@@ -129,13 +131,10 @@ ChargeSharingCalculator::ValidateD0(G4double d0Raw, const char* callerName) cons
 }
 
 ChargeSharingCalculator::ChargeModelParams
-ChargeSharingCalculator::GetChargeModelParams(G4double /*pixelSpacing*/) const
-{
+ChargeSharingCalculator::GetChargeModelParams(G4double /*pixelSpacing*/) const {
     ChargeModelParams params{};
     params.useLinear = Constants::USES_LINEAR_SIGNAL;
-    params.beta = params.useLinear && fDetector
-                      ? fDetector->GetLinearChargeModelBeta()
-                      : 0.0;
+    params.beta = params.useLinear && fDetector ? fDetector->GetLinearChargeModelBeta() : 0.0;
     return params;
 }
 
@@ -145,14 +144,11 @@ ChargeSharingCalculator::GetChargeModelParams(G4double /*pixelSpacing*/) const
 
 ChargeSharingCalculator::ChargeSharingCalculator(const DetectorConstruction* detector)
     : fDetector(detector),
-      fNeighborhoodRadius(detector ? detector->GetNeighborhoodRadius()
-                                   : Constants::NEIGHBORHOOD_RADIUS)
-{
+      fNeighborhoodRadius(detector ? detector->GetNeighborhoodRadius() : Constants::NEIGHBORHOOD_RADIUS) {
     ReserveBuffers();
 }
 
-void ChargeSharingCalculator::SetDetector(const DetectorConstruction* detector)
-{
+void ChargeSharingCalculator::SetDetector(const DetectorConstruction* detector) {
     fDetector = detector;
     if (fDetector && fNeighborhoodRadius <= 0) {
         fNeighborhoodRadius = fDetector->GetNeighborhoodRadius();
@@ -160,22 +156,19 @@ void ChargeSharingCalculator::SetDetector(const DetectorConstruction* detector)
     ReserveBuffers();
 }
 
-void ChargeSharingCalculator::SetNeighborhoodRadius(G4int radius)
-{
+void ChargeSharingCalculator::SetNeighborhoodRadius(G4int radius) {
     fNeighborhoodRadius = std::max(0, radius);
     ReserveBuffers();
 }
 
-void ChargeSharingCalculator::SetComputeFullGridFractions(G4bool enabled)
-{
+void ChargeSharingCalculator::SetComputeFullGridFractions(G4bool enabled) {
     fComputeFullGridFractions = enabled;
     if (enabled) {
         EnsureFullGridBuffer();
     }
 }
 
-ChargeSharingCalculator::PixelGridGeometry ChargeSharingCalculator::BuildGridGeometry() const
-{
+ChargeSharingCalculator::PixelGridGeometry ChargeSharingCalculator::BuildGridGeometry() const {
     PixelGridGeometry geom{};
     if (!fDetector) {
         return geom;
@@ -197,8 +190,7 @@ ChargeSharingCalculator::PixelGridGeometry ChargeSharingCalculator::BuildGridGeo
     return geom;
 }
 
-void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
-{
+void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide) {
     fResult.patch.Reset();
     if (numBlocksPerSide <= 0) {
         return;
@@ -215,7 +207,7 @@ void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
         return;
     }
 
-    const PatchInfo info{row0, col0, nRows, nCols};
+    const PatchInfo info{.row0 = row0, .col0 = col0, .nRows = nRows, .nCols = nCols};
     fResult.patch.Resize(info);
     fResult.patch.charges.Zero();
 
@@ -240,8 +232,7 @@ void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
     }
 }
 
-void ChargeSharingCalculator::ResetForEvent()
-{
+void ChargeSharingCalculator::ResetForEvent() {
     fResult.Reset();
     if (!fNeighborhoodWeights.Empty()) {
         fNeighborhoodWeights.Fill(0.0);
@@ -252,18 +243,11 @@ void ChargeSharingCalculator::ResetForEvent()
     fNeedsReset = false;
 }
 
-const ChargeSharingCalculator::Result& ChargeSharingCalculator::Compute(
-    const G4ThreeVector& hitPos,
-    G4double energyDeposit,
-    G4double ionizationEnergy,
-    G4double amplificationFactor,
-    G4double d0,
-    G4double elementaryCharge)
-{
+const ChargeSharingCalculator::Result&
+ChargeSharingCalculator::Compute(const G4ThreeVector& hitPos, G4double energyDeposit, G4double ionizationEnergy,
+                                 G4double amplificationFactor, G4double d0, G4double elementaryCharge) {
     if (!fDetector) {
-        G4Exception("ChargeSharingCalculator::Compute",
-                    "MissingDetector",
-                    FatalException,
+        G4Exception("ChargeSharingCalculator::Compute", "MissingDetector", FatalException,
                     "DetectorConstruction pointer is null.");
     }
 
@@ -290,8 +274,7 @@ const ChargeSharingCalculator::Result& ChargeSharingCalculator::Compute(
 
     const G4double edepInEV = energyDeposit / eV;
     const G4double primaryElectrons = ionizationEnergy > 0.0 ? (edepInEV / ionizationEnergy) : 0.0;
-    const G4double totalChargeElectrons =
-        std::max(0.0, primaryElectrons * amplificationFactor);
+    const G4double totalChargeElectrons = std::max(0.0, primaryElectrons * amplificationFactor);
 
     ComputeChargeFractions(hitPos, totalChargeElectrons, d0, elementaryCharge);
 
@@ -299,13 +282,8 @@ const ChargeSharingCalculator::Result& ChargeSharingCalculator::Compute(
     PopulatePatchFromNeighbors(numBlocksPerSide);
 
     if (fComputeFullGridFractions) {
-        ComputeFullGridFractions(hitPos,
-                                 d0,
-                                 fDetector->GetPixelSize(),
-                                 fDetector->GetPixelSpacing(),
-                                 numBlocksPerSide,
-                                 totalChargeElectrons,
-                                 elementaryCharge);
+        ComputeFullGridFractions(hitPos, d0, fDetector->GetPixelSize(), fDetector->GetPixelSpacing(), numBlocksPerSide,
+                                 totalChargeElectrons, elementaryCharge);
     } else {
         fResult.full.Clear();
         fFullGridWeights.Clear();
@@ -316,8 +294,7 @@ const ChargeSharingCalculator::Result& ChargeSharingCalculator::Compute(
 
 using Cell = ChargeSharingCalculator::Result::NeighborCell;
 
-void ChargeSharingCalculator::ReserveBuffers()
-{
+void ChargeSharingCalculator::ReserveBuffers() {
     const G4int gridRadius = std::max(0, fNeighborhoodRadius);
     const G4int newGridDim = (2 * gridRadius) + 1;
     const std::size_t newSize = static_cast<std::size_t>(newGridDim) * static_cast<std::size_t>(newGridDim);
@@ -332,20 +309,15 @@ void ChargeSharingCalculator::ReserveBuffers()
     }
 }
 
-G4ThreeVector ChargeSharingCalculator::CalcNearestPixel(const G4ThreeVector& pos)
-{
+G4ThreeVector ChargeSharingCalculator::CalcNearestPixel(const G4ThreeVector& pos) {
     const auto location = fDetector->FindNearestPixel(pos);
     fResult.pixelIndexI = location.indexI;
     fResult.pixelIndexJ = location.indexJ;
     return location.center;
 }
 
-
-void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos,
-                                                     G4double totalChargeElectrons,
-                                                     G4double d0,
-                                                     G4double elementaryCharge)
-{
+void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos, G4double totalChargeElectrons,
+                                                     G4double d0, G4double elementaryCharge) {
     const G4double pixelSize = fDetector->GetPixelSize();
     const G4double pixelSpacing = fDetector->GetPixelSpacing();
     const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
@@ -375,11 +347,9 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     coreConfig.numPixelsX = numBlocksPerSide;
     coreConfig.numPixelsY = numBlocksPerSide;
 
-    const auto coreResult = csc::calculateNeighborhood(
-        hitPos.x(), hitPos.y(),
-        fResult.pixelIndexI, fResult.pixelIndexJ,
-        fResult.nearestPixelCenter.x(), fResult.nearestPixelCenter.y(),
-        coreConfig);
+    const auto coreResult =
+        csc::calculateNeighborhood(hitPos.x(), hitPos.y(), fResult.pixelIndexI, fResult.pixelIndexJ,
+                                   fResult.nearestPixelCenter.x(), fResult.nearestPixelCenter.y(), coreConfig);
 
     // Build Eigen weight grid from core result for per-row/per-col normalization
     if (fNeighborhoodWeights.Rows() != gridDim || fNeighborhoodWeights.Cols() != gridDim) {
@@ -405,7 +375,8 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const int blockSize = use3x3Block ? 3 : 2;
 
     // Find pixel with highest weight
-    int maxDi = 0, maxDj = 0;
+    int maxDi = 0;
+    int maxDj = 0;
     G4double maxWeight = -1.0;
     for (const auto& pixel : coreResult.pixels) {
         if (pixel.inBounds && pixel.weight > maxWeight) {
@@ -416,7 +387,8 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     }
 
     // Find best block containing max-weight pixel
-    int blockCornerDi = maxDi, blockCornerDj = maxDj;
+    int blockCornerDi = maxDi;
+    int blockCornerDj = maxDj;
     G4double bestBlockSum = -1.0;
     const int maxOffset = use3x3Block ? -2 : -1;
 
@@ -427,9 +399,8 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
             G4double sum = 0.0;
             for (const auto& p : coreResult.pixels) {
-                if (p.inBounds &&
-                    p.di >= testDi && p.di < testDi + blockSize &&
-                    p.dj >= testDj && p.dj < testDj + blockSize) {
+                if (p.inBounds && p.di >= testDi && p.di < testDi + blockSize && p.dj >= testDj &&
+                    p.dj < testDj + blockSize) {
                     sum += p.weight;
                 }
             }
@@ -497,9 +468,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     }
 }
 
-
-void ChargeSharingCalculator::EnsureFullGridBuffer()
-{
+void ChargeSharingCalculator::EnsureFullGridBuffer() {
     if (!fDetector) {
         fResult.full.Clear();
         fFullGridWeights.Clear();
@@ -524,14 +493,9 @@ void ChargeSharingCalculator::EnsureFullGridBuffer()
     }
 }
 
-void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitPos,
-                                                       G4double d0,
-                                                       G4double pixelSize,
-                                                       G4double pixelSpacing,
-                                                       G4int numBlocksPerSide,
-                                                       G4double totalChargeElectrons,
-                                                       G4double elementaryCharge)
-{
+void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitPos, G4double d0, G4double pixelSize,
+                                                       G4double pixelSpacing, G4int numBlocksPerSide,
+                                                       G4double totalChargeElectrons, G4double elementaryCharge) {
     if (!fDetector) {
         fResult.full.Clear();
         fFullGridWeights.Clear();
@@ -596,7 +560,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
             const G4double alpha = csc::calcPadViewAngle(distanceToCenter, pixelSize, pixelSize);
 
             // Delegate weight calculation to core (handles guard logic internally)
-            G4double weight;
+            G4double weight = NAN;
             if (chargeModel.useLinear) {
                 weight = csc::calcWeightLinA(distanceToCenter, alpha, chargeModel.beta);
             } else {
@@ -655,7 +619,8 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
     const int blockSizeDim = useChargeBlock3x3 ? 3 : 2;
 
     // Find the pixel with highest F_i
-    G4int maxI = centerI, maxJ = centerJ;
+    G4int maxI = centerI;
+    G4int maxJ = centerJ;
     G4double maxWeight = 0.0;
     for (G4int i = 0; i < rows; ++i) {
         for (G4int j = 0; j < cols; ++j) {
@@ -669,11 +634,13 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
     // Determine block corner (upper-left corner of the contiguous block)
     // For both 2x2 and 3x3: find the block containing the highest F_i pixel with maximum total F_i
-    G4int blockCornerI = 0, blockCornerJ = 0;
+    G4int blockCornerI = 0;
+    G4int blockCornerJ = 0;
     {
         G4double bestSum = -1.0;
-        G4int bestCornerI = maxI, bestCornerJ = maxJ;
-        const int maxOffset = useChargeBlock3x3 ? -2 : -1;  // -2 to 0 for 3x3, -1 to 0 for 2x2
+        G4int bestCornerI = maxI;
+        G4int bestCornerJ = maxJ;
+        const int maxOffset = useChargeBlock3x3 ? -2 : -1; // -2 to 0 for 3x3, -1 to 0 for 2x2
 
         for (int offsetI = maxOffset; offsetI <= 0; ++offsetI) {
             for (int offsetJ = maxOffset; offsetJ <= 0; ++offsetJ) {
@@ -705,8 +672,8 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
     // Helper to check if pixel (i,j) is in the contiguous block
     auto isInBlock = [&](G4int i, G4int j) -> bool {
-        return i >= blockCornerI && i < blockCornerI + blockSizeDim &&
-               j >= blockCornerJ && j < blockCornerJ + blockSizeDim;
+        return i >= blockCornerI && i < blockCornerI + blockSizeDim && j >= blockCornerJ &&
+               j < blockCornerJ + blockSizeDim;
     };
 
     // Compute block sum (sum of weights for pixels in the contiguous block)
@@ -791,8 +758,8 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
     for (G4int i = 0; i < rows; ++i) {
         for (G4int j = 0; j < cols; ++j) {
-            const auto idx = (static_cast<std::size_t>(i) * static_cast<std::size_t>(cols)) +
-                             static_cast<std::size_t>(j);
+            const auto idx =
+                (static_cast<std::size_t>(i) * static_cast<std::size_t>(cols)) + static_cast<std::size_t>(j);
             // Fractions already computed via Eigen above
             const G4double fraction = fResult.full.signalFraction(i, j);
             const G4double fractionRow = fResult.full.signalFractionRow(i, j);

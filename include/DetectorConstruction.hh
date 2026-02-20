@@ -11,13 +11,14 @@
 #ifndef ECS_DETECTOR_CONSTRUCTION_HH
 #define ECS_DETECTOR_CONSTRUCTION_HH
 
-#include "G4VUserDetectorConstruction.hh"
-#include "G4VPhysicalVolume.hh"
-#include "G4ThreeVector.hh"
 #include "Config.hh"
+#include "G4ThreeVector.hh"
+#include "G4VPhysicalVolume.hh"
+#include "G4VUserDetectorConstruction.hh"
 #include <memory>
-#include <vector>
 #include <mutex>
+#include <utility>
+#include <vector>
 
 class G4LogicalVolume;
 class G4GenericMessenger;
@@ -44,8 +45,7 @@ class RunAction;
 ///
 /// The class also manages per-pixel gain noise parameters and provides
 /// methods for finding the nearest pixel to a given position.
-class DetectorConstruction : public G4VUserDetectorConstruction
-{
+class DetectorConstruction : public G4VUserDetectorConstruction {
 public:
     struct PixelLocation {
         G4ThreeVector center;
@@ -56,13 +56,13 @@ public:
 
     DetectorConstruction();
     ~DetectorConstruction() override;
-    
+
     G4VPhysicalVolume* Construct() override;
     void ConstructSDandField() override;
-    
+
     void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
     void SetRunAction(RunAction* runAction);
-    
+
     void SetGridOffset(G4double offset);
     void SetPixelSize(G4double size);
     void SetPixelSpacing(G4double spacing);
@@ -88,10 +88,13 @@ public:
     [[nodiscard]] const std::vector<G4ThreeVector>& GetPixelCenters() const { return fPixelCenters; }
     [[nodiscard]] const G4ThreeVector& GetPixelCenter(G4int globalPixelId) const;
     // Noise sigma accessors (row-major global pixel id = i*N + j)
-    [[nodiscard]] G4double GetPixelGainSigma(G4int globalPixelId) const { return (globalPixelId >= 0 && globalPixelId < (G4int)fPixelGainSigmas.size()) ? fPixelGainSigmas[globalPixelId] : 0.0; }
+    [[nodiscard]] G4double GetPixelGainSigma(G4int globalPixelId) const {
+        return (globalPixelId >= 0 && std::cmp_less(globalPixelId, fPixelGainSigmas.size()))
+                   ? fPixelGainSigmas[globalPixelId]
+                   : 0.0;
+    }
     [[nodiscard]] const std::vector<G4double>& GetPixelGainSigmas() const { return fPixelGainSigmas; }
-    
-    
+
 private:
     struct MaterialSet {
         G4Material* world{nullptr};
@@ -105,10 +108,12 @@ private:
         G4double coverage{0.0};
     };
 
-    [[nodiscard]] MaterialSet PrepareMaterials() const;
-    G4VPhysicalVolume* BuildWorld(const MaterialSet& mats, G4bool checkOverlaps, G4LogicalVolume*& logicWorld);
-    G4LogicalVolume* BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats, G4bool checkOverlaps, G4double originalDetSize);
-    PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical, const MaterialSet& mats, G4bool checkOverlaps);
+    [[nodiscard]] static MaterialSet PrepareMaterials();
+    static G4VPhysicalVolume* BuildWorld(const MaterialSet& mats, G4bool checkOverlaps, G4LogicalVolume*& logicWorld);
+    G4LogicalVolume* BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats, G4bool checkOverlaps,
+                                          G4double originalDetSize);
+    PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical,
+                                   const MaterialSet& mats, G4bool checkOverlaps);
     void InitializePixelGainSigmas();
     void SyncRunMetadata();
     void SetupMessenger();
@@ -116,7 +121,7 @@ private:
     G4double fPixelSize{0.0};
     G4double fPixelWidth{0.0};
     G4double fPixelSpacing{0.0};
-    G4double fGridOffset{0.0};  ///< DD4hep-style grid offset (0 = centered grid)
+    G4double fGridOffset{0.0}; ///< DD4hep-style grid offset (0 = centered grid)
 
     G4double fLinearChargeModelBeta{Constants::LINEAR_CHARGE_MODEL_BETA};
 
@@ -133,7 +138,7 @@ private:
 
     EventAction* fEventAction{nullptr};
     RunAction* fRunAction{nullptr};
-    
+
     G4int fNeighborhoodRadius{Constants::NEIGHBORHOOD_RADIUS};
 
     G4LogicalVolume* fLogicSilicon{nullptr};

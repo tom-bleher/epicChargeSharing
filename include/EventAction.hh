@@ -11,11 +11,11 @@
 #define ECS_EVENT_ACTION_HH
 
 #include "ChargeSharingCalculator.hh"
-#include "NeighborhoodUtils.hh"
-#include "RootIO.hh"
 #include "G4ThreeVector.hh"
 #include "G4UserEventAction.hh"
 #include "globals.hh"
+#include "NeighborhoodUtils.hh"
+#include "RootIO.hh"
 
 #include <memory>
 #include <vector>
@@ -42,8 +42,7 @@ class SteppingAction;
 ///
 /// The charge sharing computation uses the ChargeSharingCalculator
 /// to compute fractions for each pixel in a (2r+1)x(2r+1) neighborhood.
-class EventAction : public G4UserEventAction
-{
+class EventAction : public G4UserEventAction {
 public:
     EventAction(RunAction* runAction, DetectorConstruction* detector);
     ~EventAction() override = default;
@@ -53,8 +52,7 @@ public:
 
     void SetSteppingAction(SteppingAction* steppingAction) { fSteppingAction = steppingAction; }
 
-    void RegisterFirstContact(const G4ThreeVector& pos, G4double time)
-    {
+    void RegisterFirstContact(const G4ThreeVector& pos, G4double time) {
         fFirstContactPos = pos;
         fFirstContactTime = time;
         fHasFirstContactPos = true;
@@ -62,8 +60,7 @@ public:
 
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
 
-    void SetNeighborhoodRadius(G4int radius)
-    {
+    void SetNeighborhoodRadius(G4int radius) {
         fNeighborhoodRadius = radius;
         fChargeSharing.SetNeighborhoodRadius(radius);
         fNeighborhoodLayout.SetRadius(radius);
@@ -78,42 +75,32 @@ public:
 
 private:
     [[nodiscard]] const G4ThreeVector& DetermineHitPosition() const;
-    void UpdatePixelAndHitClassification(const G4ThreeVector& hitPos,
-                                         G4ThreeVector& nearestPixel,
-                                         G4bool& firstContactIsPixel,
-                                         G4bool& geometricIsPixel,
+    void UpdatePixelAndHitClassification(const G4ThreeVector& hitPos, G4ThreeVector& nearestPixel,
+                                         G4bool& firstContactIsPixel, G4bool& geometricIsPixel,
                                          G4bool& isPixelHitCombined);
     const ChargeSharingCalculator::Result& ComputeChargeSharingForEvent(const G4ThreeVector& hitPos,
                                                                         G4double energyDeposit);
     void EnsureNeighborhoodBuffers(std::size_t totalCells);
-    void UpdatePixelIndices(const ChargeSharingCalculator::Result& result,
-                            const G4ThreeVector& hitPos);
-    void ReconstructPosition(const ChargeSharingCalculator::Result& result,
-                             const G4ThreeVector& hitPos);
+    void UpdatePixelIndices(const ChargeSharingCalculator::Result& result, const G4ThreeVector& hitPos);
+    void ReconstructPosition(const ChargeSharingCalculator::Result& result, const G4ThreeVector& hitPos);
 
     /// \brief Build EventSummaryData from current event state.
-    [[nodiscard]] IO::EventSummaryData BuildEventSummary(G4double edep,
-                                            const G4ThreeVector& hitPos,
-                                            const G4ThreeVector& nearestPixel,
-                                            G4bool firstContactIsPixel,
-                                            G4bool geometricIsPixel,
-                                            G4bool isPixelHitCombined) const;
+    [[nodiscard]] IO::EventSummaryData BuildEventSummary(G4double edep, const G4ThreeVector& hitPos,
+                                                         const G4ThreeVector& nearestPixel, G4bool firstContactIsPixel,
+                                                         G4bool geometricIsPixel, G4bool isPixelHitCombined) const;
 
     /// \brief Populate record fields from charge sharing result.
-    void PopulateRecordFromChargeResult(IO::EventRecord& record,
-                                        const ChargeSharingCalculator::Result& result) const;
+    void PopulateRecordFromChargeResult(IO::EventRecord& record, const ChargeSharingCalculator::Result& result) const;
 
     /// \brief Build default grid geometry when charge sharing was not computed.
     [[nodiscard]] ChargeSharingCalculator::PixelGridGeometry BuildDefaultGridGeometry() const;
 
-    struct NeighborContext
-    {
+    struct NeighborContext {
         G4double sigmaNoise{0.0};
     };
 
     [[nodiscard]] NeighborContext MakeNeighborContext() const;
-    void PopulateNeighborCharges(const ChargeSharingCalculator::Result& result,
-                                 const NeighborContext& context);
+    void PopulateNeighborCharges(const ChargeSharingCalculator::Result& result, const NeighborContext& context);
 
     RunAction* fRunAction{nullptr};
     DetectorConstruction* fDetector{nullptr};

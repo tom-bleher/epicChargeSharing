@@ -10,8 +10,8 @@
 #ifndef ECS_PRIMARY_GENERATOR_HH
 #define ECS_PRIMARY_GENERATOR_HH
 
-#include "G4VUserPrimaryGeneratorAction.hh"
 #include "G4ThreeVector.hh"
+#include "G4VUserPrimaryGeneratorAction.hh"
 
 #include "Config.hh"
 
@@ -41,8 +41,7 @@ class DetectorConstruction;
 /// - /ecs/gun/fixedPosition (bool): Enable/disable fixed position mode
 /// - /ecs/gun/fixedX (double): X coordinate for fixed position
 /// - /ecs/gun/fixedY (double): Y coordinate for fixed position
-class PrimaryGenerator : public G4VUserPrimaryGeneratorAction
-{
+class PrimaryGenerator : public G4VUserPrimaryGeneratorAction {
 public:
     /// \brief Construct with detector reference.
     /// \param detector Pointer to detector construction for geometry info
@@ -60,16 +59,15 @@ private:
     void RecalculateSamplingWindow() const;
 
     /// \brief Sampling window parameters.
-    struct SamplingWindow
-    {
-        G4double margin{0.0};      ///< Safe margin from detector edge
-        G4double halfExtent{0.0};  ///< Half-extent of sampling region
+    struct SamplingWindow {
+        G4double margin{0.0};     ///< Safe margin from detector edge
+        G4double halfExtent{0.0}; ///< Half-extent of sampling region
     };
 
     const SamplingWindow& EnsureSamplingWindow() const;
-    G4double ClampToWindow(G4double value, const SamplingWindow& window) const;
+    static G4double ClampToWindow(G4double value, const SamplingWindow& window);
     G4ThreeVector MakeFixedPosition(const SamplingWindow& window) const;
-    G4ThreeVector MakeRandomPosition(const SamplingWindow& window) const;
+    static G4ThreeVector MakeRandomPosition(const SamplingWindow& window);
     G4ThreeVector SamplePrimaryVertex() const;
     void ApplyParticlePosition(const G4ThreeVector& position);
     void GenerateRandomPos();

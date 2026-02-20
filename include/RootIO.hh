@@ -16,8 +16,8 @@
 
 #include "ChargeSharingCalculator.hh"
 #include "Config.hh"
-#include "NeighborhoodUtils.hh"
 #include "globals.hh"
+#include "NeighborhoodUtils.hh"
 
 #include <mutex>
 #include <span>
@@ -45,11 +45,11 @@ struct EventSummaryData {
     G4double nearestPixelY{0.0};
     G4double pixelTrueDeltaX{0.0};
     G4double pixelTrueDeltaY{0.0};
-    G4double primaryMomentumX{0.0};  ///< Primary particle px (Geant4 units: MeV)
-    G4double primaryMomentumY{0.0};  ///< Primary particle py (Geant4 units: MeV)
-    G4double primaryMomentumZ{0.0};  ///< Primary particle pz (Geant4 units: MeV)
-    G4double hitTime{0.0};           ///< Global time at first contact (Geant4 units: ns)
-    G4double pathLength{0.0};        ///< Path length through sensitive volume (Geant4 units: mm)
+    G4double primaryMomentumX{0.0}; ///< Primary particle px (Geant4 units: MeV)
+    G4double primaryMomentumY{0.0}; ///< Primary particle py (Geant4 units: MeV)
+    G4double primaryMomentumZ{0.0}; ///< Primary particle pz (Geant4 units: MeV)
+    G4double hitTime{0.0};          ///< Global time at first contact (Geant4 units: ns)
+    G4double pathLength{0.0};       ///< Path length through sensitive volume (Geant4 units: mm)
     G4bool firstContactIsPixel{false};
     G4bool geometricIsPixel{false};
     G4bool isPixelHitCombined{false};
@@ -73,9 +73,9 @@ struct EventRecord {
     std::span<const G4double> neighborChargesFinalBlock;
     // Full grid fractions
     std::span<const G4double> fullFi;
-    std::span<const G4double> fullFiRow;    ///< Signal fractions with row denominator
-    std::span<const G4double> fullFiCol;    ///< Signal fractions with column denominator
-    std::span<const G4double> fullFiBlock;  ///< Signal fractions with 4-pad block denominator
+    std::span<const G4double> fullFiRow;   ///< Signal fractions with row denominator
+    std::span<const G4double> fullFiCol;   ///< Signal fractions with column denominator
+    std::span<const G4double> fullFiBlock; ///< Signal fractions with 4-pad block denominator
     // Full grid neighborhood-mode charges
     std::span<const G4double> fullQi;
     std::span<const G4double> fullQn;
@@ -137,18 +137,18 @@ public:
 
     struct VectorBuffers {
         std::vector<G4double>* chargeFractions{nullptr};
-        std::vector<G4double>* chargeFractionsRow{nullptr};  ///< Row-denominator fractions
-        std::vector<G4double>* chargeFractionsCol{nullptr};  ///< Column-denominator fractions
+        std::vector<G4double>* chargeFractionsRow{nullptr};   ///< Row-denominator fractions
+        std::vector<G4double>* chargeFractionsCol{nullptr};   ///< Column-denominator fractions
         std::vector<G4double>* chargeFractionsBlock{nullptr}; ///< Block-denominator fractions
         std::vector<G4double>* charge{nullptr};
         std::vector<G4double>* chargeNew{nullptr};
         std::vector<G4double>* chargeFinal{nullptr};
-        std::vector<G4double>* chargeRow{nullptr};      ///< Charge based on row fraction
-        std::vector<G4double>* chargeNewRow{nullptr};   ///< Noisy charge based on row fraction
-        std::vector<G4double>* chargeFinalRow{nullptr}; ///< Final charge based on row fraction
-        std::vector<G4double>* chargeCol{nullptr};      ///< Charge based on col fraction
-        std::vector<G4double>* chargeNewCol{nullptr};   ///< Noisy charge based on col fraction
-        std::vector<G4double>* chargeFinalCol{nullptr}; ///< Final charge based on col fraction
+        std::vector<G4double>* chargeRow{nullptr};        ///< Charge based on row fraction
+        std::vector<G4double>* chargeNewRow{nullptr};     ///< Noisy charge based on row fraction
+        std::vector<G4double>* chargeFinalRow{nullptr};   ///< Final charge based on row fraction
+        std::vector<G4double>* chargeCol{nullptr};        ///< Charge based on col fraction
+        std::vector<G4double>* chargeNewCol{nullptr};     ///< Noisy charge based on col fraction
+        std::vector<G4double>* chargeFinalCol{nullptr};   ///< Final charge based on col fraction
         std::vector<G4double>* chargeBlock{nullptr};      ///< Charge based on block fraction
         std::vector<G4double>* chargeNewBlock{nullptr};   ///< Noisy charge based on block fraction
         std::vector<G4double>* chargeFinalBlock{nullptr}; ///< Final charge based on block fraction
@@ -161,21 +161,21 @@ public:
 
     struct FullGridBuffers {
         std::vector<G4double>* fi{nullptr};
-        std::vector<G4double>* fiRow{nullptr};    ///< Row-denominator fractions
-        std::vector<G4double>* fiCol{nullptr};    ///< Column-denominator fractions
-        std::vector<G4double>* fiBlock{nullptr};  ///< Block-denominator fractions
+        std::vector<G4double>* fiRow{nullptr};   ///< Row-denominator fractions
+        std::vector<G4double>* fiCol{nullptr};   ///< Column-denominator fractions
+        std::vector<G4double>* fiBlock{nullptr}; ///< Block-denominator fractions
         std::vector<G4double>* qi{nullptr};
         std::vector<G4double>* qn{nullptr};
         std::vector<G4double>* qf{nullptr};
-        std::vector<G4double>* qiRow{nullptr};    ///< Charge based on row fraction
-        std::vector<G4double>* qnRow{nullptr};    ///< Noisy charge based on row fraction
-        std::vector<G4double>* qfRow{nullptr};    ///< Final charge based on row fraction
-        std::vector<G4double>* qiCol{nullptr};    ///< Charge based on col fraction
-        std::vector<G4double>* qnCol{nullptr};    ///< Noisy charge based on col fraction
-        std::vector<G4double>* qfCol{nullptr};    ///< Final charge based on col fraction
-        std::vector<G4double>* qiBlock{nullptr};  ///< Charge based on block fraction
-        std::vector<G4double>* qnBlock{nullptr};  ///< Noisy charge based on block fraction
-        std::vector<G4double>* qfBlock{nullptr};  ///< Final charge based on block fraction
+        std::vector<G4double>* qiRow{nullptr};   ///< Charge based on row fraction
+        std::vector<G4double>* qnRow{nullptr};   ///< Noisy charge based on row fraction
+        std::vector<G4double>* qfRow{nullptr};   ///< Final charge based on row fraction
+        std::vector<G4double>* qiCol{nullptr};   ///< Charge based on col fraction
+        std::vector<G4double>* qnCol{nullptr};   ///< Noisy charge based on col fraction
+        std::vector<G4double>* qfCol{nullptr};   ///< Final charge based on col fraction
+        std::vector<G4double>* qiBlock{nullptr}; ///< Charge based on block fraction
+        std::vector<G4double>* qnBlock{nullptr}; ///< Noisy charge based on block fraction
+        std::vector<G4double>* qfBlock{nullptr}; ///< Final charge based on block fraction
         std::vector<G4double>* distance{nullptr};
         std::vector<G4double>* alpha{nullptr};
         std::vector<G4double>* pixelX{nullptr};
@@ -183,23 +183,22 @@ public:
         G4int* gridSide{nullptr};
     };
 
-    void ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars,
-                               const ClassificationBuffers& classification,
+    void ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars, const ClassificationBuffers& classification,
                                const VectorBuffers& vectors,
                                Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood,
                                Config::PosReconModel reconModel = Config::PosReconModel::LogA);
-    void ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers,
-                                 Config::PosReconModel reconModel = Config::PosReconModel::LogA);
-    void ConfigureClassificationBranches(TTree* tree, const ClassificationBuffers& buffers);
-    void ConfigureVectorBranches(TTree* tree, const VectorBuffers& buffers,
-                                 Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
-    void ConfigureNeighborhoodBranches(TTree* tree, std::vector<G4int>* pixelID);
-    bool ConfigureFullGridBranches(TTree* tree, const FullGridBuffers& buffers,
-                                   Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
+    static void ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers,
+                                        Config::PosReconModel reconModel = Config::PosReconModel::LogA);
+    static void ConfigureClassificationBranches(TTree* tree, const ClassificationBuffers& buffers);
+    static void ConfigureVectorBranches(TTree* tree, const VectorBuffers& buffers,
+                                        Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
+    static void ConfigureNeighborhoodBranches(TTree* tree, std::vector<G4int>* pixelID);
+    static bool ConfigureFullGridBranches(TTree* tree, const FullGridBuffers& buffers,
+                                          Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
 
 private:
-    static constexpr int kDefaultBufferSize = 256000;       ///< 256KB for neighborhood branches
-    static constexpr int kLargeVectorBufferSize = 512000;   ///< 512KB for full grid branches (>10KB/entry)
+    static constexpr int kDefaultBufferSize = 256000;     ///< 256KB for neighborhood branches
+    static constexpr int kLargeVectorBufferSize = 512000; ///< 512KB for full grid branches (>10KB/entry)
     static constexpr int kSplitLevel = 0;
 };
 
@@ -368,7 +367,7 @@ public:
     struct GridMetadata {
         G4double pixelSize{0.0};
         G4double pixelSpacing{0.0};
-        G4double gridOffset{0.0};  ///< DD4hep-style grid offset
+        G4double gridOffset{0.0}; ///< DD4hep-style grid offset
         G4double detectorSize{0.0};
         G4double detectorThickness{0.0};
         G4double interpadGap{0.0};
@@ -379,10 +378,10 @@ public:
     };
 
     struct ModelMetadata {
-        Config::SignalModel signalModel{Config::SignalModel::LogA};  ///< Signal sharing model
-        Config::PosReconModel model{Config::PosReconModel::LogA};     ///< Reconstruction method
+        Config::SignalModel signalModel{Config::SignalModel::LogA}; ///< Signal sharing model
+        Config::PosReconModel model{Config::PosReconModel::LogA};   ///< Reconstruction method
         Config::ActivePixelMode activePixelMode{Config::ActivePixelMode::Neighborhood};
-        G4double beta{0.0};  ///< Linear signal model beta parameter (per micron)
+        G4double beta{0.0}; ///< Linear signal model beta parameter (per micron)
     };
 
     struct PhysicsMetadata {
@@ -450,13 +449,12 @@ public:
     [[nodiscard]] const Config& GetConfig() const { return fConfig; }
 
     bool Run();
-    bool RunMacro(const std::string& macroPath, const std::string& entryPoint,
-                  const std::string& rootFile);
+    bool RunMacro(const std::string& macroPath, const std::string& entryPoint, const std::string& rootFile);
 
 private:
     void EnsureBatchMode();
     void ConfigureIncludePaths();
-    std::string NormalizePath(const std::string& path);
+    static std::string NormalizePath(const std::string& path);
 
     Config fConfig;
     bool fBatchModeSet{false};

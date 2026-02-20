@@ -5,30 +5,30 @@
 #include "RunAction.hh"
 
 #include "Config.hh"
-#include "RuntimeConfig.hh"
 #include "DetectorConstruction.hh"
 #include "RootHelpers.hh"
+#include "RuntimeConfig.hh"
 
-#include "G4RunManager.hh"
 #include "G4Exception.hh"
-#include "G4Threading.hh"
+#include "G4RunManager.hh"
 #include "G4SystemOfUnits.hh"
+#include "G4Threading.hh"
 
-#include "TFile.h"
-#include "TTree.h"
-#include "TError.h"
-#include "TThread.h"
-#include "TFileMerger.h"
-#include "RVersion.h"
 #include "Compression.h"
+#include "RVersion.h"
+#include "TError.h"
+#include "TFile.h"
+#include "TFileMerger.h"
+#include "TThread.h"
+#include "TTree.h"
 
 #include "G4Version.hh"
 
 #include <algorithm>
-#include <chrono>
-#include <cstddef>
 #include <array>
+#include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <ctime>
 #include <filesystem>
 #include <iomanip>
@@ -38,68 +38,56 @@
 #include <string>
 #include <utility>
 
-namespace
-{
+namespace {
 std::once_flag gRootInitFlag;
 } // namespace
-
-namespace support = ECS;
 
 // Anonymous namespace for internal helpers removed - functionality moved to ECS::IO::MetadataPublisher
 
 RunAction::RunAction()
-    : 
-      fRootWriter(std::make_unique<ECS::RootFileWriter>()),
-      
+    : fRootWriter(std::make_unique<ECS::RootFileWriter>()),
+
       fNeighborhoodLayout(Constants::NEIGHBORHOOD_RADIUS),
-      
+
       fChargeSharingBeta(std::numeric_limits<G4double>::quiet_NaN()),
-      
+
       fStoreFullFractions(Constants::STORE_FULL_GRID),
-      
+
       fEDM4hepWriter(IO::MakeEDM4hepWriter())
-      
+
 {
     if (fEDM4hepWriter && fEDM4hepWriter->IsEnabled()) {
         fWriteEDM4hep = true;
     }
 }
 
-RunAction::~RunAction()
-{
+RunAction::~RunAction() {
     CleanupRootObjects();
 }
 
-std::unique_lock<std::mutex> RunAction::MakeTreeLock()
-{
+std::unique_lock<std::mutex> RunAction::MakeTreeLock() {
 #ifdef G4MULTITHREADED
     if (G4Threading::IsMultithreadedApplication() && !G4Threading::IsWorkerThread()) {
         return std::unique_lock<std::mutex>(fTreeMutex);
     }
 #endif
-    return std::unique_lock<std::mutex>();
+    return {};
 }
 
-TFile* RunAction::GetRootFile() const
-{
+TFile* RunAction::GetRootFile() const {
     return fRootWriter ? fRootWriter->File() : nullptr;
 }
 
-TTree* RunAction::GetTree() const
-{
+TTree* RunAction::GetTree() const {
     return fRootWriter ? fRootWriter->Tree() : nullptr;
 }
 
-void RunAction::EnsureBranchBuffersInitialized()
-{
-    const G4int radius =
-        (fGridNeighborhoodRadius >= 0) ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS;
+void RunAction::EnsureBranchBuffersInitialized() {
+    const G4int radius = (fGridNeighborhoodRadius >= 0) ? fGridNeighborhoodRadius : Constants::NEIGHBORHOOD_RADIUS;
     fNeighborhoodLayout.SetRadius(radius);
-    const std::size_t desiredCapacity =
-        std::max<std::size_t>(1, fNeighborhoodLayout.TotalCells());
+    const std::size_t desiredCapacity = std::max<std::size_t>(1, fNeighborhoodLayout.TotalCells());
 
-    if (desiredCapacity != fNeighborhoodCapacity ||
-        fNeighborhoodChargeFractions.size() != desiredCapacity) {
+    if (desiredCapacity != fNeighborhoodCapacity || fNeighborhoodChargeFractions.size() != desiredCapacity) {
         fNeighborhoodCapacity = desiredCapacity;
         const auto reserveVec = [desiredCapacity](auto& vec) {
             vec.clear();
@@ -117,9 +105,7 @@ void RunAction::EnsureBranchBuffersInitialized()
     }
 
     const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
-    ECS::ResizeAndFill(fNeighborhoodChargeFractions,
-                       fNeighborhoodCapacity,
-                       Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
+    ECS::ResizeAndFill(fNeighborhoodChargeFractions, fNeighborhoodCapacity, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
     ECS::ResizeAndFill(fNeighborhoodCharge, fNeighborhoodCapacity, 0.0);
     ECS::ResizeAndFill(fNeighborhoodChargeNew, fNeighborhoodCapacity, 0.0);
     ECS::ResizeAndFill(fNeighborhoodChargeFinal, fNeighborhoodCapacity, 0.0);
@@ -146,29 +132,40 @@ void RunAction::EnsureBranchBuffersInitialized()
     fFullFractionsBranchInitialized = false;
 }
 
-bool RunAction::EnsureFullFractionBuffer(G4int gridSide)
-{
+bool RunAction::EnsureFullFractionBuffer(G4int gridSide) {
     if (gridSide >= 0) {
         fFullGridSide = gridSide;
     }
     const G4int side = (fFullGridSide > 0) ? fFullGridSide : fGridNumBlocksPerSide;
     const G4int numBlocks = std::max(0, side);
-    const std::size_t totalPixels =
-        static_cast<std::size_t>(numBlocks) * static_cast<std::size_t>(numBlocks);
+    const std::size_t totalPixels = static_cast<std::size_t>(numBlocks) * static_cast<std::size_t>(numBlocks);
     if (totalPixels == 0U) {
         // Fractions
-        fFullFi.clear(); fFullFiRow.clear(); fFullFiCol.clear(); fFullFiBlock.clear();
+        fFullFi.clear();
+        fFullFiRow.clear();
+        fFullFiCol.clear();
+        fFullFiBlock.clear();
         // Neighborhood charges
-        fFullQi.clear(); fFullQn.clear(); fFullQf.clear();
+        fFullQi.clear();
+        fFullQn.clear();
+        fFullQf.clear();
         // Row-mode charges
-        fFullQiRow.clear(); fFullQnRow.clear(); fFullQfRow.clear();
+        fFullQiRow.clear();
+        fFullQnRow.clear();
+        fFullQfRow.clear();
         // Col-mode charges
-        fFullQiCol.clear(); fFullQnCol.clear(); fFullQfCol.clear();
+        fFullQiCol.clear();
+        fFullQnCol.clear();
+        fFullQfCol.clear();
         // Block-mode charges
-        fFullQiBlock.clear(); fFullQnBlock.clear(); fFullQfBlock.clear();
+        fFullQiBlock.clear();
+        fFullQnBlock.clear();
+        fFullQfBlock.clear();
         // Geometry
-        fFullDistance.clear(); fFullAlpha.clear();
-        fFullPixelXGrid.clear(); fFullPixelYGrid.clear();
+        fFullDistance.clear();
+        fFullAlpha.clear();
+        fFullPixelXGrid.clear();
+        fFullPixelYGrid.clear();
         fFullGridSide = 0;
         return false;
     }
@@ -182,31 +179,41 @@ bool RunAction::EnsureFullFractionBuffer(G4int gridSide)
     };
 
     // Fractions
-    ensure(fFullFi); ensure(fFullFiRow); ensure(fFullFiCol); ensure(fFullFiBlock);
+    ensure(fFullFi);
+    ensure(fFullFiRow);
+    ensure(fFullFiCol);
+    ensure(fFullFiBlock);
     // Neighborhood charges
-    ensure(fFullQi); ensure(fFullQn); ensure(fFullQf);
+    ensure(fFullQi);
+    ensure(fFullQn);
+    ensure(fFullQf);
     // Row-mode charges
-    ensure(fFullQiRow); ensure(fFullQnRow); ensure(fFullQfRow);
+    ensure(fFullQiRow);
+    ensure(fFullQnRow);
+    ensure(fFullQfRow);
     // Col-mode charges
-    ensure(fFullQiCol); ensure(fFullQnCol); ensure(fFullQfCol);
+    ensure(fFullQiCol);
+    ensure(fFullQnCol);
+    ensure(fFullQfCol);
     // Block-mode charges
-    ensure(fFullQiBlock); ensure(fFullQnBlock); ensure(fFullQfBlock);
+    ensure(fFullQiBlock);
+    ensure(fFullQnBlock);
+    ensure(fFullQfBlock);
     // Geometry
-    ensure(fFullDistance); ensure(fFullAlpha);
-    ensure(fFullPixelXGrid); ensure(fFullPixelYGrid);
+    ensure(fFullDistance);
+    ensure(fFullAlpha);
+    ensure(fFullPixelXGrid);
+    ensure(fFullPixelYGrid);
     return true;
 }
 
-void RunAction::BeginOfRunAction(const G4Run* run)
-{
+void RunAction::BeginOfRunAction(const G4Run* run) {
     std::call_once(gRootInitFlag, ECS::InitializeROOTThreading);
 
     EnsureBranchBuffersInitialized();
 
     if (!run) {
-        G4Exception("RunAction::BeginOfRunAction",
-                    "InvalidRunObject",
-                    FatalException,
+        G4Exception("RunAction::BeginOfRunAction", "InvalidRunObject", FatalException,
                     "Received null run object in BeginOfRunAction.");
         return;
     }
@@ -228,12 +235,9 @@ void RunAction::BeginOfRunAction(const G4Run* run)
     }
 }
 
-void RunAction::EndOfRunAction(const G4Run* run)
-{
+void RunAction::EndOfRunAction(const G4Run* run) {
     if (!run) {
-        G4Exception("RunAction::EndOfRunAction",
-                    "InvalidRunObject",
-                    FatalException,
+        G4Exception("RunAction::EndOfRunAction", "InvalidRunObject", FatalException,
                     "Received null run object in EndOfRunAction.");
         return;
     }
@@ -249,16 +253,14 @@ void RunAction::EndOfRunAction(const G4Run* run)
     HandleMasterEndOfRun(context, run);
 }
 
-RunAction::ThreadContext RunAction::BuildThreadContext(const G4Run* run) const
-{
+RunAction::ThreadContext RunAction::BuildThreadContext(const G4Run* run) {
     ThreadContext context;
     context.multithreaded = G4Threading::IsMultithreadedApplication();
 #ifdef G4MULTITHREADED
     context.worker = context.multithreaded && G4Threading::IsWorkerThread();
     context.master = context.multithreaded && !context.worker;
     context.threadId = context.worker ? G4Threading::G4GetThreadId() : -1;
-    context.totalWorkers =
-        context.multithreaded ? G4Threading::GetNumberOfRunningWorkerThreads() : 0;
+    context.totalWorkers = context.multithreaded ? G4Threading::GetNumberOfRunningWorkerThreads() : 0;
 #else
     context.worker = false;
     context.master = false;
@@ -273,24 +275,21 @@ RunAction::ThreadContext RunAction::BuildThreadContext(const G4Run* run) const
     return context;
 }
 
-void RunAction::LogBeginRun(const ThreadContext& context) const
-{
+void RunAction::LogBeginRun(const ThreadContext& context) {
     const G4int runId = context.runId;
     if (context.multithreaded) {
         if (context.worker) {
-            G4cout << "[RunAction] Worker " << context.threadId << " beginning run " << runId
-                   << G4endl;
+            G4cout << "[RunAction] Worker " << context.threadId << " beginning run " << runId << G4endl;
         } else {
-            G4cout << "[RunAction] Master beginning run " << runId << " with "
-                   << context.totalWorkers << " workers" << G4endl;
+            G4cout << "[RunAction] Master beginning run " << runId << " with " << context.totalWorkers << " workers"
+                   << G4endl;
         }
     } else {
         G4cout << "[RunAction] Beginning run " << runId << " (single-threaded)" << G4endl;
     }
 }
 
-G4String RunAction::DetermineOutputFileName(const ThreadContext& context) const
-{
+G4String RunAction::DetermineOutputFileName(const ThreadContext& context) {
     if (!context.multithreaded) {
         return "epicChargeSharing.root";
     }
@@ -300,16 +299,13 @@ G4String RunAction::DetermineOutputFileName(const ThreadContext& context) const
     return "epicChargeSharing.root";
 }
 
-void RunAction::InitializeRootOutputs(const ThreadContext& context, const G4String& fileName)
-{
+void RunAction::InitializeRootOutputs(const ThreadContext& context, const G4String& fileName) {
     (void)context;
 
-    std::unique_lock<std::mutex> rootLock(ECS::RootIOMutex());
+    std::unique_lock<std::mutex> const rootLock(ECS::RootIOMutex());
     auto* rootFile = new TFile(fileName.c_str(), "RECREATE");
     if (!rootFile || rootFile->IsZombie()) {
-        G4Exception("RunAction::InitializeRootOutputs",
-                    "RootFileOpenFailure",
-                    FatalException,
+        G4Exception("RunAction::InitializeRootOutputs", "RootFileOpenFailure", FatalException,
                     ("Unable to open ROOT file " + std::string(fileName)).c_str());
     }
     rootFile->SetCompressionAlgorithm(ROOT::RCompressionSetting::EAlgorithm::kZSTD);
@@ -320,7 +316,7 @@ void RunAction::InitializeRootOutputs(const ThreadContext& context, const G4Stri
     tree->SetDirectory(rootFile);
     tree->SetAutoSave(0);
     tree->SetAutoFlush(50000);
-    tree->SetMaxTreeSize(static_cast<Long64_t>(10LL) * 1024LL * 1024LL * 1024LL);
+    TTree::SetMaxTreeSize(static_cast<Long64_t>(10LL) * 1024LL * 1024LL * 1024LL);
     ConfigureCoreBranches(tree);
 
     fRootWriter->Attach(rootFile, tree, true);
@@ -348,46 +344,48 @@ void RunAction::InitializeRootOutputs(const ThreadContext& context, const G4Stri
     }
 }
 
-void RunAction::ConfigureCoreBranches(TTree* tree)
-{
+void RunAction::ConfigureCoreBranches(TTree* tree) {
     if (!tree) {
         return;
     }
 
     // Build buffer structures for BranchConfigurator
-    const IO::BranchConfigurator::ScalarBuffers scalars{
-        &fTrueX, &fTrueY, &fPixelX, &fPixelY, &fEdep,
-        &fPixelTrueDeltaX, &fPixelTrueDeltaY
-    };
+    const IO::BranchConfigurator::ScalarBuffers scalars{.trueX = &fTrueX,
+                                                        .trueY = &fTrueY,
+                                                        .pixelX = &fPixelX,
+                                                        .pixelY = &fPixelY,
+                                                        .edep = &fEdep,
+                                                        .pixelTrueDeltaX = &fPixelTrueDeltaX,
+                                                        .pixelTrueDeltaY = &fPixelTrueDeltaY};
 
-    const IO::BranchConfigurator::ClassificationBuffers classification{
-        &fIsPixelHit, &fNeighborhoodActiveCells,
-        &fNearestPixelI, &fNearestPixelJ, &fNearestPixelGlobalId
-    };
+    const IO::BranchConfigurator::ClassificationBuffers classification{.isPixelHit = &fIsPixelHit,
+                                                                       .neighborhoodActiveCells =
+                                                                           &fNeighborhoodActiveCells,
+                                                                       .nearestPixelI = &fNearestPixelI,
+                                                                       .nearestPixelJ = &fNearestPixelJ,
+                                                                       .nearestPixelGlobalId = &fNearestPixelGlobalId};
 
-    IO::BranchConfigurator::VectorBuffers vectors{
-        &fNeighborhoodChargeFractions,
-        &fNeighborhoodChargeFractionsRow,
-        &fNeighborhoodChargeFractionsCol,
-        &fNeighborhoodChargeFractionsBlock,
-        &fNeighborhoodCharge,
-        &fNeighborhoodChargeNew,
-        &fNeighborhoodChargeFinal,
-        &fNeighborhoodChargeRow,
-        &fNeighborhoodChargeNewRow,
-        &fNeighborhoodChargeFinalRow,
-        &fNeighborhoodChargeCol,
-        &fNeighborhoodChargeNewCol,
-        &fNeighborhoodChargeFinalCol,
-        &fNeighborhoodChargeBlock,
-        &fNeighborhoodChargeNewBlock,
-        &fNeighborhoodChargeFinalBlock,
-        &fNeighborhoodPixelX,
-        &fNeighborhoodPixelY,
-        &fNeighborhoodDistance,
-        &fNeighborhoodAlpha,
-        &fNeighborhoodPixelID
-    };
+    IO::BranchConfigurator::VectorBuffers const vectors{.chargeFractions = &fNeighborhoodChargeFractions,
+                                                        .chargeFractionsRow = &fNeighborhoodChargeFractionsRow,
+                                                        .chargeFractionsCol = &fNeighborhoodChargeFractionsCol,
+                                                        .chargeFractionsBlock = &fNeighborhoodChargeFractionsBlock,
+                                                        .charge = &fNeighborhoodCharge,
+                                                        .chargeNew = &fNeighborhoodChargeNew,
+                                                        .chargeFinal = &fNeighborhoodChargeFinal,
+                                                        .chargeRow = &fNeighborhoodChargeRow,
+                                                        .chargeNewRow = &fNeighborhoodChargeNewRow,
+                                                        .chargeFinalRow = &fNeighborhoodChargeFinalRow,
+                                                        .chargeCol = &fNeighborhoodChargeCol,
+                                                        .chargeNewCol = &fNeighborhoodChargeNewCol,
+                                                        .chargeFinalCol = &fNeighborhoodChargeFinalCol,
+                                                        .chargeBlock = &fNeighborhoodChargeBlock,
+                                                        .chargeNewBlock = &fNeighborhoodChargeNewBlock,
+                                                        .chargeFinalBlock = &fNeighborhoodChargeFinalBlock,
+                                                        .pixelX = &fNeighborhoodPixelX,
+                                                        .pixelY = &fNeighborhoodPixelY,
+                                                        .distance = &fNeighborhoodDistance,
+                                                        .alpha = &fNeighborhoodAlpha,
+                                                        .pixelID = &fNeighborhoodPixelID};
 
     // Delegate to BranchConfigurator
     const auto mode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
@@ -395,8 +393,7 @@ void RunAction::ConfigureCoreBranches(TTree* tree)
     fBranchConfigurator.ConfigureCoreBranches(tree, scalars, classification, vectors, mode, reconModel);
 }
 
-void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run)
-{
+void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run) {
     const G4int nofEvents = run ? run->GetNumberOfEvent() : 0;
 
     bool wroteOutput = false;
@@ -410,15 +407,12 @@ void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* 
         if (SafeWriteRootFile()) {
             wroteOutput = true;
             if (context.multithreaded) {
-                G4cout << "[RunAction] Worker " << context.threadId << " stored " << nofEvents
-                       << " events" << G4endl;
+                G4cout << "[RunAction] Worker " << context.threadId << " stored " << nofEvents << " events" << G4endl;
             } else {
                 G4cout << "[RunAction] Stored " << nofEvents << " events" << G4endl;
             }
         } else {
-            G4Exception("RunAction::HandleWorkerEndOfRun",
-                        "RootFileWriteFailure",
-                        FatalException,
+            G4Exception("RunAction::HandleWorkerEndOfRun", "RootFileWriteFailure", FatalException,
                         "SafeWriteRootFile() reported failure.");
         }
     }
@@ -439,8 +433,7 @@ void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* 
     }
 }
 
-void RunAction::HandleMasterEndOfRun(const ThreadContext& context, const G4Run* /*run*/)
-{
+void RunAction::HandleMasterEndOfRun(const ThreadContext& context, const G4Run* /*run*/) {
     const std::vector<G4String> workerFiles = CollectWorkerFileNames(context.totalWorkers);
     const std::vector<G4String> existingFiles = FilterExistingWorkerFiles(workerFiles);
 
@@ -465,8 +458,7 @@ void RunAction::HandleMasterEndOfRun(const ThreadContext& context, const G4Run* 
         }
     }
 
-    G4cout << "[RunAction] Merged " << existingFiles.size()
-           << " worker files into epicChargeSharing.root" << G4endl;
+    G4cout << "[RunAction] Merged " << existingFiles.size() << " worker files into epicChargeSharing.root" << G4endl;
 
     if (!mergedHasEntries) {
         G4cout << "[RunAction] Merged ROOT file has no entries; skipping post-processing" << G4endl;
@@ -476,8 +468,7 @@ void RunAction::HandleMasterEndOfRun(const ThreadContext& context, const G4Run* 
     RunPostProcessingFits();
 }
 
-std::vector<G4String> RunAction::CollectWorkerFileNames(G4int totalWorkers) const
-{
+std::vector<G4String> RunAction::CollectWorkerFileNames(G4int totalWorkers) {
     std::vector<G4String> workerFiles;
     workerFiles.reserve(std::max<G4int>(0, totalWorkers));
     for (G4int tid = 0; tid < totalWorkers; ++tid) {
@@ -486,8 +477,7 @@ std::vector<G4String> RunAction::CollectWorkerFileNames(G4int totalWorkers) cons
     return workerFiles;
 }
 
-std::vector<G4String> RunAction::FilterExistingWorkerFiles(const std::vector<G4String>& workerFiles) const
-{
+std::vector<G4String> RunAction::FilterExistingWorkerFiles(const std::vector<G4String>& workerFiles) {
     std::vector<G4String> existingFiles;
     existingFiles.reserve(workerFiles.size());
     for (const auto& wf : workerFiles) {
@@ -499,14 +489,12 @@ std::vector<G4String> RunAction::FilterExistingWorkerFiles(const std::vector<G4S
     return existingFiles;
 }
 
-bool RunAction::MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& existingFiles)
-{
+bool RunAction::MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& existingFiles) {
     if (existingFiles.empty()) {
         return false;
     }
 
-    auto mergeFiles = [](const std::vector<G4String>& inputs,
-                         const G4String& output) -> bool {
+    auto mergeFiles = [](const std::vector<G4String>& inputs, const G4String& output) -> bool {
         if (inputs.empty()) {
             return false;
         }
@@ -515,9 +503,7 @@ bool RunAction::MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& 
         merger.SetFastMethod(kFALSE);
         merger.SetNotrees(kFALSE);
         if (!merger.OutputFile(output.c_str(), "RECREATE")) {
-            G4Exception("RunAction::MergeWorkerFilesAndPublishMetadata",
-                        "OutputFileFailure",
-                        FatalException,
+            G4Exception("RunAction::MergeWorkerFilesAndPublishMetadata", "OutputFileFailure", FatalException,
                         "Unable to open output file for ROOT merge.");
             return false;
         }
@@ -540,14 +526,14 @@ bool RunAction::MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& 
 
     bool mergeOk = false;
     {
-        std::lock_guard<std::mutex> ioLock(ECS::RootIOMutex());
+        std::lock_guard<std::mutex> const ioLock(ECS::RootIOMutex());
         mergeOk = mergeFiles(existingFiles, "epicChargeSharing.root");
         if (mergeOk) {
             std::unique_ptr<TFile> mergedFile(TFile::Open("epicChargeSharing.root", "UPDATE"));
             if (mergedFile && !mergedFile->IsZombie()) {
-                TTree* tree = mergedFile->Get<TTree>("Hits");
+                auto* tree = mergedFile->Get<TTree>("Hits");
                 if (tree) {
-                    IO::MetadataPublisher::EntryList entries = CollectMetadataEntries();
+                    IO::MetadataPublisher::EntryList const entries = CollectMetadataEntries();
                     if (!entries.empty()) {
                         IO::MetadataPublisher::WriteEntriesToUserInfo(tree, entries);
                     }
@@ -555,9 +541,7 @@ bool RunAction::MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& 
                 }
                 mergedFile->Close();
             } else {
-                G4Exception("RunAction::MergeWorkerFilesAndPublishMetadata",
-                            "MergedFileOpenFailure",
-                            FatalException,
+                G4Exception("RunAction::MergeWorkerFilesAndPublishMetadata", "MergedFileOpenFailure", FatalException,
                             "Failed to open merged ROOT file for metadata update.");
                 mergeOk = false;
             }
@@ -567,8 +551,7 @@ bool RunAction::MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& 
     return mergeOk;
 }
 
-void RunAction::UpdateSummaryScalars(const EventRecord& record)
-{
+void RunAction::UpdateSummaryScalars(const EventRecord& record) {
     fEdep = record.summary.edep;
     fTrueX = record.summary.hitX;
     fTrueY = record.summary.hitY;
@@ -586,8 +569,7 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record)
     fNearestPixelGlobalId = record.nearestPixelGlobalId;
 }
 
-void RunAction::PrepareNeighborhoodStorage(std::size_t requestedCells)
-{
+void RunAction::PrepareNeighborhoodStorage(std::size_t requestedCells) {
     const std::size_t capacity = std::max<std::size_t>(1, requestedCells);
     fNeighborhoodCapacity = capacity;
     const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
@@ -623,11 +605,11 @@ void RunAction::PrepareNeighborhoodStorage(std::size_t requestedCells)
     fNeighborhoodActiveCells = 0;
 }
 
-void RunAction::PopulateNeighborhoodFromRecord(const EventRecord& record)
-{
+void RunAction::PopulateNeighborhoodFromRecord(const EventRecord& record) {
     auto copyCharges = [](const auto& src, auto& dst) {
         const std::size_t n = std::min(dst.size(), src.size());
-        if (n > 0) std::copy_n(src.begin(), n, dst.begin());
+        if (n > 0)
+            std::copy_n(src.begin(), n, dst.begin());
     };
 
     // Neighborhood-mode noisy charges
@@ -677,14 +659,12 @@ void RunAction::PopulateNeighborhoodFromRecord(const EventRecord& record)
     fNeighborhoodActiveCells = static_cast<G4int>(activeCells);
 }
 
-void RunAction::PopulateFullFractionsFromRecord(const EventRecord& record)
-{
+void RunAction::PopulateFullFractionsFromRecord(const EventRecord& record) {
     if (!fStoreFullFractions) {
         return;
     }
 
-    const G4int gridSide =
-        (record.fullGridCols > 0) ? record.fullGridCols : fGridNumBlocksPerSide;
+    const G4int gridSide = (record.fullGridCols > 0) ? record.fullGridCols : fGridNumBlocksPerSide;
     if (!EnsureFullFractionBuffer(gridSide)) {
         return;
     }
@@ -693,13 +673,12 @@ void RunAction::PopulateFullFractionsFromRecord(const EventRecord& record)
         fFullGridSide = record.fullGridCols;
     }
 
-    const auto copyOrZero = [](const std::span<const G4double>& source,
-                               std::vector<G4double>& target) {
+    const auto copyOrZero = [](const std::span<const G4double>& source, std::vector<G4double>& target) {
         if (target.empty()) {
             return;
         }
         if (source.empty()) {
-            std::fill(target.begin(), target.end(), 0.0);
+            std::ranges::fill(target, 0.0);
             return;
         }
         const std::size_t n = std::min<std::size_t>(target.size(), source.size());
@@ -737,8 +716,7 @@ void RunAction::PopulateFullFractionsFromRecord(const EventRecord& record)
     copyOrZero(record.fullPixelY, fFullPixelYGrid);
 }
 
-void RunAction::RunPostProcessingFits()
-{
+void RunAction::RunPostProcessingFits() {
     // Delegate to PostProcessingRunner helper
     IO::PostProcessingRunner::Config config;
     config.runFitGaus1D = Constants::FIT_GAUS_1D;
@@ -750,50 +728,40 @@ void RunAction::RunPostProcessingFits()
     fPostProcessingRunner.Run();
 }
 
-void RunAction::ResetSynchronization()
-{
+void RunAction::ResetSynchronization() {
     if (G4Threading::IsMultithreadedApplication()) {
         ECS::WorkerSync::Instance().Reset(G4Threading::GetNumberOfRunningWorkerThreads());
     }
 }
 
-void RunAction::SignalWorkerCompletion()
-{
+void RunAction::SignalWorkerCompletion() {
     if (G4Threading::IsMultithreadedApplication()) {
         ECS::WorkerSync::Instance().SignalCompletion();
     }
 }
 
-void RunAction::WaitForAllWorkersToComplete()
-{
+void RunAction::WaitForAllWorkersToComplete() {
     if (G4Threading::IsMultithreadedApplication()) {
         ECS::WorkerSync::Instance().WaitForAll();
     }
 }
 
-bool RunAction::SafeWriteRootFile()
-{
+bool RunAction::SafeWriteRootFile() {
     const bool isMT = G4Threading::IsMultithreadedApplication();
     const bool isWorker = G4Threading::IsWorkerThread();
     return fRootWriter->SafeWrite(isMT, isWorker);
 }
 
-bool RunAction::ValidateRootFile(const G4String& filename, bool* hasEntries)
-{
+bool RunAction::ValidateRootFile(const G4String& filename, bool* hasEntries) {
     return fRootWriter->Validate(filename, hasEntries);
 }
 
-void RunAction::CleanupRootObjects()
-{
+void RunAction::CleanupRootObjects() {
     fRootWriter->Cleanup();
 }
 
-void RunAction::SetDetectorGridParameters(G4double pixelSize,
-                                          G4double pixelSpacing,
-                                          G4double gridOffset,
-                                          G4double detSize,
-                                          G4int numBlocksPerSide)
-{
+void RunAction::SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, G4double gridOffset,
+                                          G4double detSize, G4int numBlocksPerSide) {
     fGridPixelSize = pixelSize;
     fGridPixelSpacing = pixelSpacing;
     fGridOffset = gridOffset;
@@ -803,8 +771,7 @@ void RunAction::SetDetectorGridParameters(G4double pixelSize,
     fChargeSharingPitch = pixelSpacing;
 }
 
-void RunAction::SetNeighborhoodRadiusMeta(G4int radius)
-{
+void RunAction::SetNeighborhoodRadiusMeta(G4int radius) {
     fGridNeighborhoodRadius = radius;
     fNeighborhoodLayout.SetRadius(radius);
 
@@ -825,10 +792,7 @@ void RunAction::SetNeighborhoodRadiusMeta(G4int radius)
     fNeighborhoodActiveCells = 0;
 }
 
-void RunAction::SetPosReconMetadata(Constants::PosReconModel model,
-                                         G4double betaPerMicron,
-                                         G4double pitch)
-{
+void RunAction::SetPosReconMetadata(Constants::PosReconModel model, G4double betaPerMicron, G4double pitch) {
     fPosReconModel = model;
     // Beta is only used when LinA signal model is active
     if (Constants::USES_LINEAR_SIGNAL && std::isfinite(betaPerMicron)) {
@@ -842,13 +806,11 @@ void RunAction::SetPosReconMetadata(Constants::PosReconModel model,
     }
 }
 
-void RunAction::SetChargeSharingDistanceAlphaMeta(G4bool enabled)
-{
+void RunAction::SetChargeSharingDistanceAlphaMeta(G4bool enabled) {
     fEmitDistanceAlphaMeta = enabled;
 }
 
-void RunAction::SetGridPixelCenters(const std::vector<G4ThreeVector>& centers)
-{
+void RunAction::SetGridPixelCenters(const std::vector<G4ThreeVector>& centers) {
     const std::size_t count = centers.size();
     fGridPixelID.resize(count);
     fGridPixelX.resize(count);
@@ -861,8 +823,7 @@ void RunAction::SetGridPixelCenters(const std::vector<G4ThreeVector>& centers)
     }
 }
 
-void RunAction::ConfigureFullFractionBranch(G4bool enable)
-{
+void RunAction::ConfigureFullFractionBranch(G4bool enable) {
     fStoreFullFractions = enable;
     if (!enable) {
         return;
@@ -883,24 +844,34 @@ void RunAction::ConfigureFullFractionBranch(G4bool enable)
     }
 
     // Build buffer structure for BranchConfigurator
-    IO::BranchConfigurator::FullGridBuffers buffers{
-        &fFullFi, &fFullFiRow, &fFullFiCol, &fFullFiBlock,
-        &fFullQi, &fFullQn, &fFullQf,
-        &fFullQiRow, &fFullQnRow, &fFullQfRow,
-        &fFullQiCol, &fFullQnCol, &fFullQfCol,
-        &fFullQiBlock, &fFullQnBlock, &fFullQfBlock,
-        &fFullDistance, &fFullAlpha,
-        &fFullPixelXGrid, &fFullPixelYGrid,
-        &fFullGridSide
-    };
+    IO::BranchConfigurator::FullGridBuffers const buffers{.fi = &fFullFi,
+                                                          .fiRow = &fFullFiRow,
+                                                          .fiCol = &fFullFiCol,
+                                                          .fiBlock = &fFullFiBlock,
+                                                          .qi = &fFullQi,
+                                                          .qn = &fFullQn,
+                                                          .qf = &fFullQf,
+                                                          .qiRow = &fFullQiRow,
+                                                          .qnRow = &fFullQnRow,
+                                                          .qfRow = &fFullQfRow,
+                                                          .qiCol = &fFullQiCol,
+                                                          .qnCol = &fFullQnCol,
+                                                          .qfCol = &fFullQfCol,
+                                                          .qiBlock = &fFullQiBlock,
+                                                          .qnBlock = &fFullQnBlock,
+                                                          .qfBlock = &fFullQfBlock,
+                                                          .distance = &fFullDistance,
+                                                          .alpha = &fFullAlpha,
+                                                          .pixelX = &fFullPixelXGrid,
+                                                          .pixelY = &fFullPixelYGrid,
+                                                          .gridSide = &fFullGridSide};
 
     // Delegate to BranchConfigurator
     const auto mode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
     fFullFractionsBranchInitialized = fBranchConfigurator.ConfigureFullGridBranches(tree, buffers, mode);
 }
 
-ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
-{
+ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const {
     ECS::IO::MetadataPublisher publisher;
     const auto& rtConfig = ECS::RuntimeConfig::Instance();
 
@@ -956,8 +927,7 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const
     return publisher;
 }
 
-void RunAction::WriteMetadataToTree(TTree* tree) const
-{
+void RunAction::WriteMetadataToTree(TTree* tree) const {
     if (!tree) {
         return;
     }
@@ -967,13 +937,11 @@ void RunAction::WriteMetadataToTree(TTree* tree) const
     publisher.WriteToTree(tree, &ioMutex);
 }
 
-ECS::IO::MetadataPublisher::EntryList RunAction::CollectMetadataEntries() const
-{
+ECS::IO::MetadataPublisher::EntryList RunAction::CollectMetadataEntries() const {
     return BuildMetadataPublisher().CollectEntries();
 }
 
-void RunAction::FillTree(const EventRecord& record, std::uint64_t eventNumber, G4int runNumber)
-{
+void RunAction::FillTree(const EventRecord& record, std::uint64_t eventNumber, G4int runNumber) {
     auto treeLock = MakeTreeLock();
     auto* tree = GetTree();
     if (!tree) {
@@ -986,19 +954,16 @@ void RunAction::FillTree(const EventRecord& record, std::uint64_t eventNumber, G
 
     UpdateSummaryScalars(record);
 
-    const std::size_t requestedCells =
-        record.totalGridCells > 0 ? static_cast<std::size_t>(record.totalGridCells)
-                                  : std::max<std::size_t>(1, fNeighborhoodLayout.TotalCells());
+    const std::size_t requestedCells = record.totalGridCells > 0
+                                           ? static_cast<std::size_t>(record.totalGridCells)
+                                           : std::max<std::size_t>(1, fNeighborhoodLayout.TotalCells());
 
     PrepareNeighborhoodStorage(requestedCells);
     PopulateNeighborhoodFromRecord(record);
     PopulateFullFractionsFromRecord(record);
 
     if (tree->Fill() < 0) {
-        G4Exception("RunAction::FillTree",
-                    "TreeFillFailure",
-                    FatalException,
-                    "TTree::Fill() reported an error.");
+        G4Exception("RunAction::FillTree", "TreeFillFailure", FatalException, "TTree::Fill() reported an error.");
     }
 
     // Write to EDM4hep output if enabled
@@ -1007,8 +972,7 @@ void RunAction::FillTree(const EventRecord& record, std::uint64_t eventNumber, G
     }
 }
 
-void RunAction::SetEDM4hepEnabled(G4bool enabled)
-{
+void RunAction::SetEDM4hepEnabled(G4bool enabled) {
     fWriteEDM4hep = enabled;
     if (fEDM4hepWriter) {
         fEDM4hepConfig.enabled = enabled;
@@ -1016,7 +980,6 @@ void RunAction::SetEDM4hepEnabled(G4bool enabled)
     }
 }
 
-G4bool RunAction::IsEDM4hepEnabled() const
-{
+G4bool RunAction::IsEDM4hepEnabled() const {
     return fWriteEDM4hep && fEDM4hepWriter && fEDM4hepWriter->IsEnabled();
 }

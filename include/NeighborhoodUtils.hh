@@ -15,7 +15,7 @@ namespace ECS {
 
 /// \brief Compute side length from neighborhood radius.
 inline std::size_t SideLengthFromRadius(int radius) {
-    return static_cast<std::size_t>(2 * std::max(0, radius) + 1);
+    return static_cast<std::size_t>((2 * std::max(0, radius)) + 1);
 }
 
 /// \brief Compute total cells from neighborhood radius.
@@ -66,12 +66,12 @@ inline void Fill(std::vector<T>& vec, Value&& value) {
 
 // Backward compatibility aliases
 namespace ECS::Internal {
-    using Layout = ECS::NeighborhoodLayout;
-    using ECS::SideLengthFromRadius;
-    using ECS::TotalCellsFromRadius;
-    using ECS::ResizeAndFill;
-    using ECS::Fill;
-}
+using Layout = ECS::NeighborhoodLayout;
+using ECS::Fill;
+using ECS::ResizeAndFill;
+using ECS::SideLengthFromRadius;
+using ECS::TotalCellsFromRadius;
+} // namespace ECS::Internal
 namespace neighbor = ECS::Internal;
 
 #endif // ECS_NEIGHBORHOOD_UTILS_HH

@@ -27,11 +27,11 @@
 
 #ifdef WITH_EDM4HEP
 
-#include <podio/ROOTWriter.h>
-#include <podio/Frame.h>
-#include <edm4hep/SimTrackerHitCollection.h>
-#include <edm4hep/MCParticleCollection.h>
 #include <edm4hep/EventHeaderCollection.h>
+#include <edm4hep/MCParticleCollection.h>
+#include <edm4hep/SimTrackerHitCollection.h>
+#include <podio/Frame.h>
+#include <podio/ROOTWriter.h>
 
 namespace ECS::IO {
 
@@ -53,9 +53,7 @@ struct EDM4hepConfig {
     /// Different detectors use different field layouts, e.g.:
     ///   B0:   {system, layer, module, sensor}
     ///   Lumi: {system, sector, module}
-    std::vector<std::pair<std::string, int>> geoFields{
-        {"system", 0}, {"layer", 0}, {"module", 0}, {"sensor", 0}
-    };
+    std::vector<std::pair<std::string, int>> geoFields{{"system", 0}, {"layer", 0}, {"module", 0}, {"sensor", 0}};
 
     bool writeMetadata{true};
     bool enabled{true};
@@ -158,18 +156,14 @@ private:
     std::uint64_t EncodeCellID(int pixelI, int pixelJ) const;
 
     /// \brief Create SimTrackerHit from EventRecord.
-    void FillSimTrackerHit(edm4hep::SimTrackerHitCollection& hits,
-                           const edm4hep::MCParticle& particle,
+    void FillSimTrackerHit(edm4hep::SimTrackerHitCollection& hits, const edm4hep::MCParticle& particle,
                            const EventRecord& record);
 
     /// \brief Create MCParticle for the primary.
-    edm4hep::MutableMCParticle FillMCParticle(edm4hep::MCParticleCollection& particles,
-                                               const EventRecord& record);
+    edm4hep::MutableMCParticle FillMCParticle(edm4hep::MCParticleCollection& particles, const EventRecord& record);
 
     /// \brief Create EventHeader.
-    void FillEventHeader(edm4hep::EventHeaderCollection& headers,
-                         std::uint64_t eventNumber,
-                         int runNumber);
+    void FillEventHeader(edm4hep::EventHeaderCollection& headers, std::uint64_t eventNumber, int runNumber);
 
     std::unique_ptr<podio::ROOTWriter> m_writer;
     EDM4hepConfig m_config;
@@ -197,11 +191,9 @@ struct EDM4hepConfig {
     std::string cellIDEncoding{"system:8,layer:4,module:12,sensor:2,x:32:-16,y:-16"};
     std::string pixelFieldX{"x"};
     std::string pixelFieldY{"y"};
-    std::vector<std::pair<std::string, int>> geoFields{
-        {"system", 0}, {"layer", 0}, {"module", 0}, {"sensor", 0}
-    };
+    std::vector<std::pair<std::string, int>> geoFields{{"system", 0}, {"layer", 0}, {"module", 0}, {"sensor", 0}};
     bool writeMetadata{true};
-    bool enabled{false};  // Disabled by default when not compiled
+    bool enabled{false}; // Disabled by default when not compiled
 
     static EDM4hepConfig B0Tracker(int layer = 1) {
         EDM4hepConfig cfg;
@@ -231,13 +223,13 @@ public:
 
     void Configure(const EDM4hepConfig&) {}
     [[nodiscard]] const EDM4hepConfig& GetConfig() const { return m_config; }
-    bool Open(const std::string&) { return false; }
-    bool WriteEvent(const EventRecord&, std::uint64_t, int) { return false; }
+    static bool Open(const std::string&) { return false; }
+    static bool WriteEvent(const EventRecord&, std::uint64_t, int) { return false; }
     void WriteRunMetadata(const MetadataPublisher&) {}
     void Close() {}
-    [[nodiscard]] bool IsOpen() const { return false; }
-    [[nodiscard]] bool IsEnabled() const { return false; }
-    [[nodiscard]] std::uint64_t EventsWritten() const { return 0; }
+    [[nodiscard]] static bool IsOpen() { return false; }
+    [[nodiscard]] static bool IsEnabled() { return false; }
+    [[nodiscard]] static std::uint64_t EventsWritten() { return 0; }
 
 private:
     EDM4hepConfig m_config;

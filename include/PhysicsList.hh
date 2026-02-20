@@ -22,8 +22,7 @@ namespace ECS {
 ///
 /// This physics list is optimized for silicon detector response
 /// studies with high-energy charged particles.
-class PhysicsList : public G4VModularPhysicsList
-{
+class PhysicsList : public G4VModularPhysicsList {
 public:
     /// \brief Construct and register physics modules.
     PhysicsList();

@@ -3,30 +3,25 @@
  * @brief Wires together user actions: primary generator, run/event/stepping actions.
  */
 #include "ActionInitialization.hh"
+#include "DetectorConstruction.hh"
+#include "EventAction.hh"
 #include "PrimaryGenerator.hh"
 #include "RunAction.hh"
-#include "EventAction.hh"
 #include "SteppingAction.hh"
-#include "DetectorConstruction.hh"
 
-ActionInitialization::ActionInitialization(DetectorConstruction* detector)
-: fDetector(detector)
-{
-}
+ActionInitialization::ActionInitialization(DetectorConstruction* detector) : fDetector(detector) {}
 
-void ActionInitialization::BuildForMaster() const
-{
+void ActionInitialization::BuildForMaster() const {
     SetUserAction(CreateRunAction());
 }
 
-void ActionInitialization::Build() const
-{
+void ActionInitialization::Build() const {
     SetUserAction(new PrimaryGenerator(fDetector));
 
     RunAction* runAction = CreateRunAction();
     SetUserAction(runAction);
 
-    EventAction* eventAction = new EventAction(runAction, fDetector);
+    auto* eventAction = new EventAction(runAction, fDetector);
     SetUserAction(eventAction);
 
     if (fDetector) {
@@ -34,26 +29,22 @@ void ActionInitialization::Build() const
         eventAction->SetNeighborhoodRadius(fDetector->GetNeighborhoodRadius());
     }
 
-    SteppingAction* steppingAction = new SteppingAction(eventAction);
+    auto* steppingAction = new SteppingAction(eventAction);
     SetUserAction(steppingAction);
 
     eventAction->SetSteppingAction(steppingAction);
 }
 
-RunAction* ActionInitialization::CreateRunAction() const
-{
-    RunAction* runAction = new RunAction();
+RunAction* ActionInitialization::CreateRunAction() const {
+    auto* runAction = new RunAction();
     if (!fDetector) {
         return runAction;
     }
 
     fDetector->SetRunAction(runAction);
-    runAction->SetDetectorGridParameters(
-        fDetector->GetPixelSize(),
-        fDetector->GetPixelSpacing(),
-        fDetector->GetGridOffset(),
-        fDetector->GetDetSize(),
-        fDetector->GetNumBlocksPerSide());
+    runAction->SetDetectorGridParameters(fDetector->GetPixelSize(), fDetector->GetPixelSpacing(),
+                                         fDetector->GetGridOffset(), fDetector->GetDetSize(),
+                                         fDetector->GetNumBlocksPerSide());
     runAction->SetNeighborhoodRadiusMeta(fDetector->GetNeighborhoodRadius());
     return runAction;
 }

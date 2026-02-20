@@ -51,15 +51,15 @@ inline TBranch* EnsureAndResetBranch(TTree* tree, const BranchInfo& info) {
     TBranch* branch = tree->GetBranch(info.name);
     if (!branch) {
         // Branch doesn't exist - create it
-        branch = info.leaflist ? tree->Branch(info.name, info.value, info.leaflist)
-                               : tree->Branch(info.name, info.value);
+        branch =
+            info.leaflist ? tree->Branch(info.name, info.value, info.leaflist) : tree->Branch(info.name, info.value);
     } else {
         // Branch exists - set address and clear for overwrite
         tree->SetBranchAddress(info.name, info.value);
         branch = tree->GetBranch(info.name);
         if (branch) {
-            branch->Reset();        // Clear previous entries
-            branch->DropBaskets();  // Drop old baskets to avoid mixing
+            branch->Reset();       // Clear previous entries
+            branch->DropBaskets(); // Drop old baskets to avoid mixing
         }
     }
     tree->SetBranchStatus(info.name, true);
@@ -67,7 +67,8 @@ inline TBranch* EnsureAndResetBranch(TTree* tree, const BranchInfo& info) {
 }
 
 inline void RegisterBranches(TTree* tree, std::vector<BranchInfo>& branches) {
-    if (!tree) return;
+    if (!tree)
+        return;
     for (auto& info : branches) {
         if (info.enabled && info.handle) {
             *info.handle = EnsureAndResetBranch(tree, info);
@@ -106,10 +107,9 @@ public:
     [[nodiscard]] TTree* Tree() const;
 
     bool SafeWrite(bool isMultithreaded, bool isWorker);
-    bool Validate(const G4String& filename, bool* hasEntries);
+    static bool Validate(const G4String& filename, bool* hasEntries);
     void Cleanup();
-    void WriteMetadataSingleThread(G4double pixelSize, G4double pixelSpacing,
-                                   G4double gridOffset, G4double detSize,
+    void WriteMetadataSingleThread(G4double pixelSize, G4double pixelSpacing, G4double gridOffset, G4double detSize,
                                    G4int numBlocksPerSide, G4int neighborhoodRadius);
 
 private:

@@ -25,9 +25,9 @@ class EventAction;
 ///
 /// Identifies which volume type the particle first contacted.
 enum class FirstContactType {
-    None,    ///< No contact recorded yet
-    Pixel,   ///< First contact was pixel aluminum (logicBlock)
-    Silicon  ///< First contact was silicon bulk (logicCube)
+    None,   ///< No contact recorded yet
+    Pixel,  ///< First contact was pixel aluminum (logicBlock)
+    Silicon ///< First contact was silicon bulk (logicCube)
 };
 
 /// \brief Step-level tracking action.
@@ -42,8 +42,7 @@ enum class FirstContactType {
 /// \note Uses cached G4LogicalVolume pointers for fast volume identification
 /// instead of string comparison. This follows Geant4 performance best practices
 /// as documented in the official B1 example and CERN TWiki performance tips.
-class SteppingAction : public G4UserSteppingAction
-{
+class SteppingAction : public G4UserSteppingAction {
 public:
     /// \brief Construct with event action reference.
     /// \param eventAction Pointer to event action for registering contacts
@@ -85,12 +84,12 @@ private:
 
     EventAction* fEventAction;
     FirstContactType fFirstContactType = FirstContactType::None;
-    G4double fPathLengthInSensitive{0.0};  ///< Accumulated path in sensitive volume
+    G4double fPathLengthInSensitive{0.0}; ///< Accumulated path in sensitive volume
 
     // Cached volume pointers for fast comparison (initialized lazily)
-    const G4LogicalVolume* fLogicBlock = nullptr;   ///< Pixel aluminum volume
-    const G4LogicalVolume* fLogicCube = nullptr;    ///< Silicon bulk volume
-    G4bool fVolumesCached = false;                  ///< Whether volumes have been cached
+    const G4LogicalVolume* fLogicBlock = nullptr; ///< Pixel aluminum volume
+    const G4LogicalVolume* fLogicCube = nullptr;  ///< Silicon bulk volume
+    G4bool fVolumesCached = false;                ///< Whether volumes have been cached
 };
 
 } // namespace ECS

@@ -29,28 +29,27 @@ static bool approxEqual(double a, double b, double tol = 1e-6) {
 }
 
 /// Run a single named test.  Prints PASS / FAIL and updates counters.
-#define RUN_TEST(func)                                                    \
-    do {                                                                  \
-        ++g_testCount;                                                    \
-        try {                                                             \
-            func();                                                       \
-            ++g_passCount;                                                \
-            std::cout << "  PASS  " << #func << "\n";                     \
-        } catch (const std::exception& e) {                               \
-            std::cerr << "  FAIL  " << #func << " : " << e.what() << "\n";\
-        } catch (...) {                                                   \
-            std::cerr << "  FAIL  " << #func << " : unknown exception\n"; \
-        }                                                                 \
+#define RUN_TEST(func)                                                                                                 \
+    do {                                                                                                               \
+        ++g_testCount;                                                                                                 \
+        try {                                                                                                          \
+            func();                                                                                                    \
+            ++g_passCount;                                                                                             \
+            std::cout << "  PASS  " << #func << "\n";                                                                  \
+        } catch (const std::exception& e) {                                                                            \
+            std::cerr << "  FAIL  " << #func << " : " << e.what() << "\n";                                             \
+        } catch (...) {                                                                                                \
+            std::cerr << "  FAIL  " << #func << " : unknown exception\n";                                              \
+        }                                                                                                              \
     } while (false)
 
 /// Assertion that throws on failure (so RUN_TEST can catch it).
-#define TEST_ASSERT(cond)                                                 \
-    do {                                                                  \
-        if (!(cond)) {                                                    \
-            throw std::runtime_error(                                     \
-                std::string("Assertion failed: ") + #cond +               \
-                " (" + __FILE__ + ":" + std::to_string(__LINE__) + ")");  \
-        }                                                                 \
+#define TEST_ASSERT(cond)                                                                                              \
+    do {                                                                                                               \
+        if (!(cond)) {                                                                                                 \
+            throw std::runtime_error(std::string("Assertion failed: ") + #cond + " (" + __FILE__ + ":" +               \
+                                     std::to_string(__LINE__) + ")");                                                  \
+        }                                                                                                              \
     } while (false)
 
 // ===========================================================================
@@ -99,7 +98,7 @@ void test_padViewAngle_decreasesWithDistance() {
 void test_padViewAngle_approachesZeroAtLargeDistance() {
     double angle = core::calcPadViewAngle(1000.0, 0.15, 0.15);
     TEST_ASSERT(angle > 0.0);
-    TEST_ASSERT(angle < 0.001);  // Very small angle at large distance
+    TEST_ASSERT(angle < 0.001); // Very small angle at large distance
 }
 
 void test_padViewAngle_symmetricInWidthHeight() {
@@ -121,7 +120,7 @@ void test_padViewAngle_positiveForPositiveInputs() {
 
 void test_weightLogA_decreasesWithDistance() {
     const double padW = 0.15, padH = 0.15;
-    const double d0 = 0.001;  // 1 um in mm
+    const double d0 = 0.001; // 1 um in mm
     double prevW = std::numeric_limits<double>::max();
     for (double d = 0.01; d <= 3.0; d += 0.05) {
         double alpha = core::calcPadViewAngle(d, padW, padH);
@@ -153,7 +152,7 @@ void test_weightLogA_largeDistanceSmallWeight() {
     double alpha = core::calcPadViewAngle(100.0, 0.15, 0.15);
     double w = core::calcWeightLogA(100.0, alpha, 0.001);
     TEST_ASSERT(w >= 0.0);
-    TEST_ASSERT(w < 0.01);  // Should be very small
+    TEST_ASSERT(w < 0.01); // Should be very small
 }
 
 // ===========================================================================
@@ -168,7 +167,7 @@ void test_weightLinA_decreasesWithDistance() {
         double alpha = core::calcPadViewAngle(d, padW, padH);
         double w = core::calcWeightLinA(d, alpha, beta);
         TEST_ASSERT(w >= 0.0);
-        TEST_ASSERT(w <= prevW + 1e-12);  // Allow tiny float tolerance
+        TEST_ASSERT(w <= prevW + 1e-12); // Allow tiny float tolerance
         prevW = w;
     }
 }
@@ -216,8 +215,7 @@ void test_calcWeight_linA_matchesDirect() {
     const double beta = core::constants::kLinearBetaNarrow;
     double alpha = core::calcPadViewAngle(d, padW, padH);
     double wDirect = core::calcWeightLinA(d, alpha, beta);
-    double wDispatch = core::calcWeight(core::SignalModel::LinA, d, padW, padH,
-                                        0.001, beta);
+    double wDispatch = core::calcWeight(core::SignalModel::LinA, d, padW, padH, 0.001, beta);
     TEST_ASSERT(approxEqual(wDirect, wDispatch));
 }
 
@@ -251,11 +249,11 @@ void test_neighborhood_fractionsSumToOne_logA() {
     core::NeighborhoodConfig cfg;
     cfg.signalModel = core::SignalModel::LogA;
     cfg.activeMode = core::ActivePixelMode::Neighborhood;
-    cfg.radius = 2;  // 5x5
+    cfg.radius = 2; // 5x5
     cfg.pixelSizeMM = 0.15;
     cfg.pixelSpacingMM = 0.5;
     cfg.d0Micron = 1.0;
-    cfg.numPixelsX = 0;  // unbounded
+    cfg.numPixelsX = 0; // unbounded
     cfg.numPixelsY = 0;
 
     // Hit exactly at center pixel
@@ -283,7 +281,7 @@ void test_neighborhood_fractionsSumToOne_linA() {
     cfg.numPixelsX = 0;
     cfg.numPixelsY = 0;
 
-    double hitX = 0.1, hitY = -0.05;  // Offset from center
+    double hitX = 0.1, hitY = -0.05; // Offset from center
     auto result = core::calculateNeighborhood(hitX, hitY, 5, 5, 0.0, 0.0, cfg);
 
     double fracSum = 0.0;
@@ -321,7 +319,7 @@ void test_neighborhood_centerPixelHighestFraction() {
 void test_neighborhood_gridSize() {
     core::NeighborhoodConfig cfg;
     cfg.signalModel = core::SignalModel::LogA;
-    cfg.radius = 3;  // 7x7
+    cfg.radius = 3; // 7x7
     cfg.pixelSizeMM = 0.15;
     cfg.pixelSpacingMM = 0.5;
     cfg.d0Micron = 1.0;
@@ -365,8 +363,10 @@ void test_neighborhood_boundsCheckClipsPixels() {
     int outOfBounds = 0;
     int inBounds = 0;
     for (const auto& p : result.pixels) {
-        if (p.inBounds) ++inBounds;
-        else ++outOfBounds;
+        if (p.inBounds)
+            ++inBounds;
+        else
+            ++outOfBounds;
     }
     // 5x5 grid = 25 total, 3x3 in-bounds = 9
     TEST_ASSERT(inBounds == 9);
@@ -375,7 +375,8 @@ void test_neighborhood_boundsCheckClipsPixels() {
     // Fractions should still sum to 1 for in-bounds pixels
     double fracSum = 0.0;
     for (const auto& p : result.pixels) {
-        if (p.inBounds) fracSum += p.fraction;
+        if (p.inBounds)
+            fracSum += p.fraction;
     }
     TEST_ASSERT(approxEqual(fracSum, 1.0, 1e-9));
 }
@@ -387,9 +388,9 @@ void test_neighborhood_symmetry() {
     cfg.activeMode = core::ActivePixelMode::Neighborhood;
     cfg.radius = 2;
     cfg.pixelSizeMM = 0.15;
-    cfg.pixelSizeYMM = 0.15;    // same as X for square pixels
+    cfg.pixelSizeYMM = 0.15; // same as X for square pixels
     cfg.pixelSpacingMM = 0.5;
-    cfg.pixelSpacingYMM = 0.5;  // same as X for square spacing
+    cfg.pixelSpacingYMM = 0.5; // same as X for square spacing
     cfg.d0Micron = 1.0;
 
     auto result = core::calculateNeighborhood(0.0, 0.0, 5, 5, 0.0, 0.0, cfg);
@@ -551,7 +552,7 @@ void test_noiseModel_enabledChangesValue() {
             ++changed;
         }
     }
-    TEST_ASSERT(changed > 50);  // Overwhelmingly likely
+    TEST_ASSERT(changed > 50); // Overwhelmingly likely
 }
 
 void test_noiseModel_outputNonNegative() {
@@ -631,7 +632,7 @@ void test_noiseModel_seedReproducibility() {
     noise2.setConfig(ncfg);
     double r2 = noise2.applyNoise(1e-15);
 
-    TEST_ASSERT(approxEqual(r1, r2, 1e-30));  // Should be bit-identical
+    TEST_ASSERT(approxEqual(r1, r2, 1e-30)); // Should be bit-identical
 }
 
 // ===========================================================================
@@ -665,7 +666,7 @@ void test_utility_clamp() {
 void test_edge_zeroRadius() {
     core::NeighborhoodConfig cfg;
     cfg.signalModel = core::SignalModel::LogA;
-    cfg.radius = 0;  // 1x1 neighborhood = center pixel only
+    cfg.radius = 0; // 1x1 neighborhood = center pixel only
     cfg.pixelSizeMM = 0.15;
     cfg.pixelSpacingMM = 0.5;
     cfg.d0Micron = 1.0;
@@ -814,8 +815,7 @@ int main() {
     std::cout << "\n[Constants]\n";
     RUN_TEST(test_constants_values);
 
-    std::cout << "\n=== Results: " << g_passCount << " / " << g_testCount
-              << " passed ===\n";
+    std::cout << "\n=== Results: " << g_passCount << " / " << g_testCount << " passed ===\n";
 
     if (g_passCount == g_testCount) {
         std::cout << "All tests passed.\n";

@@ -9,9 +9,9 @@
 #ifndef ECS_RUNTIME_CONFIG_HH
 #define ECS_RUNTIME_CONFIG_HH
 
+#include "Config.hh" // For compile-time defaults
 #include "G4SystemOfUnits.hh"
 #include "globals.hh"
-#include "Config.hh"  // For compile-time defaults
 
 #include <memory>
 

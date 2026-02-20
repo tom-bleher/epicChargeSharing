@@ -5,8 +5,8 @@
 #include "PrimaryGenerator.hh"
 
 #include "Config.hh"
-#include "RuntimeConfig.hh"
 #include "DetectorConstruction.hh"
+#include "RuntimeConfig.hh"
 
 #include "G4Event.hh"
 #include "G4Exception.hh"
@@ -21,27 +21,21 @@
 #include <mutex>
 #include <sstream>
 
-namespace
-{
+namespace {
 constexpr G4double kDefaultParticleEnergy = 10.0 * GeV;
 const G4ThreeVector kDefaultMomentumDirection(0.0, 0.0, -1.0);
 
-G4ParticleDefinition* ResolveDefaultParticle()
-{
+G4ParticleDefinition* ResolveDefaultParticle() {
     G4ParticleTable* const particleTable = G4ParticleTable::GetParticleTable();
     if (!particleTable) {
-        G4Exception("PrimaryGenerator::ResolveDefaultParticle",
-                    "MissingParticleTable",
-                    FatalException,
+        G4Exception("PrimaryGenerator::ResolveDefaultParticle", "MissingParticleTable", FatalException,
                     "Particle table is not available.");
         return nullptr;
     }
 
     G4ParticleDefinition* particle = particleTable->FindParticle("e-");
     if (!particle) {
-        G4Exception("PrimaryGenerator::ResolveDefaultParticle",
-                    "MissingParticle",
-                    FatalException,
+        G4Exception("PrimaryGenerator::ResolveDefaultParticle", "MissingParticle", FatalException,
                     "Failed to find default particle 'e-'.");
     }
     return particle;
@@ -49,41 +43,34 @@ G4ParticleDefinition* ResolveDefaultParticle()
 } // namespace
 
 PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
-    : fParticleGun(std::make_unique<G4ParticleGun>(1)),
-      fDetector(detector),
-      fFixedX(-150.0 * um)
-{
+    : fParticleGun(std::make_unique<G4ParticleGun>(1)), fDetector(detector),
+      fUseFixedPosition(ECS::RuntimeConfig::Instance().useFixedPosition), fFixedX(-150.0 * um) {
     // Override from runtime config
-    fUseFixedPosition = ECS::RuntimeConfig::Instance().useFixedPosition;
 
     ConfigureParticleGun();
     ConfigureMessenger();
 
     if (fDetector) {
-        fFixedY = 0.0;  // Center of pad row (red line), not gap row
+        fFixedY = 0.0; // Center of pad row (red line), not gap row
     }
 
     const auto& window = EnsureSamplingWindow();
     if (fDetector) {
-        G4cout << "[PrimaryGenerator] Default fixed XY position (" << fFixedX / mm << ", "
-               << fFixedY / mm << ") mm; random sampling confined to +/-" << window.halfExtent / mm
-               << " mm" << G4endl;
+        G4cout << "[PrimaryGenerator] Default fixed XY position (" << fFixedX / mm << ", " << fFixedY / mm
+               << ") mm; random sampling confined to +/-" << window.halfExtent / mm << " mm" << G4endl;
     } else {
-        G4cout << "[PrimaryGenerator] No detector available; primaries generated at origin"
-               << G4endl;
+        G4cout << "[PrimaryGenerator] No detector available; primaries generated at origin" << G4endl;
     }
 
     GenerateRandomPos();
 }
 
-void PrimaryGenerator::GeneratePrimaries(G4Event* event)
-{
+void PrimaryGenerator::GeneratePrimaries(G4Event* event) {
     GenerateRandomPos();
     fParticleGun->GeneratePrimaryVertex(event);
 }
 
-void PrimaryGenerator::ConfigureParticleGun()
-{
+void PrimaryGenerator::ConfigureParticleGun() {
     G4ParticleDefinition* const particle = ResolveDefaultParticle();
 
     if (particle) {
@@ -94,46 +81,33 @@ void PrimaryGenerator::ConfigureParticleGun()
     fParticleGun->SetParticleMomentumDirection(kDefaultMomentumDirection);
 
     if (particle) {
-        G4cout << "[PrimaryGenerator] Default particle " << particle->GetParticleName()
-               << " at " << kDefaultParticleEnergy / GeV << " GeV, direction ("
-               << kDefaultMomentumDirection.x() << ", " << kDefaultMomentumDirection.y()
-               << ", " << kDefaultMomentumDirection.z() << ")" << G4endl;
+        G4cout << "[PrimaryGenerator] Default particle " << particle->GetParticleName() << " at "
+               << kDefaultParticleEnergy / GeV << " GeV, direction (" << kDefaultMomentumDirection.x() << ", "
+               << kDefaultMomentumDirection.y() << ", " << kDefaultMomentumDirection.z() << ")" << G4endl;
     }
 }
 
-void PrimaryGenerator::ConfigureMessenger()
-{
-    fMessenger = std::make_unique<G4GenericMessenger>(
-        this,
-        "/epic/gun/",
-        "Primary generator configuration");
+void PrimaryGenerator::ConfigureMessenger() {
+    fMessenger = std::make_unique<G4GenericMessenger>(this, "/epic/gun/", "Primary generator configuration");
 
-    auto& useFixedCmd = fMessenger->DeclareProperty(
-        "useFixedPosition",
-        fUseFixedPosition,
-        "Use fixed XY position instead of random sampling within the pixel-safety margin.");
+    auto& useFixedCmd =
+        fMessenger->DeclareProperty("useFixedPosition", fUseFixedPosition,
+                                    "Use fixed XY position instead of random sampling within the pixel-safety margin.");
     useFixedCmd.SetStates(G4State_PreInit, G4State_Idle);
     useFixedCmd.SetToBeBroadcasted(true);
 
     auto& fixedXCmd = fMessenger->DeclarePropertyWithUnit(
-        "fixedX",
-        "mm",
-        fFixedX,
-        "Fixed X coordinate for primaries when useFixedPosition is true.");
+        "fixedX", "mm", fFixedX, "Fixed X coordinate for primaries when useFixedPosition is true.");
     fixedXCmd.SetStates(G4State_PreInit, G4State_Idle);
     fixedXCmd.SetToBeBroadcasted(true);
 
     auto& fixedYCmd = fMessenger->DeclarePropertyWithUnit(
-        "fixedY",
-        "mm",
-        fFixedY,
-        "Fixed Y coordinate for primaries when useFixedPosition is true.");
+        "fixedY", "mm", fFixedY, "Fixed Y coordinate for primaries when useFixedPosition is true.");
     fixedYCmd.SetStates(G4State_PreInit, G4State_Idle);
     fixedYCmd.SetToBeBroadcasted(true);
 }
 
-G4double PrimaryGenerator::CalculateSafeMargin() const
-{
+G4double PrimaryGenerator::CalculateSafeMargin() const {
     if (!fDetector) {
         return 0.0;
     }
@@ -141,22 +115,18 @@ G4double PrimaryGenerator::CalculateSafeMargin() const
     const G4int radius = fDetector->GetNeighborhoodRadius();
     // For DD4hep-style centered grid, margin is based on neighborhood radius
     // to ensure all neighbor pixels stay within detector bounds
-    const G4double margin = (0.5 * fDetector->GetPixelSize()) +
-                            (radius * fDetector->GetPixelSpacing());
+    const G4double margin = (0.5 * fDetector->GetPixelSize()) + (radius * fDetector->GetPixelSpacing());
 
     const G4double detHalfSize = fDetector->GetDetSize() / 2.0;
     if (margin >= detHalfSize) {
-        G4Exception("PrimaryGenerator::CalculateSafeMargin",
-                    "MarginTooLarge",
-                    FatalException,
+        G4Exception("PrimaryGenerator::CalculateSafeMargin", "MarginTooLarge", FatalException,
                     "Neighborhood radius larger than detector allows.");
     }
 
     return margin;
 }
 
-void PrimaryGenerator::RecalculateSamplingWindow() const
-{
+void PrimaryGenerator::RecalculateSamplingWindow() const {
     SamplingWindow window{};
     if (fDetector) {
         const G4double margin = CalculateSafeMargin();
@@ -168,24 +138,21 @@ void PrimaryGenerator::RecalculateSamplingWindow() const
     fSamplingWindowValid = true;
 }
 
-const PrimaryGenerator::SamplingWindow& PrimaryGenerator::EnsureSamplingWindow() const
-{
+const PrimaryGenerator::SamplingWindow& PrimaryGenerator::EnsureSamplingWindow() const {
     if (!fSamplingWindowValid) {
         RecalculateSamplingWindow();
     }
     return fSamplingWindow;
 }
 
-G4double PrimaryGenerator::ClampToWindow(G4double value, const SamplingWindow& window) const
-{
+G4double PrimaryGenerator::ClampToWindow(G4double value, const SamplingWindow& window) {
     if (window.halfExtent <= 0.0) {
         return 0.0;
     }
     return std::clamp(value, -window.halfExtent, window.halfExtent);
 }
 
-G4ThreeVector PrimaryGenerator::MakeFixedPosition(const SamplingWindow& window) const
-{
+G4ThreeVector PrimaryGenerator::MakeFixedPosition(const SamplingWindow& window) const {
     const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
     if (window.halfExtent <= 0.0) {
         return {0.0, 0.0, z};
@@ -197,11 +164,8 @@ G4ThreeVector PrimaryGenerator::MakeFixedPosition(const SamplingWindow& window) 
     if (targetX != fFixedX || targetY != fFixedY) {
         std::call_once(fFixedPositionWarningFlag, [&]() {
             std::ostringstream oss;
-            oss << "Fixed primary position outside safe margin. Clamping to +/-"
-                << window.halfExtent / mm << " mm.";
-            G4Exception("PrimaryGenerator::MakeFixedPosition",
-                        "FixedPositionOutOfBounds",
-                        JustWarning,
+            oss << "Fixed primary position outside safe margin. Clamping to +/-" << window.halfExtent / mm << " mm.";
+            G4Exception("PrimaryGenerator::MakeFixedPosition", "FixedPositionOutOfBounds", JustWarning,
                         oss.str().c_str());
         });
     }
@@ -209,8 +173,7 @@ G4ThreeVector PrimaryGenerator::MakeFixedPosition(const SamplingWindow& window) 
     return {targetX, targetY, z};
 }
 
-G4ThreeVector PrimaryGenerator::MakeRandomPosition(const SamplingWindow& window) const
-{
+G4ThreeVector PrimaryGenerator::MakeRandomPosition(const SamplingWindow& window) {
     const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
     if (window.halfExtent <= 0.0) {
         return {0.0, 0.0, z};
@@ -223,8 +186,7 @@ G4ThreeVector PrimaryGenerator::MakeRandomPosition(const SamplingWindow& window)
     return {randomX, randomY, z};
 }
 
-G4ThreeVector PrimaryGenerator::SamplePrimaryVertex() const
-{
+G4ThreeVector PrimaryGenerator::SamplePrimaryVertex() const {
     const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
 
     if (!fDetector) {
@@ -235,14 +197,11 @@ G4ThreeVector PrimaryGenerator::SamplePrimaryVertex() const
     return fUseFixedPosition ? MakeFixedPosition(window) : MakeRandomPosition(window);
 }
 
-void PrimaryGenerator::ApplyParticlePosition(const G4ThreeVector& position)
-{
+void PrimaryGenerator::ApplyParticlePosition(const G4ThreeVector& position) {
     fParticleGun->SetParticlePosition(position);
 }
 
-void PrimaryGenerator::GenerateRandomPos()
-{
+void PrimaryGenerator::GenerateRandomPos() {
     fSamplingWindowValid = false;
     ApplyParticlePosition(SamplePrimaryVertex());
 }
-

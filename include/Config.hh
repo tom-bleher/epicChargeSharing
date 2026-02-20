@@ -25,27 +25,27 @@ enum class Mode { LogA, LinA };
 inline constexpr Mode ACTIVE_MODE = Mode::LogA;
 
 // ───────────────────────────── Detector Geometry ────────────────────────────
-inline const G4double DETECTOR_SIZE        = 30.0 * mm;    // Sensor side length
-inline const G4double DETECTOR_WIDTH       = 0.05 * mm;    // Silicon thickness
-inline const G4double PIXEL_SIZE           = 0.15 * mm;    // Pixel pad size
-inline const G4double PIXEL_PITCH          = 0.5  * mm;    // Pixel spacing (pitch)
-inline constexpr G4int NEIGHBORHOOD_RADIUS = 2;            // Charge sharing radius
-inline const G4double PIXEL_THICKNESS      = 0.02 * mm;    // Pixel depth/thickness
+inline const G4double DETECTOR_SIZE = 30.0 * mm;   // Sensor side length
+inline const G4double DETECTOR_WIDTH = 0.05 * mm;  // Silicon thickness
+inline const G4double PIXEL_SIZE = 0.15 * mm;      // Pixel pad size
+inline const G4double PIXEL_PITCH = 0.5 * mm;      // Pixel spacing (pitch)
+inline constexpr G4int NEIGHBORHOOD_RADIUS = 2;    // Charge sharing radius
+inline const G4double PIXEL_THICKNESS = 0.02 * mm; // Pixel depth/thickness
 
 // DD4hep-style grid offset: position = index * pitch + offset
 // Set to 0.0 for centered grid (indices can be negative), or non-zero to shift grid origin
-inline const G4double GRID_OFFSET          = 0.0  * mm;    // Grid origin offset
+inline const G4double GRID_OFFSET = 0.0 * mm; // Grid origin offset
 
 // ─────────────────────────────── Physics ────────────────────────────────────
-inline constexpr G4double IONIZATION_ENERGY = 3.6;         // eV per e-h pair (silicon at room temperature)
-inline constexpr G4double GAIN              = 20.0;        // AC-LGAD gain factor; typical range 8-25
-inline constexpr G4double D0                = 1.0;         // LogA reference distance d0 (um); controls charge spread width
+inline constexpr G4double IONIZATION_ENERGY = 3.6; // eV per e-h pair (silicon at room temperature)
+inline constexpr G4double GAIN = 20.0;             // AC-LGAD gain factor; typical range 8-25
+inline constexpr G4double D0 = 1.0;                // LogA reference distance d0 (um); controls charge spread width
 
 // ────────────────────────────── Noise Model ─────────────────────────────────
 // Gain sigma bounds: typical AC-LGAD per-pixel gain variation range from lab measurements
-inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010;    // Min gain noise (1%)
-inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050;    // Max gain noise (5%)
-inline constexpr G4double NOISE_ELECTRON_COUNT = 500.0;    // Electronic noise (e-)
+inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010; // Min gain noise (1%)
+inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050; // Max gain noise (5%)
+inline constexpr G4double NOISE_ELECTRON_COUNT = 500.0; // Electronic noise (e-)
 
 // ───────────────────────────── Linear Model ─────────────────────────────────
 // LinA attenuation coefficient beta in 1/um (paper Eq. (\ref{eq:LA})).
@@ -86,58 +86,58 @@ inline constexpr G4bool FIT_GAUS_2D = false;
 
 // ─────────────────────────── Fit Uncertainty Model ───────────────────────────
 // Controls how per-pixel uncertainties (sigma) are assigned in chi-squared fits.
-inline constexpr G4double FIT_ERROR_PERCENT_OF_MAX       = 5.0;   // Base uncertainty (%)
-inline constexpr G4bool   FIT_USE_VERTICAL_UNCERTAINTIES = true;  // Enable weighted fits
-inline constexpr G4bool   FIT_USE_QN_QI_ERRORS           = false; // Use Q_n/Q_i scaling
+inline constexpr G4double FIT_ERROR_PERCENT_OF_MAX = 5.0;      // Base uncertainty (%)
+inline constexpr G4bool FIT_USE_VERTICAL_UNCERTAINTIES = true; // Enable weighted fits
+inline constexpr G4bool FIT_USE_QN_QI_ERRORS = false;          // Use Q_n/Q_i scaling
 
 // Distance-weighted errors (pixels farther from hit center have different weights)
-inline constexpr G4bool   FIT_USE_DISTANCE_WEIGHTED_ERRORS   = false; // Master switch
-inline constexpr G4double FIT_DISTANCE_SCALE_PIXELS          = 1.0;   // Scale in pixel units
-inline constexpr G4double FIT_DISTANCE_EXPONENT              = 1.0;   // Power law exponent
-inline constexpr G4double FIT_DISTANCE_FLOOR_PERCENT         = 1.0;   // Min sigma (% of Q_max)
-inline constexpr G4double FIT_DISTANCE_CAP_PERCENT           = 50.0;  // Max sigma (% of Q_max)
-inline constexpr G4bool   FIT_DISTANCE_PREFER_TRUTH_CENTER   = true;  // Use true hit position
-inline constexpr G4bool   FIT_DISTANCE_POWER_INVERSE         = true;  // Inverse power model
+inline constexpr G4bool FIT_USE_DISTANCE_WEIGHTED_ERRORS = false; // Master switch
+inline constexpr G4double FIT_DISTANCE_SCALE_PIXELS = 1.0;        // Scale in pixel units
+inline constexpr G4double FIT_DISTANCE_EXPONENT = 1.0;            // Power law exponent
+inline constexpr G4double FIT_DISTANCE_FLOOR_PERCENT = 1.0;       // Min sigma (% of Q_max)
+inline constexpr G4double FIT_DISTANCE_CAP_PERCENT = 50.0;        // Max sigma (% of Q_max)
+inline constexpr G4bool FIT_DISTANCE_PREFER_TRUTH_CENTER = true;  // Use true hit position
+inline constexpr G4bool FIT_DISTANCE_POWER_INVERSE = true;        // Inverse power model
 
 // Input charge branch for fitting
 inline constexpr const char* FIT_CHARGE_BRANCH_1D = "Qf";
 inline constexpr const char* FIT_CHARGE_BRANCH_2D = "Qf";
 
 // ─────────────────────────────── 1D Fit Options ──────────────────────────────
-inline constexpr G4bool FIT_1D_DIAGONALS       = false;  // Also fit diagonal slices
-inline constexpr G4bool FIT_1D_SAVE_A          = true;   // Save amplitude
-inline constexpr G4bool FIT_1D_SAVE_MU         = true;   // Save mean position
-inline constexpr G4bool FIT_1D_SAVE_SIGMA      = true;   // Save width
-inline constexpr G4bool FIT_1D_SAVE_B          = true;   // Save baseline offset
-inline constexpr G4bool FIT_1D_SAVE_LINE_MEANS = false;  // Save weighted mean positions
+inline constexpr G4bool FIT_1D_DIAGONALS = false;       // Also fit diagonal slices
+inline constexpr G4bool FIT_1D_SAVE_A = true;           // Save amplitude
+inline constexpr G4bool FIT_1D_SAVE_MU = true;          // Save mean position
+inline constexpr G4bool FIT_1D_SAVE_SIGMA = true;       // Save width
+inline constexpr G4bool FIT_1D_SAVE_B = true;           // Save baseline offset
+inline constexpr G4bool FIT_1D_SAVE_LINE_MEANS = false; // Save weighted mean positions
 
 // 1D diagonal fit parameter saving (when FIT_1D_DIAGONALS = true)
-inline constexpr G4bool FIT_1D_SAVE_DIAG_A     = true;
-inline constexpr G4bool FIT_1D_SAVE_DIAG_MU    = true;
+inline constexpr G4bool FIT_1D_SAVE_DIAG_A = true;
+inline constexpr G4bool FIT_1D_SAVE_DIAG_MU = true;
 inline constexpr G4bool FIT_1D_SAVE_DIAG_SIGMA = true;
-inline constexpr G4bool FIT_1D_SAVE_DIAG_B     = true;
+inline constexpr G4bool FIT_1D_SAVE_DIAG_B = true;
 
 // 1D distance model tuning (can differ from 2D)
-inline constexpr G4bool   FIT_1D_DIST_ENABLED       = true;
-inline constexpr G4double FIT_1D_DIST_SCALE_PIXELS  = 1.5;
-inline constexpr G4double FIT_1D_DIST_EXPONENT      = 1.5;
+inline constexpr G4bool FIT_1D_DIST_ENABLED = true;
+inline constexpr G4double FIT_1D_DIST_SCALE_PIXELS = 1.5;
+inline constexpr G4double FIT_1D_DIST_EXPONENT = 1.5;
 inline constexpr G4double FIT_1D_DIST_FLOOR_PERCENT = 4.0;
-inline constexpr G4double FIT_1D_DIST_CAP_PERCENT   = 10.0;
+inline constexpr G4double FIT_1D_DIST_CAP_PERCENT = 10.0;
 
 // ─────────────────────────────── 2D Fit Options ──────────────────────────────
-inline constexpr G4bool FIT_2D_SAVE_A    = true;   // Save amplitude
-inline constexpr G4bool FIT_2D_SAVE_MUX  = true;   // Save mean X position
-inline constexpr G4bool FIT_2D_SAVE_MUY  = true;   // Save mean Y position
-inline constexpr G4bool FIT_2D_SAVE_SIGX = true;   // Save width in X
-inline constexpr G4bool FIT_2D_SAVE_SIGY = true;   // Save width in Y
-inline constexpr G4bool FIT_2D_SAVE_B    = true;   // Save baseline offset
+inline constexpr G4bool FIT_2D_SAVE_A = true;    // Save amplitude
+inline constexpr G4bool FIT_2D_SAVE_MUX = true;  // Save mean X position
+inline constexpr G4bool FIT_2D_SAVE_MUY = true;  // Save mean Y position
+inline constexpr G4bool FIT_2D_SAVE_SIGX = true; // Save width in X
+inline constexpr G4bool FIT_2D_SAVE_SIGY = true; // Save width in Y
+inline constexpr G4bool FIT_2D_SAVE_B = true;    // Save baseline offset
 
 // 2D distance model tuning (can differ from 1D)
-inline constexpr G4bool   FIT_2D_DIST_ENABLED       = false;
-inline constexpr G4double FIT_2D_DIST_SCALE_PIXELS  = 1.0;
-inline constexpr G4double FIT_2D_DIST_EXPONENT      = 1.0;
+inline constexpr G4bool FIT_2D_DIST_ENABLED = false;
+inline constexpr G4double FIT_2D_DIST_SCALE_PIXELS = 1.0;
+inline constexpr G4double FIT_2D_DIST_EXPONENT = 1.0;
 inline constexpr G4double FIT_2D_DIST_FLOOR_PERCENT = 1.0;
-inline constexpr G4double FIT_2D_DIST_CAP_PERCENT   = 50.0;
+inline constexpr G4double FIT_2D_DIST_CAP_PERCENT = 50.0;
 
 // ╔═══════════════════════════════════════════════════════════════════════════╗
 // ║                    END USER SETTINGS - Internal Below                     ║
@@ -153,17 +153,15 @@ enum class ReconMethod { LogA, LinA };
 // Unified enum for runtime use (combines both 1D and 2D modes)
 enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3 };
 
-using PosReconModel = ReconMethod;  // Legacy alias
+using PosReconModel = ReconMethod; // Legacy alias
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Derived Settings (computed from ACTIVE_MODE)
 // ═══════════════════════════════════════════════════════════════════════════
 
-inline constexpr ReconMethod RECON_METHOD =
-    (ACTIVE_MODE == Mode::LogA) ? ReconMethod::LogA : ReconMethod::LinA;
+inline constexpr ReconMethod RECON_METHOD = (ACTIVE_MODE == Mode::LogA) ? ReconMethod::LogA : ReconMethod::LinA;
 
-inline constexpr SignalModel SIGNAL_MODEL =
-    (ACTIVE_MODE == Mode::LinA) ? SignalModel::LinA : SignalModel::LogA;
+inline constexpr SignalModel SIGNAL_MODEL = (ACTIVE_MODE == Mode::LinA) ? SignalModel::LinA : SignalModel::LogA;
 
 inline constexpr G4bool USES_LINEAR_SIGNAL = (SIGNAL_MODEL == SignalModel::LinA);
 
@@ -171,23 +169,22 @@ inline constexpr PosReconModel POS_RECON_MODEL = RECON_METHOD;
 
 // Map 1D mode enum to unified enum
 constexpr ActivePixelMode ActivePixelModeFrom1D(ActivePixelMode1D m) {
-    return (m == ActivePixelMode1D::Neighborhood) ? ActivePixelMode::Neighborhood :
-           (m == ActivePixelMode1D::RowCol)       ? ActivePixelMode::RowCol :
-                                                    ActivePixelMode::RowCol3x3;
+    return (m == ActivePixelMode1D::Neighborhood) ? ActivePixelMode::Neighborhood
+           : (m == ActivePixelMode1D::RowCol)     ? ActivePixelMode::RowCol
+                                                  : ActivePixelMode::RowCol3x3;
 }
 
 // Map 2D mode enum to unified enum
 constexpr ActivePixelMode ActivePixelModeFrom2D(ActivePixelMode2D m) {
-    return (m == ActivePixelMode2D::Neighborhood)   ? ActivePixelMode::Neighborhood :
-           (m == ActivePixelMode2D::ChargeBlock2x2) ? ActivePixelMode::ChargeBlock2x2 :
-                                                      ActivePixelMode::ChargeBlock3x3;
+    return (m == ActivePixelMode2D::Neighborhood)     ? ActivePixelMode::Neighborhood
+           : (m == ActivePixelMode2D::ChargeBlock2x2) ? ActivePixelMode::ChargeBlock2x2
+                                                      : ActivePixelMode::ChargeBlock3x3;
 }
 
 // The active pixel mode used at runtime
 // When FIT_GAUS_2D is enabled, use the 2D mode; otherwise use the 1D mode
 inline constexpr ActivePixelMode ACTIVE_PIXEL_MODE =
-    FIT_GAUS_2D ? ActivePixelModeFrom2D(ACTIVE_PIXEL_MODE_2D)
-                : ActivePixelModeFrom1D(ACTIVE_PIXEL_MODE_1D);
+    FIT_GAUS_2D ? ActivePixelModeFrom2D(ACTIVE_PIXEL_MODE_2D) : ActivePixelModeFrom1D(ACTIVE_PIXEL_MODE_1D);
 
 // Full grid storage: disabled by default (saves only neighborhood/block/strip data)
 // Set to true if you need per-event full-detector charge fractions
@@ -195,10 +192,9 @@ inline constexpr G4bool STORE_FULL_GRID = false;
 
 // ChargeBlock modes (2x2, 3x3) require 2D fitting to be enabled
 inline constexpr G4bool IS_CHARGE_BLOCK_MODE =
-    (ACTIVE_PIXEL_MODE == ActivePixelMode::ChargeBlock2x2 ||
-     ACTIVE_PIXEL_MODE == ActivePixelMode::ChargeBlock3x3);
+    (ACTIVE_PIXEL_MODE == ActivePixelMode::ChargeBlock2x2 || ACTIVE_PIXEL_MODE == ActivePixelMode::ChargeBlock3x3);
 static_assert(!IS_CHARGE_BLOCK_MODE || FIT_GAUS_2D,
-    "ChargeBlock2x2 and ChargeBlock3x3 active pixel modes require FIT_GAUS_2D = true");
+              "ChargeBlock2x2 and ChargeBlock3x3 active pixel modes require FIT_GAUS_2D = true");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Additional Geometry & Physics Constants
@@ -248,6 +244,8 @@ inline G4int PositionToIndex(G4double position, G4double gridSize, G4double offs
 
 // Namespace aliases for backward compatibility
 namespace Config = Constants;
-namespace ECS { namespace Config = ::Constants; }
+namespace ECS {
+namespace Config = ::Constants;
+}
 
 #endif // ECS_CONFIG_HH
