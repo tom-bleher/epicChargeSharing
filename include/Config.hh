@@ -53,7 +53,7 @@ inline constexpr G4double LINEAR_CHARGE_MODEL_BETA = 0.002;
 
 // ──────────────────────────── Particle Gun ──────────────────────────────────
 // Use fixed position (true) or random sampling (false) for primary particles
-inline constexpr G4bool USE_FIXED_POSITION = true;
+inline constexpr G4bool USE_FIXED_POSITION = false;
 
 // ─────────────────────────── Active Pixel Mode ─────────────────────────────
 // Selects which pixels are "active" for signal fraction (F_i) calculation.
@@ -80,7 +80,7 @@ inline constexpr ActivePixelMode2D ACTIVE_PIXEL_MODE_2D = ActivePixelMode2D::Nei
 // Enable Gaussian fitting for position reconstruction
 // Note: To use ActivePixelMode2D, you must set FIT_GAUS_2D = true
 inline constexpr G4bool FIT_GAUS_1D = true;
-inline constexpr G4bool FIT_GAUS_2D = false;
+inline constexpr G4bool FIT_GAUS_2D = true;
 
 // To switch to the 3x3 variant, update `ACTIVE_PIXEL_MODE_2D` above.
 

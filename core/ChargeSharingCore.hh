@@ -268,6 +268,8 @@ struct NeighborhoodConfig {
     double betaPerMicron{0.0};   ///< LinA beta (1/um), 0 = auto
     int numPixelsX{0};           ///< Total pixels in X (for bounds), 0 = unbounded
     int numPixelsY{0};           ///< Total pixels in Y (for bounds), 0 = unbounded
+    int minIndexX{0};            ///< Minimum valid DD4hep index in X (can be negative)
+    int minIndexY{0};            ///< Minimum valid DD4hep index in Y (can be negative)
 };
 
 /// Calculate charge fractions for neighborhood around hit position
@@ -308,13 +310,13 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
             const int globalI = centerI + di;
             const int globalJ = centerJ + dj;
 
-            // Check bounds if specified
-            if (config.numPixelsX > 0 && (globalI < 0 || globalI >= config.numPixelsX)) {
+            // Check bounds if specified (indices can be negative for centered DD4hep grids)
+            if (config.numPixelsX > 0 && (globalI < config.minIndexX || globalI >= config.minIndexX + config.numPixelsX)) {
                 pixel.inBounds = false;
                 result.pixels.push_back(pixel);
                 continue;
             }
-            if (config.numPixelsY > 0 && (globalJ < 0 || globalJ >= config.numPixelsY)) {
+            if (config.numPixelsY > 0 && (globalJ < config.minIndexY || globalJ >= config.minIndexY + config.numPixelsY)) {
                 pixel.inBounds = false;
                 result.pixels.push_back(pixel);
                 continue;
@@ -322,7 +324,9 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
 
             pixel.inBounds = true;
             pixel.globalIndex =
-                (config.numPixelsY > 0) ? globalI * config.numPixelsY + globalJ : globalI * gridDim + globalJ;
+                (config.numPixelsY > 0)
+                    ? (globalI - config.minIndexX) * config.numPixelsY + (globalJ - config.minIndexY)
+                    : globalI * gridDim + globalJ;
             pixel.centerX = centerX + di * pitchX;
             pixel.centerY = centerY + dj * pitchY;
 

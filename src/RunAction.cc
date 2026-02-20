@@ -456,6 +456,35 @@ void RunAction::HandleMasterEndOfRun(const ThreadContext& context, const G4Run* 
         return;
     }
 
+    // Merge per-thread EDM4hep files if enabled
+#ifdef WITH_EDM4HEP
+    {
+        std::vector<std::string> edm4hepFiles;
+        edm4hepFiles.reserve(existingFiles.size());
+        for (const auto& rootFile : existingFiles) {
+            std::string edm4hepFile = rootFile;
+            const auto dotPos = edm4hepFile.rfind('.');
+            if (dotPos != std::string::npos) {
+                edm4hepFile = edm4hepFile.substr(0, dotPos);
+            }
+            edm4hepFile += ".edm4hep.root";
+            if (std::filesystem::exists(edm4hepFile)) {
+                edm4hepFiles.push_back(edm4hepFile);
+            }
+        }
+        if (!edm4hepFiles.empty()) {
+            if (IO::MergeEDM4hepFiles(edm4hepFiles, "epicChargeSharing.edm4hep.root")) {
+                for (const auto& f : edm4hepFiles) {
+                    std::error_code ec;
+                    std::filesystem::remove(f, ec);
+                }
+            } else {
+                G4cout << "[RunAction] Warning: EDM4hep merge failed; worker files preserved" << G4endl;
+            }
+        }
+    }
+#endif
+
     for (const auto& file : existingFiles) {
         std::error_code ec;
         if (!std::filesystem::remove(file.c_str(), ec) && ec) {

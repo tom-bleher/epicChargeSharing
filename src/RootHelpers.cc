@@ -9,8 +9,10 @@
 #include "TFile.h"
 #include "TNamed.h"
 #include "TObject.h"
+#include "ROOT/RConfig.hxx"
 #include "TROOT.h"
 #include "TString.h"
+#include "TThread.h"
 #include "TTree.h"
 
 #include <sstream>
@@ -196,6 +198,7 @@ void WorkerSync::WaitForAll() {
 // ============================================================================
 
 void InitializeROOTThreading() {
+    ROOT::EnableThreadSafety();
     gROOT->SetBatch(true);
 }
 

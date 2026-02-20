@@ -346,6 +346,8 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     coreConfig.betaPerMicron = model.beta;
     coreConfig.numPixelsX = numBlocksPerSide;
     coreConfig.numPixelsY = numBlocksPerSide;
+    coreConfig.minIndexX = fDetector->GetMinIndexX();
+    coreConfig.minIndexY = fDetector->GetMinIndexY();
 
     const auto coreResult =
         csc::calculateNeighborhood(hitPos.x(), hitPos.y(), fResult.pixelIndexI, fResult.pixelIndexJ,

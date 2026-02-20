@@ -108,6 +108,8 @@ ChargeSharingReconstructor::Result ChargeSharingReconstructor::process(const Inp
     neighborCfg.betaPerMicron = m_cfg.linearBetaPerMicron;
     neighborCfg.numPixelsX = m_cfg.pixelsPerSide;
     neighborCfg.numPixelsY = m_cfg.pixelsPerSide;
+    neighborCfg.minIndexX = m_boundsX.hasBounds() ? m_boundsX.minIndex : 0;
+    neighborCfg.minIndexY = m_boundsY.hasBounds() ? m_boundsY.minIndex : 0;
 
     // Calculate charge fractions using core algorithm
     core::NeighborhoodResult neighborhood = core::calculateNeighborhood(

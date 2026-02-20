@@ -270,6 +270,35 @@ std::unique_ptr<EDM4hepWriter> MakeEDM4hepWriter() {
     return std::make_unique<EDM4hepWriter>();
 }
 
+bool MergeEDM4hepFiles(const std::vector<std::string>& workerFiles, const std::string& outputFile) {
+    if (workerFiles.empty()) {
+        return false;
+    }
+
+    try {
+        podio::ROOTWriter writer(outputFile);
+
+        for (const auto& filename : workerFiles) {
+            podio::ROOTReader reader;
+            reader.openFile(filename);
+
+            const unsigned nEntries = reader.getEntries("events");
+            for (unsigned i = 0; i < nEntries; ++i) {
+                auto frame = podio::Frame(reader.readNextEntry("events"));
+                writer.writeFrame(frame, "events");
+            }
+        }
+
+        writer.finish();
+        G4cout << "[EDM4hepMerge] Merged " << workerFiles.size() << " files into " << outputFile << G4endl;
+        return true;
+
+    } catch (const std::exception& e) {
+        G4cerr << "[EDM4hepMerge] Error merging EDM4hep files: " << e.what() << G4endl;
+        return false;
+    }
+}
+
 } // namespace ECS::IO
 
 #endif // WITH_EDM4HEP

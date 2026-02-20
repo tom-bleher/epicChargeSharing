@@ -31,6 +31,7 @@
 #include <edm4hep/MCParticleCollection.h>
 #include <edm4hep/SimTrackerHitCollection.h>
 #include <podio/Frame.h>
+#include <podio/ROOTReader.h>
 #include <podio/ROOTWriter.h>
 
 namespace ECS::IO {
@@ -177,6 +178,12 @@ private:
 /// \return Pointer to new EDM4hepWriter
 std::unique_ptr<EDM4hepWriter> MakeEDM4hepWriter();
 
+/// \brief Merge per-thread EDM4hep worker files into a single output file.
+/// \param workerFiles Vector of worker file paths to merge
+/// \param outputFile Path for the merged output file
+/// \return true if merge succeeded
+bool MergeEDM4hepFiles(const std::vector<std::string>& workerFiles, const std::string& outputFile);
+
 } // namespace ECS::IO
 
 #else // !WITH_EDM4HEP
@@ -238,6 +245,8 @@ private:
 inline std::unique_ptr<EDM4hepWriter> MakeEDM4hepWriter() {
     return std::make_unique<EDM4hepWriter>();
 }
+
+inline bool MergeEDM4hepFiles(const std::vector<std::string>&, const std::string&) { return false; }
 
 } // namespace ECS::IO
 
