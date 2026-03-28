@@ -25,7 +25,7 @@ target_include_directories(chargeSharingRecon
         ${CMAKE_CURRENT_SOURCE_DIR}/../core
         ${EICrecon_INCLUDE_DIR}
         ${EICrecon_INCLUDE_DIR}/EICrecon
-        # ROOT include dirs propagate automatically via ROOT::* target links
+        ${ROOT_INCLUDE_DIRS}
 )
 
 target_link_libraries(chargeSharingRecon

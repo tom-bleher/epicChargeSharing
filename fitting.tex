@@ -1,0 +1,748 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[margin=1in]{geometry}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  urlcolor=blue!60!black,
+  citecolor=blue!60!black,
+}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!50!black}\itshape,
+  stringstyle=\color{red!60!black},
+  numbers=none,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{black!30},
+  backgroundcolor=\color{black!3},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  showstringspaces=false,
+  columns=flexible,
+  aboveskip=1em,
+  belowskip=1em,
+}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\file}[1]{\texttt{#1}}
+
+\title{Assessment of Fitting Routines\\[4pt]
+       \large epicChargeSharing}
+\author{Code Review Notes}
+\date{February 2026}
+
+\begin{document}
+\maketitle
+
+%----------------------------------------------------------------------
+\section{What You Have}
+%----------------------------------------------------------------------
+
+Three fitting codepaths:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Component} & \textbf{File} & \textbf{Method} \\
+\midrule
+Standalone (post-processing) & \file{src/GaussianFitter.cc}          & Reads ROOT file, adds fit branches in batch \\
+EICrecon plugin (inline)     & \file{eicrecon/include/GaussianFit.hh} & Per-event during reconstruction \\
+Uncertainty weighting        & \file{include/FitUncertainty.hh}       & 9 distance-weighted $\sigma$ models \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+Both 1D and 2D Gaussian fits use:
+\begin{itemize}[nosep]
+  \item \textbf{Minimizer}: Fumili2 (fast, least-squares specialised) with Migrad fallback.
+  \item \textbf{Model}:
+    $f(x) = A \exp\!\bigl(-\tfrac{1}{2}\bigl(\tfrac{x-\mu}{\sigma}\bigr)^{2}\bigr) + B$
+    \;(1D) or the 2D equivalent with 6 parameters.
+  \item \textbf{Seeding}: $Q_{\max}$ for $A$, $Q_{\min}$ for $B$,
+    position-of-max for $\mu$, weighted variance for $\sigma$.
+  \item \textbf{Bounds}: $\mu$ constrained to $\pm 1$ pitch from the
+    centre pixel; $\sigma \in [\text{pixelSize},\; R \cdot \text{pitch}]$.
+  \item \textbf{Fallback}: Charge-weighted centroid when the fit fails.
+\end{itemize}
+
+%----------------------------------------------------------------------
+\section{What's Done Well}
+%----------------------------------------------------------------------
+
+\paragraph{1.\ Minimizer strategy is textbook-correct.}
+Fumili2 is the right first choice for $\chi^{2}$ minimisation in ROOT
+(it exploits the sum-of-squares structure), and the Migrad fallback with
+elevated strategy handles the cases Fumili2 can't.  This is what
+experienced ROOT users do.
+
+\paragraph{2.\ Initial parameter estimates are good.}
+You seed from the data itself ($Q_{\min}$/$Q_{\max}$, position of max,
+weighted variance).  Good seeds are 90\% of the battle with Minuit---many
+HEP fits fail because of bad initial values, not because of bad
+minimisers.
+
+\paragraph{3.\ Thread safety is handled correctly.}
+\code{thread\_local} TF1/TF2 objects, \code{FlatVectorStore} to decouple
+TTree I/O from parallel fitting, \code{ROOT::TThreadExecutor} for
+dispatch.  This is non-trivial to get right with ROOT.
+
+\paragraph{4.\ Centroid fallback is essential and present}
+in both standalone and plugin.  A fit failure shouldn't mean no
+reconstruction.
+
+\paragraph{5.\ Parameter bounds prevent pathological fits.}
+The $\mu$ range ($\pm 1$ pitch) and $\sigma$ bounds are physically
+reasonable constraints.
+
+%----------------------------------------------------------------------
+\section{The Fundamental Issue: Fitting the Wrong Function}
+%----------------------------------------------------------------------
+
+This is the single most important point.  The charge sharing profile from
+your LogA model is:
+\begin{equation}
+  F_i \;\propto\; \frac{\alpha_i}{\ln(d_i / d_0)}
+  \label{eq:loga}
+\end{equation}
+This is \textbf{not a Gaussian in distance}.  It falls off as
+$1/\ln r$---much slower than $e^{-r^{2}}$.  A Gaussian fit to this data:
+
+\begin{itemize}[nosep]
+  \item Has \textbf{systematic bias} on the $\mu$ parameter due to model
+    mismatch, particularly for off-centre hits.
+  \item Produces \textbf{physically meaningless} $\sigma$ and $\chi^{2}$
+    values.
+  \item Requires \textbf{4 parameters for 5 data points} (1D: $R=2$ gives
+    a central slice of 5 pixels, $\text{NDF}=1$)---the fit is essentially
+    unconstrained.
+  \item Drives the complexity in \file{FitUncertainty.hh}---those 9
+    distance-weighted $\sigma$ models are compensating for the wrong fit
+    function.
+\end{itemize}
+
+\noindent
+The Gaussian works as a \emph{reasonable interpolator} (it captures the
+peak location), which is why you get usable resolution.  But you're
+leaving accuracy on the table.
+
+%----------------------------------------------------------------------
+\section{Recommended Improvement: Fit Your Own Physics Model}
+\label{sec:physfit}
+%----------------------------------------------------------------------
+
+The core idea is simple: instead of fitting an arbitrary bell-shaped
+curve (the Gaussian) to the observed charges and extracting the peak
+position, fit the \emph{actual charge-sharing model} and extract the
+hit position directly.  This section walks through both approaches
+step-by-step so the contrast is clear.
+
+%----------------------------------------------------------------------
+\subsection{What the Current Gaussian Fit Does (Step by Step)}
+\label{sec:current-fit}
+%----------------------------------------------------------------------
+
+Consider a single event.  A particle hits the sensor at some unknown true
+position $(x_{\text{true}}, y_{\text{true}})$.  The simulation (or the
+real detector) produces an observed charge $Q_i$ on each pixel~$i$ in
+the neighbourhood.  For the 1D row fit with $R=2$, you extract the
+central row ($dj = 0$) giving 5 data points:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{}cccccc@{}}
+\toprule
+Pixel $i$ & $-2$ & $-1$ & $0$ & $+1$ & $+2$ \\
+\midrule
+Position $x_i$ & $x_{\text{px}} - 2p$ & $x_{\text{px}} - p$
+  & $x_{\text{px}}$ & $x_{\text{px}} + p$ & $x_{\text{px}} + 2p$ \\
+Observed charge & $Q_{-2}$ & $Q_{-1}$ & $Q_0$ & $Q_{+1}$ & $Q_{+2}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\medskip
+
+\noindent
+where $p$ is the pixel pitch and $x_{\text{px}}$ is the centre pixel
+position.  You then define a fit function with \textbf{4 free parameters}
+$(A, \mu, \sigma, B)$:
+\begin{equation}
+  f(x;\; A, \mu, \sigma, B)
+    \;=\; A \exp\!\Bigl(-\frac{1}{2}\Bigl(\frac{x - \mu}{\sigma}\Bigr)^{\!2}\Bigr) + B
+  \label{eq:gauss-model}
+\end{equation}
+and minimise:
+\begin{equation}
+  \chi^{2}
+    \;=\; \sum_{i=-R}^{R}
+      \frac{\bigl(Q_i - f(x_i;\; A, \mu, \sigma, B)\bigr)^{2}}
+           {\sigma_{\text{err},i}^{\,2}}
+  \label{eq:gauss-chi2}
+\end{equation}
+Minuit2 adjusts all four parameters until $\chi^{2}$ is minimised.  The
+reconstructed $x$-position is the fitted~$\mu$.
+
+\medskip\noindent
+\textbf{The problem.}\quad
+The function~$f$ is a Gaussian.  But the charges $Q_i$ were \emph{not}
+generated by a Gaussian process---they were generated by your LogA (or
+LinA) charge-sharing model.  The Gaussian has no physical connection to
+the data.  It is just a smooth bell curve being used as a generic
+interpolator.  Because the shapes don't match:
+
+\begin{itemize}[nosep]
+  \item The minimiser must use 4 degrees of freedom ($A, \mu, \sigma, B$)
+    to approximate a shape that isn't actually Gaussian, leaving only
+    $\text{NDF} = 5 - 4 = 1$.
+  \item The parameters $\sigma$ and $B$ absorb the model mismatch, biasing
+    the value of~$\mu$.
+  \item The $\chi^{2}$ value doesn't tell you whether the fit is good,
+    because the model is wrong by construction.
+  \item You need elaborate $\sigma_{\text{err},i}$ models
+    (\file{FitUncertainty.hh}) to partially compensate for the mismatch
+    by re-weighting which pixels the fitter trusts.
+\end{itemize}
+
+%----------------------------------------------------------------------
+\subsection{What the Physics-Model Fit Does Instead}
+\label{sec:phys-fit}
+%----------------------------------------------------------------------
+
+The key insight: you already have a function that predicts exactly what
+$Q_i$ should be for any trial hit position.  That function is
+\code{calcWeight()} in \file{ChargeSharingCore.hh}.  So instead of
+fitting $f(x; A, \mu, \sigma, B)$, fit the \emph{actual physics} with
+the hit position as the only free parameter.
+
+\paragraph{Step 1: Define the forward model.}
+For a trial hit position $x_0$ (the single fit parameter), compute the
+predicted charge on each pixel.  Each pixel centre is at a known position
+$c_i$.  The distance from the trial position to pixel~$i$ is:
+\begin{equation}
+  d_i(x_0) \;=\; |x_0 - c_i|
+  \qquad\text{(1D row fit)}
+  \label{eq:dist-1d}
+\end{equation}
+For the full 2D fit with trial position $(x_0, y_0)$:
+\begin{equation}
+  d_i(x_0, y_0) \;=\; \sqrt{(x_0 - c_{i,x})^{2} + (y_0 - c_{i,y})^{2}}
+  \label{eq:dist-2d}
+\end{equation}
+Then compute the weight for each pixel using your existing model.  For
+LogA:
+\begin{equation}
+  w_i(x_0) \;=\; \frac{\alpha_i\bigl(d_i(x_0)\bigr)}
+                       {\ln\bigl(d_i(x_0) / d_0\bigr)}
+  \label{eq:weight-loga}
+\end{equation}
+where $\alpha_i$ is the pad view angle (also a function of $d_i$), and
+$d_0$ is the reference distance.  These are exactly the functions
+\code{calcPadViewAngle()} and \code{calcWeightLogA()} that you already
+have.
+
+\paragraph{Step 2: Normalise to get predicted fractions.}
+\begin{equation}
+  F_i^{\,\text{pred}}(x_0) \;=\;
+    \frac{w_i(x_0)}{\displaystyle\sum_{j} w_j(x_0)}
+  \label{eq:fraction}
+\end{equation}
+This is the same normalisation your simulation already performs in
+\code{calculateNeighborhood()}.
+
+\paragraph{Step 3: Predict the charge on each pixel.}
+\begin{equation}
+  Q_i^{\,\text{pred}}(x_0)
+    \;=\; F_i^{\,\text{pred}}(x_0) \;\cdot\; Q_{\text{total}}
+  \label{eq:predicted-charge}
+\end{equation}
+where $Q_{\text{total}} = \sum_i Q_i^{\,\text{obs}}$ is the total
+observed charge (a measured quantity, not a fit parameter).
+
+\paragraph{Step 4: Minimise the $\chi^{2}$.}
+\begin{equation}
+  \chi^{2}(x_0)
+    \;=\; \sum_{i}
+      \frac{\bigl(Q_i^{\,\text{obs}} - Q_i^{\,\text{pred}}(x_0)\bigr)^{2}}
+           {\sigma_{\text{noise},i}^{\,2}}
+  \label{eq:phys-chi2}
+\end{equation}
+The uncertainty $\sigma_{\text{noise},i}$ is just the actual physical
+noise on pixel~$i$:
+\begin{equation}
+  \sigma_{\text{noise},i}
+    \;=\; \sqrt{\sigma_{\text{electronic}}^{\,2}
+                + \bigl(\sigma_{\text{gain}} \cdot Q_i^{\,\text{obs}}\bigr)^{2}}
+  \label{eq:noise}
+\end{equation}
+That's it.  \textbf{The only free parameter is $x_0$} (or $(x_0, y_0)$
+for 2D).  The minimiser adjusts $x_0$ until the predicted charges best
+match the observed charges.  The fitted $x_0$ is your reconstructed
+position.
+
+%----------------------------------------------------------------------
+\subsection{Concrete Example: One Event}
+\label{sec:example}
+%----------------------------------------------------------------------
+
+Suppose a hit occurs at $x_{\text{true}} = 0.12\;\text{mm}$ and the
+centre pixel is at $x_{\text{px}} = 0.0\;\text{mm}$ with pitch
+$p = 0.5\;\text{mm}$.  The 5 pixels in the central row are at
+$x \in \{-1.0,\; -0.5,\; 0.0,\; +0.5,\; +1.0\}\;\text{mm}$.
+
+\medskip\noindent
+\textbf{Gaussian fit:} Minuit2 searches a 4D space $(A, \mu, \sigma, B)$
+to find a Gaussian bell curve that best passes through the 5 charge
+values.  The fitted $\mu$ (somewhere near $0.12\;\text{mm}$) is your
+answer.  But $A$, $\sigma$, $B$ are nuisance parameters with no physical
+meaning---they exist only because the Gaussian shape needs them to
+approximate the non-Gaussian charge profile.
+
+\medskip\noindent
+\textbf{Physics-model fit:} Minuit2 searches a \textbf{1D} space
+($x_0$).  For each trial value (e.g.\ $x_0 = 0.10\;\text{mm}$), it
+calls your \code{calcWeight()} for all 5 pixels, normalises, multiplies
+by $Q_{\text{total}}$, and compares to the observed charges.  The
+$\chi^{2}$ landscape is a simple 1D curve with a clear minimum.
+There is no $A$, no $\sigma$, no $B$---the physics model generates the
+full predicted charge profile from $x_0$ alone.
+
+%----------------------------------------------------------------------
+\subsection{Why This Is Better}
+\label{sec:why-better}
+%----------------------------------------------------------------------
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lcl@{}}
+\toprule
+ & \textbf{Gaussian Fit} & \textbf{Physics Model Fit} \\
+\midrule
+Free parameters          & 4\,(1D) or 6\,(2D)  & \textbf{1\,(1D) or 2\,(2D)} \\
+NDF for 5 pixels (1D)    & 1                    & \textbf{4}                   \\
+NDF for 25 pixels (2D)   & 19                   & \textbf{23}                  \\
+$\sigma_{\text{err}}$ models needed
+                         & 9 elaborate ones     & \textbf{Just physical noise} \\
+$\chi^{2}$ physically meaningful
+                         & No                   & \textbf{Yes}                 \\
+Bias from model mismatch & Yes                  & \textbf{No (by construction)} \\
+Fit convergence speed    & 4--6D search         & \textbf{1--2D search}         \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+The last row matters for performance: Minuit2 converges much faster in
+1--2 dimensions than in 4--6.  Each $\chi^{2}$ evaluation calls
+\code{calcWeight()} $N$ times (where $N = 5$ or $25$), which is
+comparable in cost to evaluating the Gaussian $N$ times.
+
+%----------------------------------------------------------------------
+\subsection{What About $Q_{\text{total}}$?}
+\label{sec:qtotal}
+%----------------------------------------------------------------------
+
+In the physics-model fit, $Q_{\text{total}}$ enters
+equation~\eqref{eq:predicted-charge} as a known constant.  You have two
+options:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Use the observed total:}\quad
+    $Q_{\text{total}} = \sum_i Q_i^{\,\text{obs}}$.  This is the
+    simplest approach and works well when the neighbourhood captures most
+    of the charge.  Noise on individual pixels partially cancels in the
+    sum.
+  \item \textbf{Fit $Q_{\text{total}}$ as a second (third) parameter:}\quad
+    If charge leaks outside the neighbourhood or noise significantly
+    biases the sum, you can let $Q_{\text{total}}$ float.  This adds one
+    parameter (2 for 1D, 3 for 2D), still far fewer than the Gaussian.
+\end{enumerate}
+
+\noindent
+For your typical $R = 2$ neighbourhood with LogA, the centre pixel
+captures a large charge fraction and the sum is a good estimate, so
+option~1 should suffice.
+
+%----------------------------------------------------------------------
+\subsection{Implementation Sketch}
+\label{sec:implementation}
+%----------------------------------------------------------------------
+
+The implementation reuses your existing \code{ChargeSharingCore.hh}
+functions.  The only new code is the $\chi^{2}$ functor and the Minuit2
+wiring.
+
+\begin{lstlisting}
+#include "ChargeSharingCore.hh"
+#include <Math/Minimizer.h>
+#include <Math/Factory.h>
+#include <Math/Functor.h>
+
+struct PhysicsModelFitResult {
+    bool converged = false;
+    double x0 = NaN;       // reconstructed X
+    double y0 = NaN;       // reconstructed Y
+    double chi2 = NaN;
+    int    ndf  = 0;
+};
+
+// pixelX[i], pixelY[i]: known pixel centre positions
+// Qobs[i]:              observed charges (with noise)
+// nPixels:              number of pixels (e.g. 25 for 5x5)
+// pixelCenterX/Y:       centre pixel position (seed)
+// pitch, padSize, d0:   detector geometry (known constants)
+
+PhysicsModelFitResult fitPhysicsModel2D(
+    const double* pixelX,  const double* pixelY,
+    const double* Qobs,    int nPixels,
+    double pixelCenterX,   double pixelCenterY,
+    double pitch, double padSize, double d0MM,
+    double sigmaElectronic, double sigmaGainFrac)
+{
+    // Total observed charge (known constant, not a fit parameter)
+    double Qtotal = 0.0;
+    for (int i = 0; i < nPixels; ++i)
+        Qtotal += std::max(0.0, Qobs[i]);
+
+    // The chi2 function: given trial (x0, y0), predict all
+    // pixel charges and compare to observations.
+    auto chi2Fcn = [&](const double* par) -> double {
+        const double x0 = par[0];
+        const double y0 = par[1];
+
+        // Compute weights for all pixels at trial position
+        double wSum = 0.0;
+        double w[25];  // max neighbourhood size
+        for (int i = 0; i < nPixels; ++i) {
+            double dx = x0 - pixelX[i];
+            double dy = y0 - pixelY[i];
+            double dist = std::hypot(dx, dy);
+            // YOUR EXISTING FUNCTION:
+            w[i] = core::calcWeight(
+                core::SignalModel::LogA,
+                dist, padSize, padSize, d0MM);
+            wSum += w[i];
+        }
+
+        // chi2: compare predicted vs observed
+        double chi2 = 0.0;
+        for (int i = 0; i < nPixels; ++i) {
+            double Fpred = (wSum > 0) ? w[i] / wSum : 0.0;
+            double Qpred = Fpred * Qtotal;
+            double sigma = std::sqrt(
+                sigmaElectronic * sigmaElectronic
+                + sigmaGainFrac * sigmaGainFrac
+                  * Qobs[i] * Qobs[i]);
+            sigma = std::max(sigma, 1e-20);
+            double pull = (Qobs[i] - Qpred) / sigma;
+            chi2 += pull * pull;
+        }
+        return chi2;
+    };
+
+    // Set up Minuit2
+    auto minimizer = std::unique_ptr<ROOT::Math::Minimizer>(
+        ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+    minimizer->SetMaxFunctionCalls(200);
+    minimizer->SetTolerance(1e-6);
+    minimizer->SetPrintLevel(0);
+
+    ROOT::Math::Functor functor(chi2Fcn, 2);
+    minimizer->SetFunction(functor);
+
+    // One variable per dimension, seeded at centre pixel
+    minimizer->SetLimitedVariable(
+        0, "x0", pixelCenterX, 0.01 * pitch,
+        pixelCenterX - pitch, pixelCenterX + pitch);
+    minimizer->SetLimitedVariable(
+        1, "y0", pixelCenterY, 0.01 * pitch,
+        pixelCenterY - pitch, pixelCenterY + pitch);
+
+    PhysicsModelFitResult result;
+    result.converged = minimizer->Minimize();
+    if (result.converged) {
+        result.x0   = minimizer->X()[0];
+        result.y0   = minimizer->X()[1];
+        result.chi2 = minimizer->MinValue();
+        result.ndf  = nPixels - 2;  // 2 free params
+    }
+    return result;
+}
+\end{lstlisting}
+
+\noindent
+Note what is \emph{absent}: no amplitude~$A$, no width~$\sigma$, no
+baseline~$B$, no \file{FitUncertainty.hh} models.  The physics produces
+the shape; the position is the only unknown.
+
+%----------------------------------------------------------------------
+\subsection{Relationship to the Gaussian Fit}
+\label{sec:relationship}
+%----------------------------------------------------------------------
+
+The Gaussian fit is doing the same thing conceptually---minimising a
+$\chi^{2}$ between a model and data---but with the wrong model.  The
+table below shows the correspondence:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Concept} & \textbf{Gaussian fit} & \textbf{Physics-model fit} \\
+\midrule
+Fit function
+  & $A\, e^{-(x-\mu)^{2}/2\sigma^{2}} + B$
+  & $F_i(x_0) \cdot Q_{\text{total}}$ \\[2pt]
+Position parameter
+  & $\mu$
+  & $x_0$ \\[2pt]
+Nuisance parameters
+  & $A,\, \sigma,\, B$
+  & \emph{none} \\[2pt]
+Model shape
+  & Gaussian (wrong)
+  & LogA/LinA (correct) \\[2pt]
+Per-pixel error
+  & 9 tuneable models
+  & Physical noise \\[2pt]
+Minimiser
+  & Minuit2 (reuse as-is)
+  & Minuit2 (reuse as-is) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip\noindent
+You keep the same minimiser, the same convergence-check logic, the same
+centroid fallback.  The only change is what the $\chi^{2}$ function
+computes inside.
+
+%----------------------------------------------------------------------
+\section{Validation: Tornago et al.\ (arXiv:2007.09528)}
+\label{sec:tornago}
+%----------------------------------------------------------------------
+
+The physics-model fit described in Section~\ref{sec:physfit} is not a
+new idea---it is exactly the reconstruction strategy derived and
+validated in the foundational AC-LGAD paper by Tornago et al.~\cite{tornago2021}.
+
+\subsection{What the Paper Does}
+
+Section~3.3 of Tornago et al.\ defines position reconstruction as
+follows.  For each event, the measured charge fractions are:
+\begin{equation}
+  f_i^{\,\text{meas}} \;=\; \frac{A_i}{A_{\text{tot}}}
+  \label{eq:tornago-fmeas}
+\end{equation}
+where $A_i$ is the amplitude (charge) on pad~$i$ and
+$A_{\text{tot}} = \sum_j A_j$.  The model-predicted fractions for a
+trial position $(x, y)$ are computed from the LogA or LinA model
+(Eqs.~4 and~6 in the paper).  The reconstructed position is the one
+that minimises the $\chi^{2}$ (their Eq.~8):
+\begin{equation}
+  \chi^{2}(x, y)
+    \;=\; \sum_{i}
+      \left[
+        \left(\frac{A_i}{A_{\text{tot}}}\right)_{\!\text{meas}}
+        \;-\;
+        \left(\frac{A_i}{A_{\text{tot}}}\right)_{\!\text{calc}}
+      \right]^{2}
+  \label{eq:tornago-chi2}
+\end{equation}
+
+\noindent
+This is the same objective as equation~\eqref{eq:phys-chi2} in
+Section~\ref{sec:phys-fit}: compare measured charge fractions against
+fractions predicted by the physics model, and find the position that
+best explains the data.
+
+\subsection{Difference: Grid Search vs.\ Continuous Minimisation}
+
+Tornago et al.\ perform the minimisation as a \textbf{grid search}:
+the detector surface is divided into discrete $(x, y)$ bins, the
+predicted fractions are precomputed for each bin, and the bin with the
+smallest $\chi^{2}$ is selected.  The paper notes that ``the accuracy
+can be increased by performing a local interpolation around the
+minimum.''
+
+The approach in Section~\ref{sec:phys-fit} replaces the grid search
+with \textbf{continuous Minuit2 minimisation}, which has several
+advantages:
+
+\begin{itemize}[nosep]
+  \item \textbf{Sub-bin precision.}\quad
+    The reconstructed position is not quantised to a grid.  Minuit2
+    naturally finds the exact minimum of the $\chi^{2}$ surface.
+  \item \textbf{No precomputation.}\quad
+    There is no need to build and store a lookup table of predicted
+    fractions for every bin.  The forward model is evaluated on-the-fly
+    during minimisation.
+  \item \textbf{Proper uncertainties.}\quad
+    Per-pixel noise enters the denominator of the $\chi^{2}$
+    (equation~\eqref{eq:phys-chi2}), giving the minimiser correct
+    weighting.  The paper's Eq.~8 uses unweighted residuals.
+  \item \textbf{Fit quality metric.}\quad
+    The minimised $\chi^{2}/\text{NDF}$ is a meaningful goodness-of-fit
+    measure, enabling quality cuts.
+\end{itemize}
+
+\noindent
+Both approaches are valid.  The grid search is simpler to implement and
+avoids any risk of minimiser non-convergence; the continuous fit gives
+better resolution and richer diagnostics.
+
+\subsection{Connection to the Codebase}
+
+The functions used by Tornago et al.\ to compute the predicted fractions
+are the \emph{same} functions already implemented in
+\file{ChargeSharingCore.hh}:
+
+\medskip
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Tornago et al.} & \textbf{Your code} & \textbf{Purpose} \\
+\midrule
+Eq.~4 (LogA weight)
+  & \code{calcWeightLogA()}
+  & $F_i \propto \alpha_i / \ln(d_i/d_0)$ \\[2pt]
+Eq.~6 (LinA weight)
+  & \code{calcWeightLinA()}
+  & $F_i \propto (1 - \beta\, d_i)\,\alpha_i$ \\[2pt]
+Fraction normalisation
+  & \code{calculateNeighborhood()}
+  & $\sum_i F_i = 1$ \\[2pt]
+Pad view angle $\alpha_i$
+  & \code{calcPadViewAngle()}
+  & Geometric acceptance \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip\noindent
+In other words, the codebase already contains a complete implementation
+of the Tornago reconstruction model on the \emph{simulation} side.
+The only missing piece is calling these same functions on the
+\emph{reconstruction} side---inside a Minuit2 $\chi^{2}$ functor---rather
+than fitting a Gaussian.
+
+\begin{thebibliography}{1}
+\bibitem{tornago2021}
+  N.~Cartiglia, M.~Tornago, et al.,
+  ``Resistive AC-Coupled Silicon Detectors: principles of operation,
+    flavors, performance,''
+  \textit{Nucl.\ Instrum.\ Meth.\ A}, vol.~1003, p.~165311, 2021.
+  arXiv:2007.09528.
+\end{thebibliography}
+
+%----------------------------------------------------------------------
+\section{Secondary Issues}
+%----------------------------------------------------------------------
+
+\paragraph{1.\ \file{FitUncertainty.hh} is over-engineered.}
+Nine $\sigma$ models (\code{SigmaLinear}, \code{SigmaPower},
+\code{SigmaPowerInverse}, \code{SigmaQuadratic},
+\code{SigmaExpSaturating}, \code{SigmaPiecewiseCoreTail},
+\code{SigmaLogistic}, \code{QnQiScaled}, \code{UniformPercentOfMax})
+with ${\sim}\,15$ tuneable parameters.  This is a hyperparameter search
+to compensate for Gaussian model mismatch.  With the correct fit
+function, you need one model: physical noise.
+
+\paragraph{2.\ No fit quality cut.}
+A fit that ``converges'' but has $\sigma$ pegged at a boundary, or
+$\chi^{2}/\text{NDF} \gg 1$, or $A < 0$, is not reliable.  The plugin's
+centroid fallback triggers on non-convergence only.  Add rejection
+criteria:
+\begin{itemize}[nosep]
+  \item $\sigma$ at boundary (pegged) $\;\to\;$ reject.
+  \item $\chi^{2}/\text{NDF} > \text{threshold}$ $\;\to\;$ reject.
+  \item $A$ or $B$ at boundary $\;\to\;$ suspect.
+\end{itemize}
+
+\paragraph{3.\ 2D Gaussian lacks a rotation angle.}
+Your 2D Gaussian assumes axis-aligned elliptical contours (separate
+$\sigma_x$, $\sigma_y$).  For hits not on the pixel centre axis, the
+charge distribution has a rotated ellipse shape.  Adding a rotation
+parameter~$\theta$ (7 parameters total) would help, but this is minor
+compared to the model mismatch issue.
+
+\paragraph{4.\ Standalone fits are batch post-processing, not inline.}
+\file{GaussianFitter.cc} opens the ROOT file after simulation and adds
+branches.  This means during event processing, reconstructed positions
+aren't available.  The plugin does it correctly (inline).
+\file{PROJECT\_REPORT.md} already flags this.
+
+%----------------------------------------------------------------------
+\section{Do You Need to Improve?}
+%----------------------------------------------------------------------
+
+\textbf{For simulation studies / algorithm R\&D:}\quad
+The Gaussian fits are \emph{adequate}.  They give reasonable position
+resolution for benchmarking charge sharing models and comparing LogA
+vs.\ LinA.  The centroid fallback ensures robustness.
+
+\medskip\noindent
+\textbf{For ePIC production (integration into EICrecon):}\quad
+Yes, improving matters.  Recent results from the community:
+
+\begin{itemize}[nosep]
+  \item \textbf{Siviero et al.\ (2024):} Neural network on FBK RSD2
+    ($450\;\mu\text{m}$ pitch) achieved ${\sim}65\;\mu\text{m}$ resolution
+    at DESY test beam---${\sim}50\%$ better than analytical methods.
+  \item \textbf{Sunnarborg, CPAD 2025:} DNN on BNL AC-LGADs
+    ($500\;\mu\text{m}$ pitch) achieved ${\sim}20\;\mu\text{m}$ MSE
+    vs.\ ${\sim}25\;\mu\text{m}$ for analytical matrix inversion.
+  \item Both groups found that ML on full waveforms beats analytical
+    amplitude-only methods.
+\end{itemize}
+
+\noindent
+The physics-model fit described in Section~\ref{sec:physfit} would be a
+natural middle ground: better than a Gaussian, simpler than training an
+NN, and reusing your existing code.
+
+%----------------------------------------------------------------------
+\section{Summary of Priorities}
+%----------------------------------------------------------------------
+
+\begin{enumerate}[nosep]
+  \item \textbf{High value, moderate effort:}\quad
+    Replace the Gaussian with your own physics model as the fit function.
+    You already have \code{calcWeight()}---wrap it in a Minuit2
+    \code{FCNBase}.  This eliminates \file{FitUncertainty} complexity and
+    improves accuracy.
+
+  \item \textbf{Quick win:}\quad
+    Add fit quality cuts (boundary-pegged parameters,
+    $\chi^{2}/\text{NDF}$ threshold) to the reconstruction fallback
+    logic.
+
+  \item \textbf{Low priority:}\quad
+    The Gaussian fit is fine to keep as a \emph{secondary/comparison}
+    method---it's useful for visualisation and diagnostics.  But it
+    shouldn't be the primary reconstruction.
+
+  \item \textbf{Future:}\quad
+    For ePIC production, consider that ML approaches are achieving the
+    best resolution in the community.  Your simulation is ideal training
+    data for a lightweight neural network.
+\end{enumerate}
+
+\end{document}
