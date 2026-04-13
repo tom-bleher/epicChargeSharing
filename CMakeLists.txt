@@ -106,6 +106,18 @@ endif()
 add_custom_target(ePIC DEPENDS epicChargeSharing)
 
 # ============================================================================
+# Installation
+# ============================================================================
+include(GNUInstallDirs)
+
+install(TARGETS epicChargeSharing
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(DIRECTORY macros/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/epicChargeSharing/macros
+        FILES_MATCHING PATTERN "*.mac")
+
+# ============================================================================
 # Testing
 # ============================================================================
 if(BUILD_TESTING)

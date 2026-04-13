@@ -1,10 +1,5 @@
 # Ignore build directory
 build/
-geant4_env/
-
-# MkDocs documentation (not yet ready for public)
-docs/
-site/
 
 # Compiled Object files
 *.o
@@ -39,6 +34,7 @@ CMakeCache.txt
 cmake_install.cmake
 *.cmake
 !CMakeLists.txt
+!*Config.cmake
 
 # Python
 *.pyc
@@ -65,8 +61,16 @@ cmake_install.cmake
 # Cache directories
 .cache/
 
-# Project notes (not for version control)
-main.md
+# Python bytecode
+__pycache__/
 
 # CMake user presets (per-developer local config)
 CMakeUserPresets.json
+
+# Internal AI session notes
+**/CLAUDE.md
+!/.claude/
+
+# Planning documents (generated, not source)
+SHIPPING_PLAN.md
+EIC_INTEGRATION_GUIDE.md
