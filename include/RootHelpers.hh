@@ -158,7 +158,5 @@ std::mutex& RootIOMutex();
 
 } // namespace ECS
 
-// Alias for ROOT macro compatibility (used by FitGaussian2D.C)
-namespace rootutils = ECS::RootUtils;
 
 #endif // ECS_ROOT_HELPERS_HH

@@ -64,6 +64,14 @@ struct ChargeSharingConfig {
 
     SegmentationConfig segmentation{}; ///< Geometry from DD4hep (if available)
 
+    // ────────────────────────── Charge Sharing Sigma ────────────────────────────
+    /// Sigma mode matching upstream SiliconChargeSharingConfig:
+    ///   "abs" = sigma values are absolute lengths in mm
+    ///   "rel" = sigma values are fractions of cell width
+    std::string sigma_mode = "abs";
+    double sigma_sharingx = 0.0; ///< X sharing sigma (0 = use physics model)
+    double sigma_sharingy = 0.0; ///< Y sharing sigma (0 = use physics model)
+
     // ─────────────────────────────── Physics ────────────────────────────────────
     double ionizationEnergyEV = 3.6;   ///< eV per e-h pair in silicon
     double amplificationFactor = 20.0; ///< AC-LGAD gain (8-25 typical)

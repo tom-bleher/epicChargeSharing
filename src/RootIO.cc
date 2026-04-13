@@ -677,7 +677,6 @@ bool PostProcessingRunner::Run() {
         ECS::Fit::FitGaussian2D(fConfig.rootFileName.c_str());
         executed = true;
     }
-
     if (executed) {
         G4cout << "[PostProcessingRunner] Post-processing fits finished" << G4endl;
     }

@@ -386,7 +386,7 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
 
             const double dx = hitX - pixel.centerX;
             const double dy = hitY - pixel.centerY;
-            pixel.distance = calcDistanceToCenter(dx, dy, padW / 2.0, padH / 2.0);
+            pixel.distance = calcDistanceToCenter(dx, dy);
             pixel.alpha = calcPadViewAngle(pixel.distance, padW, padH);
 
             pixel.weight =
