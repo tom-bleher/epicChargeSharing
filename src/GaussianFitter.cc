@@ -49,7 +49,7 @@ namespace cfit = epic::chargesharing::fit;
 // ============================================================================
 namespace Config {
 // Uncertainty model
-constexpr bool USE_VERTICAL_UNCERTAINTIES = Constants::FIT_USE_VERTICAL_UNCERTAINTIES;
+const bool USE_VERTICAL_UNCERTAINTIES = ECS::RuntimeConfig::Instance().fitUseVerticalUncertainties;
 
 // Charge branches
 constexpr const char* CHARGE_BRANCH_1D = Constants::FIT_CHARGE_BRANCH_1D;
@@ -904,11 +904,11 @@ int FitGaussian2D(const char* filename) {
 // ============================================================================
 bool RunAllFits(const std::string& filename) {
     bool executed = false;
-    if (Constants::FIT_GAUS_1D) {
+    if (ECS::RuntimeConfig::Instance().fitGaus1D) {
         FitGaussian1D(filename.c_str());
         executed = true;
     }
-    if (Constants::FIT_GAUS_2D) {
+    if (ECS::RuntimeConfig::Instance().fitGaus2D) {
         FitGaussian2D(filename.c_str());
         executed = true;
     }

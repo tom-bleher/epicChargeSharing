@@ -249,10 +249,12 @@ void DetectorConstruction::SyncRunMetadata() {
     fRunAction->SetGridPixelCenters(fPixelCenters);
     fRunAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
 
-    const auto reconMethod = Constants::RECON_METHOD;
+    const auto reconMethod = (ECS::RuntimeConfig::Instance().activeMode == 1)
+                                 ? Constants::ReconMethod::LinA
+                                 : Constants::ReconMethod::LogA;
     G4double linearBeta = std::numeric_limits<G4double>::quiet_NaN();
     // Beta is only used when LinA signal model is active
-    if (Constants::USES_LINEAR_SIGNAL) {
+    if (ECS::RuntimeConfig::Instance().activeMode == 1) {
         linearBeta = GetLinearChargeModelBeta();
     }
     fRunAction->SetPosReconMetadata(reconMethod, linearBeta, fPixelSpacing);

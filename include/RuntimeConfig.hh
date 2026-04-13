@@ -50,7 +50,8 @@ public:
     RuntimeConfig& operator=(RuntimeConfig&&) = delete;
 
     // ---- Mode Selection ----
-    // Mode is kept compile-time (structural choice affecting branches/fitting)
+    G4int activeMode{static_cast<G4int>(Constants::ACTIVE_MODE)};           // 0=LogA, 1=LinA
+    G4int activePixelMode{static_cast<G4int>(Constants::ACTIVE_PIXEL_MODE)}; // 0-4, see ActivePixelMode enum
 
     // ---- Detector Geometry ----
     // These are exposed here for read access, but note that
@@ -81,6 +82,16 @@ public:
 
     // ---- Fitting ----
     G4double fitErrorPercentOfMax{Constants::FIT_ERROR_PERCENT_OF_MAX};
+    G4bool fitGaus1D{Constants::FIT_GAUS_1D};
+    G4bool fitGaus2D{Constants::FIT_GAUS_2D};
+    G4bool fitUseVerticalUncertainties{Constants::FIT_USE_VERTICAL_UNCERTAINTIES};
+    // ---- Charge Sharing (upstream-compatible) ----
+    G4String sigmaMode{"abs"};    ///< "abs" = sigma in mm, "rel" = fraction of cell width
+    G4double sigmaSharingX{0.0};  ///< X sharing sigma (0 = use physics model)
+    G4double sigmaSharingY{0.0};  ///< Y sharing sigma (0 = use physics model)
+
+    // ---- Output ----
+    G4bool storeFullGrid{Constants::STORE_FULL_GRID};
 
 private:
     RuntimeConfig();
@@ -90,6 +101,9 @@ private:
     std::unique_ptr<G4GenericMessenger> fNoiseMessenger;
     std::unique_ptr<G4GenericMessenger> fFitMessenger;
     std::unique_ptr<G4GenericMessenger> fGunMessenger;
+    std::unique_ptr<G4GenericMessenger> fModeMessenger;
+    std::unique_ptr<G4GenericMessenger> fOutputMessenger;
+    std::unique_ptr<G4GenericMessenger> fChargeSharingMessenger;
 };
 
 } // namespace ECS

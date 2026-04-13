@@ -194,8 +194,8 @@ private:
     G4int fGridNumBlocksPerSide{0};
     G4int fGridNeighborhoodRadius{0};
 
-    Constants::PosReconModel fPosReconModel{Constants::POS_RECON_MODEL};
-    Constants::ActivePixelMode fActivePixelMode{Constants::ACTIVE_PIXEL_MODE};
+    Constants::PosReconModel fPosReconModel{};
+    Constants::ActivePixelMode fActivePixelMode{};
     G4double fChargeSharingBeta{0.0};
     G4double fChargeSharingPitch{0.0};
     G4bool fEmitDistanceAlphaMeta{false};

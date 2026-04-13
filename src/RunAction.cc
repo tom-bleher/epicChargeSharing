@@ -55,11 +55,16 @@ RunAction::RunAction()
 
       fChargeSharingBeta(std::numeric_limits<G4double>::quiet_NaN()),
 
-      fStoreFullFractions(Constants::STORE_FULL_GRID),
+      fStoreFullFractions(ECS::RuntimeConfig::Instance().storeFullGrid),
 
       fEDM4hepWriter(IO::MakeEDM4hepWriter())
 
 {
+    fActivePixelMode = static_cast<Constants::ActivePixelMode>(
+        ECS::RuntimeConfig::Instance().activePixelMode);
+    fPosReconModel = (ECS::RuntimeConfig::Instance().activeMode == 1)
+                         ? Constants::PosReconModel::LinA
+                         : Constants::PosReconModel::LogA;
     if (fEDM4hepWriter && fEDM4hepWriter->IsEnabled()) {
         fWriteEDM4hep = true;
     }
@@ -755,8 +760,8 @@ void RunAction::PopulateFullFractionsFromRecord(const EventRecord& record) {
 void RunAction::RunPostProcessingFits() {
     // Delegate to PostProcessingRunner helper
     IO::PostProcessingRunner::Config config;
-    config.runFitGaus1D = Constants::FIT_GAUS_1D;
-    config.runFitGaus2D = Constants::FIT_GAUS_2D;
+    config.runFitGaus1D = ECS::RuntimeConfig::Instance().fitGaus1D;
+    config.runFitGaus2D = ECS::RuntimeConfig::Instance().fitGaus2D;
     config.sourceDir = PROJECT_SOURCE_DIR;
     config.rootFileName = "epicChargeSharing.root";
 
@@ -831,7 +836,7 @@ void RunAction::SetNeighborhoodRadiusMeta(G4int radius) {
 void RunAction::SetPosReconMetadata(Constants::PosReconModel model, G4double betaPerMicron, G4double pitch) {
     fPosReconModel = model;
     // Beta is only used when LinA signal model is active
-    if (Constants::USES_LINEAR_SIGNAL && std::isfinite(betaPerMicron)) {
+    if (ECS::RuntimeConfig::Instance().activeMode == 1 && std::isfinite(betaPerMicron)) {
         fChargeSharingBeta = betaPerMicron;
     } else {
         fChargeSharingBeta = std::numeric_limits<G4double>::quiet_NaN();
@@ -940,7 +945,9 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const {
 
     // Charge sharing model metadata
     ECS::IO::MetadataPublisher::ModelMetadata model;
-    model.signalModel = Constants::SIGNAL_MODEL;
+    model.signalModel = (ECS::RuntimeConfig::Instance().activeMode == 1)
+                            ? Constants::SignalModel::LinA
+                            : Constants::SignalModel::LogA;
     model.model = static_cast<ECS::Config::PosReconModel>(fPosReconModel);
     model.activePixelMode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
     model.beta = fChargeSharingBeta;

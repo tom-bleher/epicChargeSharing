@@ -58,7 +58,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
       fChargeSharing(detector),
 
       fNeighborhoodLayout(detector ? detector->GetNeighborhoodRadius() : Constants::NEIGHBORHOOD_RADIUS),
-      fEmitDistanceAlphaOutputs(true), fComputeFullFractions(Constants::STORE_FULL_GRID) {
+      fEmitDistanceAlphaOutputs(true), fComputeFullFractions(ECS::RuntimeConfig::Instance().storeFullGrid) {
     // Override physics parameters from runtime config
     const auto& rtConfig = ECS::RuntimeConfig::Instance();
     fIonizationEnergy = rtConfig.ionizationEnergy;
@@ -75,7 +75,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
         fRunAction->ConfigureFullFractionBranch(fComputeFullFractions);
     }
 
-    fMessenger = std::make_unique<G4GenericMessenger>(this, "/epic/chargeSharing/", "Charge sharing configuration");
+    fMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/chargeSharing/", "Charge sharing configuration");
     auto& cmd = fMessenger->DeclareProperty("computeDistanceAlpha", fEmitDistanceAlphaOutputs,
                                             "Enable per-neighbor distance and alpha outputs");
     cmd.SetStates(G4State_PreInit, G4State_Idle);
@@ -84,6 +84,7 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
                                                 "Enable per-event full-detector charge fractions (F_i)");
     fullCmd.SetStates(G4State_PreInit, G4State_Idle);
     fullCmd.SetToBeBroadcasted(true);
+
 }
 
 void EventAction::BeginOfEventAction(const G4Event* /*event*/) {
