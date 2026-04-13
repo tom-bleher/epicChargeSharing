@@ -96,12 +96,27 @@ inline T clamp(T value, T lo, T hi) {
 // Charge Model Calculations
 // ============================================================================
 
-/// @brief Calculate Euclidean distance from hit point to pixel center.
+/// @brief Calculate distance from hit point to nearest pad metal edge.
+///
+/// Following Tornago et al. (NIM A 1003, 2021), $d_i$ is the distance from the
+/// hit to the nearest point on the pad metal boundary, not the pad center.
+/// For a hit inside the pad, returns 0. This gives the correct signal gradient
+/// near pad edges where charge sharing contrast is highest.
 /// @param dxMM Offset in X from hit to pixel center (mm).
 /// @param dyMM Offset in Y from hit to pixel center (mm).
-/// @return Distance in mm.
-inline double calcDistanceToCenter(double dxMM, double dyMM) {
-    return std::hypot(dxMM, dyMM);
+/// @param padHalfWidthMM Half of pad width in X (mm). Pass 0 to fall back to center distance.
+/// @param padHalfHeightMM Half of pad height in Y (mm). Pass 0 to fall back to center distance.
+/// @return Distance to nearest pad edge in mm (>= 0).
+inline double calcDistanceToCenter(double dxMM, double dyMM,
+                                   double padHalfWidthMM = 0.0, double padHalfHeightMM = 0.0) {
+    if (padHalfWidthMM <= 0.0 && padHalfHeightMM <= 0.0) {
+        // Legacy: distance to center (backward compatible)
+        return std::hypot(dxMM, dyMM);
+    }
+    // Distance to nearest edge of rectangular pad
+    const double edgeDx = std::max(0.0, std::abs(dxMM) - padHalfWidthMM);
+    const double edgeDy = std::max(0.0, std::abs(dyMM) - padHalfHeightMM);
+    return std::hypot(edgeDx, edgeDy);
 }
 
 /// @brief Calculate pad view angle (alpha) -- approximate solid angle subtended by the pad.
@@ -371,7 +386,7 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
 
             const double dx = hitX - pixel.centerX;
             const double dy = hitY - pixel.centerY;
-            pixel.distance = calcDistanceToCenter(dx, dy);
+            pixel.distance = calcDistanceToCenter(dx, dy, padW / 2.0, padH / 2.0);
             pixel.alpha = calcPadViewAngle(pixel.distance, padW, padH);
 
             pixel.weight =
@@ -568,7 +583,7 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
 /// Models two physical effects: per-pixel gain non-uniformity (multiplicative)
 /// and front-end electronic noise (additive, in electron-equivalent units).
 struct NoiseConfig {
-    bool enabled{false};
+    bool enabled{true};
     double gainSigmaMin{0.01};                ///< Minimum per-pixel gain variation (1%)
     double gainSigmaMax{0.05};                ///< Maximum per-pixel gain variation (5%)
     double electronNoiseCount{500.0};         ///< Electronic noise RMS (electrons)

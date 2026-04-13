@@ -46,7 +46,7 @@ inline const G4double GRID_OFFSET = 0.0 * mm; // Grid origin offset
 
 // ─────────────────────────────── Physics ────────────────────────────────────
 inline constexpr G4double IONIZATION_ENERGY = 3.6; // eV per e-h pair (silicon at room temperature)
-inline constexpr G4double GAIN = 20.0;             // AC-LGAD gain factor; typical range 8-25
+inline constexpr G4double GAIN = 10.0;             // AC-LGAD gain factor; typical range 8-25
 inline constexpr G4double D0 = 1.0;                // LogA reference distance d0 (um); controls charge spread width
 
 // ────────────────────────────── Noise Model ─────────────────────────────────

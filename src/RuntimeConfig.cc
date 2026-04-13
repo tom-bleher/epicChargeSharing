@@ -45,10 +45,12 @@ void RuntimeConfig::DefineCommands() {
     fFitMessenger->DeclareProperty("errorPercentOfMax", fitErrorPercentOfMax, "Fit uncertainty (% of max charge)")
         .SetRange("errorPercentOfMax > 0");
 
-    // Gun commands
+    // Gun commands: useFixedPosition, fixedX, fixedY are owned by PrimaryGenerator's
+    // own messenger (also at /ecs/gun/) which binds directly to its member variables.
+    // RuntimeConfig only stores defaults that PrimaryGenerator reads at construction.
+    // Only energy is registered here (PrimaryGenerator reads it from RuntimeConfig).
     fGunMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/gun/", "Particle gun configuration");
 
-    fGunMessenger->DeclareProperty("useFixedPosition", useFixedPosition, "Use fixed position (true) or random sampling (false)");
     fGunMessenger->DeclarePropertyWithUnit("energy", "GeV", particleEnergy, "Primary particle kinetic energy")
         .SetRange("energy > 0");
 }

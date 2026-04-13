@@ -14,6 +14,8 @@
 #include "TObject.h"
 #include "ROOT/RConfig.hxx"
 #include "TROOT.h"
+#include "TSystem.h"
+#include "ROOT/RConfig.hxx"
 #include "TString.h"
 #include "TThread.h"
 #include "TTree.h"
@@ -203,6 +205,15 @@ void WorkerSync::WaitForAll() {
 void InitializeROOTThreading() {
     ROOT::EnableThreadSafety();
     gROOT->SetBatch(true);
+    ROOT::EnableThreadSafety();
+
+    // Force ROOT to load all required dictionaries in the master thread
+    // BEFORE worker threads start. This prevents the Cling interpreter from
+    // racing on dictionary loading in MT mode (ROOT 6.38 macOS crash).
+    gSystem->Load("libTree");
+    gSystem->Load("libHist");
+    gSystem->Load("libMinuit2");
+    gSystem->Load("libMathCore");
 }
 
 G4String WorkerFileName(G4int threadId) {

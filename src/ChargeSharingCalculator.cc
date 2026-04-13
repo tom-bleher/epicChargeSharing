@@ -199,32 +199,26 @@ void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
         return;
     }
 
+    // Use the neighborhood radius to define a patch around the hit pixel.
+    // The patch is a (2*radius+1) x (2*radius+1) grid centered on pixelIndex{I,J}.
+    // We work directly with the cell's grid-relative index (di, dj) from the
+    // core library instead of globalPixelId, which can be negative for detectors
+    // whose pixel indices include negative values (e.g., centered grids).
     const G4int radius = std::max(0, fNeighborhoodRadius);
-    const G4int row0 = std::max(0, fResult.pixelIndexI - radius);
-    const G4int col0 = std::max(0, fResult.pixelIndexJ - radius);
-    const G4int row1 = std::min(numBlocksPerSide, fResult.pixelIndexI + radius + 1);
-    const G4int col1 = std::min(numBlocksPerSide, fResult.pixelIndexJ + radius + 1);
-    const G4int nRows = std::max(0, row1 - row0);
-    const G4int nCols = std::max(0, col1 - col0);
-    if (nRows <= 0 || nCols <= 0) {
-        return;
-    }
+    const G4int patchDim = 2 * radius + 1;
 
-    const PatchInfo info{.row0 = row0, .col0 = col0, .nRows = nRows, .nCols = nCols};
+    const PatchInfo info{.row0 = 0, .col0 = 0, .nRows = patchDim, .nCols = patchDim};
     fResult.patch.Resize(info);
     fResult.patch.charges.Zero();
 
     for (const auto& cell : fResult.cells) {
-        if (cell.globalPixelId < 0) {
+        // Use grid-relative index: cell.gridIndex = (di+R)*gridDim + (dj+R)
+        // where di,dj are offsets from the center pixel
+        if (cell.gridIndex < 0 || cell.gridIndex >= patchDim * patchDim) {
             continue;
         }
-        const G4int globalRow = cell.globalPixelId / numBlocksPerSide;
-        const G4int globalCol = cell.globalPixelId % numBlocksPerSide;
-        if (globalRow < row0 || globalRow >= row1 || globalCol < col0 || globalCol >= col1) {
-            continue;
-        }
-        const G4int localRow = globalRow - row0;
-        const G4int localCol = globalCol - col0;
+        const G4int localRow = cell.gridIndex / patchDim;
+        const G4int localCol = cell.gridIndex % patchDim;
         fResult.patch.charges.signalFraction(localRow, localCol) = cell.fraction;
         fResult.patch.charges.signalFractionRow(localRow, localCol) = cell.fractionRow;
         fResult.patch.charges.signalFractionCol(localRow, localCol) = cell.fractionCol;
@@ -352,8 +346,16 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     coreConfig.minIndexX = fDetector->GetMinIndexX();
     coreConfig.minIndexY = fDetector->GetMinIndexY();
 
+    // The core library uses 0-based pixel indices for bounds checking,
+    // but the standalone simulation uses centered indices (e.g., -30 to +30).
+    // Convert to 0-based by subtracting the minimum index.
+    const G4int minIndexX = fDetector->GetMinIndexX();
+    const G4int minIndexY = fDetector->GetMinIndexY();
+    const G4int centerI_0based = fResult.pixelIndexI - minIndexX;
+    const G4int centerJ_0based = fResult.pixelIndexJ - minIndexY;
+
     const auto coreResult =
-        csc::calculateNeighborhood(hitPos.x(), hitPos.y(), fResult.pixelIndexI, fResult.pixelIndexJ,
+        csc::calculateNeighborhood(hitPos.x(), hitPos.y(), centerI_0based, centerJ_0based,
                                    fResult.nearestPixelCenter.x(), fResult.nearestPixelCenter.y(), coreConfig);
 
     // Build Eigen weight grid from core result for per-row/per-col normalization
@@ -561,7 +563,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
             const G4double dxToCenter = baseDx - (di * pixelSpacing);
             const G4double dyToCenter = baseDy - (dj * pixelSpacing);
-            const G4double distanceToCenter = csc::calcDistanceToCenter(dxToCenter, dyToCenter);
+            const G4double distanceToCenter = csc::calcDistanceToCenter(dxToCenter, dyToCenter, pixelSize / 2.0, pixelSize / 2.0);
             const G4double alpha = csc::calcPadViewAngle(distanceToCenter, pixelSize, pixelSize);
 
             // Delegate weight calculation to core (handles guard logic internally)

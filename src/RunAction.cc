@@ -21,6 +21,7 @@
 #include "RVersion.h"
 #include "TError.h"
 #include "TFile.h"
+#include "TChain.h"
 #include "TFileMerger.h"
 #include "TThread.h"
 #include "TTree.h"
@@ -536,29 +537,22 @@ bool RunAction::MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& 
             return false;
         }
 
-        TFileMerger merger(kFALSE);
-        merger.SetFastMethod(kFALSE);
-        merger.SetNotrees(kFALSE);
-        if (!merger.OutputFile(output.c_str(), "RECREATE")) {
-            G4Exception("RunAction::MergeWorkerFilesAndPublishMetadata", "OutputFileFailure", FatalException,
-                        "Unable to open output file for ROOT merge.");
-            return false;
-        }
-
-        bool added = false;
+        // Use TChain::Merge instead of TFileMerger.
+        // TFileMerger silently drops TTrees with variable-length array branches
+        // in ROOT 6.38+ (observed with branches like NeighborhoodPixelX[NeighborhoodSize]).
+        TChain chain("Hits");
         for (const auto& file : inputs) {
             if (std::filesystem::exists(file.c_str())) {
-                if (merger.AddFile(file.c_str())) {
-                    added = true;
-                }
+                chain.Add(file.c_str());
             }
         }
 
-        if (!added) {
+        if (chain.GetEntries() == 0) {
             return false;
         }
 
-        return merger.Merge();
+        auto mergeResult = chain.Merge(output.c_str());
+        return mergeResult > 0;
     };
 
     bool mergeOk = false;
