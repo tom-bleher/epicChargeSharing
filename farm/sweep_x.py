@@ -114,6 +114,32 @@ def calculate_gap_positions(
 
     return sorted(positions)
 
+def calculate_full_pitch_positions(
+    pixel_pitch: float = PIXEL_PITCH_UM,
+    half_pad: float = HALF_PAD_UM,
+    step_size: float = STEP_SIZE_UM,
+    n_pixels: int = 3,
+) -> list:
+    """Calculate positions covering the full pitch range including metal pads.
+
+    Unlike calculate_gap_positions(), this covers EVERYWHERE: gaps and pads.
+    Useful for reproducing plots like Dutta Figure 16 which show both
+    two-channel (gap) and one-channel (pad) resolution.
+
+    Returns positions from the left edge of the leftmost pixel to
+    the right edge of the rightmost pixel.
+    """
+    half_span = (n_pixels - 1) // 2
+    x_min = -half_span * pixel_pitch - half_pad
+    x_max = half_span * pixel_pitch + half_pad
+    positions = []
+    x = x_min
+    while x <= x_max + 0.1:
+        positions.append(round(x, 1))
+        x += step_size
+    return positions
+
+
 # Default positions: gap regions between 3 pixels, avoiding metal pads
 POSITIONS = calculate_gap_positions()
 
@@ -143,17 +169,19 @@ def write_file_text(path: Path, text: str) -> None:
         f.write(text)
 
 
-def generate_position_macro(x_um: float, n_events: int = 10000) -> str:
+def generate_position_macro(
+    x_um: float,
+    n_events: int = 10000,
+    particle: str = "e-",
+    energy_gev: float = 10.0,
+) -> str:
     """Generate a Geant4 macro that sets the particle gun to a fixed X position.
-
-    Uses the /epic/gun/ messenger commands defined in PrimaryGenerator.cc:
-    - /epic/gun/useFixedPosition true  (enable fixed position mode)
-    - /epic/gun/fixedX <value> mm      (set X coordinate)
-    - /epic/gun/fixedY 0 mm            (set Y to center of pad row)
 
     Args:
         x_um: X position in micrometers
         n_events: Number of events to simulate
+        particle: Geant4 particle name (e.g. "e-", "proton")
+        energy_gev: Beam energy in GeV
 
     Returns:
         Macro file contents as a string
@@ -171,13 +199,13 @@ def generate_position_macro(x_um: float, n_events: int = 10000) -> str:
 /run/initialize
 
 # Set particle gun parameters
-/gun/particle e-
-/gun/energy 10 GeV
+/gun/particle {particle}
+/gun/energy {energy_gev} GeV
 
 # Set fixed position mode with X = {x_um:.1f} µm ({x_mm:.4f} mm)
-/epic/gun/useFixedPosition true
-/epic/gun/fixedX {x_mm:.4f} mm
-/epic/gun/fixedY 0 mm
+/ecs/gun/useFixedPosition true
+/ecs/gun/fixedX {x_mm:.4f} mm
+/ecs/gun/fixedY 0 mm
 
 # Run events
 /run/beamOn {n_events}
@@ -209,7 +237,6 @@ def run_simulation(macro_path: Path):
         raise RuntimeError(f"Executable not found: {EXECUTABLE}")
     if not macro_path.exists():
         raise RuntimeError(f"Macro file not found: {macro_path}")
-    # Multithreaded by default (let executable decide threads)
     run_cmd([str(EXECUTABLE), "-m", str(macro_path)])
 
 
@@ -320,13 +347,36 @@ def main():
         action="store_true",
         help="Skip building (assume executable is already up to date).",
     )
+    parser.add_argument(
+        "--full-pitch",
+        dest="full_pitch",
+        action="store_true",
+        help="Scan full pitch range including metal pads (for Dutta-style resolution plots).",
+    )
+    parser.add_argument(
+        "--particle",
+        type=str,
+        default="e-",
+        help="Geant4 particle name (e.g. 'e-', 'proton').",
+    )
+    parser.add_argument(
+        "--energy-gev",
+        dest="energy_gev",
+        type=float,
+        default=10.0,
+        help="Beam energy in GeV.",
+    )
     args = parser.parse_args()
 
     os.chdir(str(REPO_ROOT))
 
+    positions = calculate_full_pitch_positions() if args.full_pitch else POSITIONS
+
     output_dir = determine_output_dir(args.output_dir)
     print(f"Writing output ROOT files to {output_dir}")
-    print(f"Positions to sweep: {len(POSITIONS)} points")
+    print(f"Mode: {'full pitch' if args.full_pitch else 'gap only'}")
+    print(f"Beam: {args.particle} at {args.energy_gev} GeV")
+    print(f"Positions to sweep: {len(positions)} points")
     print(f"Events per position: {args.n_events}")
 
     # Build once at the start (no recompilation needed for position changes!)
@@ -348,15 +398,18 @@ def main():
     print("=" * 80)
     print("Using Geant4 macro commands to set position (no recompilation needed)")
 
-    for i, x_um in enumerate(POSITIONS, 1):
+    for i, x_um in enumerate(positions, 1):
         out_name = output_dir / (
             f"{int(x_um)}um.root" if float(x_um).is_integer() else f"{x_um}um.root"
         )
 
-        print(f"\n=== [{i}/{len(POSITIONS)}] Position x = {x_um} µm ===")
+        print(f"\n=== [{i}/{len(positions)}] Position x = {x_um} µm ===")
 
         # Generate position-specific macro
-        macro_content = generate_position_macro(x_um, args.n_events)
+        macro_content = generate_position_macro(
+            x_um, args.n_events,
+            particle=args.particle, energy_gev=args.energy_gev,
+        )
         macro_path = macro_dir / f"run_x{int(x_um) if float(x_um).is_integer() else x_um}um.mac"
         write_file_text(macro_path, macro_content)
 
