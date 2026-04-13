@@ -72,6 +72,54 @@ namespace csc = epic::chargesharing::core;
 
 namespace {
 std::once_flag gInvalidD0WarningFlag;
+std::once_flag gInvalidActivePixelModeFlag;
+std::once_flag gInvalidActiveModeFlag;
+std::once_flag gChargeBlockWithout2DFlag;
+
+/// Validate activePixelMode G4int before casting to enum.
+/// Falls back to Neighborhood on out-of-range values.
+Constants::ActivePixelMode validatedActivePixelMode() {
+    const G4int raw = ECS::RuntimeConfig::Instance().activePixelMode;
+    constexpr G4int maxVal = static_cast<G4int>(Constants::ActivePixelMode::ChargeBlock3x3);
+    if (raw < 0 || raw > maxVal) {
+        std::call_once(gInvalidActivePixelModeFlag, [raw]() {
+            G4Exception("ChargeSharingCalculator", "InvalidActivePixelMode", JustWarning,
+                        G4String("activePixelMode=" + std::to_string(raw) +
+                                 " out of range [0," + std::to_string(maxVal) +
+                                 "]; falling back to Neighborhood.").c_str());
+        });
+        return Constants::ActivePixelMode::Neighborhood;
+    }
+    auto mode = static_cast<Constants::ActivePixelMode>(raw);
+    // ChargeBlock modes require 2D fitting at runtime (mirrors compile-time static_assert)
+    if ((mode == Constants::ActivePixelMode::ChargeBlock2x2 ||
+         mode == Constants::ActivePixelMode::ChargeBlock3x3) &&
+        !ECS::RuntimeConfig::Instance().fitGaus2D) {
+        std::call_once(gChargeBlockWithout2DFlag, []() {
+            G4Exception("ChargeSharingCalculator", "ChargeBlockRequires2D", JustWarning,
+                        "ChargeBlock active pixel mode requires fitGaus2D=true; "
+                        "falling back to Neighborhood.");
+        });
+        return Constants::ActivePixelMode::Neighborhood;
+    }
+    return mode;
+}
+
+/// Validate activeMode G4int (0=LogA, 1=LinA).
+/// Returns true for linear (1), false for logarithmic (0).
+/// Falls back to LogA on out-of-range values.
+bool validatedUseLinear() {
+    const G4int raw = ECS::RuntimeConfig::Instance().activeMode;
+    if (raw != 0 && raw != 1) {
+        std::call_once(gInvalidActiveModeFlag, [raw]() {
+            G4Exception("ChargeSharingCalculator", "InvalidActiveMode", JustWarning,
+                        G4String("activeMode=" + std::to_string(raw) +
+                                 " invalid (expected 0=LogA or 1=LinA); falling back to LogA.").c_str());
+        });
+        return false;
+    }
+    return raw == 1;
+}
 
 /// Map standalone signal model flag to core enum
 csc::SignalModel mapSignalModel(bool useLinear) {
@@ -136,7 +184,7 @@ ChargeSharingCalculator::D0Params ChargeSharingCalculator::ValidateD0(G4double d
 ChargeSharingCalculator::ChargeModelParams
 ChargeSharingCalculator::GetChargeModelParams(G4double /*pixelSpacing*/) const {
     ChargeModelParams params{};
-    params.useLinear = Constants::USES_LINEAR_SIGNAL;
+    params.useLinear = validatedUseLinear();
     params.beta = params.useLinear && fDetector ? fDetector->GetLinearChargeModelBeta() : 0.0;
     return params;
 }
@@ -326,7 +374,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const int radius = std::max(0, fNeighborhoodRadius);
     const int gridDim = (2 * radius) + 1;
     const G4bool recordDistanceAlpha = fEmitDistanceAlpha;
-    const auto activePixelMode = Constants::ACTIVE_PIXEL_MODE;
+    const auto activePixelMode = validatedActivePixelMode();
     const bool useRowColMode = (activePixelMode == Constants::ActivePixelMode::RowCol ||
                                 activePixelMode == Constants::ActivePixelMode::RowCol3x3);
 
@@ -343,8 +391,9 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     coreConfig.betaPerMicron = model.beta;
     coreConfig.numPixelsX = numBlocksPerSide;
     coreConfig.numPixelsY = numBlocksPerSide;
-    coreConfig.minIndexX = fDetector->GetMinIndexX();
-    coreConfig.minIndexY = fDetector->GetMinIndexY();
+    // Convert bounds to 0-based to match the 0-based center index below
+    coreConfig.minIndexX = 0;
+    coreConfig.minIndexY = 0;
 
     // The core library uses 0-based pixel indices for bounds checking,
     // but the standalone simulation uses centered indices (e.g., -30 to +30).
@@ -563,7 +612,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
             const G4double dxToCenter = baseDx - (di * pixelSpacing);
             const G4double dyToCenter = baseDy - (dj * pixelSpacing);
-            const G4double distanceToCenter = csc::calcDistanceToCenter(dxToCenter, dyToCenter, pixelSize / 2.0, pixelSize / 2.0);
+            const G4double distanceToCenter = csc::calcDistanceToCenter(dxToCenter, dyToCenter);
             const G4double alpha = csc::calcPadViewAngle(distanceToCenter, pixelSize, pixelSize);
 
             // Delegate weight calculation to core (handles guard logic internally)
@@ -588,7 +637,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
     // Use Eigen for vectorized computation
     auto weightsEigen = fFullGridWeights.AsEigen();
-    const auto activePixelMode = Constants::ACTIVE_PIXEL_MODE;
+    const auto activePixelMode = validatedActivePixelMode();
     const bool useRowColMode = (activePixelMode == Constants::ActivePixelMode::RowCol ||
                                 activePixelMode == Constants::ActivePixelMode::RowCol3x3);
     const bool include3x3 = (activePixelMode == Constants::ActivePixelMode::RowCol3x3);
