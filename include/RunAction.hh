@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// \file RunAction.hh
 /// \brief Definition of the ECS::RunAction class.
 ///

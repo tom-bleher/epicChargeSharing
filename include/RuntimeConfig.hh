@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// @file RuntimeConfig.hh
 /// @brief Runtime configuration for the standalone simulation.
 ///
@@ -31,6 +34,7 @@ namespace ECS {
 ///   /ecs/noise/gainSigmaMin 0.01
 ///   /ecs/noise/gainSigmaMax 0.05
 ///   /ecs/fit/errorPercentOfMax 5.0
+///   /ecs/gun/energy 10.0 GeV
 ///   /ecs/gun/useFixedPosition true
 ///
 /// Note: Detector geometry parameters (pixelSize, pixelPitch, etc.) are
@@ -73,6 +77,7 @@ public:
 
     // ---- Particle Gun ----
     G4bool useFixedPosition{Constants::USE_FIXED_POSITION};
+    G4double particleEnergy{10.0 * CLHEP::GeV};
 
     // ---- Fitting ----
     G4double fitErrorPercentOfMax{Constants::FIT_ERROR_PERCENT_OF_MAX};

@@ -1,15 +1,18 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 #pragma once
 
 #include "ChargeSharingCore.hh"
 #include <cmath>
 #include <string>
 
-namespace epic::chargesharing {
+namespace eicrecon {
 
-// Import enums from core
-using core::ActivePixelMode;
-using core::ReconMethod;
-using core::SignalModel;
+// Import enums from core library (epic::chargesharing::core namespace)
+using epic::chargesharing::core::ActivePixelMode;
+using epic::chargesharing::core::ReconMethod;
+using epic::chargesharing::core::SignalModel;
 
 struct SegmentationConfig {
     bool valid{false};
@@ -152,4 +155,4 @@ struct ChargeSharingConfig {
     }
 };
 
-} // namespace epic::chargesharing
+} // namespace eicrecon

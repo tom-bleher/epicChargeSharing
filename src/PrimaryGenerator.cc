@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /**
  * @file PrimaryGenerator.cc
  * @brief Configures particle type/energy and samples primary vertex positions safely within the detector.
@@ -22,7 +25,6 @@
 #include <sstream>
 
 namespace {
-constexpr G4double kDefaultParticleEnergy = 10.0 * GeV;
 const G4ThreeVector kDefaultMomentumDirection(0.0, 0.0, -1.0);
 
 G4ParticleDefinition* ResolveDefaultParticle() {
@@ -77,18 +79,19 @@ void PrimaryGenerator::ConfigureParticleGun() {
         fParticleGun->SetParticleDefinition(particle);
     }
 
-    fParticleGun->SetParticleEnergy(kDefaultParticleEnergy);
+    const G4double energy = ECS::RuntimeConfig::Instance().particleEnergy;
+    fParticleGun->SetParticleEnergy(energy);
     fParticleGun->SetParticleMomentumDirection(kDefaultMomentumDirection);
 
     if (particle) {
         G4cout << "[PrimaryGenerator] Default particle " << particle->GetParticleName() << " at "
-               << kDefaultParticleEnergy / GeV << " GeV, direction (" << kDefaultMomentumDirection.x() << ", "
+               << energy / GeV << " GeV, direction (" << kDefaultMomentumDirection.x() << ", "
                << kDefaultMomentumDirection.y() << ", " << kDefaultMomentumDirection.z() << ")" << G4endl;
     }
 }
 
 void PrimaryGenerator::ConfigureMessenger() {
-    fMessenger = std::make_unique<G4GenericMessenger>(this, "/epic/gun/", "Primary generator configuration");
+    fMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/gun/", "Primary generator configuration");
 
     auto& useFixedCmd =
         fMessenger->DeclareProperty("useFixedPosition", fUseFixedPosition,

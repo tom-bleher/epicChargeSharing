@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// @file ChargeSharingCore.hh
 /// @brief Core charge sharing algorithms shared between simulation and reconstruction.
 ///
@@ -22,10 +25,16 @@ namespace epic::chargesharing::core {
 // Signal Model Selection
 // ============================================================================
 
-/// Signal sharing model type
+/// @brief Signal sharing model selecting the charge-weight functional form.
+///
+/// LogA uses a logarithmic attenuation model calibrated to BNL AC-LGAD test-beam data.
+/// LinA uses a linear attenuation model parameterized by pitch-dependent beta.
 enum class SignalModel { LogA, LinA };
 
-/// Active pixel selection mode for denominator calculation
+/// @brief Active pixel selection mode controlling which pixels form the normalization denominator.
+///
+/// Different modes trade spatial coverage against signal-to-noise: wider denominators
+/// dilute the fractions but reduce sensitivity to edge effects.
 enum class ActivePixelMode {
     Neighborhood,   ///< All pixels in neighborhood
     RowCol,         ///< Cross pattern (center row + center column)
@@ -34,7 +43,10 @@ enum class ActivePixelMode {
     ChargeBlock3x3  ///< 9 pixels with highest weight (contiguous)
 };
 
-/// Reconstruction method (position extraction)
+/// @brief Reconstruction method for extracting hit position from charge fractions.
+///
+/// These algorithms estimate the sub-pixel hit coordinate from the measured
+/// (or simulated) charge distribution across the neighborhood.
 enum class ReconMethod {
     Centroid,   ///< Charge-weighted centroid (simple)
     Gaussian1D, ///< Fit 1D Gaussians to row and column slices
@@ -84,15 +96,22 @@ inline T clamp(T value, T lo, T hi) {
 // Charge Model Calculations
 // ============================================================================
 
-/// Calculate Euclidean distance from hit point to pixel center
+/// @brief Calculate Euclidean distance from hit point to pixel center.
+/// @param dxMM Offset in X from hit to pixel center (mm).
+/// @param dyMM Offset in Y from hit to pixel center (mm).
+/// @return Distance in mm.
 inline double calcDistanceToCenter(double dxMM, double dyMM) {
     return std::hypot(dxMM, dyMM);
 }
 
-/// Calculate pad view angle (alpha) - approximate solid angle subtended by pad
-/// @param distanceToCenterMM Distance from hit to pixel center (mm)
-/// @param padWidthMM Pad width (mm)
-/// @param padHeightMM Pad height (mm)
+/// @brief Calculate pad view angle (alpha) -- approximate solid angle subtended by the pad.
+///
+/// Models the geometric acceptance: pads closer to the hit subtend a larger angle
+/// and therefore collect more induced signal.
+/// @param distanceToCenterMM Distance from hit to pixel center (mm).
+/// @param padWidthMM Pad width (mm).
+/// @param padHeightMM Pad height (mm).
+/// @return View angle alpha (radians), in range (0, pi/4].
 inline double calcPadViewAngle(double distanceToCenterMM, double padWidthMM, double padHeightMM) {
     const double l = (padWidthMM + padHeightMM) / 2.0;
     const double numerator = (l / 2.0) * std::sqrt(2.0);
@@ -156,14 +175,19 @@ inline double calcWeightLinA(double distanceMM, double alphaPadViewAngle, double
     return weight;
 }
 
-/// Calculate charge sharing weight using specified model
-/// @param model Signal model (LogA or LinA)
-/// @param distanceMM Distance from hit to pixel center (mm)
-/// @param padWidthMM Pad width (mm)
-/// @param padHeightMM Pad height (mm)
-/// @param d0MM Reference distance for LogA (mm)
-/// @param betaPerMicron Attenuation for LinA (1/um), or 0 to auto-compute
-/// @param pitchMM Pixel pitch for auto-computing beta (mm)
+/// @brief Calculate the unnormalized charge sharing weight for a single pixel.
+///
+/// Dispatches to LogA or LinA depending on the model selection. The returned
+/// weight is proportional to the signal fraction induced on this pad; call
+/// calculateNeighborhood() to obtain properly normalized fractions.
+/// @param model Signal model (LogA or LinA).
+/// @param distanceMM Distance from hit to pixel center (mm).
+/// @param padWidthMM Pad width (mm).
+/// @param padHeightMM Pad height (mm).
+/// @param d0MM Reference distance for LogA model (mm).
+/// @param betaPerMicron Attenuation coefficient for LinA (1/um), or 0 to auto-select from pitch.
+/// @param pitchMM Pixel pitch used when betaPerMicron is 0 (mm).
+/// @return Unnormalized weight (dimensionless, non-negative).
 inline double calcWeight(SignalModel model, double distanceMM, double padWidthMM, double padHeightMM, double d0MM,
                          double betaPerMicron = 0.0, double pitchMM = 0.0) {
     const double alpha = calcPadViewAngle(distanceMM, padWidthMM, padHeightMM);
@@ -180,7 +204,10 @@ inline double calcWeight(SignalModel model, double distanceMM, double padWidthMM
 // Neighborhood Data Structures
 // ============================================================================
 
-/// Data for a single pixel in the neighborhood
+/// @brief Data for a single pixel in the charge-sharing neighborhood.
+///
+/// Stores geometry, raw weight, and normalized charge fractions computed
+/// under different denominator conventions (full neighborhood, row, col, block).
 struct NeighborPixel {
     int di{0};            ///< Offset from center pixel (row)
     int dj{0};            ///< Offset from center pixel (col)
@@ -205,7 +232,11 @@ struct NeighborPixel {
     double chargeBlock{0.0}; ///< Charge using block fraction
 };
 
-/// Complete neighborhood calculation result
+/// @brief Complete result of a neighborhood charge-sharing calculation.
+///
+/// Contains per-pixel weights and fractions for an NxN grid centered on the
+/// hit pixel. Provides helper accessors for extracting row/column slices
+/// used by 1-D Gaussian fitting.
 struct NeighborhoodResult {
     std::vector<NeighborPixel> pixels;
     int centerPixelI{0};
@@ -255,7 +286,10 @@ struct NeighborhoodResult {
 // Neighborhood Calculation
 // ============================================================================
 
-/// Configuration for neighborhood calculation
+/// @brief Configuration parameters for the neighborhood charge-sharing calculation.
+///
+/// Groups detector geometry (pad size, pitch, pixel count) and model parameters
+/// (d0, beta, radius) needed by calculateNeighborhood().
 struct NeighborhoodConfig {
     SignalModel signalModel{SignalModel::LogA};
     ActivePixelMode activeMode{ActivePixelMode::Neighborhood};
@@ -272,15 +306,20 @@ struct NeighborhoodConfig {
     int minIndexY{0};            ///< Minimum valid DD4hep index in Y (can be negative)
 };
 
-/// Calculate charge fractions for neighborhood around hit position
-/// @param hitX Hit X position (mm)
-/// @param hitY Hit Y position (mm)
-/// @param centerI Center pixel row index
-/// @param centerJ Center pixel column index
-/// @param centerX Center pixel X position (mm)
-/// @param centerY Center pixel Y position (mm)
-/// @param config Neighborhood configuration
-/// @return Neighborhood result with pixel fractions
+/// @brief Calculate charge fractions for the pixel neighborhood around a hit position.
+///
+/// This is the main entry point for the charge-sharing model. Given a hit position
+/// and the struck pixel coordinates, it computes weights and normalized fractions
+/// for all pixels within the configured radius, applying the chosen signal model
+/// and active-pixel mode.
+/// @param hitX Hit X position in local coordinates (mm).
+/// @param hitY Hit Y position in local coordinates (mm).
+/// @param centerI Center (struck) pixel row index.
+/// @param centerJ Center (struck) pixel column index.
+/// @param centerX Center pixel X position (mm).
+/// @param centerY Center pixel Y position (mm).
+/// @param config Neighborhood configuration (model, geometry, radius).
+/// @return NeighborhoodResult containing per-pixel fractions and diagnostic slices.
 inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int centerI, int centerJ, double centerX,
                                                 double centerY, const NeighborhoodConfig& config) {
 
@@ -524,7 +563,10 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
 // Noise Model
 // ============================================================================
 
-/// Configuration for noise injection
+/// @brief Configuration for realistic noise injection into charge values.
+///
+/// Models two physical effects: per-pixel gain non-uniformity (multiplicative)
+/// and front-end electronic noise (additive, in electron-equivalent units).
 struct NoiseConfig {
     bool enabled{false};
     double gainSigmaMin{0.01};                ///< Minimum per-pixel gain variation (1%)
@@ -533,8 +575,10 @@ struct NoiseConfig {
     double elementaryCharge{1.602176634e-19}; ///< For converting electrons to Coulombs
 };
 
-/// Noise model for realistic charge simulation.
-/// Applies gain variations and electronic noise to charge values.
+/// @brief Noise model for realistic charge simulation.
+///
+/// Applies per-pixel gain variations (multiplicative Gaussian) and additive
+/// electronic noise to charge values in Coulombs. Use one instance per thread.
 ///
 /// @note Thread Safety: This class contains an std::mt19937 generator and
 /// distribution objects whose operator() mutates internal state. Instances

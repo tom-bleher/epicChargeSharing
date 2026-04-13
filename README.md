@@ -1,6 +1,6 @@
 # epicChargeSharing
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: LGPL-3.0-or-later](https://img.shields.io/badge/License-LGPL--3.0--or--later-blue.svg)](LICENSE)
 
 GEANT4-based simulation and reconstruction plugin for studying charge sharing position reconstruction in AC-LGAD detectors.
 
@@ -128,10 +128,13 @@ See [eicrecon/README.md](eicrecon/README.md) for full configuration options and 
 
 ## Documentation
 
-- [Getting Started](https://tom-bleher.github.io/epicChargeSharing/getting-started/) - Build and run instructions
-- [Configuration](https://tom-bleher.github.io/epicChargeSharing/configuration/) - Compile-time and runtime options
-- [Physics Model](https://tom-bleher.github.io/epicChargeSharing/physics-model/) - Charge sharing theory
-- [Analysis Guide](https://tom-bleher.github.io/epicChargeSharing/analysis-guide/) - Post-processing workflows
+Full documentation is published at <https://tom-bleher.github.io/epicChargeSharing/> and lives in the sibling [`epicChargeSharingDocs`](https://github.com/tom-bleher/epicChargeSharingDocs) repository.
+
+- [Getting Started](https://tom-bleher.github.io/epicChargeSharing/getting-started/installation/) — install dependencies and build the simulation
+- [User Guide](https://tom-bleher.github.io/epicChargeSharing/user-guide/running/) — running, configuration, output format, and analysis
+- [Physics](https://tom-bleher.github.io/epicChargeSharing/physics/charge-sharing-models/) — LogA / LinA models, noise, position reconstruction
+- [EICrecon Plugin](https://tom-bleher.github.io/epicChargeSharing/plugin/overview/) — building and running the `chargeSharingRecon` plugin
+- [Reference](https://tom-bleher.github.io/epicChargeSharing/reference/architecture/) — code architecture, build options, CI, glossary
 
 ## Project Structure
 
@@ -139,13 +142,15 @@ See [eicrecon/README.md](eicrecon/README.md) for full configuration options and 
 epicChargeSharing/
 ├── include/          # Header files
 ├── src/              # Source files
+├── core/             # Header-only physics core (shared with the plugin)
 ├── macros/           # GEANT4 macro scripts
 ├── eicrecon/         # EICrecon plugin for EIC integration
 ├── farm/             # Python analysis and parameter sweep tools
 ├── proc/             # ROOT macros and GUI for visualization
-├── tests/            # Unit tests (build with -DBUILD_TESTING=ON)
-└── docs/             # Documentation source
+└── tests/            # Unit tests (build with -DBUILD_TESTING=ON)
 ```
+
+User documentation lives in the sibling [`epicChargeSharingDocs`](https://github.com/tom-bleher/epicChargeSharingDocs) repository.
 
 ## Citation
 
@@ -171,7 +176,34 @@ Python analysis scripts require packages listed in `requirements.txt` (`pip inst
 
 ## Contributing
 
-Contributions are welcome. Please run `make tidy` and `make format-check` before submitting changes.
+Contributions are welcome. Please follow these guidelines:
+
+### Code Style
+
+- C++ naming: PascalCase classes, camelCase methods, `m_snake_case` members, `snake_case` locals, `SCREAMING_SNAKE_CASE` constants
+- All source files must carry an SPDX `LGPL-3.0-or-later` header
+- Run `make format` before submitting; `make format-check` is enforced in CI
+
+### Building and Testing
+
+```bash
+# Standalone simulation
+cmake --preset default && cmake --build build
+
+# Unit tests
+cmake --preset debug && ctest --test-dir build-debug --output-on-failure
+
+# EICrecon plugin (requires eic-shell)
+cmake -S eicrecon -B build/eicrecon -DCMAKE_INSTALL_PREFIX=$(pwd)/eicrecon/install
+cmake --build build/eicrecon --target install
+```
+
+### Workflow
+
+1. Fork the repository and create a feature branch
+2. Run `make tidy` and `make format-check` to check code quality
+3. Run unit tests (see above)
+4. Open a pull request against `main`
 
 ## Contact
 

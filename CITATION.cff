@@ -12,7 +12,7 @@ version: 1.0.0
 date-released: 2025-01-01
 url: "https://github.com/tom-bleher/epicChargeSharing"
 repository-code: "https://github.com/tom-bleher/epicChargeSharing"
-license: MIT
+license: LGPL-3.0-or-later
 keywords:
   - GEANT4
   - AC-LGAD

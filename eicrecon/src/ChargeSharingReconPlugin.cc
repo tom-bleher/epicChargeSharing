@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 #include <JANA/JApplication.h>
 
 #include "ChargeSharingConfig.h"
@@ -13,31 +16,33 @@ void InitPlugin(JApplication* app) {
     // ═══════════════════════════════════════════════════════════════════════════
     // B0 Tracker (forward region)
     // ═══════════════════════════════════════════════════════════════════════════
-    epic::chargesharing::ChargeSharingConfig b0_config;
+    eicrecon::ChargeSharingConfig b0_config;
     b0_config.readout = "B0TrackerHits";
 
-    app->Add(new JOmniFactoryGeneratorT<epic::chargesharing::ChargeSharingReconFactory>(
+    app->Add(new JOmniFactoryGeneratorT<eicrecon::ChargeSharingReconFactory>(
         "B0ChargeSharingRecon",         // Tag
         {"B0TrackerHits"},              // Input: B0 tracker SimTrackerHit
-        {"B0ChargeSharingTrackerHits"}, // Output: TrackerHit with charge sharing recon
+        {"B0ChargeSharingTrackerHits", "B0ChargeSharingTrackerHitAssociations"},
         b0_config, app));
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Luminosity Spectrometer Tracker
     // ═══════════════════════════════════════════════════════════════════════════
-    epic::chargesharing::ChargeSharingConfig lumi_config;
+    eicrecon::ChargeSharingConfig lumi_config;
     lumi_config.readout = "LumiSpecTrackerHits";
     // Lumi tracker may have different geometry - adjust as needed
     // lumi_config.pixelSizeMM = 0.5;
     // lumi_config.pixelSpacingMM = 0.5;
 
-    app->Add(new JOmniFactoryGeneratorT<epic::chargesharing::ChargeSharingReconFactory>(
-        "LumiSpecTrackerChargeSharingRecon", {"LumiSpecTrackerHits"}, {"LumiSpecTrackerChargeSharingHits"}, lumi_config,
-        app));
+    app->Add(new JOmniFactoryGeneratorT<eicrecon::ChargeSharingReconFactory>(
+        "LumiSpecTrackerChargeSharingRecon",         // Tag
+        {"LumiSpecTrackerHits"},                     // Input: Lumi tracker SimTrackerHit
+        {"LumiSpecTrackerChargeSharingHits", "LumiSpecTrackerChargeSharingHitAssociations"},
+        lumi_config, app));
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Monitoring processor (optional, for validation)
     // ═══════════════════════════════════════════════════════════════════════════
-    app->Add(new epic::chargesharing::ChargeSharingMonitor());
+    app->Add(new eicrecon::ChargeSharingMonitor());
 }
 }

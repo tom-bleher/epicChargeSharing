@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// @file GaussianFitter.cc
 /// @brief Compiled Gaussian fitting routines for position reconstruction.
 ///
@@ -6,11 +9,13 @@
 /// This follows the same delegation pattern as ChargeSharingCalculator.cc
 /// delegating to core/ChargeSharingCore.hh.
 ///
-/// Configuration is read from Config.hh at compile time for better performance.
+/// Compile-time flags come from Config.hh; physics parameters that can be
+/// overridden via macro commands are read from RuntimeConfig at run time.
 
 #include "GaussianFitter.hh"
 #include "Config.hh"
 #include "GaussianFit.hh"
+#include "RuntimeConfig.hh"
 
 #include <Math/MinimizerOptions.h>
 #include <ROOT/TThreadExecutor.hxx>
@@ -40,11 +45,10 @@ namespace ECS::Fit {
 namespace cfit = epic::chargesharing::fit;
 
 // ============================================================================
-// Configuration from Config.hh (compile-time constants)
+// Compile-time configuration flags from Config.hh
 // ============================================================================
 namespace Config {
 // Uncertainty model
-constexpr double ERROR_PERCENT_OF_MAX = Constants::FIT_ERROR_PERCENT_OF_MAX;
 constexpr bool USE_VERTICAL_UNCERTAINTIES = Constants::FIT_USE_VERTICAL_UNCERTAINTIES;
 
 // Charge branches
@@ -221,7 +225,7 @@ int FitGaussian1D(const char* filename) {
     ROOT::Math::MinimizerOptions::SetDefaultStrategy(0);
     ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
-    const double errorPercentOfMax = Config::ERROR_PERCENT_OF_MAX;
+    const double errorPercentOfMax = ECS::RuntimeConfig::Instance().fitErrorPercentOfMax;
     const bool saveParamA = Config::SAVE_1D_A;
     const bool saveParamMu = Config::SAVE_1D_MU;
     const bool saveParamSigma = Config::SAVE_1D_SIGMA;
@@ -585,7 +589,7 @@ int FitGaussian2D(const char* filename) {
     ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
     const bool verticalErrorsEnabled = Config::USE_VERTICAL_UNCERTAINTIES;
-    const double errorPercentOfMax = Config::ERROR_PERCENT_OF_MAX;
+    const double errorPercentOfMax = ECS::RuntimeConfig::Instance().fitErrorPercentOfMax;
     const bool saveParamA = Config::SAVE_2D_A;
     const bool saveParamMux = Config::SAVE_2D_MUX;
     const bool saveParamMuy = Config::SAVE_2D_MUY;

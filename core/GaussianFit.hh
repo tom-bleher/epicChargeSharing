@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// @file GaussianFit.hh
 /// @brief Gaussian fitting routines for charge sharing position reconstruction.
 ///
@@ -38,7 +41,13 @@ constexpr double kDefaultErrorPercent = 5.0;
 // Distance-Weighted Error Configuration
 // ============================================================================
 
-/// Configuration for distance-weighted fit errors
+/// @brief Configuration for the distance-weighted error model used in chi-square fits.
+///
+/// Models the per-pixel fit uncertainty as a function of distance from the
+/// cluster center, using a power-law dependence.  In "inverse" mode the
+/// central pixels (closest to the hit) receive the smallest errors and
+/// therefore the highest weight in the fit, which improves position resolution.
+/// All percentage values are fractions of the maximum charge Q_max.
 struct DistanceWeightedErrorConfig {
     bool enabled{false};          ///< Master switch for distance-weighted errors
     double scalePixels{1.0};      ///< Distance scale in pixel units
@@ -157,34 +166,42 @@ inline double computeDistanceWeightedError1D(double pixelPos, double centerPos,
 // Fit Result Structures
 // ============================================================================
 
-/// Result of 1D Gaussian fit
+/// @brief Result of a 1D Gaussian + baseline fit to a row or column charge profile.
+///
+/// The fitted model is A * exp(-0.5*((x - mu)/sigma)^2) + B.
 struct GaussFit1DResult {
-    bool converged{false};
-    double A{constants::kInvalidValue};     ///< Amplitude
-    double mu{constants::kInvalidValue};    ///< Mean (position)
-    double sigma{constants::kInvalidValue}; ///< Width
-    double B{constants::kInvalidValue};     ///< Baseline offset
-    double chi2{constants::kInvalidValue};
-    double ndf{constants::kInvalidValue};
-    double muError{constants::kInvalidValue}; ///< Error on mu from fit covariance matrix
+    bool converged{false};                    ///< True if the minimizer converged
+    double A{constants::kInvalidValue};       ///< Peak amplitude above baseline (ADC counts or charge units)
+    double mu{constants::kInvalidValue};      ///< Reconstructed hit position along the strip/row (mm)
+    double sigma{constants::kInvalidValue};   ///< Gaussian width, related to charge spread (mm)
+    double B{constants::kInvalidValue};       ///< Constant baseline offset (electronic pedestal or leakage)
+    double chi2{constants::kInvalidValue};    ///< Chi-square of the fit
+    double ndf{constants::kInvalidValue};     ///< Number of degrees of freedom (N_points - N_params)
+    double muError{constants::kInvalidValue}; ///< 1-sigma uncertainty on mu from the fit covariance matrix (mm)
 };
 
-/// Result of 2D Gaussian fit
+/// @brief Result of a 2D Gaussian + baseline fit to a pixel cluster charge map.
+///
+/// The fitted model is A * exp(-0.5*((x-muX)/sigmaX)^2 - 0.5*((y-muY)/sigmaY)^2) + B.
+/// No cross-term (rotation) is included; the axes are aligned with pixel rows/columns.
 struct GaussFit2DResult {
-    bool converged{false};
-    double A{constants::kInvalidValue};      ///< Amplitude
-    double muX{constants::kInvalidValue};    ///< Mean X (position)
-    double muY{constants::kInvalidValue};    ///< Mean Y (position)
-    double sigmaX{constants::kInvalidValue}; ///< Width X
-    double sigmaY{constants::kInvalidValue}; ///< Width Y
-    double B{constants::kInvalidValue};      ///< Baseline offset
-    double chi2{constants::kInvalidValue};
-    double ndf{constants::kInvalidValue};
-    double muXError{constants::kInvalidValue}; ///< Error on muX from fit covariance matrix
-    double muYError{constants::kInvalidValue}; ///< Error on muY from fit covariance matrix
+    bool converged{false};                     ///< True if the minimizer converged
+    double A{constants::kInvalidValue};        ///< Peak amplitude above baseline (charge units)
+    double muX{constants::kInvalidValue};      ///< Reconstructed hit position X (mm)
+    double muY{constants::kInvalidValue};      ///< Reconstructed hit position Y (mm)
+    double sigmaX{constants::kInvalidValue};   ///< Gaussian width along X (mm)
+    double sigmaY{constants::kInvalidValue};   ///< Gaussian width along Y (mm)
+    double B{constants::kInvalidValue};        ///< Constant baseline offset (charge units)
+    double chi2{constants::kInvalidValue};     ///< Chi-square of the fit
+    double ndf{constants::kInvalidValue};      ///< Number of degrees of freedom
+    double muXError{constants::kInvalidValue}; ///< 1-sigma uncertainty on muX from fit covariance (mm)
+    double muYError{constants::kInvalidValue}; ///< 1-sigma uncertainty on muY from fit covariance (mm)
 };
 
-/// Combined reconstruction result
+/// @brief Combined output of the charge-sharing position reconstruction.
+///
+/// Holds the final reconstructed (X, Y, Z) position and the underlying
+/// fit results from both the 1D row/column projections and the 2D fit.
 struct ReconstructionResult {
     double reconX{constants::kInvalidValue}; ///< Reconstructed X position
     double reconY{constants::kInvalidValue}; ///< Reconstructed Y position
@@ -229,7 +246,11 @@ inline double gauss2DPlusB(double* xy, double* p) {
 // Utility Functions
 // ============================================================================
 
-/// Calculate weighted centroid as fallback
+/// @brief Compute the charge-weighted centroid of a 1D distribution (fallback when fit fails).
+/// @param positions Pixel center coordinates (mm).
+/// @param charges   Measured charge at each pixel.
+/// @param baseline  Pedestal to subtract before weighting (default 0).
+/// @return Pair of (centroid position, success flag).
 inline std::pair<double, bool> weightedCentroid(const std::vector<double>& positions,
                                                 const std::vector<double>& charges, double baseline = 0.0) {
 
@@ -296,7 +317,7 @@ inline double estimateSigma(const std::vector<double>& positions, const std::vec
 // 1D Gaussian Fitting
 // ============================================================================
 
-/// Configuration for 1D Gaussian fit
+/// @brief Configuration controlling the 1D Gaussian fit (bounds, error model, pixel geometry).
 struct GaussFit1DConfig {
     double muLo;                                          ///< Lower bound for mu
     double muHi;                                          ///< Upper bound for mu
@@ -309,11 +330,15 @@ struct GaussFit1DConfig {
     double centerPosition{0.0};                           ///< Center position for distance calculation (1D)
 };
 
-/// Perform 1D Gaussian fit on charge distribution
-/// @param positions Pixel center positions
-/// @param charges Charge values at each position
-/// @param config Fit configuration
-/// @return Fit result with parameters and convergence status
+/// @brief Fit a 1D Gaussian + baseline to a row or column charge profile to extract hit position.
+///
+/// Uses ROOT's Minuit2 (Fumili2, falling back to Migrad) to minimize chi-square.
+/// Requires at least 3 data points.
+///
+/// @param positions Pixel center coordinates along the projection axis (mm).
+/// @param charges   Integrated charge measured at each pixel (ADC or fC).
+/// @param config    Fit bounds, pixel pitch, and error model parameters.
+/// @return GaussFit1DResult with fitted parameters; check `converged` before using.
 inline GaussFit1DResult fitGaussian1D(const std::vector<double>& positions, const std::vector<double>& charges,
                                       const GaussFit1DConfig& config) {
 
@@ -422,7 +447,7 @@ inline GaussFit1DResult fitGaussian1D(const std::vector<double>& positions, cons
 // 2D Gaussian Fitting
 // ============================================================================
 
-/// Configuration for 2D Gaussian fit
+/// @brief Configuration controlling the 2D Gaussian fit (bounds, error model, pixel geometry).
 struct GaussFit2DConfig {
     double muXLo, muXHi;     ///< Bounds for mu_x
     double muYLo, muYHi;     ///< Bounds for mu_y
@@ -433,12 +458,16 @@ struct GaussFit2DConfig {
     DistanceWeightedErrorConfig distanceErrorConfig{}; ///< Distance-weighted error config
 };
 
-/// Perform 2D Gaussian fit on charge distribution
-/// @param xPositions X positions of pixels
-/// @param yPositions Y positions of pixels
-/// @param charges Charge values at each pixel
-/// @param config Fit configuration
-/// @return Fit result with parameters and convergence status
+/// @brief Fit a 2D Gaussian + baseline to a pixel cluster charge map to extract (X, Y) hit position.
+///
+/// Uses ROOT's Minuit2 (Fumili2, falling back to Migrad) to minimize chi-square.
+/// The Gaussian is axis-aligned (no rotation parameter). Requires at least 5 pixels.
+///
+/// @param xPositions X coordinates of pixel centers (mm).
+/// @param yPositions Y coordinates of pixel centers (mm).
+/// @param charges    Integrated charge measured at each pixel (ADC or fC).
+/// @param config     Fit bounds, pixel pitch, and error model parameters.
+/// @return GaussFit2DResult with fitted parameters; check `converged` before using.
 inline GaussFit2DResult fitGaussian2D(const std::vector<double>& xPositions, const std::vector<double>& yPositions,
                                       const std::vector<double>& charges, const GaussFit2DConfig& config) {
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// @file RuntimeConfig.cc
 /// @brief Implementation of RuntimeConfig singleton and Geant4 messenger commands.
 
@@ -46,6 +49,8 @@ void RuntimeConfig::DefineCommands() {
     fGunMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/gun/", "Particle gun configuration");
 
     fGunMessenger->DeclareProperty("useFixedPosition", useFixedPosition, "Use fixed position (true) or random sampling (false)");
+    fGunMessenger->DeclarePropertyWithUnit("energy", "GeV", particleEnergy, "Primary particle kinetic energy")
+        .SetRange("energy > 0");
 }
 
 } // namespace ECS

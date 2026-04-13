@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// @file ChargeSharingMonitor.cc
 /// @brief Implementation of charge sharing reconstruction monitoring.
 
@@ -13,7 +16,7 @@
 #include <cmath>
 #include <fmt/core.h>
 
-namespace epic::chargesharing {
+namespace eicrecon {
 
 ChargeSharingMonitor::ChargeSharingMonitor() {
     SetTypeName(NAME_OF_THIS);
@@ -23,9 +26,9 @@ void ChargeSharingMonitor::InitWithGlobalRootLock() {
     auto app = GetApplication();
 
     // Get input collection names from configuration
-    app->SetDefaultParameter("ChargeSharingMonitor:inputRecoHits", m_inputRecoHits,
+    app->SetDefaultParameter("ChargeSharingMonitor:inputRecoHits", m_input_reco_hits,
                              "Reconstructed TrackerHit collection name");
-    app->SetDefaultParameter("ChargeSharingMonitor:inputSimHits", m_inputSimHits,
+    app->SetDefaultParameter("ChargeSharingMonitor:inputSimHits", m_input_sim_hits,
                              "Input SimTrackerHit collection name");
 
     // Configure detector pairs to monitor
@@ -58,20 +61,20 @@ void ChargeSharingMonitor::InitWithGlobalRootLock() {
     m_tree = new TTree("hits", "Charge Sharing Reconstruction Hits");
 
     // Branch setup - similar to main simulation output
-    m_tree->Branch("trueX", &m_trueX, "trueX/D");
-    m_tree->Branch("trueY", &m_trueY, "trueY/D");
-    m_tree->Branch("trueZ", &m_trueZ, "trueZ/D");
-    m_tree->Branch("reconX", &m_reconX, "reconX/D");
-    m_tree->Branch("reconY", &m_reconY, "reconY/D");
-    m_tree->Branch("reconZ", &m_reconZ, "reconZ/D");
-    m_tree->Branch("residualX", &m_residualX, "residualX/D");
-    m_tree->Branch("residualY", &m_residualY, "residualY/D");
-    m_tree->Branch("residualR", &m_residualR, "residualR/D");
+    m_tree->Branch("trueX", &m_true_x, "trueX/D");
+    m_tree->Branch("trueY", &m_true_y, "trueY/D");
+    m_tree->Branch("trueZ", &m_true_z, "trueZ/D");
+    m_tree->Branch("reconX", &m_recon_x, "reconX/D");
+    m_tree->Branch("reconY", &m_recon_y, "reconY/D");
+    m_tree->Branch("reconZ", &m_recon_z, "reconZ/D");
+    m_tree->Branch("residualX", &m_residual_x, "residualX/D");
+    m_tree->Branch("residualY", &m_residual_y, "residualY/D");
+    m_tree->Branch("residualR", &m_residual_r, "residualR/D");
     m_tree->Branch("edep", &m_edep, "edep/D");
     m_tree->Branch("time", &m_time, "time/D");
-    m_tree->Branch("cellID", &m_cellID, "cellID/l");
-    m_tree->Branch("eventNumber", &m_eventNumber, "eventNumber/I");
-    m_tree->Branch("detectorIndex", &m_detectorIndex, "detectorIndex/I");
+    m_tree->Branch("cellID", &m_cell_id, "cellID/l");
+    m_tree->Branch("eventNumber", &m_event_number, "eventNumber/I");
+    m_tree->Branch("detectorIndex", &m_detector_index, "detectorIndex/I");
 }
 
 void ChargeSharingMonitor::CreateHistograms(const std::string& detectorName) {
@@ -132,12 +135,12 @@ void ChargeSharingMonitor::CreateHistograms(const std::string& detectorName) {
 }
 
 void ChargeSharingMonitor::ProcessSequential(const std::shared_ptr<const JEvent>& event) {
-    m_eventNumber = static_cast<int>(event->GetEventNumber());
+    m_event_number = static_cast<int>(event->GetEventNumber());
 
     // Process each configured detector
     for (size_t detIdx = 0; detIdx < m_detectors.size(); ++detIdx) {
         const auto& det = m_detectors[detIdx];
-        m_detectorIndex = static_cast<int>(detIdx);
+        m_detector_index = static_cast<int>(detIdx);
 
         // Try to get the collections - may not exist for all detectors in all events
         const edm4eic::TrackerHitCollection* recoHits = nullptr;
@@ -184,38 +187,38 @@ void ChargeSharingMonitor::FillData(const std::string& detectorName, const edm4e
     const auto& recoPos = recoHit.getPosition();
     const auto& simPos = simHit.getPosition();
 
-    m_trueX = simPos.x;
-    m_trueY = simPos.y;
-    m_trueZ = simPos.z;
-    m_reconX = recoPos.x;
-    m_reconY = recoPos.y;
-    m_reconZ = recoPos.z;
+    m_true_x = simPos.x;
+    m_true_y = simPos.y;
+    m_true_z = simPos.z;
+    m_recon_x = recoPos.x;
+    m_recon_y = recoPos.y;
+    m_recon_z = recoPos.z;
 
     // Calculate residuals
-    m_residualX = m_reconX - m_trueX;
-    m_residualY = m_reconY - m_trueY;
-    m_residualR = std::hypot(m_residualX, m_residualY);
+    m_residual_x = m_recon_x - m_true_x;
+    m_residual_y = m_recon_y - m_true_y;
+    m_residual_r = std::hypot(m_residual_x, m_residual_y);
 
     // Other quantities
     m_edep = recoHit.getEdep();
     m_time = recoHit.getTime();
-    m_cellID = recoHit.getCellID();
+    m_cell_id = recoHit.getCellID();
 
     // Fill histograms
     auto& hists = m_histograms[detectorName];
 
-    hists.hResidualX->Fill(m_residualX);
-    hists.hResidualY->Fill(m_residualY);
-    hists.hResidualR->Fill(m_residualR);
+    hists.hResidualX->Fill(m_residual_x);
+    hists.hResidualY->Fill(m_residual_y);
+    hists.hResidualR->Fill(m_residual_r);
 
-    hists.hRecoVsTrueX->Fill(m_trueX, m_reconX);
-    hists.hRecoVsTrueY->Fill(m_trueY, m_reconY);
+    hists.hRecoVsTrueX->Fill(m_true_x, m_recon_x);
+    hists.hRecoVsTrueY->Fill(m_true_y, m_recon_y);
 
-    hists.hTrueXY->Fill(m_trueX, m_trueY);
-    hists.hRecoXY->Fill(m_reconX, m_reconY);
+    hists.hTrueXY->Fill(m_true_x, m_true_y);
+    hists.hRecoXY->Fill(m_recon_x, m_recon_y);
 
-    hists.hResidualVsTrueX->Fill(m_trueX, m_residualX);
-    hists.hResidualVsTrueY->Fill(m_trueY, m_residualY);
+    hists.hResidualVsTrueX->Fill(m_true_x, m_residual_x);
+    hists.hResidualVsTrueY->Fill(m_true_y, m_residual_y);
 
     hists.hEnergyDeposit->Fill(m_edep);
 
@@ -243,4 +246,4 @@ void ChargeSharingMonitor::FinishWithGlobalRootLock() {
     log->info("TTree 'hits' contains {} entries", m_tree->GetEntries());
 }
 
-} // namespace epic::chargesharing
+} // namespace eicrecon

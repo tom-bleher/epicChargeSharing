@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// @file ChargeSharingMonitor.h
 /// @brief JEventProcessor for monitoring charge sharing reconstruction performance.
 ///
@@ -19,7 +22,7 @@
 #include <string>
 #include <vector>
 
-namespace epic::chargesharing {
+namespace eicrecon {
 
 /// Monitor processor for charge sharing reconstruction validation.
 ///
@@ -65,8 +68,8 @@ private:
     std::vector<DetectorConfig> m_detectors;
 
     // Parameters (set via JANA configuration)
-    std::string m_inputRecoHits{"B0ChargeSharingTrackerHits"};
-    std::string m_inputSimHits{"B0TrackerHits"};
+    std::string m_input_reco_hits{"B0ChargeSharingTrackerHits"};
+    std::string m_input_sim_hits{"B0TrackerHits"};
 
     // ─────────────────────────────────────────────────────────────────────────
     // Histograms (per detector)
@@ -99,20 +102,20 @@ private:
     TTree* m_tree{nullptr};
 
     // Tree branches - matching main simulation output naming
-    double m_trueX{0.0};
-    double m_trueY{0.0};
-    double m_trueZ{0.0};
-    double m_reconX{0.0};
-    double m_reconY{0.0};
-    double m_reconZ{0.0};
-    double m_residualX{0.0}; // reconX - trueX
-    double m_residualY{0.0}; // reconY - trueY
-    double m_residualR{0.0}; // sqrt(residualX^2 + residualY^2)
-    double m_edep{0.0};      // Energy deposit (GeV)
-    double m_time{0.0};      // Hit time
-    uint64_t m_cellID{0};    // Cell ID from hit
-    int m_eventNumber{0};
-    int m_detectorIndex{0}; // Which detector (0=B0, 1=BackwardMPGD, etc.)
+    double m_true_x{0.0};
+    double m_true_y{0.0};
+    double m_true_z{0.0};
+    double m_recon_x{0.0};
+    double m_recon_y{0.0};
+    double m_recon_z{0.0};
+    double m_residual_x{0.0}; // recon_x - true_x
+    double m_residual_y{0.0}; // recon_y - true_y
+    double m_residual_r{0.0}; // sqrt(residual_x^2 + residual_y^2)
+    double m_edep{0.0};       // Energy deposit (GeV)
+    double m_time{0.0};       // Hit time
+    uint64_t m_cell_id{0};    // Cell ID from hit
+    int m_event_number{0};
+    int m_detector_index{0}; // Which detector (0=B0, 1=BackwardMPGD, etc.)
 };
 
-} // namespace epic::chargesharing
+} // namespace eicrecon

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+
 /// @file Config.hh
 /// @brief Simulation configuration - edit values in USER SETTINGS section
 /// @see docs/configuration.md for detailed documentation
@@ -16,10 +19,15 @@ namespace Constants {
 // ║               Edit values below to configure the simulation               ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
+// ── Structural constants ──────────────────────────────────────────────────────
+// These select code paths at compile time. Edit here and rebuild to change model.
+// All numeric physics parameters are runtime-configurable via /ecs/ macro commands
+// (see RuntimeConfig.hh for the full list of runtime-tunable parameters).
+//
 // ─────────────────────────────── Mode Selection ─────────────────────────────
 // Choose reconstruction mode: LogA or LinA
-//   LogA - Logarithmic attenuation model (paper Eq. (\ref{eq:masterformula}))
-//   LinA - Linear attenuation model (paper Eq. (\ref{eq:LA}))
+//   LogA - Logarithmic attenuation model
+//   LinA - Linear attenuation model
 enum class Mode { LogA, LinA };
 
 inline constexpr Mode ACTIVE_MODE = Mode::LogA;
@@ -48,7 +56,7 @@ inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050; // Max gain noise (5%)
 inline constexpr G4double NOISE_ELECTRON_COUNT = 500.0; // Electronic noise (e-)
 
 // ───────────────────────────── Linear Model ─────────────────────────────────
-// LinA attenuation coefficient beta in 1/um (paper Eq. (\ref{eq:LA})).
+// LinA attenuation coefficient beta in 1/um
 inline constexpr G4double LINEAR_CHARGE_MODEL_BETA = 0.002;
 
 // ──────────────────────────── Particle Gun ──────────────────────────────────
