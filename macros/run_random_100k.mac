@@ -6,10 +6,11 @@
 
 /run/initialize
 
-# Random beam, all fits on
+# Random beam over full detector + 10% overshoot for edge/miss events
 /ecs/gun/useFixedPosition false
-/ecs/fit/gaus1D true
-/ecs/fit/gaus2D true
+/ecs/gun/beamOvershoot 0.1
+/ecs/fit/gaus1D false
+/ecs/fit/gaus2D false
 
 /gun/particle e-
 /gun/energy 10 GeV

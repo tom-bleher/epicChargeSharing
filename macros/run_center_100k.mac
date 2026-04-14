@@ -6,8 +6,8 @@
 /run/initialize
 /ecs/gun/useFixedPosition false
 /ecs/mode/useEdgeDistance false
-/ecs/fit/gaus1D true
-/ecs/fit/gaus2D true
+/ecs/fit/gaus1D false
+/ecs/fit/gaus2D false
 /gun/particle e-
 /gun/energy 10 GeV
 /run/beamOn 100000
