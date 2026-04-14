@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <JANA/JEventProcessorSequentialRoot.h>
+#include <JANA/JEventProcessor.h>
 
 #include <edm4eic/TrackerHitCollection.h>
 #include <edm4hep/SimTrackerHitCollection.h>
@@ -38,14 +38,14 @@ namespace eicrecon {
 ///            -PChargeSharingMonitor:inputSimHits=B0TrackerHits \
 ///            input.edm4hep.root
 ///
-class ChargeSharingMonitor : public JEventProcessorSequentialRoot {
+class ChargeSharingMonitor : public JEventProcessor {
 public:
     ChargeSharingMonitor();
     ~ChargeSharingMonitor() override = default;
 
-    void InitWithGlobalRootLock() override;
-    void ProcessSequential(const std::shared_ptr<const JEvent>& event) override;
-    void FinishWithGlobalRootLock() override;
+    void Init() override;
+    void ProcessSequential(const JEvent& event) override;
+    void Finish() override;
 
 private:
     /// Create histograms for a given detector

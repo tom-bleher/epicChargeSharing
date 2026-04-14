@@ -24,7 +24,7 @@ target_include_directories(chargeSharingRecon
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../core
-        ${EICrecon_INCLUDE_DIR}
+        ${EICrecon_INCLUDE_DIR}/EICrecon
         # ROOT include dirs propagate automatically via ROOT::* target links
 )
 
@@ -39,8 +39,15 @@ target_link_libraries(chargeSharingRecon
         ROOT::Minuit2
         ROOT::Hist
         ROOT::Tree
-        ActsCore
+        Acts::Core
         fmt::fmt
+)
+
+# EICrecon headers need JANA version macros for podio datamodel glue selection
+target_compile_definitions(chargeSharingRecon PRIVATE
+    JANA_VERSION_MAJOR=${JANA_VERSION_MAJOR}
+    JANA_VERSION_MINOR=${JANA_VERSION_MINOR}
+    JANA_VERSION_PATCH=${JANA_VERSION_PATCH}
 )
 
 set_target_properties(chargeSharingRecon PROPERTIES

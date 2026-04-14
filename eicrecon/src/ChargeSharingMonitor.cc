@@ -22,7 +22,7 @@ ChargeSharingMonitor::ChargeSharingMonitor() {
     SetTypeName(NAME_OF_THIS);
 }
 
-void ChargeSharingMonitor::InitWithGlobalRootLock() {
+void ChargeSharingMonitor::Init() {
     auto app = GetApplication();
 
     // Get input collection names from configuration
@@ -134,8 +134,8 @@ void ChargeSharingMonitor::CreateHistograms(const std::string& detectorName) {
     m_histograms[detectorName] = hists;
 }
 
-void ChargeSharingMonitor::ProcessSequential(const std::shared_ptr<const JEvent>& event) {
-    m_event_number = static_cast<int>(event->GetEventNumber());
+void ChargeSharingMonitor::ProcessSequential(const JEvent& event) {
+    m_event_number = static_cast<int>(event.GetEventNumber());
 
     // Process each configured detector
     for (size_t detIdx = 0; detIdx < m_detectors.size(); ++detIdx) {
@@ -147,14 +147,14 @@ void ChargeSharingMonitor::ProcessSequential(const std::shared_ptr<const JEvent>
         const edm4hep::SimTrackerHitCollection* simHits = nullptr;
 
         try {
-            recoHits = event->GetCollection<edm4eic::TrackerHit>(det.recoCollection);
+            recoHits = event.GetCollection<edm4eic::TrackerHit>(det.recoCollection);
         } catch (...) {
             // Collection doesn't exist for this detector
             continue;
         }
 
         try {
-            simHits = event->GetCollection<edm4hep::SimTrackerHit>(det.simCollection);
+            simHits = event.GetCollection<edm4hep::SimTrackerHit>(det.simCollection);
         } catch (...) {
             // No sim hits to compare against
             continue;
@@ -226,7 +226,7 @@ void ChargeSharingMonitor::FillData(const std::string& detectorName, const edm4e
     m_tree->Fill();
 }
 
-void ChargeSharingMonitor::FinishWithGlobalRootLock() {
+void ChargeSharingMonitor::Finish() {
     // Calculate and print summary statistics
     auto app = GetApplication();
     auto log = app->GetService<Log_service>()->logger("ChargeSharingMonitor");

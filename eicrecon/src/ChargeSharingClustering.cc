@@ -17,6 +17,8 @@
 #include <DDSegmentation/CartesianGridXY.h>
 #include <DDSegmentation/MultiSegmentation.h>
 
+#include <spdlog/spdlog.h>
+
 #include <algorithms/geo.h>
 #include <algorithms/interfaces/ActsSvc.h>
 
@@ -91,10 +93,10 @@ ChargeSharingClustering::getLocalSegmentation(const dd4hep::rec::CellID& cellID)
 // ============================================================================
 
 void ChargeSharingClustering::init() {
-    m_log = logger();
+    m_log = spdlog::default_logger()->clone(std::string(name()));
 
     m_converter = algorithms::GeoSvc::instance().cellIDPositionConverter();
-    m_detector = &algorithms::GeoSvc::instance().detector();
+    m_detector = algorithms::GeoSvc::instance().detector();
     m_seg = m_detector->readout(m_cfg.readout).segmentation();
     m_decoder = m_seg.decoder();
     m_acts_context = algorithms::ActsSvc::instance().acts_geometry_provider();

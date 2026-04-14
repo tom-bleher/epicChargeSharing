@@ -185,17 +185,17 @@ void ChargeSharingReconstructor::init() {
                     segCfg.valid = (segImplXY != nullptr || segImplXZ != nullptr) && decoder != nullptr;
 
                     if (segImplXY != nullptr) {
-                        segCfg.gridSizeXMM = segImplXY->gridSizeX();
-                        segCfg.gridSizeYMM = segImplXY->gridSizeY();
-                        segCfg.offsetXMM = segImplXY->offsetX();
-                        segCfg.offsetYMM = segImplXY->offsetY();
+                        segCfg.gridSizeXMM = segImplXY->gridSizeX() / dd4hep::mm;
+                        segCfg.gridSizeYMM = segImplXY->gridSizeY() / dd4hep::mm;
+                        segCfg.offsetXMM = segImplXY->offsetX() / dd4hep::mm;
+                        segCfg.offsetYMM = segImplXY->offsetY() / dd4hep::mm;
                         segCfg.fieldNameX = segImplXY->fieldNameX();
                         segCfg.fieldNameY = segImplXY->fieldNameY();
                     } else {
-                        segCfg.gridSizeXMM = segImplXZ->gridSizeX();
-                        segCfg.gridSizeYMM = segImplXZ->gridSizeZ();
-                        segCfg.offsetXMM = segImplXZ->offsetX();
-                        segCfg.offsetYMM = segImplXZ->offsetZ();
+                        segCfg.gridSizeXMM = segImplXZ->gridSizeX() / dd4hep::mm;
+                        segCfg.gridSizeYMM = segImplXZ->gridSizeZ() / dd4hep::mm;
+                        segCfg.offsetXMM = segImplXZ->offsetX() / dd4hep::mm;
+                        segCfg.offsetYMM = segImplXZ->offsetZ() / dd4hep::mm;
                         segCfg.fieldNameX = segImplXZ->fieldNameX();
                         segCfg.fieldNameY = segImplXZ->fieldNameZ();
                     }
@@ -217,9 +217,9 @@ void ChargeSharingReconstructor::init() {
 
                     const auto dims = segImplXY ? segImplXY->cellDimensions(0) : segImplXZ->cellDimensions(0);
                     if (!dims.empty()) {
-                        segCfg.cellSizeXMM = dims[0];
+                        segCfg.cellSizeXMM = dims[0] / dd4hep::mm;
                         if (dims.size() > 1) {
-                            segCfg.cellSizeYMM = dims[1];
+                            segCfg.cellSizeYMM = dims[1] / dd4hep::mm;
                         }
                     }
                     if (segCfg.cellSizeXMM <= 0.0) {
@@ -307,7 +307,7 @@ void ChargeSharingReconstructor::init() {
                      m_cfg.readout, m_cfg.detectorThicknessMM, m_cfg.detectorSizeMM);
             } else {
                 double volumeThickness = getSensorThicknessFromReadout(detector, m_cfg.readout);
-                if (volumeThickness > 0.0) {
+                if (volumeThickness > 0.0 && volumeThickness < 10.0) { // reject assembly volumes
                     m_cfg.detectorThicknessMM = volumeThickness;
                     info("Read Si thickness from detector volume for '{}': {} mm", m_cfg.readout,
                          m_cfg.detectorThicknessMM);

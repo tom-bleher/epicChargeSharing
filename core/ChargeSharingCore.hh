@@ -39,8 +39,9 @@ enum class ActivePixelMode {
     Neighborhood,   ///< All pixels in neighborhood
     RowCol,         ///< Cross pattern (center row + center column)
     RowCol3x3,      ///< Cross pattern + 3x3 center block
-    ChargeBlock2x2, ///< 4 pixels with highest weight (contiguous)
-    ChargeBlock3x3  ///< 9 pixels with highest weight (contiguous)
+    ChargeBlock2x2,      ///< 4 pixels with highest weight (contiguous)
+    ChargeBlock3x3,      ///< 9 pixels with highest weight (contiguous)
+    ThresholdAboveNoise  ///< Pads above N×σ_noise; threshold applied post-noise in caller
 };
 
 /// @brief Reconstruction method for extracting hit position from charge fractions.
@@ -475,6 +476,13 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
             }
             break;
         }
+
+        case ActivePixelMode::ThresholdAboveNoise:
+            // All in-bounds pixels initially active; threshold applied post-noise by caller
+            for (size_t i = 0; i < result.pixels.size(); ++i) {
+                isActive[i] = result.pixels[i].inBounds;
+            }
+            break;
     }
 
     // Calculate total weight from active pixels
