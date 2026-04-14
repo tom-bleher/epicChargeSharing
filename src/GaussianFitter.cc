@@ -226,6 +226,9 @@ int FitGaussian1D(const char* filename) {
     ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(0);
 
     const double errorPercentOfMax = ECS::RuntimeConfig::Instance().fitErrorPercentOfMax;
+    const double fitGainSigma = 0.5 * (ECS::RuntimeConfig::Instance().pixelGainSigmaMin +
+                                        ECS::RuntimeConfig::Instance().pixelGainSigmaMax);
+    const double fitNoiseSigma = ECS::RuntimeConfig::Instance().noiseElectronCount * Constants::ELEMENTARY_CHARGE;
     const bool saveParamA = Config::SAVE_1D_A;
     const bool saveParamMu = Config::SAVE_1D_MU;
     const bool saveParamSigma = Config::SAVE_1D_SIGMA;
@@ -466,14 +469,18 @@ int FitGaussian1D(const char* filename) {
                                                 .sigmaHi = sigHiBound,
                                                 .qMax = qmaxNeighborhood,
                                                 .pixelSpacing = pixelSpacing,
-                                                .errorPercent = errorPercentOfMax};
+                                                .errorPercent = errorPercentOfMax,
+                                                .gainSigma = fitGainSigma,
+                                                .noiseElectronSigma = fitNoiseSigma};
             const cfit::GaussFit1DConfig colCfg{.muLo = muYLo,
                                                 .muHi = muYHi,
                                                 .sigmaLo = sigLoBound,
                                                 .sigmaHi = sigHiBound,
                                                 .qMax = qmaxNeighborhood,
                                                 .pixelSpacing = pixelSpacing,
-                                                .errorPercent = errorPercentOfMax};
+                                                .errorPercent = errorPercentOfMax,
+                                                .gainSigma = fitGainSigma,
+                                                .noiseElectronSigma = fitNoiseSigma};
 
             const auto rowFit = cfit::fitGaussian1D(x_row, q_row, rowCfg);
             const auto colFit = cfit::fitGaussian1D(y_col, q_col, colCfg);
@@ -590,6 +597,9 @@ int FitGaussian2D(const char* filename) {
 
     const bool verticalErrorsEnabled = Config::USE_VERTICAL_UNCERTAINTIES;
     const double errorPercentOfMax = ECS::RuntimeConfig::Instance().fitErrorPercentOfMax;
+    const double fitGainSigma2D = 0.5 * (ECS::RuntimeConfig::Instance().pixelGainSigmaMin +
+                                          ECS::RuntimeConfig::Instance().pixelGainSigmaMax);
+    const double fitNoiseSigma2D = ECS::RuntimeConfig::Instance().noiseElectronCount * Constants::ELEMENTARY_CHARGE;
     const bool saveParamA = Config::SAVE_2D_A;
     const bool saveParamMux = Config::SAVE_2D_MUX;
     const bool saveParamMuy = Config::SAVE_2D_MUY;
@@ -797,7 +807,9 @@ int FitGaussian2D(const char* filename) {
                                                .sigmaHi = sigHiBound,
                                                .qMax = qmaxNeighborhood,
                                                .pixelSpacing = pixelSpacing,
-                                               .errorPercent = effectiveErrorPercent};
+                                               .errorPercent = effectiveErrorPercent,
+                                               .gainSigma = fitGainSigma2D,
+                                               .noiseElectronSigma = fitNoiseSigma2D};
 
             const auto fitResult = cfit::fitGaussian2D(Xf, Yf, Zf, cfg2D);
 

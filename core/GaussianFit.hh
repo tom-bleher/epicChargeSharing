@@ -325,9 +325,11 @@ struct GaussFit1DConfig {
     double sigmaHi;                                       ///< Upper bound for sigma
     double qMax;                                          ///< Maximum charge value (for uncertainty estimate)
     double pixelSpacing;                                  ///< Pixel pitch (mm)
-    double errorPercent{constants::kDefaultErrorPercent}; ///< Error as % of max
+    double errorPercent{constants::kDefaultErrorPercent}; ///< Error as % of max (fallback when noise model inactive)
     DistanceWeightedErrorConfig distanceErrorConfig{};    ///< Distance-weighted error config
     double centerPosition{0.0};                           ///< Center position for distance calculation (1D)
+    double gainSigma{0.0};          ///< Per-pixel multiplicative gain sigma (0 = use errorPercent instead)
+    double noiseElectronSigma{0.0}; ///< Additive electronic noise floor in charge units (Coulombs)
 };
 
 /// @brief Fit a 1D Gaussian + baseline to a row or column charge profile to extract hit position.
@@ -363,13 +365,22 @@ inline GaussFit1DResult fitGaussian1D(const std::vector<double>& positions, cons
     const double sigma0 = estimateSigma(positions, charges, B0, config.pixelSpacing, config.sigmaLo, config.sigmaHi);
 
     // Calculate base uncertainty
+    const bool useNoiseModel = config.gainSigma > 0.0 || config.noiseElectronSigma > 0.0;
     const double uniformSigma = std::max(1e-12, config.qMax * config.errorPercent / 100.0);
 
-    // Compute per-pixel errors (distance-weighted if enabled)
+    // Compute per-pixel errors
     std::vector<double> perPixelErrors(positions.size());
     const bool useDistanceErrors = config.distanceErrorConfig.enabled;
     for (size_t i = 0; i < positions.size(); ++i) {
-        if (useDistanceErrors) {
+        if (useNoiseModel) {
+            // Physics-based: σ_i = sqrt((σ_gain × Q_i)² + σ_noise²)
+            const double gainTerm = config.gainSigma * charges[i];
+            perPixelErrors[i] = std::sqrt(gainTerm * gainTerm +
+                                          config.noiseElectronSigma * config.noiseElectronSigma);
+            if (!std::isfinite(perPixelErrors[i]) || perPixelErrors[i] <= 0.0) {
+                perPixelErrors[i] = std::max(config.noiseElectronSigma, 1e-20);
+            }
+        } else if (useDistanceErrors) {
             perPixelErrors[i] = computeDistanceWeightedError1D(positions[i], config.centerPosition,
                                                                config.distanceErrorConfig, config.qMax);
             if (!std::isfinite(perPixelErrors[i]) || perPixelErrors[i] <= 0.0) {
@@ -454,8 +465,10 @@ struct GaussFit2DConfig {
     double sigmaLo, sigmaHi; ///< Bounds for sigma
     double qMax;             ///< Maximum charge value
     double pixelSpacing;     ///< Pixel pitch (mm)
-    double errorPercent{constants::kDefaultErrorPercent};
+    double errorPercent{constants::kDefaultErrorPercent}; ///< Error as % of max (fallback when noise model inactive)
     DistanceWeightedErrorConfig distanceErrorConfig{}; ///< Distance-weighted error config
+    double gainSigma{0.0};          ///< Per-pixel multiplicative gain sigma (0 = use errorPercent instead)
+    double noiseElectronSigma{0.0}; ///< Additive electronic noise floor in charge units (Coulombs)
 };
 
 /// @brief Fit a 2D Gaussian + baseline to a pixel cluster charge map to extract (X, Y) hit position.
@@ -518,13 +531,22 @@ inline GaussFit2DResult fitGaussian2D(const std::vector<double>& xPositions, con
     const double sigY0 = estimateSigma2D(false);
 
     // Calculate base uncertainty
+    const bool useNoiseModel = config.gainSigma > 0.0 || config.noiseElectronSigma > 0.0;
     const double uniformSigma = std::max(1e-12, config.qMax * config.errorPercent / 100.0);
 
-    // Compute per-pixel errors (distance-weighted if enabled)
+    // Compute per-pixel errors
     std::vector<double> perPixelErrors(nPts);
     const bool useDistanceErrors = config.distanceErrorConfig.enabled;
     for (size_t i = 0; i < nPts; ++i) {
-        if (useDistanceErrors) {
+        if (useNoiseModel) {
+            // Physics-based: σ_i = sqrt((σ_gain × Q_i)² + σ_noise²)
+            const double gainTerm = config.gainSigma * charges[i];
+            perPixelErrors[i] = std::sqrt(gainTerm * gainTerm +
+                                          config.noiseElectronSigma * config.noiseElectronSigma);
+            if (!std::isfinite(perPixelErrors[i]) || perPixelErrors[i] <= 0.0) {
+                perPixelErrors[i] = std::max(config.noiseElectronSigma, 1e-20);
+            }
+        } else if (useDistanceErrors) {
             perPixelErrors[i] =
                 computeDistanceWeightedError(xPositions[i], yPositions[i], config.distanceErrorConfig, config.qMax);
             if (!std::isfinite(perPixelErrors[i]) || perPixelErrors[i] <= 0.0) {
