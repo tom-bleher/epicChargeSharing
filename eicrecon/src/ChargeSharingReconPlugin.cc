@@ -4,8 +4,10 @@
 #include <JANA/JApplication.h>
 
 #include "ChargeSharingConfig.h"
+#include "ChargeSharingClusteringConfig.h"
 #include "ChargeSharingMonitor.h"
-#include "ChargeSharingReconFactory.h"
+#include "ChargeSharingReconstructor_factory.h"
+#include "ChargeSharingClustering_factory.h"
 
 #include "extensions/jana/JOmniFactoryGeneratorT.h"
 
@@ -39,6 +41,35 @@ void InitPlugin(JApplication* app) {
         {"LumiSpecTrackerHits"},                     // Input: Lumi tracker SimTrackerHit
         {"LumiSpecTrackerChargeSharingHits", "LumiSpecTrackerChargeSharingHitAssociations"},
         lumi_config, app));
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Clustering with Gaussian fitting (drop-in for LGADHitClustering)
+    // Takes calibrated TrackerHits, produces Measurement2D with fitted positions.
+    // Generic — works with any detector using CartesianGridXY segmentation.
+    // Wire additional detectors by adding more factory registrations here.
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // --- BTOF ---
+    eicrecon::ChargeSharingClusteringConfig btof_cluster_config;
+    btof_cluster_config.readout = "TOFBarrelHits";
+    btof_cluster_config.reconMethod = 2; // Gaussian 2D
+
+    app->Add(new JOmniFactoryGeneratorT<eicrecon::ChargeSharingClustering_factory>(
+        "TOFBarrelCSClustering",
+        {"TOFBarrelCalibratedHits"},
+        {"TOFBarrelCSClusterHits"},
+        btof_cluster_config, app));
+
+    // --- B0 Tracker ---
+    eicrecon::ChargeSharingClusteringConfig b0_cluster_config;
+    b0_cluster_config.readout = "B0TrackerHits";
+    b0_cluster_config.reconMethod = 2;
+
+    app->Add(new JOmniFactoryGeneratorT<eicrecon::ChargeSharingClustering_factory>(
+        "B0CSClustering",
+        {"B0ChargeSharingTrackerHits"},
+        {"B0CSClusterHits"},
+        b0_cluster_config, app));
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Monitoring processor (optional, for validation)

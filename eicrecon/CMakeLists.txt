@@ -11,11 +11,12 @@ find_package(DD4hep REQUIRED COMPONENTS DDCore)
 
 # Find ROOT for Gaussian fitting and monitoring histograms/trees
 find_package(ROOT REQUIRED COMPONENTS Core MathCore Minuit2 Hist Tree)
+find_package(Acts REQUIRED COMPONENTS Core)
 
 add_library(chargeSharingRecon SHARED
-    src/ChargeSharingReconFactory.cc
     src/ChargeSharingReconPlugin.cc
     src/ChargeSharingReconstructor.cc
+    src/ChargeSharingClustering.cc
     src/ChargeSharingMonitor.cc
 )
 
@@ -24,7 +25,6 @@ target_include_directories(chargeSharingRecon
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../core
         ${EICrecon_INCLUDE_DIR}
-        ${EICrecon_INCLUDE_DIR}/EICrecon
         # ROOT include dirs propagate automatically via ROOT::* target links
 )
 
@@ -39,6 +39,7 @@ target_link_libraries(chargeSharingRecon
         ROOT::Minuit2
         ROOT::Hist
         ROOT::Tree
+        ActsCore
         fmt::fmt
 )
 
