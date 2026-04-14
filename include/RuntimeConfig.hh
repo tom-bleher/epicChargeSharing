@@ -51,7 +51,7 @@ public:
 
     // ---- Mode Selection ----
     G4int activeMode{static_cast<G4int>(Constants::ACTIVE_MODE)};           // 0=LogA, 1=LinA
-    G4int activePixelMode{static_cast<G4int>(Constants::ACTIVE_PIXEL_MODE)}; // 0-4, see ActivePixelMode enum
+    G4int activePixelMode{static_cast<G4int>(Constants::ACTIVE_PIXEL_MODE)}; // 0-5, see ActivePixelMode enum
 
     // ---- Detector Geometry ----
     // These are exposed here for read access, but note that

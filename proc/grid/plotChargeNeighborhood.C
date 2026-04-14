@@ -30,7 +30,7 @@
 
 namespace {
   // Signal fraction mode enum matching Config.hh
-  enum class ActivePixelMode { Neighborhood, ChargeBlock2x2, ChargeBlock3x3, RowCol, RowCol3x3, Unknown };
+  enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3, ThresholdAboveNoise, Unknown };
 
   // Helper to read string metadata from tree UserInfo
   std::string ReadStringNamed(TTree* tree, const char* key, const char* defaultVal = "")
@@ -58,6 +58,7 @@ namespace {
     if (modeStr == "rowcol") return ActivePixelMode::RowCol;
     if (modeStr == "chargeblock3x3") return ActivePixelMode::ChargeBlock3x3;
     if (modeStr == "chargeblock" || modeStr == "chargeblock2x2") return ActivePixelMode::ChargeBlock2x2;
+    if (modeStr == "thresholdabovenoise") return ActivePixelMode::ThresholdAboveNoise;
     return ActivePixelMode::Neighborhood; // default
   }
 
@@ -70,6 +71,7 @@ namespace {
       case ActivePixelMode::RowCol3x3: return "RowCol3x3";
       case ActivePixelMode::ChargeBlock2x2: return "ChargeBlock2x2";
       case ActivePixelMode::ChargeBlock3x3: return "ChargeBlock3x3";
+      case ActivePixelMode::ThresholdAboveNoise: return "ThresholdAboveNoise";
       default: return "Unknown";
     }
   }
@@ -81,7 +83,8 @@ namespace {
     const int center = 2; // center of 5x5 ROI
     switch (mode) {
       case ActivePixelMode::Neighborhood:
-        return true; // all cells relevant
+      case ActivePixelMode::ThresholdAboveNoise:
+        return true; // all cells relevant (threshold applied to charges, not geometry)
       case ActivePixelMode::RowCol:
         // Only center row (i == 2) or center column (j == 2)
         return (i == center) || (j == center);
