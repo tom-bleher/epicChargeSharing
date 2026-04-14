@@ -3,7 +3,7 @@
 
 /**
  * @file DetectorConstruction.cc
- * @brief Builds world, silicon detector, and pixel pads; attaches MFD and scorers.
+ * @brief Builds world, silicon detector, and pixel pads.
  */
 #include "DetectorConstruction.hh"
 
@@ -16,25 +16,18 @@
 #include "G4Colour.hh"
 #include "G4GenericMessenger.hh"
 #include "G4LogicalVolume.hh"
-#include "G4Material.hh"
-#include "G4MultiFunctionalDetector.hh"
 #include "G4NistManager.hh"
-#include "G4PSEnergyDeposit.hh"
 #include "G4PVPlacement.hh"
 #include "G4RunManager.hh"
-#include "G4SDManager.hh"
 #include "G4UserLimits.hh"
-#include "G4VisAttributes.hh"
 #include "G4VSensitiveDetector.hh"
-#include <G4ScoringManager.hh>
+#include "G4VisAttributes.hh"
 
 #include "Randomize.hh"
 
 #include <algorithm>
-#include <cmath>
 #include <limits>
 #include <mutex>
-#include <sstream>
 #include <string>
 
 DetectorConstruction::DetectorConstruction()
@@ -72,14 +65,13 @@ void DetectorConstruction::SetGridOffset(G4double offset) {
 
 G4VPhysicalVolume* DetectorConstruction::Construct() {
     const G4bool checkOverlaps = true;
-    const G4double originalDetSize = fDetSize;
 
     const MaterialSet materials = PrepareMaterials();
 
     G4LogicalVolume* logicWorld = nullptr;
     G4VPhysicalVolume* const physWorld = BuildWorld(materials, checkOverlaps, logicWorld);
 
-    G4LogicalVolume* siliconLogical = BuildSiliconDetector(logicWorld, materials, checkOverlaps, originalDetSize);
+    G4LogicalVolume* siliconLogical = BuildSiliconDetector(logicWorld, materials, checkOverlaps);
 
     const PixelGridStats gridStats = ConfigurePixels(logicWorld, siliconLogical, materials, checkOverlaps);
 
@@ -118,9 +110,7 @@ G4VPhysicalVolume* DetectorConstruction::BuildWorld(const MaterialSet& mats, G4b
 }
 
 G4LogicalVolume* DetectorConstruction::BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats,
-                                                            G4bool checkOverlaps, G4double originalDetSize) {
-    (void)originalDetSize;
-
+                                                            G4bool checkOverlaps) {
     const G4ThreeVector& detectorPos = GetDetectorPos();
 
     auto* cubeVisAtt = new G4VisAttributes(G4Colour(0.7, 0.7, 0.7));
@@ -300,23 +290,7 @@ const G4ThreeVector& DetectorConstruction::GetPixelCenter(G4int globalPixelId) c
     return fPixelCenters[idx];
 }
 
-void DetectorConstruction::ConstructSDandField() {
-    G4ScoringManager::GetScoringManager();
-
-    auto* mfd = new G4MultiFunctionalDetector("SiliconDetector");
-    G4SDManager::GetSDMpointer()->AddNewDetector(mfd);
-
-    G4VPrimitiveScorer* energyScorer = new G4PSEnergyDeposit("EnergyDeposit");
-    mfd->RegisterPrimitive(energyScorer);
-
-    SetSensitiveDetector("logicCube", mfd);
-
-    G4VSensitiveDetector const* attachedDetector = fLogicSilicon ? fLogicSilicon->GetSensitiveDetector() : nullptr;
-    if (attachedDetector != mfd) {
-        G4Exception("DetectorConstruction::ConstructSDandField", "SensitiveDetectorAttachmentFailed", FatalException,
-                    "Failed to attach Multi-Functional Detector to silicon volume.");
-    }
-}
+void DetectorConstruction::ConstructSDandField() {}
 
 void DetectorConstruction::SetNeighborhoodRadius(G4int radius) {
     G4cout << "[Detector] Neighborhood radius set to " << radius << " (" << ((2 * radius) + 1) << "x"

@@ -29,8 +29,6 @@ class G4Box;
 class G4NistManager;
 class G4PVPlacement;
 class G4VisAttributes;
-class G4MultiFunctionalDetector;
-class G4VPrimitiveScorer;
 class G4Material;
 
 namespace ECS {
@@ -75,7 +73,6 @@ public:
 
     [[nodiscard]] G4double GetPixelSize() const { return fPixelSize; }
     [[nodiscard]] G4double GetPixelSpacing() const { return fPixelSpacing; }
-    [[nodiscard]] G4double GetPixelPitch() const { return fPixelSpacing; }
     [[nodiscard]] G4double GetLinearChargeModelBeta() const { return fLinearChargeModelBeta; }
     [[nodiscard]] G4double GetGridOffset() const { return fGridOffset; }
     [[nodiscard]] G4double GetDetSize() const { return fDetSize; }
@@ -84,8 +81,6 @@ public:
     /// @brief Get minimum pixel index (DD4hep-style, can be negative for centered grid).
     [[nodiscard]] G4int GetMinIndexX() const { return fMinIndexX; }
     [[nodiscard]] G4int GetMinIndexY() const { return fMinIndexY; }
-    [[nodiscard]] G4int GetMaxIndexX() const { return fMaxIndexX; }
-    [[nodiscard]] G4int GetMaxIndexY() const { return fMaxIndexY; }
     [[nodiscard]] const G4ThreeVector& GetDetectorPos() const { return fDetectorPos; }
     [[nodiscard]] PixelLocation FindNearestPixel(const G4ThreeVector& pos) const;
     [[nodiscard]] const std::vector<G4ThreeVector>& GetPixelCenters() const { return fPixelCenters; }
@@ -113,8 +108,7 @@ private:
 
     [[nodiscard]] static MaterialSet PrepareMaterials();
     static G4VPhysicalVolume* BuildWorld(const MaterialSet& mats, G4bool checkOverlaps, G4LogicalVolume*& logicWorld);
-    G4LogicalVolume* BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats, G4bool checkOverlaps,
-                                          G4double originalDetSize);
+    G4LogicalVolume* BuildSiliconDetector(G4LogicalVolume* logicWorld, const MaterialSet& mats, G4bool checkOverlaps);
     PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical,
                                    const MaterialSet& mats, G4bool checkOverlaps);
     void InitializePixelGainSigmas();
