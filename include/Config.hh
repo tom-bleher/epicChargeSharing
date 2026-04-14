@@ -118,12 +118,12 @@ inline constexpr G4bool FIT_1D_SAVE_B = true;           // Save baseline offset
 inline constexpr G4bool FIT_1D_SAVE_LINE_MEANS = false; // Save weighted mean positions
 
 // ─────────────────────────────── 2D Fit Options ──────────────────────────────
-inline constexpr G4bool FIT_2D_SAVE_A = true;    // Save amplitude
-inline constexpr G4bool FIT_2D_SAVE_MUX = true;  // Save mean X position
-inline constexpr G4bool FIT_2D_SAVE_MUY = true;  // Save mean Y position
-inline constexpr G4bool FIT_2D_SAVE_SIGX = true; // Save width in X
-inline constexpr G4bool FIT_2D_SAVE_SIGY = true; // Save width in Y
-inline constexpr G4bool FIT_2D_SAVE_B = true;    // Save baseline offset
+inline constexpr G4bool FIT_2D_SAVE_A = false;    // Save amplitude
+inline constexpr G4bool FIT_2D_SAVE_MUX = false;  // Save mean X position
+inline constexpr G4bool FIT_2D_SAVE_MUY = false;  // Save mean Y position
+inline constexpr G4bool FIT_2D_SAVE_SIGX = false; // Save width in X
+inline constexpr G4bool FIT_2D_SAVE_SIGY = false; // Save width in Y
+inline constexpr G4bool FIT_2D_SAVE_B = false;    // Save baseline offset
 
 // ╔═══════════════════════════════════════════════════════════════════════════╗
 // ║                    END USER SETTINGS - Internal Below                     ║
