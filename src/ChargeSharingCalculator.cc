@@ -1136,4 +1136,30 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
             fResult.full.chargeFinalBlock(i, j) = qfBlock;
         }
     }
+
+    // Apply readout threshold in ThresholdAboveNoise mode:
+    // Zero out pads where the final charge (post-noise) falls below N×σ_noise,
+    // consistent with the neighborhood threshold in EventAction::PopulateNeighborCharges.
+    if (activePixelMode == Constants::ActivePixelMode::ThresholdAboveNoise && hasAdditiveNoise) {
+        const G4double thresholdSigma = ECS::RuntimeConfig::Instance().readoutThresholdSigma;
+        const G4double threshold = thresholdSigma * sigmaNoise;
+        for (G4int i = 0; i < rows; ++i) {
+            for (G4int j = 0; j < cols; ++j) {
+                if (fResult.full.chargeFinal(i, j) < threshold) {
+                    fResult.full.chargeInduced(i, j) = 0.0;
+                    fResult.full.chargeWithNoise(i, j) = 0.0;
+                    fResult.full.chargeFinal(i, j) = 0.0;
+                    fResult.full.chargeInducedRow(i, j) = 0.0;
+                    fResult.full.chargeWithNoiseRow(i, j) = 0.0;
+                    fResult.full.chargeFinalRow(i, j) = 0.0;
+                    fResult.full.chargeInducedCol(i, j) = 0.0;
+                    fResult.full.chargeWithNoiseCol(i, j) = 0.0;
+                    fResult.full.chargeFinalCol(i, j) = 0.0;
+                    fResult.full.chargeInducedBlock(i, j) = 0.0;
+                    fResult.full.chargeWithNoiseBlock(i, j) = 0.0;
+                    fResult.full.chargeFinalBlock(i, j) = 0.0;
+                }
+            }
+        }
+    }
 }
