@@ -35,7 +35,7 @@ inline constexpr Mode ACTIVE_MODE = Mode::LogA;
 // ───────────────────────────── Detector Geometry ────────────────────────────
 inline const G4double DETECTOR_SIZE = 30.0 * mm;   // Sensor side length
 inline const G4double DETECTOR_WIDTH = 0.05 * mm;  // Silicon thickness
-inline const G4double PIXEL_SIZE = 0.10 * mm;      // Pixel pad size (BNL B0/lumi: 100 um electrode)
+inline const G4double PIXEL_SIZE = 0.15 * mm;      // Pixel pad size (HPK PH4/PH6/PH7: 150 um electrode)
 inline const G4double PIXEL_PITCH = 0.5 * mm;      // Pixel spacing (pitch)
 inline constexpr G4int NEIGHBORHOOD_RADIUS = 2;    // Charge sharing radius
 inline const G4double PIXEL_THICKNESS = 0.02 * mm; // Pixel depth/thickness
@@ -92,7 +92,7 @@ inline constexpr ActivePixelMode2D ACTIVE_PIXEL_MODE_2D = ActivePixelMode2D::Cha
 // ─────────────────────────────── Fitting ───────────────────────────────────
 // Enable Gaussian fitting for position reconstruction
 // Note: To use ActivePixelMode2D, you must set FIT_GAUS_2D = true
-inline constexpr G4bool FIT_GAUS_1D = false;
+inline constexpr G4bool FIT_GAUS_1D = true;
 inline constexpr G4bool FIT_GAUS_2D = true;
 
 // To switch to the 3x3 variant, update `ACTIVE_PIXEL_MODE_2D` above.
