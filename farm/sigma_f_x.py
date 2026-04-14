@@ -445,7 +445,7 @@ def save_sigma_vs_x_scatter(
     results: Dict[str, List[Tuple[float, float, float, float]]],
     output_dir: pathlib.Path,
     pixel_spacing_mm: float = 0.5,
-    pixel_size_mm: float = 0.15,
+    pixel_size_mm: float = 0.10,
 ) -> None:
     """Create FNAL paper-style plots of sigma_f vs x for each branch.
 
@@ -584,7 +584,7 @@ def main(input_dir: pathlib.Path = None, output_dir: pathlib.Path = None) -> Non
 
     # Read pixel geometry metadata from first ROOT file
     pixel_spacing_mm = 0.5  # Default: 500 µm
-    pixel_size_mm = 0.15    # Default: 150 µm
+    pixel_size_mm = 0.10    # Default: 100 µm (BNL B0/lumi)
     if root_files:
         metadata = read_metadata_from_root_file(root_files[0])
         if "GridPixelSpacing_mm" in metadata:

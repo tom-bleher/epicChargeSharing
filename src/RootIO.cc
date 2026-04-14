@@ -634,6 +634,36 @@ void MetadataPublisher::WriteToTree(TTree* tree, std::mutex* ioMutex) const {
     }
 }
 
+void MetadataPublisher::WriteEntriesToFileLevel(TDirectory* dir, const EntryList& entries) {
+    if (!dir)
+        return;
+
+    TDirectory* saved = gDirectory;
+    dir->cd();
+
+    for (const auto& [key, value] : entries) {
+        std::visit(
+            [&key](auto&& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, G4double>) {
+                    TParameter<double> p(key.c_str(), val);
+                    p.Write(key.c_str(), TObject::kOverwrite);
+                } else if constexpr (std::is_same_v<T, G4int>) {
+                    TParameter<int> p(key.c_str(), val);
+                    p.Write(key.c_str(), TObject::kOverwrite);
+                } else if constexpr (std::is_same_v<T, G4bool>) {
+                    TParameter<bool> p(key.c_str(), val);
+                    p.Write(key.c_str(), TObject::kOverwrite);
+                }
+                // Strings (TNamed) skipped — use UserInfo for those
+            },
+            value);
+    }
+
+    if (saved)
+        saved->cd();
+}
+
 // ============================================================================
 // PostProcessingRunner
 // ============================================================================

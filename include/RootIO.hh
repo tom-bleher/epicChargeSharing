@@ -457,6 +457,13 @@ public:
     void WriteToTree(TTree* tree, std::mutex* ioMutex = nullptr) const;
     static void WriteEntriesToUserInfo(TTree* tree, const EntryList& entries);
 
+    /// \brief Write numeric metadata as TParameter objects at file level.
+    ///
+    /// This makes metadata accessible to uproot (which cannot read tree UserInfo).
+    /// Writes TParameter<double>, TParameter<int>, or TParameter<bool> for each
+    /// numeric entry; string entries are skipped (use UserInfo for those).
+    static void WriteEntriesToFileLevel(TDirectory* dir, const EntryList& entries);
+
 private:
     static std::string ModelToString(Config::PosReconModel model);
     static std::string SignalModelToString(Config::SignalModel model);
