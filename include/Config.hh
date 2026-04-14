@@ -55,6 +55,11 @@ inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010; // Min gain noise (1%)
 inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050; // Max gain noise (5%)
 inline constexpr G4double NOISE_ELECTRON_COUNT = 500.0; // Electronic noise (e-)
 
+// ──────────────────── Event-Level Gain Fluctuation ──────────────────────────
+inline constexpr G4double GAIN_EXCESS_NOISE_FACTOR = 2.0;  // McIntyre F-factor for Si avalanche
+inline constexpr G4double GAIN_SATURATION_CHARGE = 5000.0;  // Saturation onset (primary electrons)
+inline constexpr G4bool   GAIN_FLUCTUATION_ENABLED = true;  // Enable event-level gain fluctuation
+
 // ───────────────────────────── Linear Model ─────────────────────────────────
 // LinA attenuation coefficient beta in 1/um
 inline constexpr G4double LINEAR_CHARGE_MODEL_BETA = 0.002;
@@ -82,12 +87,12 @@ enum class ActivePixelMode2D { Neighborhood, ChargeBlock2x2, ChargeBlock3x3 };
 inline constexpr ActivePixelMode1D ACTIVE_PIXEL_MODE_1D = ActivePixelMode1D::Neighborhood;
 
 // 2D-only active pixel selection (used when FIT_GAUS_2D = true)
-inline constexpr ActivePixelMode2D ACTIVE_PIXEL_MODE_2D = ActivePixelMode2D::Neighborhood;
+inline constexpr ActivePixelMode2D ACTIVE_PIXEL_MODE_2D = ActivePixelMode2D::ChargeBlock2x2;
 
 // ─────────────────────────────── Fitting ───────────────────────────────────
 // Enable Gaussian fitting for position reconstruction
 // Note: To use ActivePixelMode2D, you must set FIT_GAUS_2D = true
-inline constexpr G4bool FIT_GAUS_1D = true;
+inline constexpr G4bool FIT_GAUS_1D = false;
 inline constexpr G4bool FIT_GAUS_2D = true;
 
 // To switch to the 3x3 variant, update `ACTIVE_PIXEL_MODE_2D` above.

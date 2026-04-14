@@ -1,0 +1,13 @@
+# 100k events — EDGE-DISTANCE model (Tornago)
+/control/verbose 0
+/run/verbose 0
+/event/verbose 0
+/tracking/verbose 0
+/run/initialize
+/ecs/gun/useFixedPosition false
+/ecs/mode/useEdgeDistance true
+/ecs/fit/gaus1D true
+/ecs/fit/gaus2D true
+/gun/particle e-
+/gun/energy 10 GeV
+/run/beamOn 100000

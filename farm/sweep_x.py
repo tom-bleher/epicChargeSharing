@@ -174,6 +174,7 @@ def generate_position_macro(
     n_events: int = 10000,
     particle: str = "e-",
     energy_gev: float = 10.0,
+    active_pixel_mode: Optional[int] = None,
 ) -> str:
     """Generate a Geant4 macro that sets the particle gun to a fixed X position.
 
@@ -182,11 +183,16 @@ def generate_position_macro(
         n_events: Number of events to simulate
         particle: Geant4 particle name (e.g. "e-", "proton")
         energy_gev: Beam energy in GeV
+        active_pixel_mode: Active pixel mode (0-4), or None for compile-time default
 
     Returns:
         Macro file contents as a string
     """
     x_mm = x_um / 1000.0  # Convert µm to mm
+
+    mode_line = ""
+    if active_pixel_mode is not None:
+        mode_line = f"\n# Active pixel mode: {active_pixel_mode}\n/ecs/mode/activePixelMode {active_pixel_mode}\n"
 
     return f"""# Auto-generated macro for sweep position x = {x_um:.1f} µm
 # Set verbosity
@@ -197,7 +203,7 @@ def generate_position_macro(
 
 # Initialize
 /run/initialize
-
+{mode_line}
 # Set particle gun parameters
 /gun/particle {particle}
 /gun/energy {energy_gev} GeV
@@ -354,6 +360,13 @@ def main():
         help="Scan full pitch range including metal pads (for Dutta-style resolution plots).",
     )
     parser.add_argument(
+        "--active-pixel-mode",
+        dest="active_pixel_mode",
+        type=int,
+        default=None,
+        help="Active pixel mode: 0=Neighborhood, 1=RowCol, 2=RowCol3x3, 3=ChargeBlock2x2, 4=ChargeBlock3x3. Default: use compile-time default.",
+    )
+    parser.add_argument(
         "--particle",
         type=str,
         default="e-",
@@ -374,7 +387,9 @@ def main():
 
     output_dir = determine_output_dir(args.output_dir)
     print(f"Writing output ROOT files to {output_dir}")
+    MODE_NAMES = {0: "Neighborhood", 1: "RowCol", 2: "RowCol3x3", 3: "ChargeBlock2x2", 4: "ChargeBlock3x3"}
     print(f"Mode: {'full pitch' if args.full_pitch else 'gap only'}")
+    print(f"Active pixel mode: {MODE_NAMES.get(args.active_pixel_mode, 'default')} ({args.active_pixel_mode})" if args.active_pixel_mode is not None else "Active pixel mode: default (Neighborhood)")
     print(f"Beam: {args.particle} at {args.energy_gev} GeV")
     print(f"Positions to sweep: {len(positions)} points")
     print(f"Events per position: {args.n_events}")
@@ -409,6 +424,7 @@ def main():
         macro_content = generate_position_macro(
             x_um, args.n_events,
             particle=args.particle, energy_gev=args.energy_gev,
+            active_pixel_mode=args.active_pixel_mode,
         )
         macro_path = macro_dir / f"run_x{int(x_um) if float(x_um).is_integer() else x_um}um.mac"
         write_file_text(macro_path, macro_content)
