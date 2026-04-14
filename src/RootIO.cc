@@ -111,6 +111,7 @@ void BranchConfigurator::ConfigureVectorBranches(TTree* tree, const VectorBuffer
     // Mode-specific branches
     switch (mode) {
         case Config::ActivePixelMode::Neighborhood:
+        case Config::ActivePixelMode::ThresholdAboveNoise:
             addBranch("Fi", buffers.chargeFractions);
             addBranch("Qi", buffers.charge);
             addBranch("Qn", buffers.chargeNew);
@@ -185,6 +186,7 @@ bool BranchConfigurator::ConfigureFullGridBranches(TTree* tree, const FullGridBu
     // Mode-specific branches
     switch (mode) {
         case Config::ActivePixelMode::Neighborhood:
+        case Config::ActivePixelMode::ThresholdAboveNoise:
             addBranch("FiGrid", buffers.fi);
             addBranch("QiGrid", buffers.qi);
             addBranch("QnGrid", buffers.qn);

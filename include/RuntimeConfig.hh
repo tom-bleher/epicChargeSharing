@@ -81,6 +81,7 @@ public:
     G4double pixelGainSigmaMin{Constants::PIXEL_GAIN_SIGMA_MIN};
     G4double pixelGainSigmaMax{Constants::PIXEL_GAIN_SIGMA_MAX};
     G4double noiseElectronCount{Constants::NOISE_ELECTRON_COUNT};
+    G4double readoutThresholdSigma{Constants::READOUT_THRESHOLD_SIGMA};
 
     // ---- Particle Gun ----
     G4bool useFixedPosition{Constants::USE_FIXED_POSITION};

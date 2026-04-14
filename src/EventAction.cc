@@ -412,6 +412,28 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
         fNeighborhoodChargeNewBlock[gridIndex] = noisyBlock;
         fNeighborhoodChargeFinalBlock[gridIndex] = finalBlock;
     }
+
+    // Apply readout threshold in ThresholdAboveNoise mode:
+    // Zero out pads where the final charge (post-noise) falls below N×σ_noise.
+    // This simulates the per-channel discriminator in real ASICs (EICROC, FCFD, ALTIROC)
+    // which gates readout — only pads exceeding the threshold produce hit data.
+    const G4int pixelModeInt = ECS::RuntimeConfig::Instance().activePixelMode;
+    if (pixelModeInt == static_cast<G4int>(Constants::ActivePixelMode::ThresholdAboveNoise)) {
+        const G4double thresholdSigma = ECS::RuntimeConfig::Instance().readoutThresholdSigma;
+        const G4double threshold = thresholdSigma * context.sigmaNoise;
+        for (std::size_t i = 0; i < targetCells; ++i) {
+            if (fNeighborhoodChargeFinal[i] < threshold) {
+                fNeighborhoodChargeFinal[i] = 0.0;
+                fNeighborhoodChargeNew[i] = 0.0;
+                fNeighborhoodChargeFinalRow[i] = 0.0;
+                fNeighborhoodChargeNewRow[i] = 0.0;
+                fNeighborhoodChargeFinalCol[i] = 0.0;
+                fNeighborhoodChargeNewCol[i] = 0.0;
+                fNeighborhoodChargeFinalBlock[i] = 0.0;
+                fNeighborhoodChargeNewBlock[i] = 0.0;
+            }
+        }
+    }
 }
 
 

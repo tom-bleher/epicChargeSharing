@@ -29,6 +29,7 @@
 #include <variant>
 #include <vector>
 
+class TDirectory;
 class TFile;
 class TTree;
 

@@ -46,6 +46,9 @@ void RuntimeConfig::DefineCommands() {
         .SetRange("gainSigmaMax >= 0");
     fNoiseMessenger->DeclareProperty("electronCount", noiseElectronCount, "Electronic noise RMS (electrons)")
         .SetRange("electronCount >= 0");
+    fNoiseMessenger->DeclareProperty("thresholdSigma", readoutThresholdSigma,
+                                     "Readout threshold in units of noise sigma (ThresholdAboveNoise mode)")
+        .SetRange("thresholdSigma >= 0");
 
     // Fitting commands
     fFitMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/fit/", "Fit parameter configuration");
@@ -65,7 +68,8 @@ void RuntimeConfig::DefineCommands() {
                                     "Signal model: 0=LogA (logarithmic), 1=LinA (linear)");
     fModeMessenger->DeclareProperty(
         "activePixelMode", activePixelMode,
-        "Active pixel mode: 0=Neighborhood, 1=RowCol, 2=RowCol3x3, 3=ChargeBlock2x2, 4=ChargeBlock3x3");
+        "Active pixel mode: 0=Neighborhood, 1=RowCol, 2=RowCol3x3, 3=ChargeBlock2x2, 4=ChargeBlock3x3, "
+        "5=ThresholdAboveNoise");
 
     // Output commands
     fOutputMessenger =

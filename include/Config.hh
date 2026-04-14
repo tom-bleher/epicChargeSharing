@@ -55,6 +55,7 @@ inline constexpr G4double D0 = 1.0;                // LogA reference distance d0
 inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010; // Min gain noise (1%)
 inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050; // Max gain noise (5%)
 inline constexpr G4double NOISE_ELECTRON_COUNT = 1500.0; // Electronic noise (e-); EICROC0 bare: ~1625 e-
+inline constexpr G4double READOUT_THRESHOLD_SIGMA = 5.0; // Readout threshold (N × noise σ) for ThresholdAboveNoise mode
 
 // ──────────────────── Event-Level Gain Fluctuation ──────────────────────────
 inline constexpr G4double GAIN_EXCESS_NOISE_FACTOR = 2.0;  // McIntyre F-factor for Si avalanche
@@ -74,16 +75,17 @@ inline constexpr G4bool USE_FIXED_POSITION = false;
 // The denominator sums F_i only over active pixels.
 //
 // 1D-compatible modes (work with FIT_GAUS_1D or FIT_GAUS_2D):
-enum class ActivePixelMode1D { Neighborhood, RowCol, RowCol3x3 };
+enum class ActivePixelMode1D { Neighborhood, RowCol, RowCol3x3, ThresholdAboveNoise };
 //   Neighborhood - All pixels in the neighborhood
 //   RowCol       - Cross pattern (center row + center column)
 //   RowCol3x3    - Cross pattern + 3x3 center block
 //
 // 2D-only modes (require FIT_GAUS_2D = true):
-enum class ActivePixelMode2D { Neighborhood, ChargeBlock2x2, ChargeBlock3x3 };
-//   Neighborhood   - All pixels in the neighborhood
-//   ChargeBlock2x2 - 4 pads with highest weight
-//   ChargeBlock3x3 - 9 pads with highest weight
+enum class ActivePixelMode2D { Neighborhood, ChargeBlock2x2, ChargeBlock3x3, ThresholdAboveNoise };
+//   Neighborhood        - All pixels in the neighborhood
+//   ChargeBlock2x2      - 4 pads with highest weight
+//   ChargeBlock3x3      - 9 pads with highest weight
+//   ThresholdAboveNoise - Pads above N×σ_noise (realistic ASIC discriminator)
 
 inline constexpr ActivePixelMode1D ACTIVE_PIXEL_MODE_1D = ActivePixelMode1D::Neighborhood;
 
@@ -135,14 +137,15 @@ enum class SignalModel { LogA, LinA };
 enum class ReconMethod { LogA, LinA };
 
 // Unified enum for runtime use (combines both 1D and 2D modes)
-enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3 };
+enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3, ThresholdAboveNoise };
 
 constexpr const char* ActivePixelModeName(ActivePixelMode m) {
     return (m == ActivePixelMode::Neighborhood)   ? "Neighborhood"
            : (m == ActivePixelMode::RowCol)       ? "RowCol"
            : (m == ActivePixelMode::RowCol3x3)    ? "RowCol3x3"
            : (m == ActivePixelMode::ChargeBlock2x2) ? "ChargeBlock2x2"
-                                                    : "ChargeBlock3x3";
+           : (m == ActivePixelMode::ChargeBlock3x3) ? "ChargeBlock3x3"
+                                                    : "ThresholdAboveNoise";
 }
 
 constexpr const char* SignalModelName(SignalModel m) {
@@ -165,16 +168,18 @@ inline constexpr PosReconModel POS_RECON_MODEL = RECON_METHOD;
 
 // Map 1D mode enum to unified enum
 constexpr ActivePixelMode ActivePixelModeFrom1D(ActivePixelMode1D m) {
-    return (m == ActivePixelMode1D::Neighborhood) ? ActivePixelMode::Neighborhood
-           : (m == ActivePixelMode1D::RowCol)     ? ActivePixelMode::RowCol
-                                                  : ActivePixelMode::RowCol3x3;
+    return (m == ActivePixelMode1D::Neighborhood)        ? ActivePixelMode::Neighborhood
+           : (m == ActivePixelMode1D::RowCol)              ? ActivePixelMode::RowCol
+           : (m == ActivePixelMode1D::RowCol3x3)           ? ActivePixelMode::RowCol3x3
+                                                           : ActivePixelMode::ThresholdAboveNoise;
 }
 
 // Map 2D mode enum to unified enum
 constexpr ActivePixelMode ActivePixelModeFrom2D(ActivePixelMode2D m) {
-    return (m == ActivePixelMode2D::Neighborhood)     ? ActivePixelMode::Neighborhood
-           : (m == ActivePixelMode2D::ChargeBlock2x2) ? ActivePixelMode::ChargeBlock2x2
-                                                      : ActivePixelMode::ChargeBlock3x3;
+    return (m == ActivePixelMode2D::Neighborhood)         ? ActivePixelMode::Neighborhood
+           : (m == ActivePixelMode2D::ChargeBlock2x2)     ? ActivePixelMode::ChargeBlock2x2
+           : (m == ActivePixelMode2D::ChargeBlock3x3)     ? ActivePixelMode::ChargeBlock3x3
+                                                          : ActivePixelMode::ThresholdAboveNoise;
 }
 
 // The active pixel mode used at runtime

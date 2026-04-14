@@ -80,7 +80,7 @@ std::once_flag gChargeBlockWithout2DFlag;
 /// Falls back to Neighborhood on out-of-range values.
 Constants::ActivePixelMode validatedActivePixelMode() {
     const G4int raw = ECS::RuntimeConfig::Instance().activePixelMode;
-    constexpr G4int maxVal = static_cast<G4int>(Constants::ActivePixelMode::ChargeBlock3x3);
+    constexpr G4int maxVal = static_cast<G4int>(Constants::ActivePixelMode::ThresholdAboveNoise);
     if (raw < 0 || raw > maxVal) {
         std::call_once(gInvalidActivePixelModeFlag, [raw]() {
             G4Exception("ChargeSharingCalculator", "InvalidActivePixelMode", JustWarning,
@@ -139,6 +139,8 @@ csc::ActivePixelMode mapActivePixelMode(Constants::ActivePixelMode mode) {
             return csc::ActivePixelMode::ChargeBlock2x2;
         case Constants::ActivePixelMode::ChargeBlock3x3:
             return csc::ActivePixelMode::ChargeBlock3x3;
+        case Constants::ActivePixelMode::ThresholdAboveNoise:
+            return csc::ActivePixelMode::ThresholdAboveNoise;
     }
     return csc::ActivePixelMode::Neighborhood;
 }
