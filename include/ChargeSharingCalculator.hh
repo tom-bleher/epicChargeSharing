@@ -411,6 +411,24 @@ public:
     const Result& Compute(const G4ThreeVector& hitPos, G4double energyDeposit, G4double ionizationEnergy,
                           G4double amplificationFactor, G4double d0, G4double elementaryCharge);
 
+    /// \brief Minimal step deposit for per-step charge sharing (decoupled from SteppingAction).
+    struct StepInput {
+        G4ThreeVector position;
+        G4double edep{0.0};
+    };
+
+    /// \brief Compute charge sharing from multiple step positions (superposition).
+    ///
+    /// Each step contributes charge based on its own (x,y) position on the sensor.
+    /// The neighborhood is centered on the edep-weighted centroid of all steps.
+    /// Effective fractions are a convex combination of per-step fractions,
+    /// guaranteeing sum=1 by construction.
+    ///
+    /// For single-step events, delegates to Compute() for bit-identical results.
+    const Result& ComputeFromSteps(const std::vector<StepInput>& steps, G4double totalEnergyDeposit,
+                                   G4double ionizationEnergy, G4double amplificationFactor, G4double d0,
+                                   G4double elementaryCharge);
+
 private:
     /// \brief Validated D0 parameters for charge sharing calculations.
     ///

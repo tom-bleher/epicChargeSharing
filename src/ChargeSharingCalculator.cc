@@ -337,6 +337,259 @@ ChargeSharingCalculator::Compute(const G4ThreeVector& hitPos, G4double energyDep
     return fResult;
 }
 
+const ChargeSharingCalculator::Result&
+ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G4double totalEnergyDeposit,
+                                          G4double ionizationEnergy, G4double amplificationFactor, G4double d0,
+                                          G4double elementaryCharge) {
+    // Edge cases: delegate to single-point Compute for 0 or 1 steps
+    if (steps.empty()) {
+        ResetForEvent();
+        return fResult;
+    }
+    if (steps.size() == 1) {
+        return Compute(steps[0].position, totalEnergyDeposit, ionizationEnergy, amplificationFactor, d0,
+                       elementaryCharge);
+    }
+
+    if (!fDetector) {
+        G4Exception("ChargeSharingCalculator::ComputeFromSteps", "MissingDetector", FatalException,
+                    "DetectorConstruction pointer is null.");
+    }
+
+    // 1. Edep-weighted centroid
+    G4ThreeVector centroid(0., 0., 0.);
+    for (const auto& s : steps) {
+        centroid += s.position * s.edep;
+    }
+    centroid /= totalEnergyDeposit;
+
+    // 2. Standard preamble (same as Compute)
+    ReserveBuffers();
+    if (fNeedsReset) {
+        ResetForEvent();
+    }
+    fNeedsReset = true;
+
+    fResult.mode = fComputeFullGridFractions ? ChargeMode::FullGrid : ChargeMode::Patch;
+    fResult.gridRadius = fNeighborhoodRadius;
+    fResult.gridSide = fGridDim;
+    fResult.totalCells = static_cast<std::size_t>(fGridDim) * static_cast<std::size_t>(fGridDim);
+    fResult.cells.clear();
+    fResult.nearestPixelCenter = CalcNearestPixel(centroid);
+    fResult.hit.trueX = centroid.x();
+    fResult.hit.trueY = centroid.y();
+    fResult.hit.trueZ = centroid.z();
+    fResult.hit.pixRow = fResult.pixelIndexI;
+    fResult.hit.pixCol = fResult.pixelIndexJ;
+    fResult.hit.pixCenterX = fResult.nearestPixelCenter.x();
+    fResult.hit.pixCenterY = fResult.nearestPixelCenter.y();
+    fResult.geometry = BuildGridGeometry();
+
+    const G4double edepInEV = totalEnergyDeposit / eV;
+    const G4double primaryElectrons = ionizationEnergy > 0.0 ? (edepInEV / ionizationEnergy) : 0.0;
+    const G4double totalChargeElectrons = std::max(0.0, primaryElectrons * amplificationFactor);
+    const G4double totalChargeCoulomb = totalChargeElectrons * elementaryCharge;
+
+    // 3. Build core config (same as ComputeChargeFractions)
+    const G4double pixelSize = fDetector->GetPixelSize();
+    const G4double pixelSpacing = fDetector->GetPixelSpacing();
+    const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
+
+    const D0Params d0p = ValidateD0(d0, "ChargeSharingCalculator::ComputeFromSteps");
+    const ChargeModelParams model = GetChargeModelParams(pixelSpacing);
+
+    const int radius = std::max(0, fNeighborhoodRadius);
+    const int gridDim = (2 * radius) + 1;
+    const G4bool recordDistanceAlpha = fEmitDistanceAlpha;
+    const auto activePixelMode = validatedActivePixelMode();
+    const bool useRowColMode = (activePixelMode == Constants::ActivePixelMode::RowCol ||
+                                activePixelMode == Constants::ActivePixelMode::RowCol3x3);
+
+    csc::NeighborhoodConfig coreConfig;
+    coreConfig.signalModel = mapSignalModel(model.useLinear);
+    coreConfig.activeMode = mapActivePixelMode(activePixelMode);
+    coreConfig.radius = radius;
+    coreConfig.pixelSizeMM = pixelSize;
+    coreConfig.pixelSizeYMM = pixelSize;
+    coreConfig.pixelSpacingMM = pixelSpacing;
+    coreConfig.pixelSpacingYMM = pixelSpacing;
+    coreConfig.d0Micron = d0p.micron;
+    coreConfig.betaPerMicron = model.beta;
+    coreConfig.numPixelsX = numBlocksPerSide;
+    coreConfig.numPixelsY = numBlocksPerSide;
+    coreConfig.minIndexX = 0;
+    coreConfig.minIndexY = 0;
+
+    const G4int minIndexX = fDetector->GetMinIndexX();
+    const G4int minIndexY = fDetector->GetMinIndexY();
+    const G4int centerI_0based = fResult.pixelIndexI - minIndexX;
+    const G4int centerJ_0based = fResult.pixelIndexJ - minIndexY;
+
+    // 4. Accumulate per-step fractions (convex combination)
+    // accFrac[i] = sum_s (edep_s / totalEdep) * fraction_i(pos_s)
+    if (fNeighborhoodWeights.Rows() != gridDim || fNeighborhoodWeights.Cols() != gridDim) {
+        fNeighborhoodWeights.Resize(gridDim, gridDim, 0.0);
+    } else {
+        fNeighborhoodWeights.Fill(0.0);
+    }
+
+    // Accumulated fraction grids
+    Grid2D<G4double> accFraction(gridDim, gridDim);
+    Grid2D<G4double> accFractionRow(gridDim, gridDim);
+    Grid2D<G4double> accFractionCol(gridDim, gridDim);
+
+    // Store per-pixel metadata from the centroid-based calculation (for distance/alpha output)
+    // We'll compute this from the first step's core result and update with centroid later
+    struct PixelMeta {
+        G4int globalIndex{-1};
+        G4double centerX{0.0}, centerY{0.0};
+        G4double distance{0.0}, alpha{0.0};
+        bool seen{false};
+    };
+    Grid2D<PixelMeta> pixelMeta(gridDim, gridDim);
+
+    for (const auto& step : steps) {
+        const G4double stepFrac = step.edep / totalEnergyDeposit;
+
+        const auto coreResult = csc::calculateNeighborhood(
+            step.position.x(), step.position.y(), centerI_0based, centerJ_0based,
+            fResult.nearestPixelCenter.x(), fResult.nearestPixelCenter.y(), coreConfig);
+
+        for (const auto& pixel : coreResult.pixels) {
+            if (!pixel.inBounds)
+                continue;
+            const int row = pixel.di + radius;
+            const int col = pixel.dj + radius;
+
+            accFraction(row, col) += pixel.fraction * stepFrac;
+            fNeighborhoodWeights(row, col) += pixel.weight * stepFrac;
+
+            // Row/col fractions need per-step row/col normalization
+            // For RowCol modes, fraction == fractionRow == fractionCol in core
+            if (useRowColMode) {
+                accFractionRow(row, col) += pixel.fraction * stepFrac;
+                accFractionCol(row, col) += pixel.fraction * stepFrac;
+            } else {
+                accFractionRow(row, col) += pixel.fractionRow * stepFrac;
+                accFractionCol(row, col) += pixel.fractionCol * stepFrac;
+            }
+
+            // Record pixel metadata from first step that sees this pixel
+            auto& meta = pixelMeta(row, col);
+            if (!meta.seen) {
+                meta.globalIndex = pixel.globalIndex;
+                meta.centerX = pixel.centerX;
+                meta.centerY = pixel.centerY;
+                meta.distance = pixel.distance;
+                meta.alpha = pixel.alpha;
+                meta.seen = true;
+            }
+        }
+    }
+
+    // 5. Block determination from accumulated weights
+    const bool use3x3Block = (activePixelMode == Constants::ActivePixelMode::ChargeBlock3x3);
+    const int blockSize = use3x3Block ? 3 : 2;
+
+    int maxDi = 0, maxDj = 0;
+    G4double maxWeight = -1.0;
+    for (int di = -radius; di <= radius; ++di) {
+        for (int dj = -radius; dj <= radius; ++dj) {
+            const G4double w = fNeighborhoodWeights(di + radius, dj + radius);
+            if (w > maxWeight) {
+                maxWeight = w;
+                maxDi = di;
+                maxDj = dj;
+            }
+        }
+    }
+
+    int blockCornerDi = maxDi, blockCornerDj = maxDj;
+    G4double bestBlockSum = -1.0;
+    const int maxOffset = use3x3Block ? -2 : -1;
+    for (int oi = maxOffset; oi <= 0; ++oi) {
+        for (int oj = maxOffset; oj <= 0; ++oj) {
+            const int testDi = maxDi + oi;
+            const int testDj = maxDj + oj;
+            G4double sum = 0.0;
+            for (int bi = 0; bi < blockSize; ++bi) {
+                for (int bj = 0; bj < blockSize; ++bj) {
+                    const int r = testDi + bi + radius;
+                    const int c = testDj + bj + radius;
+                    if (r >= 0 && r < gridDim && c >= 0 && c < gridDim) {
+                        sum += fNeighborhoodWeights(r, c);
+                    }
+                }
+            }
+            if (sum > bestBlockSum) {
+                bestBlockSum = sum;
+                blockCornerDi = testDi;
+                blockCornerDj = testDj;
+            }
+        }
+    }
+    const G4double invBlockSum = (bestBlockSum > 0.0) ? (1.0 / bestBlockSum) : 0.0;
+
+    // 6. Populate Result.cells from accumulated fractions
+    fResult.cells.clear();
+    fResult.chargeBlock.clear();
+
+    for (int di = -radius; di <= radius; ++di) {
+        for (int dj = -radius; dj <= radius; ++dj) {
+            const int row = di + radius;
+            const int col = dj + radius;
+            const auto& meta = pixelMeta(row, col);
+            if (!meta.seen)
+                continue;
+
+            const G4double frac = accFraction(row, col);
+            if (frac <= 0.0)
+                continue;
+
+            Result::NeighborCell cell;
+            cell.gridIndex = (row * gridDim) + col;
+            cell.globalPixelId = meta.globalIndex;
+            cell.center = {meta.centerX, meta.centerY, fResult.nearestPixelCenter.z()};
+            if (recordDistanceAlpha) {
+                cell.distance = meta.distance;
+                cell.alpha = meta.alpha;
+            }
+
+            cell.fraction = frac;
+            cell.charge = frac * totalChargeCoulomb;
+
+            cell.fractionRow = accFractionRow(row, col);
+            cell.fractionCol = accFractionCol(row, col);
+
+            const bool inBlock = (di >= blockCornerDi && di < blockCornerDi + blockSize &&
+                                  dj >= blockCornerDj && dj < blockCornerDj + blockSize);
+            cell.fractionBlock = inBlock ? (fNeighborhoodWeights(row, col) * invBlockSum) : 0.0;
+
+            cell.chargeRow = cell.fractionRow * totalChargeCoulomb;
+            cell.chargeCol = cell.fractionCol * totalChargeCoulomb;
+            cell.chargeBlock = cell.fractionBlock * totalChargeCoulomb;
+
+            fResult.cells.push_back(cell);
+            if (inBlock) {
+                fResult.chargeBlock.push_back(cell);
+            }
+        }
+    }
+
+    PopulatePatchFromNeighbors(numBlocksPerSide);
+
+    if (fComputeFullGridFractions) {
+        // Full grid uses centroid as single reference point (not per-step)
+        ComputeFullGridFractions(centroid, d0, pixelSize, pixelSpacing, numBlocksPerSide, totalChargeElectrons,
+                                 elementaryCharge);
+    } else {
+        fResult.full.Clear();
+        fFullGridWeights.Clear();
+    }
+
+    return fResult;
+}
+
 using Cell = ChargeSharingCalculator::Result::NeighborCell;
 
 void ChargeSharingCalculator::ReserveBuffers() {
