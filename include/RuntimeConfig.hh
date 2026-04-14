@@ -71,6 +71,11 @@ public:
     G4double d0{Constants::D0};
     G4double linearBeta{Constants::LINEAR_CHARGE_MODEL_BETA};
 
+    // ---- Event-Level Gain Fluctuation ----
+    G4double gainExcessNoiseFactor{Constants::GAIN_EXCESS_NOISE_FACTOR};
+    G4double gainSaturationCharge{Constants::GAIN_SATURATION_CHARGE};
+    G4bool   gainFluctuationEnabled{Constants::GAIN_FLUCTUATION_ENABLED};
+
     // ---- Noise ----
     G4double pixelGainSigmaMin{Constants::PIXEL_GAIN_SIGMA_MIN};
     G4double pixelGainSigmaMax{Constants::PIXEL_GAIN_SIGMA_MAX};

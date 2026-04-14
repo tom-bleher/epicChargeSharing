@@ -28,6 +28,12 @@ void RuntimeConfig::DefineCommands() {
     fPhysicsMessenger->DeclareProperty("d0", d0, "LogA reference distance d0 (um)").SetRange("d0 > 0");
     fPhysicsMessenger->DeclareProperty("linearBeta", linearBeta, "LinA attenuation coefficient beta (1/um)")
         .SetRange("linearBeta >= 0");
+    fPhysicsMessenger->DeclareProperty("gainExcessNoiseFactor", gainExcessNoiseFactor,
+        "McIntyre excess noise factor F for avalanche gain fluctuation").SetRange("gainExcessNoiseFactor > 0");
+    fPhysicsMessenger->DeclareProperty("gainSaturationCharge", gainSaturationCharge,
+        "Gain saturation onset in primary electrons").SetRange("gainSaturationCharge > 0");
+    fPhysicsMessenger->DeclareProperty("gainFluctuationEnabled", gainFluctuationEnabled,
+        "Enable event-level stochastic gain fluctuation");
 
     // Noise commands
     fNoiseMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/noise/", "Noise model configuration");

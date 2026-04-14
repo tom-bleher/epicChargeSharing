@@ -53,6 +53,7 @@ struct EventSummaryData {
     G4double primaryMomentumZ{0.0}; ///< Primary particle pz (Geant4 units: MeV)
     G4double hitTime{0.0};          ///< Global time at first contact (Geant4 units: ns)
     G4double pathLength{0.0};       ///< Path length through sensitive volume (Geant4 units: mm)
+    G4double eventGain{0.0};        ///< Sampled event-level gain (includes saturation + fluctuation)
     G4bool firstContactIsPixel{false};
     G4bool geometricIsPixel{false};
     G4bool isPixelHitCombined{false};
@@ -133,6 +134,7 @@ public:
         G4double* primaryMomentumZ{nullptr};
         G4double* hitTime{nullptr};
         G4double* pathLength{nullptr};
+        G4double* eventGain{nullptr};
     };
 
     struct ClassificationBuffers {
@@ -251,6 +253,7 @@ public:
     G4double& PrimaryMomentumZ() { return fPrimaryMomentumZ; }
     G4double& HitTime() { return fHitTime; }
     G4double& PathLength() { return fPathLength; }
+    G4double& EventGain() { return fEventGain; }
     G4bool& IsPixelHit() { return fIsPixelHit; }
     G4int& NeighborhoodActiveCells() { return fNeighborhoodActiveCells; }
     G4int& NearestPixelI() { return fNearestPixelI; }
@@ -323,6 +326,7 @@ private:
     G4double fPrimaryMomentumX{0.0}, fPrimaryMomentumY{0.0}, fPrimaryMomentumZ{0.0};
     G4double fHitTime{0.0};
     G4double fPathLength{0.0};
+    G4double fEventGain{0.0};
     G4bool fIsPixelHit{false};
     G4int fNeighborhoodActiveCells{0};
     G4int fNearestPixelI{-1}, fNearestPixelJ{-1}, fNearestPixelGlobalId{-1};

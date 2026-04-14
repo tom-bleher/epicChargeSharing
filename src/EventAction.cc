@@ -126,9 +126,10 @@ void EventAction::EndOfEventAction(const G4Event* event) {
 
     // Compute charge sharing if applicable
     const G4bool computeChargeSharing = (!isPixelHitCombined) && (finalEdep > 0.0);
+    const G4double eventGain = computeChargeSharing ? SampleEventGain(finalEdep) : fGain;
     const ChargeSharingCalculator::Result* chargeResult = nullptr;
     if (computeChargeSharing) {
-        chargeResult = &ComputeChargeSharingForEvent(hitPos, finalEdep);
+        chargeResult = &ComputeChargeSharingForEvent(hitPos, finalEdep, eventGain);
         ReconstructPosition(*chargeResult, hitPos);
     } else {
         fChargeSharing.ResetForEvent();
@@ -156,6 +157,7 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     record.summary.primaryMomentumZ = primaryMomentum.z();
     record.summary.hitTime = fFirstContactTime;
     record.summary.pathLength = pathLength;
+    record.summary.eventGain = eventGain;
     record.nearestPixelI = fPixelIndexI;
     record.nearestPixelJ = fPixelIndexJ;
     record.nearestPixelGlobalId = fNearestPixelGlobalId;
@@ -241,9 +243,10 @@ void EventAction::UpdatePixelAndHitClassification(const G4ThreeVector& hitPos, G
 }
 
 const ChargeSharingCalculator::Result& EventAction::ComputeChargeSharingForEvent(const G4ThreeVector& hitPos,
-                                                                                 G4double energyDeposit) {
+                                                                                 G4double energyDeposit,
+                                                                                 G4double eventGain) {
     const ChargeSharingCalculator::Result& result =
-        fChargeSharing.Compute(hitPos, energyDeposit, fIonizationEnergy, fGain, fD0, fElementaryCharge);
+        fChargeSharing.Compute(hitPos, energyDeposit, fIonizationEnergy, eventGain, fD0, fElementaryCharge);
 
     UpdatePixelIndices(result, hitPos);
     fNeighborhoodLayout.SetRadius(result.gridRadius);
@@ -252,6 +255,25 @@ const ChargeSharingCalculator::Result& EventAction::ComputeChargeSharingForEvent
     const NeighborContext context = MakeNeighborContext();
     PopulateNeighborCharges(result, context);
     return result;
+}
+
+G4double EventAction::SampleEventGain(G4double energyDeposit) const {
+    const auto& rtConfig = ECS::RuntimeConfig::Instance();
+    if (!rtConfig.gainFluctuationEnabled) {
+        return fGain;
+    }
+
+    const G4double nPrimary = (energyDeposit / CLHEP::eV) / fIonizationEnergy;
+
+    // Gain saturation: large deposits create space charge that screens the gain field
+    const G4double satFactor = 1.0 / (1.0 + nPrimary / rtConfig.gainSaturationCharge);
+    const G4double effectiveGain = fGain * satFactor;
+
+    // Stochastic amplification: McIntyre excess noise factor
+    const G4double sigmaRel = std::sqrt(rtConfig.gainExcessNoiseFactor / std::max(1.0, nPrimary));
+    const G4double sampledGain = G4RandGauss::shoot(effectiveGain, effectiveGain * sigmaRel);
+
+    return std::max(1.0, sampledGain);
 }
 
 void EventAction::EnsureNeighborhoodBuffers(std::size_t totalCells) {

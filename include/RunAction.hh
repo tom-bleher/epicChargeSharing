@@ -149,6 +149,7 @@ private:
     G4double fPrimaryMomentumZ{0.0};
     G4double fHitTime{0.0};
     G4double fPathLength{0.0};
+    G4double fEventGain{0.0};
 
     G4bool fFirstContactIsPixel{false};
     G4bool fGeometricIsPixel{false};

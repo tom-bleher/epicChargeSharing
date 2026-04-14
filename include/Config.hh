@@ -35,7 +35,7 @@ inline constexpr Mode ACTIVE_MODE = Mode::LogA;
 // ───────────────────────────── Detector Geometry ────────────────────────────
 inline const G4double DETECTOR_SIZE = 30.0 * mm;   // Sensor side length
 inline const G4double DETECTOR_WIDTH = 0.05 * mm;  // Silicon thickness
-inline const G4double PIXEL_SIZE = 0.15 * mm;      // Pixel pad size
+inline const G4double PIXEL_SIZE = 0.10 * mm;      // Pixel pad size (BNL B0/lumi: 100 um electrode)
 inline const G4double PIXEL_PITCH = 0.5 * mm;      // Pixel spacing (pitch)
 inline constexpr G4int NEIGHBORHOOD_RADIUS = 2;    // Charge sharing radius
 inline const G4double PIXEL_THICKNESS = 0.02 * mm; // Pixel depth/thickness
@@ -46,18 +46,18 @@ inline const G4double GRID_OFFSET = 0.0 * mm; // Grid origin offset
 
 // ─────────────────────────────── Physics ────────────────────────────────────
 inline constexpr G4double IONIZATION_ENERGY = 3.6; // eV per e-h pair (silicon at room temperature)
-inline constexpr G4double GAIN = 10.0;             // AC-LGAD gain factor; typical range 8-25
+inline constexpr G4double GAIN = 20.0;             // AC-LGAD gain factor; typical range 8-25
 inline constexpr G4double D0 = 1.0;                // LogA reference distance d0 (um); controls charge spread width
 
 // ────────────────────────────── Noise Model ─────────────────────────────────
 // Gain sigma bounds: typical AC-LGAD per-pixel gain variation range from lab measurements
 inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010; // Min gain noise (1%)
 inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050; // Max gain noise (5%)
-inline constexpr G4double NOISE_ELECTRON_COUNT = 500.0; // Electronic noise (e-)
+inline constexpr G4double NOISE_ELECTRON_COUNT = 1500.0; // Electronic noise (e-); EICROC0 bare: ~1625 e-
 
 // ──────────────────── Event-Level Gain Fluctuation ──────────────────────────
 inline constexpr G4double GAIN_EXCESS_NOISE_FACTOR = 2.0;  // McIntyre F-factor for Si avalanche
-inline constexpr G4double GAIN_SATURATION_CHARGE = 5000.0;  // Saturation onset (primary electrons)
+inline constexpr G4double GAIN_SATURATION_CHARGE = 30000.0; // Saturation onset (primary electrons)
 inline constexpr G4bool   GAIN_FLUCTUATION_ENABLED = true;  // Enable event-level gain fluctuation
 
 // ───────────────────────────── Linear Model ─────────────────────────────────

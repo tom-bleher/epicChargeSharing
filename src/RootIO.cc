@@ -55,7 +55,7 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
     };
 
     // Core branches (always present)
-    const std::array<BranchDef, 12> coreBranches{{
+    const std::array<BranchDef, 13> coreBranches{{
         {.name = "TrueX", .addr = buffers.trueX, .leaf = "TrueX/D"},
         {.name = "TrueY", .addr = buffers.trueY, .leaf = "TrueY/D"},
         {.name = "PixelX", .addr = buffers.pixelX, .leaf = "PixelX/D"},
@@ -68,6 +68,7 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
         {.name = "PrimaryMomentumZ", .addr = buffers.primaryMomentumZ, .leaf = "PrimaryMomentumZ/D"},
         {.name = "HitTime", .addr = buffers.hitTime, .leaf = "HitTime/D"},
         {.name = "PathLength", .addr = buffers.pathLength, .leaf = "PathLength/D"},
+        {.name = "EventGain", .addr = buffers.eventGain, .leaf = "EventGain/D"},
     }};
 
     for (const auto& def : coreBranches) {
@@ -250,6 +251,7 @@ void TreeFiller::UpdateSummaryScalars(const EventRecord& record) {
     fPrimaryMomentumZ = record.summary.primaryMomentumZ;
     fHitTime = record.summary.hitTime;
     fPathLength = record.summary.pathLength;
+    fEventGain = record.summary.eventGain;
     fIsPixelHit = record.summary.isPixelHitCombined;
     fNearestPixelI = record.nearestPixelI;
     fNearestPixelJ = record.nearestPixelJ;

@@ -82,10 +82,15 @@ private:
                                          G4bool& firstContactIsPixel, G4bool& geometricIsPixel,
                                          G4bool& isPixelHitCombined);
     const ChargeSharingCalculator::Result& ComputeChargeSharingForEvent(const G4ThreeVector& hitPos,
-                                                                        G4double energyDeposit);
+                                                                        G4double energyDeposit,
+                                                                        G4double eventGain);
     void EnsureNeighborhoodBuffers(std::size_t totalCells);
     void UpdatePixelIndices(const ChargeSharingCalculator::Result& result, const G4ThreeVector& hitPos);
     void ReconstructPosition(const ChargeSharingCalculator::Result& result, const G4ThreeVector& hitPos);
+
+    /// \brief Sample a fluctuated gain value for this event.
+    /// Includes stochastic amplification noise (McIntyre) and gain saturation.
+    G4double SampleEventGain(G4double energyDeposit) const;
 
     /// \brief Build EventSummaryData from current event state.
     [[nodiscard]] IO::EventSummaryData BuildEventSummary(G4double edep, const G4ThreeVector& hitPos,

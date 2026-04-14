@@ -370,7 +370,8 @@ void RunAction::ConfigureCoreBranches(TTree* tree) {
                                                         .primaryMomentumY = &fPrimaryMomentumY,
                                                         .primaryMomentumZ = &fPrimaryMomentumZ,
                                                         .hitTime = &fHitTime,
-                                                        .pathLength = &fPathLength};
+                                                        .pathLength = &fPathLength,
+                                                        .eventGain = &fEventGain};
 
     const IO::BranchConfigurator::ClassificationBuffers classification{.isPixelHit = &fIsPixelHit,
                                                                        .neighborhoodActiveCells =
@@ -601,6 +602,7 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record) {
     fPrimaryMomentumZ = record.summary.primaryMomentumZ;
     fHitTime = record.summary.hitTime;
     fPathLength = record.summary.pathLength;
+    fEventGain = record.summary.eventGain;
     fFirstContactIsPixel = record.summary.firstContactIsPixel;
     fGeometricIsPixel = record.summary.geometricIsPixel;
     fIsPixelHit = record.summary.isPixelHitCombined;
