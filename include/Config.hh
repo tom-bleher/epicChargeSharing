@@ -87,15 +87,15 @@ enum class ActivePixelMode2D { Neighborhood, ChargeBlock2x2, ChargeBlock3x3, Thr
 //   ChargeBlock3x3      - 9 pads with highest weight
 //   ThresholdAboveNoise - Pads above N×σ_noise (realistic ASIC discriminator)
 
-inline constexpr ActivePixelMode1D ACTIVE_PIXEL_MODE_1D = ActivePixelMode1D::Neighborhood;
+inline constexpr ActivePixelMode1D ACTIVE_PIXEL_MODE_1D = ActivePixelMode1D::ThresholdAboveNoise;
 
 // 2D-only active pixel selection (used when FIT_GAUS_2D = true)
-inline constexpr ActivePixelMode2D ACTIVE_PIXEL_MODE_2D = ActivePixelMode2D::ChargeBlock2x2;
+inline constexpr ActivePixelMode2D ACTIVE_PIXEL_MODE_2D = ActivePixelMode2D::ThresholdAboveNoise;
 
 // ─────────────────────────────── Fitting ───────────────────────────────────
 // Enable Gaussian fitting for position reconstruction
 // Note: To use ActivePixelMode2D, you must set FIT_GAUS_2D = true
-inline constexpr G4bool FIT_GAUS_1D = true;
+inline constexpr G4bool FIT_GAUS_1D = false;
 inline constexpr G4bool FIT_GAUS_2D = true;
 
 // To switch to the 3x3 variant, update `ACTIVE_PIXEL_MODE_2D` above.
