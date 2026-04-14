@@ -34,6 +34,8 @@ void RuntimeConfig::DefineCommands() {
         "Gain saturation onset in primary electrons").SetRange("gainSaturationCharge > 0");
     fPhysicsMessenger->DeclareProperty("gainFluctuationEnabled", gainFluctuationEnabled,
         "Enable event-level stochastic gain fluctuation");
+    fPhysicsMessenger->DeclareProperty("perStepChargeSharing", perStepChargeSharing,
+        "Compute charge sharing per Geant4 step (for angled tracks)");
 
     // Noise commands
     fNoiseMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/noise/", "Noise model configuration");

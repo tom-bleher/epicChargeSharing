@@ -75,6 +75,7 @@ public:
     G4double gainExcessNoiseFactor{Constants::GAIN_EXCESS_NOISE_FACTOR};
     G4double gainSaturationCharge{Constants::GAIN_SATURATION_CHARGE};
     G4bool   gainFluctuationEnabled{Constants::GAIN_FLUCTUATION_ENABLED};
+    G4bool   perStepChargeSharing{true}; ///< Per-step charge sharing for angled tracks
 
     // ---- Noise ----
     G4double pixelGainSigmaMin{Constants::PIXEL_GAIN_SIGMA_MIN};
