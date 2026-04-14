@@ -7,15 +7,14 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
-#include "G4MTRunManager.hh"
 #include "G4RunManager.hh"
+#include "G4RunManagerFactory.hh"
 #include "G4Threading.hh"
+#include "TROOT.h"
 #include "G4UIExecutive.hh"
 #include "G4UImanager.hh"
 #include "G4VisExecutive.hh"
-#include "G4VisManager.hh"
 
 #include "ActionInitialization.hh"
 #include "DetectorConstruction.hh"
@@ -31,15 +30,6 @@ struct ProgramOptions {
     G4int requestedThreads{-1};
 };
 
-#ifdef _WIN32
-void SetEnv(const std::string& key, const std::string& value) {
-    _putenv_s(key.c_str(), value.c_str());
-}
-
-void UnsetEnv(const std::string& key) {
-    _putenv_s(key.c_str(), "");
-}
-#else
 void SetEnv(const std::string& key, const std::string& value) {
     ::setenv(key.c_str(), value.c_str(), 1);
 }
@@ -47,7 +37,6 @@ void SetEnv(const std::string& key, const std::string& value) {
 void UnsetEnv(const std::string& key) {
     ::unsetenv(key.c_str());
 }
-#endif
 
 class EnvironmentGuard {
 public:
@@ -83,17 +72,8 @@ public:
 
     EnvironmentGuard(const EnvironmentGuard&) = delete;
     EnvironmentGuard& operator=(const EnvironmentGuard&) = delete;
-    EnvironmentGuard(EnvironmentGuard&& other) noexcept { *this = std::move(other); }
-    EnvironmentGuard& operator=(EnvironmentGuard&& other) noexcept {
-        if (this != &other) {
-            Restore();
-            fKey = std::move(other.fKey);
-            fPrevious = std::move(other.fPrevious);
-            fApplied = other.fApplied;
-            other.fApplied = false;
-        }
-        return *this;
-    }
+    EnvironmentGuard(EnvironmentGuard&&) = delete;
+    EnvironmentGuard& operator=(EnvironmentGuard&&) = delete;
 
 private:
     std::string fKey;
@@ -132,29 +112,18 @@ ProgramOptions ParseArguments(int argc, char** argv) {
 }
 
 G4RunManager* CreateRunManager(const ProgramOptions& opts) {
-#ifdef G4MULTITHREADED
-    if (opts.requestedThreads != 1) {
-        auto* mtRunManager = new G4MTRunManager;
+    auto* runManager = G4RunManagerFactory::CreateRunManager();
 
-        G4int nThreads = 0;
-        if (opts.requestedThreads > 0) {
-            nThreads = opts.requestedThreads;
-        } else {
-            nThreads = G4Threading::G4GetNumberOfCores();
-        }
+    G4int nThreads = (opts.requestedThreads > 0) ? opts.requestedThreads
+                                                  : G4Threading::G4GetNumberOfCores();
+    const G4int maxThreads = G4Threading::G4GetNumberOfCores();
+    nThreads = std::min(nThreads, maxThreads);
 
-        const G4int maxThreads = G4Threading::G4GetNumberOfCores();
-        nThreads = std::min(nThreads, maxThreads);
+    runManager->SetNumberOfThreads(nThreads);
+    G4cout << "[Main] " << nThreads << " / " << maxThreads << " cores ("
+           << (opts.isBatch ? "batch" : "interactive") << ")" << G4endl;
 
-        mtRunManager->SetNumberOfThreads(nThreads);
-        G4cout << "[Main] Multithreaded mode with " << nThreads << " / " << maxThreads << " cores ("
-               << (opts.isBatch ? "batch" : "interactive") << ")" << G4endl;
-
-        return mtRunManager;
-    }
-#endif
-    G4cout << "[Main] Single-threaded mode (" << (opts.isBatch ? "batch" : "interactive") << ")" << G4endl;
-    return new G4RunManager;
+    return runManager;
 }
 
 void ConfigureInitialization(G4RunManager* runManager, DetectorConstruction* detector) {
@@ -163,9 +132,7 @@ void ConfigureInitialization(G4RunManager* runManager, DetectorConstruction* det
     runManager->SetUserInitialization(new ActionInitialization(detector));
 }
 
-bool ExecuteBatchMode(G4RunManager* runManager, const ProgramOptions& opts) {
-    (void)runManager;
-
+bool ExecuteBatchMode(const ProgramOptions& opts) {
     G4UImanager* uiManager = G4UImanager::GetUIpointer();
     G4cout << "[Batch] Executing macro '" << opts.macroFile << "'" << G4endl;
     G4String const command = "/control/execute " + opts.macroFile;
@@ -177,9 +144,7 @@ bool ExecuteBatchMode(G4RunManager* runManager, const ProgramOptions& opts) {
     return true;
 }
 
-void ExecuteInteractiveMode(G4RunManager* runManager, int argc, char** argv) {
-    (void)runManager;
-
+void ExecuteInteractiveMode(int argc, char** argv) {
     auto ui = std::make_unique<G4UIExecutive>(argc, argv);
     auto visManager = std::make_unique<G4VisExecutive>();
     visManager->Initialize();
@@ -216,6 +181,8 @@ int main(int argc, char** argv) {
             uiGuard.Apply("EPIC_INTERACTIVE_UI", "1");
         }
 
+        ROOT::EnableThreadSafety();
+
         // Initialize runtime configuration (registers /ecs/ macro commands).
         // Must be created before RunManager so macro commands are available
         // when macros are parsed.
@@ -227,12 +194,12 @@ int main(int argc, char** argv) {
         ConfigureInitialization(runManager.get(), detector);
 
         if (opts.isBatch) {
-            const bool success = ExecuteBatchMode(runManager.get(), opts);
+            const bool success = ExecuteBatchMode(opts);
             if (!success) {
                 return 1;
             }
         } else {
-            ExecuteInteractiveMode(runManager.get(), argc, argv);
+            ExecuteInteractiveMode(argc, argv);
         }
 
         return 0;
