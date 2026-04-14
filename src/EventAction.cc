@@ -358,26 +358,6 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
     const bool hasGainNoise = gainCount > 0;
     const bool hasAdditiveNoise = context.sigmaNoise > 0.0;
 
-    // Helper lambda to apply noise to a base charge
-    auto applyNoise = [&](G4double baseCharge, G4int globalId) -> std::pair<G4double, G4double> {
-        G4double noisyCharge = baseCharge;
-        if (hasGainNoise && globalId >= 0) {
-            const auto gid = static_cast<std::size_t>(globalId);
-            if (gid < gainCount) {
-                const G4double sigmaGain = gainSigmas[gid];
-                if (sigmaGain > 0.0) {
-                    noisyCharge *= G4RandGauss::shoot(1.0, sigmaGain);
-                }
-            }
-        }
-        G4double finalCharge = noisyCharge;
-        if (hasAdditiveNoise) {
-            finalCharge += G4RandGauss::shoot(0.0, context.sigmaNoise);
-        }
-        finalCharge = std::max(0.0, finalCharge);
-        return {noisyCharge, finalCharge};
-    };
-
     for (const auto& cell : result.cells) {
         if (cell.gridIndex < 0) {
             continue;
@@ -392,23 +372,44 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
             continue;
         }
 
-        // Neighborhood mode (using cell.charge)
-        auto [noisyCharge, finalCharge] = applyNoise(cell.charge, globalId);
+        // Draw noise ONCE per pixel — each physical pad has one gain variation
+        // and one electronic noise sample, shared across all normalization modes.
+        G4double gainFactor = 1.0;
+        if (hasGainNoise) {
+            const auto gid = static_cast<std::size_t>(globalId);
+            if (gid < gainCount) {
+                const G4double sigmaGain = gainSigmas[gid];
+                if (sigmaGain > 0.0) {
+                    gainFactor = G4RandGauss::shoot(1.0, sigmaGain);
+                }
+            }
+        }
+        const G4double additiveNoise = hasAdditiveNoise ? G4RandGauss::shoot(0.0, context.sigmaNoise) : 0.0;
+
+        // Apply the same noise realization to all normalization modes
+        auto applyNoise = [gainFactor, additiveNoise](G4double baseCharge) -> std::pair<G4double, G4double> {
+            const G4double noisyCharge = baseCharge * gainFactor;
+            const G4double finalCharge = std::max(0.0, noisyCharge + additiveNoise);
+            return {noisyCharge, finalCharge};
+        };
+
+        // Neighborhood mode
+        auto [noisyCharge, finalCharge] = applyNoise(cell.charge);
         fNeighborhoodChargeNew[gridIndex] = noisyCharge;
         fNeighborhoodChargeFinal[gridIndex] = finalCharge;
 
-        // Row mode (using cell.chargeRow)
-        auto [noisyRow, finalRow] = applyNoise(cell.chargeRow, globalId);
+        // Row mode
+        auto [noisyRow, finalRow] = applyNoise(cell.chargeRow);
         fNeighborhoodChargeNewRow[gridIndex] = noisyRow;
         fNeighborhoodChargeFinalRow[gridIndex] = finalRow;
 
-        // Col mode (using cell.chargeCol)
-        auto [noisyCol, finalCol] = applyNoise(cell.chargeCol, globalId);
+        // Col mode
+        auto [noisyCol, finalCol] = applyNoise(cell.chargeCol);
         fNeighborhoodChargeNewCol[gridIndex] = noisyCol;
         fNeighborhoodChargeFinalCol[gridIndex] = finalCol;
 
-        // Block mode (using cell.chargeBlock)
-        auto [noisyBlock, finalBlock] = applyNoise(cell.chargeBlock, globalId);
+        // Block mode
+        auto [noisyBlock, finalBlock] = applyNoise(cell.chargeBlock);
         fNeighborhoodChargeNewBlock[gridIndex] = noisyBlock;
         fNeighborhoodChargeFinalBlock[gridIndex] = finalBlock;
     }
