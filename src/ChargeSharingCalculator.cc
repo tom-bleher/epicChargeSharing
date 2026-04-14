@@ -867,15 +867,16 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
             const G4double dxToCenter = baseDx - (di * pixelSpacing);
             const G4double dyToCenter = baseDy - (dj * pixelSpacing);
-            const G4double distanceToCenter = csc::calcDistanceToCenter(dxToCenter, dyToCenter);
-            const G4double alpha = csc::calcPadViewAngle(distanceToCenter, pixelSize, pixelSize);
+            const G4double distanceToEdge = csc::calcDistanceToCenter(dxToCenter, dyToCenter,
+                                                                      pixelSize / 2.0, pixelSize / 2.0);
+            const G4double alpha = csc::calcPadViewAngle(distanceToEdge, pixelSize, pixelSize);
 
             // Delegate weight calculation to core (handles guard logic internally)
             G4double weight = NAN;
             if (chargeModel.useLinear) {
-                weight = csc::calcWeightLinA(distanceToCenter, alpha, chargeModel.beta);
+                weight = csc::calcWeightLinA(distanceToEdge, alpha, chargeModel.beta);
             } else {
-                weight = csc::calcWeightLogA(distanceToCenter, alpha, d0p.lengthMM);
+                weight = csc::calcWeightLogA(distanceToEdge, alpha, d0p.lengthMM);
             }
 
             // DD4hep formula: position = index * pitch + offset
@@ -883,7 +884,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
             const G4double pixelCenterY = detectorPos.y() + Constants::IndexToPosition(gridJ, pixelSpacing, gridOffset);
 
             fFullGridWeights(localI, localJ) = weight;
-            fResult.full.distance(localI, localJ) = distanceToCenter;
+            fResult.full.distance(localI, localJ) = distanceToEdge;
             fResult.full.alpha(localI, localJ) = alpha;
             fResult.full.pixelX(localI, localJ) = pixelCenterX;
             fResult.full.pixelY(localI, localJ) = pixelCenterY;

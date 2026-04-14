@@ -120,20 +120,21 @@ inline double calcDistanceToCenter(double dxMM, double dyMM,
     return std::hypot(edgeDx, edgeDy);
 }
 
-/// @brief Calculate pad view angle (alpha) -- approximate solid angle subtended by the pad.
+/// @brief Calculate pad view angle (alpha) per Cartiglia (TREDI 2020, slide 9).
 ///
-/// Models the geometric acceptance: pads closer to the hit subtend a larger angle
-/// and therefore collect more induced signal.
-/// @param distanceToCenterMM Distance from hit to pixel center (mm).
+/// alpha = atan( (l/2)*sqrt(2) / ((l/2)*sqrt(2) + d) )
+/// where l is the pad side length and d is the distance from the hit to the
+/// nearest pad metal edge (Tornago et al., arXiv:2007.09528, Eq. 4).
+/// @param edgeDistMM Distance from hit to nearest pad edge (mm).
 /// @param padWidthMM Pad width (mm).
 /// @param padHeightMM Pad height (mm).
 /// @return View angle alpha (radians), in range (0, pi/4].
-inline double calcPadViewAngle(double distanceToCenterMM, double padWidthMM, double padHeightMM) {
+inline double calcPadViewAngle(double edgeDistMM, double padWidthMM, double padHeightMM) {
     const double l = (padWidthMM + padHeightMM) / 2.0;
     const double numerator = (l / 2.0) * std::sqrt(2.0);
-    const double denominator = numerator + distanceToCenterMM;
-    if (distanceToCenterMM == 0.0) {
-        return std::atan(1.0); // pi/4
+    const double denominator = numerator + edgeDistMM;
+    if (edgeDistMM <= 0.0) {
+        return std::atan(1.0); // pi/4 -- hit on pad metal
     }
     return std::atan(numerator / denominator);
 }
@@ -152,8 +153,8 @@ inline double getLinearBeta(double pitchMM) {
 }
 
 /// Calculate weight for LogA model: w_i = alpha_i / ln(d_i/d0)
-/// @param distanceMM Distance from hit to pixel center (mm)
-/// @param alphaPadViewAngle Pad view angle
+/// @param distanceMM Distance from hit to nearest pad edge (mm)
+/// @param alphaPadViewAngle Pad view angle (radians)
 /// @param d0MM Reference distance d0 (mm)
 inline double calcWeightLogA(double distanceMM, double alphaPadViewAngle, double d0MM) {
     const double minSafeDistance = d0MM * constants::kGuardFactor;
@@ -387,7 +388,7 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
 
             const double dx = hitX - pixel.centerX;
             const double dy = hitY - pixel.centerY;
-            pixel.distance = calcDistanceToCenter(dx, dy);
+            pixel.distance = calcDistanceToCenter(dx, dy, padW / 2.0, padH / 2.0);
             pixel.alpha = calcPadViewAngle(pixel.distance, padW, padH);
 
             pixel.weight =
