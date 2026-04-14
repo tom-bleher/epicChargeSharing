@@ -122,6 +122,7 @@ private:
     G4int fPixelIndexJ{-1};
     G4double fPixelTrueDeltaX{0.};
     G4double fPixelTrueDeltaY{0.};
+    G4bool fHitWithinDetector{false};
 
     G4double fIonizationEnergy{Constants::IONIZATION_ENERGY};
     G4double fGain{Constants::GAIN};

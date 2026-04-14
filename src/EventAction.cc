@@ -98,6 +98,7 @@ void EventAction::BeginOfEventAction(const G4Event* /*event*/) {
     fFirstContactTime = 0.0;
     fHasFirstContactPos = false;
     fNearestPixelGlobalId = -1;
+    fHitWithinDetector = false;
 
     fChargeSharing.ResetForEvent();
     EnsureNeighborhoodBuffers(fNeighborhoodLayout.TotalCells());
@@ -108,7 +109,12 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     fScorerEnergyDeposit = fSteppingAction ? fSteppingAction->GetTotalEdep() : 0.0;
 
     const G4double finalEdep = fScorerEnergyDeposit;
-    const G4ThreeVector& hitPos = DetermineHitPosition();
+    // Use first-contact position when available; fall back to primary vertex
+    // so that TrueX/TrueY always report where the beam aimed, even for misses.
+    G4ThreeVector hitPos = DetermineHitPosition();
+    if (!fHasFirstContactPos && event && event->GetPrimaryVertex()) {
+        hitPos = event->GetPrimaryVertex()->GetPosition();
+    }
 
     G4ThreeVector nearestPixel(0., 0., 0.);
     G4bool firstContactIsPixel = false;
@@ -116,8 +122,22 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     G4bool isPixelHitCombined = false;
     UpdatePixelAndHitClassification(hitPos, nearestPixel, firstContactIsPixel, geometricIsPixel, isPixelHitCombined);
 
+    // Skip charge sharing for edge pixels whose neighborhood extends beyond the detector.
+    // These produce incomplete neighborhoods with biased fractions.
+    G4bool isEdgePixel = false;
+    if (fDetector) {
+        const G4int radius = fDetector->GetNeighborhoodRadius();
+        const G4int numBlocks = fDetector->GetNumBlocksPerSide();
+        const G4int minI = fDetector->GetMinIndexX();
+        const G4int minJ = fDetector->GetMinIndexY();
+        const G4int maxI = minI + numBlocks - 1;
+        const G4int maxJ = minJ + numBlocks - 1;
+        isEdgePixel = (fPixelIndexI < minI + radius || fPixelIndexI > maxI - radius ||
+                       fPixelIndexJ < minJ + radius || fPixelIndexJ > maxJ - radius);
+    }
+
     // Compute charge sharing if applicable
-    const G4bool computeChargeSharing = (!isPixelHitCombined) && (finalEdep > 0.0);
+    const G4bool computeChargeSharing = (!isPixelHitCombined) && (finalEdep > 0.0) && !isEdgePixel;
     const G4double eventGain = computeChargeSharing ? SampleEventGain(finalEdep) : fGain;
     const ChargeSharingCalculator::Result* chargeResult = nullptr;
     if (computeChargeSharing) {
@@ -225,6 +245,7 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos) {
 
     fPixelIndexI = location.indexI;
     fPixelIndexJ = location.indexJ;
+    fHitWithinDetector = location.withinDetector;
 
     return location.center;
 }
@@ -453,6 +474,7 @@ ECS::IO::EventSummaryData EventAction::BuildEventSummary(G4double edep, const G4
     summary.firstContactIsPixel = firstContactIsPixel;
     summary.geometricIsPixel = geometricIsPixel;
     summary.isPixelHitCombined = isPixelHitCombined;
+    summary.hitWithinDetector = fHitWithinDetector;
     return summary;
 }
 
