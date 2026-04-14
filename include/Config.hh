@@ -55,7 +55,7 @@ inline constexpr G4double D0 = 1.0;                // LogA reference distance d0
 inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010; // Min gain noise (1%)
 inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050; // Max gain noise (5%)
 inline constexpr G4double NOISE_ELECTRON_COUNT = 1500.0; // Electronic noise (e-); EICROC0 bare: ~1625 e-
-inline constexpr G4double READOUT_THRESHOLD_SIGMA = 5.0; // Readout threshold (N × noise σ) for ThresholdAboveNoise mode
+inline constexpr G4double READOUT_THRESHOLD_SIGMA = 2.0; // Readout threshold (N × noise σ) for ThresholdAboveNoise mode
 
 // ──────────────────── Event-Level Gain Fluctuation ──────────────────────────
 inline constexpr G4double GAIN_EXCESS_NOISE_FACTOR = 2.0;  // McIntyre F-factor for Si avalanche
