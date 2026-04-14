@@ -34,6 +34,8 @@ SteppingAction::SteppingAction(EventAction* eventAction)
 void SteppingAction::Reset() {
     fFirstContactType = FirstContactType::None;
     fPathLengthInSensitive = 0.0;
+    fTotalEdep = 0.0;
+    fStepDeposits.clear();
 }
 
 void SteppingAction::CacheVolumes() {
@@ -105,9 +107,34 @@ void SteppingAction::AccumulatePathLength(const G4Step* step) {
     }
 }
 
+void SteppingAction::AccumulateEdep(const G4Step* step) {
+    CacheVolumes();
+
+    const G4StepPoint* prePoint = step->GetPreStepPoint();
+    if (!prePoint)
+        return;
+
+    G4VPhysicalVolume const* preVol = prePoint->GetTouchableHandle()->GetVolume();
+    if (!preVol)
+        return;
+
+    // Only accumulate in silicon bulk, matching the former G4PSEnergyDeposit scorer
+    const G4LogicalVolume* lv = preVol->GetLogicalVolume();
+    if (lv != fLogicCube)
+        return;
+
+    const G4double edep = step->GetTotalEnergyDeposit();
+    if (edep <= 0.0)
+        return;
+
+    fTotalEdep += edep;
+    fStepDeposits.push_back({prePoint->GetPosition(), edep, prePoint->GetGlobalTime()});
+}
+
 void SteppingAction::UserSteppingAction(const G4Step* step) {
     TrackVolumeInteractions(step);
     AccumulatePathLength(step);
+    AccumulateEdep(step);
 }
 
 } // namespace ECS
