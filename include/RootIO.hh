@@ -29,7 +29,6 @@
 #include <variant>
 #include <vector>
 
-class TDirectory;
 class TFile;
 class TTree;
 
@@ -59,6 +58,7 @@ struct EventSummaryData {
     G4bool firstContactIsPixel{false};
     G4bool geometricIsPixel{false};
     G4bool isPixelHitCombined{false};
+    G4bool hitWithinDetector{false}; ///< True if hit position maps to a valid pixel (not clamped from outside grid)
 };
 
 /// \brief Complete event record for ROOT tree filling.
@@ -147,6 +147,7 @@ public:
 
     struct ClassificationBuffers {
         G4bool* isPixelHit{nullptr};
+        G4bool* hitWithinDetector{nullptr};
         G4int* neighborhoodActiveCells{nullptr};
         G4int* nearestPixelI{nullptr};
         G4int* nearestPixelJ{nullptr};
@@ -273,6 +274,7 @@ public:
     G4double& PathLength() { return fPathLength; }
     G4double& EventGain() { return fEventGain; }
     G4bool& IsPixelHit() { return fIsPixelHit; }
+    G4bool& HitWithinDetector() { return fHitWithinDetector; }
     G4int& NeighborhoodActiveCells() { return fNeighborhoodActiveCells; }
     G4int& NearestPixelI() { return fNearestPixelI; }
     G4int& NearestPixelJ() { return fNearestPixelJ; }
@@ -346,6 +348,7 @@ private:
     G4double fPathLength{0.0};
     G4double fEventGain{0.0};
     G4bool fIsPixelHit{false};
+    G4bool fHitWithinDetector{false};
     G4int fNeighborhoodActiveCells{0};
     G4int fNearestPixelI{-1}, fNearestPixelJ{-1}, fNearestPixelGlobalId{-1};
 
@@ -457,13 +460,6 @@ public:
     ///        the TTree's UserInfo list.
     void WriteToTree(TTree* tree, std::mutex* ioMutex = nullptr) const;
     static void WriteEntriesToUserInfo(TTree* tree, const EntryList& entries);
-
-    /// \brief Write numeric metadata as TParameter objects at file level.
-    ///
-    /// This makes metadata accessible to uproot (which cannot read tree UserInfo).
-    /// Writes TParameter<double>, TParameter<int>, or TParameter<bool> for each
-    /// numeric entry; string entries are skipped (use UserInfo for those).
-    static void WriteEntriesToFileLevel(TDirectory* dir, const EntryList& entries);
 
 private:
     static std::string ModelToString(Config::PosReconModel model);

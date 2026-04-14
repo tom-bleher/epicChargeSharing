@@ -92,24 +92,23 @@ def ensure_dir(path: str) -> None:
 
 def read_metadata_from_root_file(root_path: pathlib.Path) -> Dict[str, float]:
     """Read grid metadata (pixel size, spacing) from a ROOT file.
-    
+
     Returns a dict with keys like 'GridPixelSize_mm', 'GridPixelSpacing_mm'.
-    Uses TParameter<double> objects stored in the tree's UserInfo.
+    Reads TParameter objects from the TTree's UserInfo list.
     """
     metadata = {}
     try:
-        with uproot.open(root_path) as f:
+        with uproot.open(root_path, minimal_ttree_metadata=False) as f:
             if "Hits" not in f:
                 return metadata
-            # Try accessing via file-level keys for TParameter objects
-            for key in f.keys():
-                obj = f[key]
-                if hasattr(obj, 'member'):
+            tree = f["Hits"]
+            user_info = tree.member("fUserInfo", none_if_missing=True)
+            if user_info is not None:
+                for obj in user_info:
                     try:
-                        name = key.split(';')[0]
+                        name = obj.member("fName")
                         if name.startswith('Grid') or name == 'Gain':
-                            val = obj.member('fVal')
-                            metadata[name] = float(val)
+                            metadata[name] = float(obj.member("fVal"))
                     except Exception:
                         pass
     except Exception:

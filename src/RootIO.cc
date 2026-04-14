@@ -82,6 +82,8 @@ void BranchConfigurator::ConfigureClassificationBranches(TTree* tree, const Clas
         return;
     if (buffers.isPixelHit)
         tree->Branch("isPixelHit", buffers.isPixelHit, "isPixelHit/O");
+    if (buffers.hitWithinDetector)
+        tree->Branch("hitWithinDetector", buffers.hitWithinDetector, "hitWithinDetector/O");
     if (buffers.neighborhoodActiveCells)
         tree->Branch("NeighborhoodSize", buffers.neighborhoodActiveCells, "NeighborhoodSize/I");
     if (buffers.nearestPixelI)
@@ -271,6 +273,7 @@ void TreeFiller::UpdateSummaryScalars(const EventRecord& record) {
     fPathLength = record.summary.pathLength;
     fEventGain = record.summary.eventGain;
     fIsPixelHit = record.summary.isPixelHitCombined;
+    fHitWithinDetector = record.summary.hitWithinDetector;
     fNearestPixelI = record.nearestPixelI;
     fNearestPixelJ = record.nearestPixelJ;
     fNearestPixelGlobalId = record.nearestPixelGlobalId;
@@ -617,35 +620,6 @@ void MetadataPublisher::WriteToTree(TTree* tree, std::mutex* ioMutex) const {
     }
 }
 
-void MetadataPublisher::WriteEntriesToFileLevel(TDirectory* dir, const EntryList& entries) {
-    if (!dir)
-        return;
-
-    TDirectory* saved = gDirectory;
-    dir->cd();
-
-    for (const auto& [key, value] : entries) {
-        std::visit(
-            [&key](auto&& val) {
-                using T = std::decay_t<decltype(val)>;
-                if constexpr (std::is_same_v<T, G4double>) {
-                    TParameter<double> p(key.c_str(), val);
-                    p.Write(key.c_str(), TObject::kOverwrite);
-                } else if constexpr (std::is_same_v<T, G4int>) {
-                    TParameter<int> p(key.c_str(), val);
-                    p.Write(key.c_str(), TObject::kOverwrite);
-                } else if constexpr (std::is_same_v<T, G4bool>) {
-                    TParameter<bool> p(key.c_str(), val);
-                    p.Write(key.c_str(), TObject::kOverwrite);
-                }
-                // Strings (TNamed) skipped — use UserInfo for those
-            },
-            value);
-    }
-
-    if (saved)
-        saved->cd();
-}
 
 // ============================================================================
 // PostProcessingRunner

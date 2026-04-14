@@ -88,34 +88,25 @@ def ensure_dir(path: Path) -> None:
 
 def read_metadata_from_root_file(root_path: Path) -> Dict[str, float]:
     """Read grid metadata (pixel size, spacing) from a ROOT file.
-    
+
     Returns a dict with keys like 'GridPixelSize_mm', 'GridPixelSpacing_mm'.
-    Uses TParameter<double> objects stored in the tree's UserInfo.
+    Reads TParameter objects from the TTree's UserInfo list.
     """
     metadata = {}
     try:
-        with uproot.open(root_path) as f:
+        with uproot.open(root_path, minimal_ttree_metadata=False) as f:
             if "Hits" not in f:
                 return metadata
             tree = f["Hits"]
-            user_info = tree.get("fUserInfo", None)
-            if user_info is None:
-                # Try accessing via the tree's user_info list
-                try:
-                    # uproot stores UserInfo as objects in tree directory
-                    for key in f.keys():
-                        obj = f[key]
-                        if hasattr(obj, 'member'):
-                            try:
-                                # Check if it's a TParameter<double>
-                                name = key.split(';')[0]
-                                if name.startswith('Grid') or name == 'Gain':
-                                    val = obj.member('fVal')
-                                    metadata[name] = float(val)
-                            except Exception:
-                                pass
-                except Exception:
-                    pass
+            user_info = tree.member("fUserInfo", none_if_missing=True)
+            if user_info is not None:
+                for obj in user_info:
+                    try:
+                        name = obj.member("fName")
+                        if name.startswith('Grid') or name == 'Gain':
+                            metadata[name] = float(obj.member("fVal"))
+                    except Exception:
+                        pass
     except Exception:
         pass
     return metadata

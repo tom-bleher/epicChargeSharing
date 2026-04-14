@@ -162,6 +162,7 @@ private:
     G4bool fFirstContactIsPixel{false};
     G4bool fGeometricIsPixel{false};
     G4bool fIsPixelHit{false};
+    G4bool fHitWithinDetector{false};
 
     // Neighborhood fractions
     std::vector<G4double> fNeighborhoodChargeFractions;

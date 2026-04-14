@@ -375,6 +375,7 @@ void RunAction::ConfigureCoreBranches(TTree* tree) {
                                                         .eventGain = &fEventGain};
 
     const IO::BranchConfigurator::ClassificationBuffers classification{.isPixelHit = &fIsPixelHit,
+                                                                       .hitWithinDetector = &fHitWithinDetector,
                                                                        .neighborhoodActiveCells =
                                                                            &fNeighborhoodActiveCells,
                                                                        .nearestPixelI = &fNearestPixelI,
@@ -427,11 +428,6 @@ void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* 
         // persists it for post-processing macros.
         if (!context.multithreaded) {
             WriteMetadataToTree(fRootWriter ? fRootWriter->Tree() : nullptr);
-            // Also write as file-level TParameter objects for uproot access
-            if (fRootWriter && fRootWriter->File()) {
-                IO::MetadataPublisher::WriteEntriesToFileLevel(
-                    fRootWriter->File(), CollectMetadataEntries());
-            }
         }
 
         if (SafeWriteRootFile()) {
@@ -588,8 +584,6 @@ bool RunAction::MergeWorkerFilesAndPublishMetadata(const std::vector<G4String>& 
                     IO::MetadataPublisher::EntryList const entries = CollectMetadataEntries();
                     if (!entries.empty()) {
                         IO::MetadataPublisher::WriteEntriesToUserInfo(tree, entries);
-                        // Also write as file-level TParameter objects for uproot access
-                        IO::MetadataPublisher::WriteEntriesToFileLevel(mergedFile.get(), entries);
                     }
                     tree->Write("", TObject::kOverwrite);
                 }
@@ -623,6 +617,7 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record) {
     fFirstContactIsPixel = record.summary.firstContactIsPixel;
     fGeometricIsPixel = record.summary.geometricIsPixel;
     fIsPixelHit = record.summary.isPixelHitCombined;
+    fHitWithinDetector = record.summary.hitWithinDetector;
 
     fNearestPixelI = record.nearestPixelI;
     fNearestPixelJ = record.nearestPixelJ;
