@@ -20,7 +20,7 @@ option(BUILD_TESTING "Build unit tests"                            OFF)
 # ============================================================================
 # Dependencies
 # ============================================================================
-find_package(Geant4 REQUIRED ui_all vis_all)
+find_package(Geant4 11.0 REQUIRED ui_all vis_all)
 find_package(ROOT CONFIG REQUIRED COMPONENTS Core RIO Hist Tree Graf Minuit MathCore Matrix)
 find_package(Eigen3 REQUIRED CONFIG)
 find_package(Threads REQUIRED)
