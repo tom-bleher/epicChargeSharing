@@ -2,22 +2,8 @@
 # See sweep_analysis.py for usage. CLI arguments override these values.
 
 # Positions to sweep (micrometers from pixel center)
-positions:
-  - 0
-  - 25
-  - -25
-  - 50
-  - -50
-  - 75
-  - -75
-  - 100
-  - -100
-  - 125
-  - -125
-  - 150
-  - -150
-  - 175
-  - -175
+# Set to null to auto-compute from Config.hh geometry (gap region, 25 µm steps)
+positions: null
 
 # Charge sharing model: LogA or LinA
 # Set to null to use current Config.hh setting

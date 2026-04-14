@@ -15,13 +15,14 @@ recompiling for each position.
 """
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 # Configuration
 # Resolve repository root relative to this script so the tool works anywhere
@@ -30,25 +31,29 @@ BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"
 BASE_MAC = REPO_ROOT / "macros" / "run.mac"
 DEFAULT_OUTPUT_BASE = REPO_ROOT / "sweep_x_runs"
+CONFIG_HH = REPO_ROOT / "include" / "Config.hh"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Geometry Configuration
+# Geometry Configuration — parsed from Config.hh so sweeps adapt automatically
 # ═══════════════════════════════════════════════════════════════════════════════
-# Pixel pitch = 500 µm (pixels centered at ..., -500, 0, +500, ... µm)
-# Metal pad size = 150 µm (pads span ±75 µm from pixel center)
-#
-# For 3 pixels centered at -500, 0, +500 µm:
-#   Metal pads at: [-575,-425], [-75,+75], [+425,+575] µm
-#   Gap regions:   [-425,-75] and [+75,+425] µm
-#
-# We want positions that:
-#   1. Stay in the gap regions (avoid hitting metal pads)
-#   2. Are equally spaced
-#   3. Get close to pixel edges from left and right
 
-PIXEL_PITCH_UM = 500.0      # Pixel spacing in µm
-METAL_PAD_SIZE_UM = 150.0   # Metal pad size in µm
-HALF_PAD_UM = METAL_PAD_SIZE_UM / 2.0  # 75 µm
+def _parse_geometry_from_config() -> Tuple[float, float]:
+    """Read PIXEL_SIZE and PIXEL_PITCH from Config.hh (values in mm), return in µm."""
+    pitch_mm, size_mm = 0.5, 0.15  # safe fallbacks
+    try:
+        text = CONFIG_HH.read_text()
+        m = re.search(r'PIXEL_PITCH\s*=\s*([\d.]+)\s*\*\s*mm', text)
+        if m:
+            pitch_mm = float(m.group(1))
+        m = re.search(r'PIXEL_SIZE\s*=\s*([\d.]+)\s*\*\s*mm', text)
+        if m:
+            size_mm = float(m.group(1))
+    except OSError:
+        pass
+    return pitch_mm * 1000.0, size_mm * 1000.0
+
+PIXEL_PITCH_UM, METAL_PAD_SIZE_UM = _parse_geometry_from_config()
+HALF_PAD_UM = METAL_PAD_SIZE_UM / 2.0
 EDGE_MARGIN_UM = 3.0        # Margin from pad edge to avoid touching
 STEP_SIZE_UM = 25.0         # Step size between positions
 

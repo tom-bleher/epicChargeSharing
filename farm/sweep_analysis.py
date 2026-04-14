@@ -98,6 +98,22 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FARM_DIR = Path(__file__).resolve().parent
 SRC_FILE = REPO_ROOT / "src" / "PrimaryGenerator.cc"
 CONFIG_FILE = REPO_ROOT / "include" / "Config.hh"
+
+
+def _parse_geometry_from_config() -> Tuple[float, float]:
+    """Read PIXEL_PITCH and PIXEL_SIZE from Config.hh, return (pitch_mm, size_mm)."""
+    pitch_mm, size_mm = 0.5, 0.15  # safe fallbacks
+    try:
+        text = CONFIG_FILE.read_text()
+        m = re.search(r'PIXEL_PITCH\s*=\s*([\d.]+)\s*\*\s*mm', text)
+        if m:
+            pitch_mm = float(m.group(1))
+        m = re.search(r'PIXEL_SIZE\s*=\s*([\d.]+)\s*\*\s*mm', text)
+        if m:
+            size_mm = float(m.group(1))
+    except OSError:
+        pass
+    return pitch_mm, size_mm
 BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"
 RUN_MAC = (BUILD_DIR / "run.mac") if (BUILD_DIR / "run.mac").exists() else (REPO_ROOT / "macros" / "run.mac")
@@ -125,8 +141,20 @@ NEIGHBORHOOD_TYPES = {
     "distance": ("distance", "Qn"),  # Distance to hit (uses Qn for valid cell detection)
 }
 
-# Default positions to sweep (micrometers)
-DEFAULT_POSITIONS = [0, 25, -25, 50, -50, 75, -75, 100, -100, 125, -125, 150, -150, 175, -175]
+# Default positions to sweep (computed from Config.hh geometry)
+def _default_gap_positions() -> List[float]:
+    """Compute gap-region sweep positions from Config.hh pixel geometry."""
+    pitch_mm, size_mm = _parse_geometry_from_config()
+    half_gap_um = (pitch_mm - size_mm) * 1000.0 / 2.0  # half of gap width in µm
+    step = 25.0
+    positions = [0.0]
+    x = step
+    while x <= half_gap_um - 3.0:  # 3 µm margin from pad edge
+        positions.extend([x, -x])
+        x += step
+    return sorted(positions)
+
+DEFAULT_POSITIONS = _default_gap_positions()
 
 # Regex to locate fFixedX assignment in PrimaryGenerator.cc
 FIXED_X_LINE_REGEX = re.compile(
@@ -1172,9 +1200,10 @@ def extract_fi_from_file(
 # Summary Plots
 # =============================================================================
 
-# Default pixel geometry for plots (can be overridden)
-DEFAULT_PIXEL_SPACING_MM = 0.5   # 500 µm
-DEFAULT_PIXEL_SIZE_MM = 0.15    # 150 µm
+# Pixel geometry for plots — parsed from Config.hh
+_GEOM_SPACING_MM, _GEOM_SIZE_MM = _parse_geometry_from_config()
+DEFAULT_PIXEL_SPACING_MM = _GEOM_SPACING_MM
+DEFAULT_PIXEL_SIZE_MM = _GEOM_SIZE_MM
 
 
 def draw_pixel_regions(
