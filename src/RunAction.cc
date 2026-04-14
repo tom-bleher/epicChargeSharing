@@ -16,6 +16,7 @@
 #include "G4RunManager.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Threading.hh"
+#include "Randomize.hh"
 
 #include "Compression.h"
 #include "RVersion.h"
@@ -286,15 +287,12 @@ RunAction::ThreadContext RunAction::BuildThreadContext(const G4Run* run) {
 
 void RunAction::LogBeginRun(const ThreadContext& context) {
     const G4int runId = context.runId;
-    if (context.multithreaded) {
-        if (context.worker) {
-            G4cout << "[RunAction] Worker " << context.threadId << " beginning run " << runId << G4endl;
-        } else {
-            G4cout << "[RunAction] Master beginning run " << runId << " with " << context.totalWorkers << " workers"
-                   << G4endl;
-        }
+    if (context.worker) {
+        G4cout << "[RunAction] Worker " << context.threadId << " beginning run " << runId << G4endl;
     } else {
-        G4cout << "[RunAction] Beginning run " << runId << " (single-threaded)" << G4endl;
+        G4cout << "[RunAction] Master beginning run " << runId << " with " << context.totalWorkers << " workers"
+               << G4endl;
+        G4cout << "[Run] Random seed: " << CLHEP::HepRandom::getTheSeed() << G4endl;
     }
 }
 
@@ -777,10 +775,15 @@ void RunAction::PopulateFullFractionsFromRecord(const EventRecord& record) {
 }
 
 void RunAction::RunPostProcessingFits() {
-    // Delegate to PostProcessingRunner helper
+    const auto& rc = ECS::RuntimeConfig::Instance();
+    if (!rc.fitGaus1D && !rc.fitGaus2D) {
+        G4cout << "[RunAction] Post-processing skipped (no fits enabled)" << G4endl;
+        return;
+    }
+
     IO::PostProcessingRunner::Config config;
-    config.runFitGaus1D = ECS::RuntimeConfig::Instance().fitGaus1D;
-    config.runFitGaus2D = ECS::RuntimeConfig::Instance().fitGaus2D;
+    config.runFitGaus1D = rc.fitGaus1D;
+    config.runFitGaus2D = rc.fitGaus2D;
     config.sourceDir = PROJECT_SOURCE_DIR;
     config.rootFileName = "epicChargeSharing.root";
 
