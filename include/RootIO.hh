@@ -54,6 +54,7 @@ struct EventSummaryData {
     G4double hitTime{0.0};          ///< Global time at first contact (Geant4 units: ns)
     G4double pathLength{0.0};       ///< Path length through sensitive volume (Geant4 units: mm)
     G4double eventGain{0.0};        ///< Sampled event-level gain (includes saturation + fluctuation)
+    G4int nSteps{0};                ///< Number of Geant4 steps in sensitive volume
     G4bool firstContactIsPixel{false};
     G4bool geometricIsPixel{false};
     G4bool isPixelHitCombined{false};
@@ -110,6 +111,12 @@ struct EventRecord {
     G4int nearestPixelI{-1};
     G4int nearestPixelJ{-1};
     G4int nearestPixelGlobalId{-1};
+    // Per-step energy deposits (Landau fluctuation data)
+    std::span<const G4double> stepEdep;
+    std::span<const G4double> stepX;
+    std::span<const G4double> stepY;
+    std::span<const G4double> stepZ;
+    std::span<const G4double> stepTime;
     G4int totalGridCells{0};
     G4bool includeDistanceAlpha{false};
 };
@@ -193,6 +200,15 @@ public:
         G4int* gridSide{nullptr};
     };
 
+    struct StepBuffers {
+        G4int* nSteps{nullptr};
+        std::vector<G4double>* edep{nullptr};
+        std::vector<G4double>* x{nullptr};
+        std::vector<G4double>* y{nullptr};
+        std::vector<G4double>* z{nullptr};
+        std::vector<G4double>* time{nullptr};
+    };
+
     void ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars, const ClassificationBuffers& classification,
                                const VectorBuffers& vectors,
                                Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood,
@@ -203,6 +219,7 @@ public:
     static void ConfigureVectorBranches(TTree* tree, const VectorBuffers& buffers,
                                         Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
     static void ConfigureNeighborhoodBranches(TTree* tree, std::vector<G4int>* pixelID);
+    static void ConfigureStepBranches(TTree* tree, const StepBuffers& buffers);
     static bool ConfigureFullGridBranches(TTree* tree, const FullGridBuffers& buffers,
                                           Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
 

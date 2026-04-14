@@ -15,13 +15,10 @@
 
 #include "G4Event.hh"
 #include "G4GenericMessenger.hh"
-#include "G4HCofThisEvent.hh"
 #include "G4Run.hh"
 #include "G4RunManager.hh"
-#include "G4SDManager.hh"
 #include "G4StateManager.hh"
 #include "G4SystemOfUnits.hh"
-#include "G4THitsMap.hh"
 
 #include "Randomize.hh"
 
@@ -88,12 +85,6 @@ EventAction::EventAction(RunAction* runAction, DetectorConstruction* detector)
 }
 
 void EventAction::BeginOfEventAction(const G4Event* /*event*/) {
-    fChargeSharing.SetEmitDistanceAlpha(fEmitDistanceAlphaOutputs);
-    fChargeSharing.SetComputeFullGridFractions(fComputeFullFractions);
-    if (fRunAction) {
-        fRunAction->ConfigureFullFractionBranch(fComputeFullFractions);
-    }
-
     if (fSteppingAction) {
         fSteppingAction->Reset();
     }
@@ -113,7 +104,8 @@ void EventAction::BeginOfEventAction(const G4Event* /*event*/) {
 }
 
 void EventAction::EndOfEventAction(const G4Event* event) {
-    CollectScorerData(event);
+    // Read energy deposit from SteppingAction (replaces G4PSEnergyDeposit scorer)
+    fScorerEnergyDeposit = fSteppingAction ? fSteppingAction->GetTotalEdep() : 0.0;
 
     const G4double finalEdep = fScorerEnergyDeposit;
     const G4ThreeVector& hitPos = DetermineHitPosition();
@@ -130,7 +122,6 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     const ChargeSharingCalculator::Result* chargeResult = nullptr;
     if (computeChargeSharing) {
         chargeResult = &ComputeChargeSharingForEvent(hitPos, finalEdep, eventGain);
-        ReconstructPosition(*chargeResult, hitPos);
     } else {
         fChargeSharing.ResetForEvent();
         EnsureNeighborhoodBuffers(fNeighborhoodLayout.TotalCells());
@@ -148,6 +139,22 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     // Get path length accumulated by SteppingAction
     const G4double pathLength = fSteppingAction ? fSteppingAction->GetPathLength() : 0.0;
 
+    // Populate per-step energy deposit vectors for Landau fluctuation output
+    fStepEdeps.clear();
+    fStepX.clear();
+    fStepY.clear();
+    fStepZ.clear();
+    fStepTimes.clear();
+    if (fSteppingAction) {
+        for (const auto& s : fSteppingAction->GetStepDeposits()) {
+            fStepEdeps.push_back(s.edep);
+            fStepX.push_back(s.position.x());
+            fStepY.push_back(s.position.y());
+            fStepZ.push_back(s.position.z());
+            fStepTimes.push_back(s.time);
+        }
+    }
+
     // Build event record
     ECS::IO::EventRecord record{};
     record.summary =
@@ -158,6 +165,12 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     record.summary.hitTime = fFirstContactTime;
     record.summary.pathLength = pathLength;
     record.summary.eventGain = eventGain;
+    record.summary.nSteps = static_cast<G4int>(fStepEdeps.size());
+    record.stepEdep = std::span<const G4double>(fStepEdeps.data(), fStepEdeps.size());
+    record.stepX = std::span<const G4double>(fStepX.data(), fStepX.size());
+    record.stepY = std::span<const G4double>(fStepY.data(), fStepY.size());
+    record.stepZ = std::span<const G4double>(fStepZ.data(), fStepZ.size());
+    record.stepTime = std::span<const G4double>(fStepTimes.data(), fStepTimes.size());
     record.nearestPixelI = fPixelIndexI;
     record.nearestPixelJ = fPixelIndexJ;
     record.nearestPixelGlobalId = fNearestPixelGlobalId;
@@ -213,14 +226,6 @@ G4ThreeVector EventAction::CalcNearestPixel(const G4ThreeVector& pos) {
     fPixelIndexI = location.indexI;
     fPixelIndexJ = location.indexJ;
 
-    if (location.withinDetector) {
-        fPixelTrueDeltaX = std::abs(location.center.x() - pos.x());
-        fPixelTrueDeltaY = std::abs(location.center.y() - pos.y());
-    } else {
-        fPixelTrueDeltaX = std::numeric_limits<G4double>::quiet_NaN();
-        fPixelTrueDeltaY = std::numeric_limits<G4double>::quiet_NaN();
-    }
-
     return location.center;
 }
 
@@ -245,10 +250,34 @@ void EventAction::UpdatePixelAndHitClassification(const G4ThreeVector& hitPos, G
 const ChargeSharingCalculator::Result& EventAction::ComputeChargeSharingForEvent(const G4ThreeVector& hitPos,
                                                                                  G4double energyDeposit,
                                                                                  G4double eventGain) {
-    const ChargeSharingCalculator::Result& result =
-        fChargeSharing.Compute(hitPos, energyDeposit, fIonizationEnergy, eventGain, fD0, fElementaryCharge);
+    const auto& rtConfig = ECS::RuntimeConfig::Instance();
+    const ChargeSharingCalculator::Result* resultPtr = nullptr;
 
-    UpdatePixelIndices(result, hitPos);
+    // Per-step charge sharing: compute fractions from each step's position independently
+    if (rtConfig.perStepChargeSharing && fSteppingAction) {
+        const auto& deposits = fSteppingAction->GetStepDeposits();
+        if (deposits.size() > 1) {
+            std::vector<ChargeSharingCalculator::StepInput> inputs;
+            inputs.reserve(deposits.size());
+            for (const auto& d : deposits) {
+                inputs.push_back({d.position, d.edep});
+            }
+            resultPtr = &fChargeSharing.ComputeFromSteps(inputs, energyDeposit, fIonizationEnergy, eventGain, fD0,
+                                                         fElementaryCharge);
+        }
+    }
+
+    // Fallback: legacy single-point computation
+    if (!resultPtr) {
+        resultPtr = &fChargeSharing.Compute(hitPos, energyDeposit, fIonizationEnergy, eventGain, fD0,
+                                            fElementaryCharge);
+    }
+
+    const auto& result = *resultPtr;
+
+    // Use centroid (from result.hit) for pixel indexing when per-step was used
+    const G4ThreeVector effectiveHitPos(result.hit.trueX, result.hit.trueY, result.hit.trueZ);
+    UpdatePixelIndices(result, effectiveHitPos);
     fNeighborhoodLayout.SetRadius(result.gridRadius);
     EnsureNeighborhoodBuffers(result.totalCells);
 
@@ -384,35 +413,6 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
     }
 }
 
-void EventAction::CollectScorerData(const G4Event* event) {
-    fScorerEnergyDeposit = 0.0;
-
-    G4HCofThisEvent* const hce = event->GetHCofThisEvent();
-    if (!hce) {
-        return;
-    }
-
-    static G4int edepID = -1;
-    if (edepID < 0) {
-        if (auto* sdm = G4SDManager::GetSDMpointer()) {
-            edepID = sdm->GetCollectionID("SiliconDetector/EnergyDeposit");
-        }
-    }
-
-    if (edepID >= 0) {
-        if (auto* edepMap = dynamic_cast<G4THitsMap<G4double>*>(hce->GetHC(edepID))) {
-            for (const auto& kv : *edepMap->GetMap()) {
-                fScorerEnergyDeposit += *(kv.second);
-            }
-        }
-    }
-}
-
-void EventAction::ReconstructPosition(const ChargeSharingCalculator::Result& /*result*/,
-                                      const G4ThreeVector& /*hitPos*/) {
-    // Position reconstruction is done via post-processing Gaussian fits
-    // (ReconRowX/ColY or ReconX_2D/Y_2D).
-}
 
 ECS::IO::EventSummaryData EventAction::BuildEventSummary(G4double edep, const G4ThreeVector& hitPos,
                                                          const G4ThreeVector& nearestPixel, G4bool firstContactIsPixel,

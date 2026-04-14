@@ -150,6 +150,14 @@ private:
     G4double fHitTime{0.0};
     G4double fPathLength{0.0};
     G4double fEventGain{0.0};
+    G4int fNSteps{0};
+
+    // Per-step energy deposit branch buffers
+    std::vector<G4double> fStepEdep;
+    std::vector<G4double> fStepX;
+    std::vector<G4double> fStepY;
+    std::vector<G4double> fStepZ;
+    std::vector<G4double> fStepTime;
 
     G4bool fFirstContactIsPixel{false};
     G4bool fGeometricIsPixel{false};

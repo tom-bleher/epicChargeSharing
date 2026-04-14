@@ -406,6 +406,15 @@ void RunAction::ConfigureCoreBranches(TTree* tree) {
     const auto mode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
     const auto reconModel = static_cast<ECS::Config::PosReconModel>(fPosReconModel);
     fBranchConfigurator.ConfigureCoreBranches(tree, scalars, classification, vectors, mode, reconModel);
+
+    // Per-step energy deposit branches (Landau fluctuation data)
+    const IO::BranchConfigurator::StepBuffers steps{.nSteps = &fNSteps,
+                                                     .edep = &fStepEdep,
+                                                     .x = &fStepX,
+                                                     .y = &fStepY,
+                                                     .z = &fStepZ,
+                                                     .time = &fStepTime};
+    IO::BranchConfigurator::ConfigureStepBranches(tree, steps);
 }
 
 void RunAction::HandleWorkerEndOfRun(const ThreadContext& context, const G4Run* run) {
@@ -610,6 +619,14 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record) {
     fNearestPixelI = record.nearestPixelI;
     fNearestPixelJ = record.nearestPixelJ;
     fNearestPixelGlobalId = record.nearestPixelGlobalId;
+
+    // Per-step energy deposits
+    fNSteps = record.summary.nSteps;
+    fStepEdep.assign(record.stepEdep.begin(), record.stepEdep.end());
+    fStepX.assign(record.stepX.begin(), record.stepX.end());
+    fStepY.assign(record.stepY.begin(), record.stepY.end());
+    fStepZ.assign(record.stepZ.begin(), record.stepZ.end());
+    fStepTime.assign(record.stepTime.begin(), record.stepTime.end());
 }
 
 void RunAction::PrepareNeighborhoodStorage(std::size_t requestedCells) {

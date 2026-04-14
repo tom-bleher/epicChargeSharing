@@ -71,8 +71,6 @@ public:
     }
     [[nodiscard]] G4int GetNeighborhoodRadius() const { return fNeighborhoodRadius; }
 
-    void CollectScorerData(const G4Event* event);
-
     void SetEmitDistanceAlpha(G4bool enabled);
     void SetComputeFullFractions(G4bool enabled);
 
@@ -86,7 +84,7 @@ private:
                                                                         G4double eventGain);
     void EnsureNeighborhoodBuffers(std::size_t totalCells);
     void UpdatePixelIndices(const ChargeSharingCalculator::Result& result, const G4ThreeVector& hitPos);
-    void ReconstructPosition(const ChargeSharingCalculator::Result& result, const G4ThreeVector& hitPos);
+
 
     /// \brief Sample a fluctuated gain value for this event.
     /// Includes stochastic amplification noise (McIntyre) and gain saturation.
@@ -149,6 +147,13 @@ private:
     G4bool fEmitDistanceAlphaOutputs{false};
     G4bool fComputeFullFractions{false};
     std::unique_ptr<G4GenericMessenger> fMessenger;
+
+    // Per-step energy deposit vectors (populated from SteppingAction each event)
+    std::vector<G4double> fStepEdeps;
+    std::vector<G4double> fStepX;
+    std::vector<G4double> fStepY;
+    std::vector<G4double> fStepZ;
+    std::vector<G4double> fStepTimes;
 };
 
 } // namespace ECS

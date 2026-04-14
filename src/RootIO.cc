@@ -145,6 +145,22 @@ void BranchConfigurator::ConfigureNeighborhoodBranches(TTree* tree, std::vector<
     }
 }
 
+void BranchConfigurator::ConfigureStepBranches(TTree* tree, const StepBuffers& buffers) {
+    if (!tree)
+        return;
+    if (buffers.nSteps)
+        tree->Branch("NSteps", buffers.nSteps, "NSteps/I");
+    auto addVec = [&](const char* name, auto* vec) {
+        if (vec)
+            tree->Branch(name, vec, kDefaultBufferSize, kSplitLevel);
+    };
+    addVec("StepEdep", buffers.edep);
+    addVec("StepX", buffers.x);
+    addVec("StepY", buffers.y);
+    addVec("StepZ", buffers.z);
+    addVec("StepTime", buffers.time);
+}
+
 bool BranchConfigurator::ConfigureFullGridBranches(TTree* tree, const FullGridBuffers& buffers,
                                                    Config::ActivePixelMode mode) {
     if (!tree)
