@@ -11,6 +11,7 @@
 #include "G4SystemOfUnits.hh"
 #include "globals.hh"
 #include <cmath>
+#include <limits>
 
 namespace Constants {
 
@@ -136,6 +137,18 @@ enum class ReconMethod { LogA, LinA };
 // Unified enum for runtime use (combines both 1D and 2D modes)
 enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3 };
 
+constexpr const char* ActivePixelModeName(ActivePixelMode m) {
+    return (m == ActivePixelMode::Neighborhood)   ? "Neighborhood"
+           : (m == ActivePixelMode::RowCol)       ? "RowCol"
+           : (m == ActivePixelMode::RowCol3x3)    ? "RowCol3x3"
+           : (m == ActivePixelMode::ChargeBlock2x2) ? "ChargeBlock2x2"
+                                                    : "ChargeBlock3x3";
+}
+
+constexpr const char* SignalModelName(SignalModel m) {
+    return (m == SignalModel::LinA) ? "LinA" : "LogA";
+}
+
 using PosReconModel = ReconMethod; // Legacy alias
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -193,7 +206,7 @@ inline const G4double GEOMETRY_TOLERANCE = 1.0 * um;
 inline const G4double PRECISION_TOLERANCE = 1.0 * nm;
 
 inline constexpr G4double ELEMENTARY_CHARGE = 1.602176634e-19;
-inline constexpr G4double OUT_OF_BOUNDS_FRACTION_SENTINEL = -999.0;
+inline constexpr G4double OUT_OF_BOUNDS_FRACTION_SENTINEL = std::numeric_limits<double>::quiet_NaN();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DD4hep-style Grid Helper Functions

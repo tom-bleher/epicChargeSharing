@@ -176,7 +176,7 @@ FIGSIZE = (12, 8)
 DPI = 300
 
 # F_i extraction configuration
-SENTINEL_INVALID_FRACTION = -999.0
+SENTINEL_INVALID_FRACTION = float("nan")  # NaN sentinel — use np.isfinite() to filter
 
 
 # =============================================================================
@@ -1012,7 +1012,7 @@ def infer_pixel_of_interest(
                         if have_neighborhood_x:
                             px_flat = px_flat[finite_mask]
 
-                        valid_mask = (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
+                        valid_mask = np.isfinite(fi_flat) & (fi_flat >= 0.0)
                         if not valid_mask.any():
                             if remaining <= 0:
                                 break
@@ -1167,7 +1167,7 @@ def extract_fi_from_file(
                     continue
                 fi_flat = fi_flat[finite_mask]
 
-                valid_mask = (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
+                valid_mask = np.isfinite(fi_flat) & (fi_flat >= 0.0)
                 if not valid_mask.any():
                     continue
                 fi_flat = fi_flat[valid_mask]

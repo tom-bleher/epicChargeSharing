@@ -306,15 +306,16 @@ G4double EventAction::SampleEventGain(G4double energyDeposit) const {
 }
 
 void EventAction::EnsureNeighborhoodBuffers(std::size_t totalCells) {
-    neighbor::ResizeAndFill(fNeighborhoodChargeNew, totalCells, 0.0);
-    neighbor::ResizeAndFill(fNeighborhoodChargeFinal, totalCells, 0.0);
+    const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
+    neighbor::ResizeAndFill(fNeighborhoodChargeNew, totalCells, nan);
+    neighbor::ResizeAndFill(fNeighborhoodChargeFinal, totalCells, nan);
     // Row/Col/Block mode noisy charges
-    neighbor::ResizeAndFill(fNeighborhoodChargeNewRow, totalCells, 0.0);
-    neighbor::ResizeAndFill(fNeighborhoodChargeFinalRow, totalCells, 0.0);
-    neighbor::ResizeAndFill(fNeighborhoodChargeNewCol, totalCells, 0.0);
-    neighbor::ResizeAndFill(fNeighborhoodChargeFinalCol, totalCells, 0.0);
-    neighbor::ResizeAndFill(fNeighborhoodChargeNewBlock, totalCells, 0.0);
-    neighbor::ResizeAndFill(fNeighborhoodChargeFinalBlock, totalCells, 0.0);
+    neighbor::ResizeAndFill(fNeighborhoodChargeNewRow, totalCells, nan);
+    neighbor::ResizeAndFill(fNeighborhoodChargeFinalRow, totalCells, nan);
+    neighbor::ResizeAndFill(fNeighborhoodChargeNewCol, totalCells, nan);
+    neighbor::ResizeAndFill(fNeighborhoodChargeFinalCol, totalCells, nan);
+    neighbor::ResizeAndFill(fNeighborhoodChargeNewBlock, totalCells, nan);
+    neighbor::ResizeAndFill(fNeighborhoodChargeFinalBlock, totalCells, nan);
 }
 
 void EventAction::UpdatePixelIndices(const ChargeSharingCalculator::Result& result, const G4ThreeVector& hitPos) {

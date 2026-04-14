@@ -105,8 +105,8 @@ void BranchConfigurator::ConfigureVectorBranches(TTree* tree, const VectorBuffer
     // Common branches (always saved)
     addBranch("NeighborhoodPixelX", buffers.pixelX);
     addBranch("NeighborhoodPixelY", buffers.pixelY);
-    addBranch("d_i", buffers.distance);
-    addBranch("alpha_i", buffers.alpha);
+    addBranch("Distance", buffers.distance);
+    addBranch("Alpha", buffers.alpha);
 
     // Mode-specific branches
     switch (mode) {
@@ -285,21 +285,21 @@ void TreeFiller::PrepareNeighborhoodStorage(std::size_t requestedCells) {
     ResizeAndFill(fNeighborhoodChargeFractionsCol, capacity, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
     ResizeAndFill(fNeighborhoodChargeFractionsBlock, capacity, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
     // Neighborhood charges
-    ResizeAndFill(fNeighborhoodCharge, capacity, 0.0);
-    ResizeAndFill(fNeighborhoodChargeNew, capacity, 0.0);
-    ResizeAndFill(fNeighborhoodChargeFinal, capacity, 0.0);
+    ResizeAndFill(fNeighborhoodCharge, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeNew, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeFinal, capacity, nan);
     // Row-mode charges
-    ResizeAndFill(fNeighborhoodChargeRow, capacity, 0.0);
-    ResizeAndFill(fNeighborhoodChargeNewRow, capacity, 0.0);
-    ResizeAndFill(fNeighborhoodChargeFinalRow, capacity, 0.0);
+    ResizeAndFill(fNeighborhoodChargeRow, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeNewRow, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeFinalRow, capacity, nan);
     // Col-mode charges
-    ResizeAndFill(fNeighborhoodChargeCol, capacity, 0.0);
-    ResizeAndFill(fNeighborhoodChargeNewCol, capacity, 0.0);
-    ResizeAndFill(fNeighborhoodChargeFinalCol, capacity, 0.0);
+    ResizeAndFill(fNeighborhoodChargeCol, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeNewCol, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeFinalCol, capacity, nan);
     // Block-mode charges
-    ResizeAndFill(fNeighborhoodChargeBlock, capacity, 0.0);
-    ResizeAndFill(fNeighborhoodChargeNewBlock, capacity, 0.0);
-    ResizeAndFill(fNeighborhoodChargeFinalBlock, capacity, 0.0);
+    ResizeAndFill(fNeighborhoodChargeBlock, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeNewBlock, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeFinalBlock, capacity, nan);
     // Geometry
     ResizeAndFill(fNeighborhoodDistance, capacity, nan);
     ResizeAndFill(fNeighborhoodAlpha, capacity, nan);
@@ -501,30 +501,11 @@ std::string MetadataPublisher::ModelToString(Config::PosReconModel model) {
 }
 
 std::string MetadataPublisher::SignalModelToString(Config::SignalModel model) {
-    switch (model) {
-        case Config::SignalModel::LinA:
-            return "LinA";
-        case Config::SignalModel::LogA:
-        default:
-            return "LogA";
-    }
+    return Config::SignalModelName(model);
 }
 
 static std::string ActivePixelModeToString(Config::ActivePixelMode mode) {
-    switch (mode) {
-        case Config::ActivePixelMode::Neighborhood:
-            return "Neighborhood";
-        case Config::ActivePixelMode::ChargeBlock2x2:
-            return "ChargeBlock2x2";
-        case Config::ActivePixelMode::ChargeBlock3x3:
-            return "ChargeBlock3x3";
-        case Config::ActivePixelMode::RowCol:
-            return "RowCol";
-        case Config::ActivePixelMode::RowCol3x3:
-            return "RowCol3x3";
-        default:
-            return "Neighborhood";
-    }
+    return Config::ActivePixelModeName(mode);
 }
 
 MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {

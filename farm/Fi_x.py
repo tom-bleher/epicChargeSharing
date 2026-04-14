@@ -47,7 +47,7 @@ import pathlib
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 SWEEP_RUNS_DIR = REPO_ROOT / "sweep_x_runs"
-SENTINEL_INVALID_FRACTION = -999.0
+SENTINEL_INVALID_FRACTION = float("nan")  # NaN sentinel — use np.isfinite() to filter
 
 
 def find_latest_sweep_dir() -> pathlib.Path:
@@ -401,7 +401,7 @@ def infer_pixel_of_interest(
                         fi_flat = fi_flat[finite_mask]
                         ids_flat = ids_flat[finite_mask]
 
-                        valid_mask = (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
+                        valid_mask = np.isfinite(fi_flat) & (fi_flat >= 0.0)
                         if not valid_mask.any():
                             if remaining <= 0:
                                 break
@@ -555,7 +555,7 @@ def collect_file_stats(
                 # Get the F_i value for this pixel from the first event
                 fi_selected = fi[mask_pixel]
                 fi_flat = ak.to_numpy(ak.flatten(fi_selected, axis=None)).astype(float)
-                valid_mask = np.isfinite(fi_flat) & (fi_flat != SENTINEL_INVALID_FRACTION) & (fi_flat >= 0.0)
+                valid_mask = np.isfinite(fi_flat) & (fi_flat >= 0.0)
                 if not valid_mask.any():
                     fi_value = float("nan")  # No valid fraction for this pixel
                 else:

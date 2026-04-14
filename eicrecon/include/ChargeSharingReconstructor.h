@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -95,7 +96,7 @@ public:
     };
 
     struct NeighborData {
-        double fraction{-999.0};
+        double fraction{std::numeric_limits<double>::quiet_NaN()};
         double chargeC{0.0};
         double distanceMM{0.0}; ///< d_i: distance to pixel center (mm)
         double alphaRad{0.0};

@@ -315,7 +315,7 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
       const std::vector<double>* vptr = (kind == "coulomb") ? (Qi ? Qi : Fi) : (Fi ? Fi : Qi);
       if (!vptr) continue;
       if (vptr->empty()) continue;
-      const bool hasValid = std::any_of(vptr->begin(), vptr->end(), [](double v){ return std::isfinite(v) && v != -999.0; });
+      const bool hasValid = std::any_of(vptr->begin(), vptr->end(), [](double v){ return std::isfinite(v); });
       if (hasValid) { evt = i; break; }
     }
     if (evt < 0) evt = 0; // fallback
@@ -832,7 +832,7 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
         if (!vec || vec->empty()) continue;
 
         const double raw = (*vec)[idxFlat];
-        if (!(std::isfinite(raw)) || raw < 0.0) continue; // ignore -999 sentinel and invalid
+        if (!std::isfinite(raw)) continue; // ignore NaN sentinel and invalid
 
         double val = 0.0;
         if (kind == "fraction") {

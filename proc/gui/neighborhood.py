@@ -127,8 +127,8 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         self.quantity_combo = QtWidgets.QComboBox()
         self.quantity_combo.addItem("Coulomb", "coulomb")
         self.quantity_combo.addItem("Fraction", "fraction")
-        self.quantity_combo.addItem("d_i", "d_i")
-        self.quantity_combo.addItem("alpha_i", "alpha_i")
+        self.quantity_combo.addItem("Distance", "Distance")
+        self.quantity_combo.addItem("Alpha", "Alpha")
         ctrl.addWidget(self.quantity_combo)
 
         ctrl.addWidget(QtWidgets.QLabel("Branch:"))
@@ -321,7 +321,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         # Use a concrete vector branch present in the file; prefer Qf
         key = None
         try:
-            for k in ["Qf", "Qn", "Qi", "Fi", "d_i", "alpha_i"]:
+            for k in ["Qf", "Qn", "Qi", "Fi", "Distance", "Alpha"]:
                 if self._tree is not None and k in self._tree.keys():
                     key = k
                     break
@@ -446,7 +446,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                     branches.append(kshape)
                     break
         # Include additional quantity branches if needed
-        if quantity in ("d_i", "alpha_i"):
+        if quantity in ("Distance", "Alpha"):
             branches.append(quantity)
         try:
             arrs = self._tree.arrays(branches, entry_start=evt, entry_stop=evt + 1)
@@ -579,7 +579,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
 
         # Optionally build auxiliary grids for d_i / alpha_i
         aux_grid = None
-        if quantity in ("d_i", "alpha_i"):
+        if quantity in ("Distance", "Alpha"):
             try:
                 aux_values = np.asarray(arrs[quantity][0], dtype=float)
             except Exception:
@@ -617,7 +617,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 elif quantity == "coulomb":
                     val = base_raw if usingQ else (base_raw * q_total)
                     roi_vals_for_range.append(val)
-                elif quantity in ("d_i", "alpha_i"):
+                elif quantity in ("Distance", "Alpha"):
                     if aux_grid is None:
                         continue
                     aux_raw = aux_grid[ii, jj]
@@ -680,7 +680,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                         shown = (fval / q_total) if usingQ else fval
                 elif quantity == "coulomb":
                     shown = fval if usingQ else (fval * q_total)
-                elif quantity in ("d_i", "alpha_i"):
+                elif quantity in ("Distance", "Alpha"):
                     if aux_grid is None:
                         continue
                     shown = aux_grid[ii, jj]
@@ -741,7 +741,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         if mask_mode:
             label = "Outlier removed (1=yes, 0=no)"
         else:
-            label = {"coulomb": "Charge [C]", "fraction": "Charge Fraction", "d_i": "Distance [mm]", "alpha_i": "Alpha [rad]"}[quantity]
+            label = {"coulomb": "Charge [C]", "fraction": "Charge Fraction", "Distance": "Distance [mm]", "Alpha": "Alpha [rad]"}[quantity]
         ax.set_title(f"Event {evt} Charge Neighborhood\nHit: ({trueX:.3f}, {trueY:.3f}) mm,  Pixel: ({pixelX:.3f}, {pixelY:.3f}) mm   isPixelHit={int(is_pixel_hit)}")
         sm.set_array([])
         self.canvas.set_colorbar(sm, label)
@@ -810,7 +810,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                             shape_key = kshape
                             branches.append(kshape)
                             break
-                if quantity in ("d_i", "alpha_i"):
+                if quantity in ("Distance", "Alpha"):
                     branches.append(quantity)
                 arrs = self._tree.arrays(branches, entry_start=evt, entry_stop=evt + 1)
 
@@ -910,7 +910,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
 
                 # Optional aux grid for d_i / alpha_i
                 aux_grid = None
-                if quantity in ("d_i", "alpha_i"):
+                if quantity in ("Distance", "Alpha"):
                     q_vals = np.asarray(arrs[quantity][0], dtype=float)
                     if q_vals.size == values.size:
                         aux_grid = np.full((dim, dim), np.nan, dtype=float)
@@ -939,7 +939,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                             roi_vals.append(frac)
                         elif quantity == "coulomb":
                             roi_vals.append(raw if usingQ else (raw * q_total))
-                        elif quantity in ("d_i", "alpha_i"):
+                        elif quantity in ("Distance", "Alpha"):
                             if aux_grid is None:
                                 continue
                             aux_raw = aux_grid[ii, jj]
@@ -996,7 +996,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                                 shown = (fval / q_total) if usingQ else fval
                         elif quantity == "coulomb":
                             shown = fval if usingQ else (fval * q_total)
-                        elif quantity in ("d_i", "alpha_i"):
+                        elif quantity in ("Distance", "Alpha"):
                             if aux_grid is None:
                                 continue
                             shown = aux_grid[ii, jj]
@@ -1022,7 +1022,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 if mask_mode:
                     label = "Outlier removed (1=yes, 0=no)"
                 else:
-                    label = {"coulomb": "Charge [C]", "fraction": "Charge Fraction", "d_i": "Distance [mm]", "alpha_i": "Alpha [rad]"}[quantity]
+                    label = {"coulomb": "Charge [C]", "fraction": "Charge Fraction", "Distance": "Distance [mm]", "Alpha": "Alpha [rad]"}[quantity]
                 ax.set_title(f"Event {evt} Charge Neighborhood")
                 sm.set_array([])
                 cbar = fig.colorbar(sm, ax=ax)

@@ -116,9 +116,9 @@ void RunAction::EnsureBranchBuffersInitialized() {
 
     const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
     ECS::ResizeAndFill(fNeighborhoodChargeFractions, fNeighborhoodCapacity, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
-    ECS::ResizeAndFill(fNeighborhoodCharge, fNeighborhoodCapacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeNew, fNeighborhoodCapacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinal, fNeighborhoodCapacity, 0.0);
+    ECS::ResizeAndFill(fNeighborhoodCharge, fNeighborhoodCapacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeNew, fNeighborhoodCapacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeFinal, fNeighborhoodCapacity, nan);
     ECS::ResizeAndFill(fNeighborhoodDistance, fNeighborhoodCapacity, nan);
     ECS::ResizeAndFill(fNeighborhoodAlpha, fNeighborhoodCapacity, nan);
     ECS::ResizeAndFill(fNeighborhoodPixelX, fNeighborhoodCapacity, nan);
@@ -319,7 +319,10 @@ void RunAction::InitializeRootOutputs(const ThreadContext& context, const G4Stri
     rootFile->SetCompressionLevel(4);
     rootFile->cd();
 
-    auto* tree = new TTree("Hits", "AC-LGAD charge sharing hits");
+    const std::string treeTitle = std::string("AC-LGAD charge sharing hits (")
+        + Config::ActivePixelModeName(Config::ACTIVE_PIXEL_MODE) + ", "
+        + Config::SignalModelName(Config::SIGNAL_MODEL) + ")";
+    auto* tree = new TTree("Hits", treeTitle.c_str());
     tree->SetDirectory(rootFile);
     tree->SetAutoSave(0);
     tree->SetAutoFlush(50000);
@@ -646,21 +649,21 @@ void RunAction::PrepareNeighborhoodStorage(std::size_t requestedCells) {
     ECS::ResizeAndFill(fNeighborhoodChargeFractionsCol, capacity, sentinelFrac);
     ECS::ResizeAndFill(fNeighborhoodChargeFractionsBlock, capacity, sentinelFrac);
     // Neighborhood charges
-    ECS::ResizeAndFill(fNeighborhoodCharge, capacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeNew, capacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinal, capacity, 0.0);
+    ECS::ResizeAndFill(fNeighborhoodCharge, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeNew, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeFinal, capacity, nan);
     // Row-mode charges
-    ECS::ResizeAndFill(fNeighborhoodChargeRow, capacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeNewRow, capacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinalRow, capacity, 0.0);
+    ECS::ResizeAndFill(fNeighborhoodChargeRow, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeNewRow, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeFinalRow, capacity, nan);
     // Col-mode charges
-    ECS::ResizeAndFill(fNeighborhoodChargeCol, capacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeNewCol, capacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinalCol, capacity, 0.0);
+    ECS::ResizeAndFill(fNeighborhoodChargeCol, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeNewCol, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeFinalCol, capacity, nan);
     // Block-mode charges
-    ECS::ResizeAndFill(fNeighborhoodChargeBlock, capacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeNewBlock, capacity, 0.0);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinalBlock, capacity, 0.0);
+    ECS::ResizeAndFill(fNeighborhoodChargeBlock, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeNewBlock, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeFinalBlock, capacity, nan);
     // Geometry
     ECS::ResizeAndFill(fNeighborhoodDistance, capacity, nan);
     ECS::ResizeAndFill(fNeighborhoodAlpha, capacity, nan);

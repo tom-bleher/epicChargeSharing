@@ -62,7 +62,7 @@ constexpr double kMillimeterPerMicron = 1.0e-3;
 constexpr double kMicronPerMillimeter = 1.0e3;
 constexpr double kGuardFactor = 1.0 + 1e-6;     // Prevents log(0) singularity when distance == d0, with minimal bias
 constexpr double kMinD0Micron = 1e-6;           // Floor for d0 to avoid division by zero in log(d/d0)
-constexpr double kOutOfBoundsFraction = -999.0; // Sentinel value indicating pixel is outside detector bounds
+constexpr double kOutOfBoundsFraction = std::numeric_limits<double>::quiet_NaN(); // Sentinel: pixel outside detector bounds
 
 // Linear model beta coefficients (1/um) from paper -- empirical fits to AC-LGAD data
 constexpr double kLinearBetaNarrow = 0.003;      // For pitch 100-200 um (steeper attenuation)
