@@ -63,8 +63,9 @@ private:
 
     /// \brief Sampling window parameters.
     struct SamplingWindow {
-        G4double margin{0.0};     ///< Safe margin from detector edge
-        G4double halfExtent{0.0}; ///< Half-extent of sampling region
+        G4double margin{0.0};            ///< Safe margin from detector edge (for fixed mode clamping)
+        G4double halfExtent{0.0};        ///< Margin-reduced half-extent (fixed mode)
+        G4double randomHalfExtent{0.0};  ///< Full detector + overshoot (random mode)
     };
 
     const SamplingWindow& EnsureSamplingWindow() const;
@@ -82,6 +83,7 @@ private:
     G4bool fUseFixedPosition{Constants::USE_FIXED_POSITION};
     G4double fFixedX{0.0};
     G4double fFixedY{0.0};
+    G4double fBeamOvershoot{0.0};  ///< Fraction of detector half-size to extend random sampling beyond edges
     mutable std::once_flag fFixedPositionWarningFlag;
     mutable SamplingWindow fSamplingWindow;
     mutable G4bool fSamplingWindowValid{false};

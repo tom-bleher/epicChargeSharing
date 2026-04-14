@@ -59,7 +59,8 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
     const auto& window = EnsureSamplingWindow();
     if (fDetector) {
         G4cout << "[PrimaryGenerator] Default fixed XY position (" << fFixedX / mm << ", " << fFixedY / mm
-               << ") mm; random sampling confined to +/-" << window.halfExtent / mm << " mm" << G4endl;
+               << ") mm; random sampling +/-" << window.randomHalfExtent / mm << " mm"
+               << " (overshoot " << fBeamOvershoot * 100 << "%)" << G4endl;
     } else {
         G4cout << "[PrimaryGenerator] No detector available; primaries generated at origin" << G4endl;
     }
@@ -108,6 +109,12 @@ void PrimaryGenerator::ConfigureMessenger() {
         "fixedY", "mm", fFixedY, "Fixed Y coordinate for primaries when useFixedPosition is true.");
     fixedYCmd.SetStates(G4State_PreInit, G4State_Idle);
     fixedYCmd.SetToBeBroadcasted(true);
+
+    auto& overshootCmd = fMessenger->DeclareProperty(
+        "beamOvershoot", fBeamOvershoot,
+        "Fraction of detector half-size to extend random sampling beyond edges (0 = full detector, 0.1 = 10% overshoot).");
+    overshootCmd.SetStates(G4State_PreInit, G4State_Idle);
+    overshootCmd.SetToBeBroadcasted(true);
 }
 
 G4double PrimaryGenerator::CalculateSafeMargin() const {
@@ -133,9 +140,10 @@ void PrimaryGenerator::RecalculateSamplingWindow() const {
     SamplingWindow window{};
     if (fDetector) {
         const G4double margin = CalculateSafeMargin();
-        const G4double halfExtent = (fDetector->GetDetSize() / 2.0) - margin;
+        const G4double detHalfSize = fDetector->GetDetSize() / 2.0;
         window.margin = margin;
-        window.halfExtent = std::max(0.0, halfExtent);
+        window.halfExtent = std::max(0.0, detHalfSize - margin);
+        window.randomHalfExtent = detHalfSize * (1.0 + fBeamOvershoot);
     }
     fSamplingWindow = window;
     fSamplingWindowValid = true;
@@ -178,11 +186,11 @@ G4ThreeVector PrimaryGenerator::MakeFixedPosition(const SamplingWindow& window) 
 
 G4ThreeVector PrimaryGenerator::MakeRandomPosition(const SamplingWindow& window) {
     const G4double z = Constants::PRIMARY_PARTICLE_Z_POSITION;
-    if (window.halfExtent <= 0.0) {
+    if (window.randomHalfExtent <= 0.0) {
         return {0.0, 0.0, z};
     }
 
-    const G4double halfExtent = window.halfExtent;
+    const G4double halfExtent = window.randomHalfExtent;
     const G4double randomX = (2.0 * G4UniformRand() - 1.0) * halfExtent;
     const G4double randomY = (2.0 * G4UniformRand() - 1.0) * halfExtent;
 
