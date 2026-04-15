@@ -11,6 +11,8 @@
 #include <TTree.h>
 #include <TBranch.h>
 #include <TNamed.h>
+#include <TParameter.h>
+#include <TList.h>
 #include <TSystem.h>
 #include <TGraph.h>
 #include <TGraph2D.h>
@@ -94,14 +96,17 @@ int processing3D_plots(const char* filename = "../build/epicChargeSharing.root",
     return 2;
   }
 
-  // Pixel spacing/size: prefer metadata; fallback to inference/defaults
+  // Pixel spacing/size: prefer metadata from UserInfo; fallback to inference/defaults
   double pixelSpacing = NAN;
   double pixelSize    = NAN;
-  if (auto* spacingObj = dynamic_cast<TNamed*>(file->Get("GridPixelSpacing_mm"))) {
-    try { pixelSpacing = std::stod(spacingObj->GetTitle()); } catch (...) {}
-  }
-  if (auto* sizeObj = dynamic_cast<TNamed*>(file->Get("GridPixelSize_mm"))) {
-    try { pixelSize = std::stod(sizeObj->GetTitle()); } catch (...) {}
+  {
+    TList* info = tree->GetUserInfo();
+    if (info) {
+      if (auto* p = dynamic_cast<TParameter<double>*>(info->FindObject("GridPixelSpacing_mm")))
+        pixelSpacing = p->GetVal();
+      if (auto* p = dynamic_cast<TParameter<double>*>(info->FindObject("GridPixelSize_mm")))
+        pixelSize = p->GetVal();
+    }
   }
 
   auto computeGap = [](std::vector<double>& v)->double{

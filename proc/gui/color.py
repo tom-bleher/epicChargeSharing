@@ -277,24 +277,20 @@ MODE_LABELS = {
 
 
 def read_named_double(file: uproot.ReadOnlyFile, key: str) -> float:
-    obj = file.get(key)
-    if obj is None:
-        raise RuntimeError(f"Missing metadata object: '{key}'")
-    # uproot returns a GenericObject for TNamed; access the fTitle member
-    try:
-        title = obj.member("fTitle")
-    except Exception:
-        # fallback: try attributes
-        title = getattr(obj, "fTitle", None)
-        if title is None:
-            # try to interpret as a TObjString-like string
-            title = str(obj)
-    if title is None:
-        raise RuntimeError(f"TNamed '{key}' has empty title")
-    try:
-        return float(title)
-    except Exception as e:
-        raise RuntimeError(f"Cannot parse '{key}' title to float: {title}") from e
+    """Read a metadata value from the Hits tree's UserInfo list by name."""
+    tree = file.get("Hits")
+    if tree is None:
+        raise RuntimeError("No 'Hits' tree in file")
+    user_info = tree.member("fUserInfo", none_if_missing=True)
+    if user_info is None:
+        raise RuntimeError("No UserInfo in Hits tree")
+    for obj in user_info:
+        try:
+            if obj.member("fName") == key:
+                return float(obj.member("fVal"))
+        except Exception:
+            pass
+    raise RuntimeError(f"Missing metadata object: '{key}'")
 
 
 def read_named_int(file: uproot.ReadOnlyFile, key: str) -> int:

@@ -228,7 +228,7 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
     pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
     gridOffsetMm        = ReadDoubleNamed(tree, "GridOffset_mm");
     detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
-    numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
+    numPerSide          = ReadIntNamed  (tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl;
     f->Close();
@@ -735,7 +735,7 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
     pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
     gridOffsetMm        = ReadDoubleNamed(tree, "GridOffset_mm");
     detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
-    numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
+    numPerSide          = ReadIntNamed  (tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl; f->Close(); delete f; return;
   }
@@ -1051,7 +1051,7 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
     pixelSpacingMm      = ReadDoubleNamed(tree, "GridPixelSpacing_mm");
     gridOffsetMm        = ReadDoubleNamed(tree, "GridOffset_mm");
     detSizeMm           = ReadDoubleNamed(tree, "GridDetectorSize_mm");
-    numPerSide          = ReadIntNamed  (f, tree, "GridNumBlocksPerSide");
+    numPerSide          = ReadIntNamed  (tree, "GridNumBlocksPerSide");
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << std::endl;
     f->Close(); delete f; return 2;
