@@ -47,12 +47,8 @@ DetectorConstruction::DetectorConstruction()
 
 DetectorConstruction::~DetectorConstruction() = default;
 
-void DetectorConstruction::SetRunAction(RunAction* runAction) {
-    fRunAction = runAction;
-    if (fRunAction) {
-        SyncRunMetadata();
-    }
-}
+// SetRunAction removed: metadata is now pushed in ActionInitialization::CreateRunAction()
+// to avoid storing per-thread action pointers on the shared geometry object (MT race).
 
 void DetectorConstruction::SetGridOffset(G4double offset) {
     G4cout << "[Detector] Grid offset set to " << offset / mm << " mm" << G4endl;
@@ -75,7 +71,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
 
     const PixelGridStats gridStats = ConfigurePixels(logicWorld, siliconLogical, materials, checkOverlaps);
 
-    SyncRunMetadata();
+    // Note: metadata push moved to ActionInitialization::CreateRunAction().
 
     static std::once_flag summaryFlag;
     std::call_once(summaryFlag, [&]() {
@@ -230,25 +226,8 @@ void DetectorConstruction::InitializePixelGainSigmas() {
     }
 }
 
-void DetectorConstruction::SyncRunMetadata() {
-    if (!fRunAction) {
-        return;
-    }
-
-    fRunAction->SetDetectorGridParameters(fPixelSize, fPixelSpacing, fGridOffset, fDetSize, fNumBlocksPerSide);
-    fRunAction->SetGridPixelCenters(fPixelCenters);
-    fRunAction->SetNeighborhoodRadiusMeta(fNeighborhoodRadius);
-
-    const auto reconMethod = (ECS::RuntimeConfig::Instance().activeMode == 1)
-                                 ? Constants::ReconMethod::LinA
-                                 : Constants::ReconMethod::LogA;
-    G4double linearBeta = std::numeric_limits<G4double>::quiet_NaN();
-    // Beta is only used when LinA signal model is active
-    if (ECS::RuntimeConfig::Instance().activeMode == 1) {
-        linearBeta = GetLinearChargeModelBeta();
-    }
-    fRunAction->SetPosReconMetadata(reconMethod, linearBeta, fPixelSpacing);
-}
+// SyncRunMetadata() removed — metadata push moved to ActionInitialization::CreateRunAction()
+// to eliminate per-thread action pointer storage on the shared geometry object (MT race fix).
 
 DetectorConstruction::PixelLocation DetectorConstruction::FindNearestPixel(const G4ThreeVector& pos) const {
     PixelLocation result{};
@@ -296,14 +275,8 @@ void DetectorConstruction::SetNeighborhoodRadius(G4int radius) {
     G4cout << "[Detector] Neighborhood radius set to " << radius << " (" << ((2 * radius) + 1) << "x"
            << ((2 * radius) + 1) << ")" << G4endl;
     fNeighborhoodRadius = radius;
-
-    if (fEventAction) {
-        fEventAction->SetNeighborhoodRadius(radius);
-    }
-
-    if (fRunAction) {
-        fRunAction->SetNeighborhoodRadiusMeta(radius);
-    }
+    // Also update RuntimeConfig so per-thread EventActions pick up the new value
+    ECS::RuntimeConfig::Instance().neighborhoodRadius = radius;
 }
 
 void DetectorConstruction::SetPixelSize(G4double size) {

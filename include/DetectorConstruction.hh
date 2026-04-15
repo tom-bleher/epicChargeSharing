@@ -34,8 +34,6 @@ class G4Material;
 namespace ECS {
 
 // Forward declarations within namespace
-class EventAction;
-class RunAction;
 
 /// \brief Constructs the AC-LGAD detector geometry.
 ///
@@ -61,8 +59,8 @@ public:
     G4VPhysicalVolume* Construct() override;
     void ConstructSDandField() override;
 
-    void SetEventAction(EventAction* eventAction) { fEventAction = eventAction; }
-    void SetRunAction(RunAction* runAction);
+    // Note: no SetEventAction/SetRunAction — actions pull from detector
+    // at construction time via ActionInitialization, avoiding MT data races.
 
     void SetGridOffset(G4double offset);
     void SetPixelSize(G4double size);
@@ -112,7 +110,6 @@ private:
     PixelGridStats ConfigurePixels(G4LogicalVolume* logicWorld, G4LogicalVolume* siliconLogical,
                                    const MaterialSet& mats, G4bool checkOverlaps);
     void InitializePixelGainSigmas();
-    void SyncRunMetadata();
     void SetupMessenger();
 
     G4double fPixelSize{0.0};
@@ -133,8 +130,6 @@ private:
     G4int fMaxIndexX{0};
     G4int fMaxIndexY{0};
 
-    EventAction* fEventAction{nullptr};
-    RunAction* fRunAction{nullptr};
 
     G4int fNeighborhoodRadius{Constants::NEIGHBORHOOD_RADIUS};
 
