@@ -49,10 +49,10 @@ public:
 
 private:
     /// Create histograms for a given detector
-    void CreateHistograms(const std::string& detectorName);
+    void createHistograms(const std::string& detectorName);
 
     /// Fill histograms and tree for matched hits
-    void FillData(const std::string& detectorName, const edm4eic::TrackerHit& recoHit,
+    void fillData(const std::string& detectorName, const edm4eic::TrackerHit& recoHit,
                   const edm4hep::SimTrackerHit& simHit);
 
     // ─────────────────────────────────────────────────────────────────────────

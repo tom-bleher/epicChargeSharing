@@ -53,7 +53,7 @@ void ChargeSharingMonitor::Init() {
 
     // Create histograms for each detector
     for (const auto& det : m_detectors) {
-        CreateHistograms(det.displayName);
+        createHistograms(det.displayName);
     }
 
     // Create TTree for detailed per-hit data
@@ -77,7 +77,7 @@ void ChargeSharingMonitor::Init() {
     m_tree->Branch("detectorIndex", &m_detector_index, "detectorIndex/I");
 }
 
-void ChargeSharingMonitor::CreateHistograms(const std::string& detectorName) {
+void ChargeSharingMonitor::createHistograms(const std::string& detectorName) {
     auto app = GetApplication();
     auto rootfile_svc = app->GetService<RootFile_service>();
     auto rootfile = rootfile_svc->GetHistFile();
@@ -175,13 +175,13 @@ void ChargeSharingMonitor::ProcessSequential(const JEvent& event) {
         for (const auto& recoHit : *recoHits) {
             auto it = simHitMap.find(recoHit.getCellID());
             if (it != simHitMap.end()) {
-                FillData(det.displayName, recoHit, *(it->second));
+                fillData(det.displayName, recoHit, *(it->second));
             }
         }
     }
 }
 
-void ChargeSharingMonitor::FillData(const std::string& detectorName, const edm4eic::TrackerHit& recoHit,
+void ChargeSharingMonitor::fillData(const std::string& detectorName, const edm4eic::TrackerHit& recoHit,
                                     const edm4hep::SimTrackerHit& simHit) {
     // Extract positions
     const auto& recoPos = recoHit.getPosition();

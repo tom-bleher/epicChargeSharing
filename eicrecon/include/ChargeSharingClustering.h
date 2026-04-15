@@ -69,7 +69,7 @@ private:
 
     // ---- Union-Find for clustering ----
     class UnionFind {
-        std::vector<int> mParent, mRank;
+        std::vector<int> m_parent, m_rank;
 
     public:
         explicit UnionFind(int n);

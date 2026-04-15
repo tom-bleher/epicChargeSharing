@@ -40,27 +40,27 @@ namespace cfit = epic::chargesharing::fit;
 // Union-Find
 // ============================================================================
 
-ChargeSharingClustering::UnionFind::UnionFind(int n) : mParent(n), mRank(n, 0) {
-    std::iota(mParent.begin(), mParent.end(), 0);
+ChargeSharingClustering::UnionFind::UnionFind(int n) : m_parent(n), m_rank(n, 0) {
+    std::iota(m_parent.begin(), m_parent.end(), 0);
 }
 
 int ChargeSharingClustering::UnionFind::find(int id) {
-    if (mParent[id] == id)
+    if (m_parent[id] == id)
         return id;
-    return mParent[id] = find(mParent[id]); // path compression
+    return m_parent[id] = find(m_parent[id]); // path compression
 }
 
 void ChargeSharingClustering::UnionFind::merge(int id1, int id2) {
     int root1 = find(id1);
     int root2 = find(id2);
     if (root1 != root2) {
-        if (mRank[root1] > mRank[root2])
-            mParent[root2] = root1;
-        else if (mRank[root1] < mRank[root2])
-            mParent[root1] = root2;
+        if (m_rank[root1] > m_rank[root2])
+            m_parent[root2] = root1;
+        else if (m_rank[root1] < m_rank[root2])
+            m_parent[root1] = root2;
         else {
-            mParent[root1] = root2;
-            mRank[root2]++;
+            m_parent[root1] = root2;
+            m_rank[root2]++;
         }
     }
 }
@@ -374,7 +374,19 @@ void ChargeSharingClustering::reconstructCluster(
     // --- Build Measurement2D ---
     auto cluster = clusters->create();
     cluster.setSurface(surface->geometryId().value());
-    cluster.setLoc({static_cast<float>(reconX), static_cast<float>(reconY)});
+
+    // Transform reconstructed global position to Acts surface-local coordinates.
+    // reconX/reconY are in mm (divided by dd4hep::mm); convert back for the 3D point.
+    const auto refPos = m_seg.position(maxCellID);
+    const Acts::Vector3 globalPos(reconX * dd4hep::mm, reconY * dd4hep::mm, refPos.z());
+    auto locResult = surface->globalToLocal(Acts::GeometryContext{}, globalPos, Acts::Vector3::Zero());
+    if (locResult.ok()) {
+        cluster.setLoc({static_cast<float>(locResult.value()[0] / dd4hep::mm),
+                        static_cast<float>(locResult.value()[1] / dd4hep::mm)});
+    } else {
+        m_log->warn("globalToLocal failed for cellID {:#018x}; using global coordinates", maxCellID);
+        cluster.setLoc({static_cast<float>(reconX), static_cast<float>(reconY)});
+    }
     cluster.setTime(static_cast<float>(earliestTime));
 
     // Covariance: {xx, yy, tt, xy}
