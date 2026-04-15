@@ -446,13 +446,12 @@ void EventAction::PopulateNeighborCharges(const ChargeSharingCalculator::Result&
         for (std::size_t i = 0; i < targetCells; ++i) {
             if (fNeighborhoodChargeFinal[i] < threshold) {
                 fNeighborhoodChargeFinal[i] = 0.0;
-                fNeighborhoodChargeNew[i] = 0.0;
                 fNeighborhoodChargeFinalRow[i] = 0.0;
-                fNeighborhoodChargeNewRow[i] = 0.0;
                 fNeighborhoodChargeFinalCol[i] = 0.0;
-                fNeighborhoodChargeNewCol[i] = 0.0;
                 fNeighborhoodChargeFinalBlock[i] = 0.0;
-                fNeighborhoodChargeNewBlock[i] = 0.0;
+                // Qn (ChargeNew) preserved: intermediate truth should not be
+                // destroyed by readout threshold, matching EIC convention that
+                // truth/diagnostic quantities are immutable (cf. SiliconTrackerDigi).
             }
         }
     }
