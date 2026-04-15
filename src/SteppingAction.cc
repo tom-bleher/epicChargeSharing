@@ -128,7 +128,8 @@ void SteppingAction::AccumulateEdep(const G4Step* step) {
         return;
 
     fTotalEdep += edep;
-    fStepDeposits.push_back({prePoint->GetPosition(), edep, prePoint->GetGlobalTime()});
+    const G4ThreeVector midpoint = 0.5 * (prePoint->GetPosition() + step->GetPostStepPoint()->GetPosition());
+    fStepDeposits.push_back({midpoint, edep, prePoint->GetGlobalTime()});
 }
 
 void SteppingAction::UserSteppingAction(const G4Step* step) {
