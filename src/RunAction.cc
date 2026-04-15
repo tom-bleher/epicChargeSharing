@@ -994,6 +994,16 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const {
     noise.electronCount = rtConfig.noiseElectronCount;
     publisher.SetNoiseMetadata(noise);
 
+    // Beam parameters (for reproducibility)
+    IO::MetadataPublisher::BeamMetadata beam;
+    beam.particleName = rtConfig.particleName;
+    beam.energyGeV = rtConfig.particleEnergy / CLHEP::GeV;
+    beam.useFixedPosition = rtConfig.useFixedPosition;
+    beam.fixedXMM = rtConfig.fixedX / CLHEP::mm;
+    beam.fixedYMM = rtConfig.fixedY / CLHEP::mm;
+    beam.beamOvershoot = rtConfig.beamOvershoot;
+    publisher.SetBeamMetadata(beam);
+
     return publisher;
 }
 

@@ -89,6 +89,13 @@ void PrimaryGenerator::ConfigureParticleGun() {
                << energy / GeV << " GeV, direction (" << kDefaultMomentumDirection.x() << ", "
                << kDefaultMomentumDirection.y() << ", " << kDefaultMomentumDirection.z() << ")" << G4endl;
     }
+
+    // Sync beam parameters to RuntimeConfig for metadata publishing
+    auto& rtConfig = ECS::RuntimeConfig::Instance();
+    if (particle) rtConfig.particleName = particle->GetParticleName();
+    rtConfig.fixedX = fFixedX;
+    rtConfig.fixedY = fFixedY;
+    rtConfig.beamOvershoot = fBeamOvershoot;
 }
 
 void PrimaryGenerator::ConfigureMessenger() {

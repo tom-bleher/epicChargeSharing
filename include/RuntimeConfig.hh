@@ -86,6 +86,10 @@ public:
     // ---- Particle Gun ----
     G4bool useFixedPosition{Constants::USE_FIXED_POSITION};
     G4double particleEnergy{10.0 * CLHEP::GeV};
+    std::string particleName{"e-"};
+    G4double fixedX{-150.0 * CLHEP::micrometer};
+    G4double fixedY{0.0};
+    G4double beamOvershoot{0.0};
 
     // ---- Fitting ----
     G4double fitErrorPercentOfMax{Constants::FIT_ERROR_PERCENT_OF_MAX};

@@ -443,11 +443,21 @@ public:
         std::string rootVersion;
     };
 
+    struct BeamMetadata {
+        std::string particleName;
+        G4double energyGeV{0.0};
+        G4bool useFixedPosition{false};
+        G4double fixedXMM{0.0};
+        G4double fixedYMM{0.0};
+        G4double beamOvershoot{0.0};
+    };
+
     void SetGridMetadata(const GridMetadata& m) { fGrid = m; }
     void SetModelMetadata(const ModelMetadata& m) { fModel = m; }
     void SetPhysicsMetadata(const PhysicsMetadata& m) { fPhysics = m; }
     void SetNoiseMetadata(const NoiseMetadata& m) { fNoise = m; }
     void SetSimulationMetadata(const SimulationMetadata& m) { fSimulation = m; }
+    void SetBeamMetadata(const BeamMetadata& m) { fBeam = m; }
 
     [[nodiscard]] EntryList CollectEntries() const;
 
@@ -470,6 +480,7 @@ private:
     PhysicsMetadata fPhysics;
     NoiseMetadata fNoise;
     SimulationMetadata fSimulation;
+    BeamMetadata fBeam;
 };
 
 // ============================================================================

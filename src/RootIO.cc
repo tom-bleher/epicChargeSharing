@@ -536,6 +536,19 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
     if (!fSimulation.rootVersion.empty())
         addString("ROOTVersion", fSimulation.rootVersion);
 
+    // Beam parameters (for reproducibility)
+    if (!fBeam.particleName.empty())
+        addString("BeamParticle", fBeam.particleName);
+    if (fBeam.energyGeV > 0.0)
+        addDouble("BeamEnergy_GeV", fBeam.energyGeV);
+    addInt("BeamUseFixedPosition", fBeam.useFixedPosition ? 1 : 0);
+    if (fBeam.useFixedPosition) {
+        addDouble("BeamFixedX_mm", fBeam.fixedXMM);
+        addDouble("BeamFixedY_mm", fBeam.fixedYMM);
+    }
+    if (fBeam.beamOvershoot > 0.0)
+        addDouble("BeamOvershoot", fBeam.beamOvershoot);
+
     // Grid parameters (doubles and ints)
     if (fGrid.pixelSize > 0.0)
         addDouble("GridPixelSize_mm", fGrid.pixelSize);
