@@ -26,8 +26,12 @@ find_package(Eigen3 REQUIRED CONFIG)
 find_package(Threads REQUIRED)
 
 if(WITH_EDM4HEP)
-    find_package(podio 1.0 REQUIRED)
-    find_package(EDM4HEP REQUIRED)
+    find_package(podio 1.0 QUIET)
+    find_package(EDM4HEP QUIET)
+    if(NOT podio_FOUND OR NOT EDM4HEP_FOUND)
+        message(STATUS "podio/EDM4HEP not found — disabling WITH_EDM4HEP")
+        set(WITH_EDM4HEP OFF)
+    endif()
 endif()
 
 # ============================================================================
