@@ -118,7 +118,7 @@ BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"
 RUN_MAC = (BUILD_DIR / "run.mac") if (BUILD_DIR / "run.mac").exists() else (REPO_ROOT / "macros" / "run.mac")
 DEFAULT_OUTPUT_BASE = REPO_ROOT / "sweep_analysis_runs"
-MACRO_PATH = REPO_ROOT / "proc" / "fit" / "plotFitGaus1DReplayQiFit.C"
+MACRO_PATH = REPO_ROOT / "proc" / "plotFitGaus1D.C"
 NEIGHBORHOOD_MACRO_PATH = REPO_ROOT / "proc" / "grid" / "plotChargeNeighborhood.C"
 DEFAULT_CONFIG_FILE = FARM_DIR / "sweep_config.yaml"
 

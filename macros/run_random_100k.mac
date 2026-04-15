@@ -10,7 +10,7 @@
 /ecs/gun/useFixedPosition false
 /ecs/gun/beamOvershoot 0.1
 /ecs/fit/gaus1D false
-/ecs/fit/gaus2D false
+/ecs/fit/gaus2D true
 
 /gun/particle e-
 /gun/energy 10 GeV
