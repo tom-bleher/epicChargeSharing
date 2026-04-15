@@ -220,7 +220,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                     self._root.close()
                 except Exception:
                     pass
-            self._root = uproot.open(path)
+            self._root = uproot.open(path, minimal_ttree_metadata=False)
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Open", f"Failed to open ROOT file:\n{e}")
             return

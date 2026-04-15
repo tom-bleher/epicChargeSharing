@@ -91,8 +91,8 @@ class _AggregateWorker(QtCore.QObject):
                     self.finished.emit(self.seq, np.array([]), np.array([]), np.array([]))
                 return
 
-            # Base validity (finite and not pixel-only)
-            base_mask_global = np.isfinite(x_hit) & np.isfinite(y_hit) & (~is_px_hit)
+            # Base validity (finite coords and metric, not pixel-only)
+            base_mask_global = np.isfinite(x_hit) & np.isfinite(y_hit) & np.isfinite(base_z) & (~is_px_hit)
 
             # Prepare chunks
             max_workers = max(1, (os.cpu_count() or 4) - 1)
@@ -512,7 +512,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(self, "Open ROOT", f"File not found: {path}")
             return
         try:
-            self.file = uproot.open(path)
+            self.file = uproot.open(path, minimal_ttree_metadata=False)
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Open ROOT", f"Failed to open {path}: {e}")
             return
@@ -554,7 +554,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(self, "Open ROOT (B)", f"File not found: {path}")
             return
         try:
-            self.file_b = uproot.open(path)
+            self.file_b = uproot.open(path, minimal_ttree_metadata=False)
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Open ROOT (B)", f"Failed to open {path}: {e}")
             return
@@ -1049,7 +1049,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         if hits is None:
             return
         branches = set(hits.keys())
-        self.hasRecon2D = ("ReconTrueDeltaRowX" in branches) and ("ReconTrueDeltaColY" in branches)
+        self.hasRecon2D = ("ReconTrueDeltaX_2D" in branches) and ("ReconTrueDeltaY_2D" in branches)
         # 2D signed uses the same base branches; abs takes |.| when plotting
         self.hasRecon2DSigned = self.hasRecon2D
         self.hasRecon3D = ("ReconTrueDeltaX_3D" in branches) and ("ReconTrueDeltaY_3D" in branches)
@@ -1067,7 +1067,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         if hits is None:
             return
         branches = set(hits.keys())
-        self.hasRecon2D_b = ("ReconTrueDeltaRowX" in branches) and ("ReconTrueDeltaColY" in branches)
+        self.hasRecon2D_b = ("ReconTrueDeltaX_2D" in branches) and ("ReconTrueDeltaY_2D" in branches)
         self.hasRecon2DSigned_b = self.hasRecon2D_b
         self.hasRecon3D_b = ("ReconTrueDeltaX_3D" in branches) and ("ReconTrueDeltaY_3D" in branches)
         self.hasRecon3DSigned_b = ("ReconTrueDeltaX_3D_Signed" in branches) and ("ReconTrueDeltaY_3D_Signed" in branches)
@@ -1511,12 +1511,12 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 x1 = xc - ps/2.0
                 y1 = yc - ps/2.0
                 rect = mpatches.Rectangle((x1, y1), ps, ps,
-                                          facecolor=color_fill, edgecolor=color_line, linewidth=1)
+                                          facecolor=color_fill, edgecolor=color_line, linewidth=1, zorder=5)
                 ax.add_patch(rect)
 
         # Draw window border
         border = mpatches.Rectangle((x_min, y_min), x_max-x_min, y_max-y_min,
-                                    fill=False, edgecolor="black", linewidth=3)
+                                    fill=False, edgecolor="black", linewidth=3, zorder=6)
         ax.add_patch(border)
 
     def draw_current(self):
@@ -1597,9 +1597,9 @@ class PyColorGUI(QtWidgets.QMainWindow):
 
         branches = ["TrueX", "TrueY", "isPixelHit"]
         if need2D:
-            branches += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
+            branches += ["ReconTrueDeltaX_2D", "ReconTrueDeltaY_2D"]
         if need2DS:
-            branches += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
+            branches += ["ReconTrueDeltaX_2D", "ReconTrueDeltaY_2D"]
         if need3D:
             branches += ["ReconTrueDeltaX_3D", "ReconTrueDeltaY_3D"]
         if need3DS:
@@ -1650,8 +1650,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 return v
 
             if self.mode == Mode.TwoD_Abs:
-                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX"))
-                dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
+                dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
                 if sel == 0:
                     base_z = dtx2
                 elif sel == 1:
@@ -1663,8 +1663,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 else:
                     base_z = np.maximum(dtx2, dty2)
             elif self.mode == Mode.TwoD_Signed:
-                dtx2s = arr_or_zero("ReconTrueDeltaRowX")
-                dty2s = arr_or_zero("ReconTrueDeltaColY")
+                dtx2s = arr_or_zero("ReconTrueDeltaX_2D")
+                dty2s = arr_or_zero("ReconTrueDeltaY_2D")
                 base_z = dtx2s if sel == 0 else (dty2s if sel == 1 else 0.5 * (dtx2s + dty2s))
             elif self.mode == Mode.ThreeD_Abs:
                 dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D"))
@@ -1684,8 +1684,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 dty3s = arr_or_zero("ReconTrueDeltaY_3D_Signed")
                 base_z = dtx3s if sel == 0 else (dty3s if sel == 1 else 0.5 * (dtx3s + dty3s))
             elif self.mode == Mode.TwoD_vs_Pixel:
-                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX"))
-                dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
+                dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
                 dpx = np.abs(arr_or_zero("PixelTrueDeltaX"))
                 dpy = np.abs(arr_or_zero("PixelTrueDeltaY"))
                 m2 = 0.5 * (dtx2 + dty2)
@@ -1737,8 +1737,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
                     else:
                         base_z = (r3 - rp)
             elif self.mode == Mode.TwoD_vs_ThreeD:
-                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX"))
-                dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
+                dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
                 dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D"))
                 dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
                 m2 = 0.5 * (dtx2 + dty2)
@@ -1854,8 +1854,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
             return v[mask] if v is not None else None
 
         if self.mode == Mode.TwoD_Abs:
-            dtx2 = np.abs(safe_get("ReconTrueDeltaRowX"))
-            dty2 = np.abs(safe_get("ReconTrueDeltaColY"))
+            dtx2 = np.abs(safe_get("ReconTrueDeltaX_2D"))
+            dty2 = np.abs(safe_get("ReconTrueDeltaY_2D"))
             if sel == 0:
                 zvals = dtx2
             elif sel == 1:
@@ -1867,8 +1867,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
             else:
                 zvals = np.maximum(dtx2, dty2)
         elif self.mode == Mode.TwoD_Signed:
-            dtx2s = safe_get("ReconTrueDeltaRowX")
-            dty2s = safe_get("ReconTrueDeltaColY")
+            dtx2s = safe_get("ReconTrueDeltaX_2D")
+            dty2s = safe_get("ReconTrueDeltaY_2D")
             if sel == 0:
                 zvals = dtx2s
             elif sel == 1:
@@ -1898,8 +1898,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
             else:
                 zvals = 0.5 * (dtx3s + dty3s)
         elif self.mode == Mode.TwoD_vs_Pixel:
-            dtx2 = np.abs(safe_get("ReconTrueDeltaRowX"))
-            dty2 = np.abs(safe_get("ReconTrueDeltaColY"))
+            dtx2 = np.abs(safe_get("ReconTrueDeltaX_2D"))
+            dty2 = np.abs(safe_get("ReconTrueDeltaY_2D"))
             dpx = np.abs(safe_get("PixelTrueDeltaX"))
             dpy = np.abs(safe_get("PixelTrueDeltaY"))
             m2 = 0.5 * (dtx2 + dty2)
@@ -1950,8 +1950,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 else:
                     zvals = (r3 - rp)
         elif self.mode == Mode.TwoD3D_Combined:
-            dtx2 = np.abs(safe_get("ReconTrueDeltaRowX"))
-            dty2 = np.abs(safe_get("ReconTrueDeltaColY"))
+            dtx2 = np.abs(safe_get("ReconTrueDeltaX_2D"))
+            dty2 = np.abs(safe_get("ReconTrueDeltaY_2D"))
             dtx3 = np.abs(safe_get("ReconTrueDeltaX_3D"))
             dty3 = np.abs(safe_get("ReconTrueDeltaY_3D"))
             if sel == 0:
@@ -2003,21 +2003,19 @@ class PyColorGUI(QtWidgets.QMainWindow):
         ax = self.canvas.ax
 
         # draw a compact scatter for performance, approximate radius
-        # Approximate marker size so diameter ~ pixel_size_mm/3 in data units
+        # Approximate marker size so diameter ~ pixel_size_mm/8 in data units
         # Convert data span to pixels; assume 100 dpi and figure size
         try:
             bbox = self.canvas.fig.get_window_extent().transformed(self.canvas.fig.dpi_scale_trans.inverted())
             fig_w_px = bbox.width * self.canvas.fig.dpi
-            fig_h_px = bbox.height * self.canvas.fig.dpi
             ax_bbox = ax.get_position()
             ax_w_px = (ax_bbox.width) * fig_w_px
-            ax_h_px = (ax_bbox.height) * fig_h_px
             mm_per_px_x = (x_max - x_min) / max(ax_w_px, 1.0)
-            # desired radius in pixels ~ (pixel_size_mm/6) / mm_per_px_x
-            r_px = (self.geom.pixel_size_mm / 6.0) / max(mm_per_px_x, 1e-6)
-            size_pts2 = max(10.0, (2.0 * r_px) ** 2)
+            # desired radius in pixels ~ (pixel_size_mm/16) / mm_per_px_x
+            r_px = (self.geom.pixel_size_mm / 16.0) / max(mm_per_px_x, 1e-6)
+            size_pts2 = max(1.0, (2.0 * r_px) ** 2)
         except Exception:
-            size_pts2 = 36.0
+            size_pts2 = 4.0
 
         # Ensure previous colorbar is removed before adding a new one
         try:
@@ -2027,7 +2025,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             pass
         self.canvas.cbar = None
 
-        sc = ax.scatter(xs, ys, c=zvals, cmap=cmap, norm=norm, s=size_pts2, marker='o', linewidths=0)
+        sc = ax.scatter(xs, ys, c=zvals, cmap=cmap, norm=norm, s=size_pts2, marker='o', linewidths=0, zorder=2)
         cbar = self.canvas.fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
         self.canvas.cbar = cbar
 
@@ -2109,7 +2107,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             pass
         self.canvas.cbar = None
 
-        mesh = ax.pcolormesh(x_edges, y_edges, zgrid, cmap=cmap, norm=norm, shading='auto')
+        mesh = ax.pcolormesh(x_edges, y_edges, zgrid, cmap=cmap, norm=norm, shading='auto', zorder=2)
         cbar = self.canvas.fig.colorbar(mesh, ax=ax, fraction=0.046, pad=0.04)
         self.canvas.cbar = cbar
         cbar.set_label(self._get_colorbar_label(sel))
@@ -2555,9 +2553,9 @@ class CompareDialog(QtWidgets.QDialog):
         needPix = (mode in (Mode.TwoD_vs_Pixel, Mode.ThreeD_vs_Pixel))
         br = ["TrueX", "TrueY", "isPixelHit"]
         if need2D:
-            br += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
+            br += ["ReconTrueDeltaX_2D", "ReconTrueDeltaY_2D"]
         if need2DS:
-            br += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
+            br += ["ReconTrueDeltaX_2D", "ReconTrueDeltaY_2D"]
         if need3D:
             br += ["ReconTrueDeltaX_3D", "ReconTrueDeltaY_3D"]
         if need3DS:
@@ -2573,14 +2571,14 @@ class CompareDialog(QtWidgets.QDialog):
                 return np.zeros_like(x_hit, dtype=float)
             return v
         if mode == Mode.TwoD_Abs:
-            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
             if sel == 0: return dtx2
             if sel == 1: return dty2
             if sel == 2: return 0.5 * (dtx2 + dty2)
             if sel == 3: return np.sqrt(dtx2 * dtx2 + dty2 * dty2)
             return np.maximum(dtx2, dty2)
         if mode == Mode.TwoD_Signed:
-            dtx2s = arr_or_zero("ReconTrueDeltaRowX"); dty2s = arr_or_zero("ReconTrueDeltaColY")
+            dtx2s = arr_or_zero("ReconTrueDeltaX_2D"); dty2s = arr_or_zero("ReconTrueDeltaY_2D")
             return dtx2s if sel == 0 else (dty2s if sel == 1 else 0.5 * (dtx2s + dty2s))
         if mode == Mode.ThreeD_Abs:
             dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
@@ -2593,7 +2591,7 @@ class CompareDialog(QtWidgets.QDialog):
             dtx3s = arr_or_zero("ReconTrueDeltaX_3D_Signed"); dty3s = arr_or_zero("ReconTrueDeltaY_3D_Signed")
             return dtx3s if sel == 0 else (dty3s if sel == 1 else 0.5 * (dtx3s + dty3s))
         if mode == Mode.TwoD_vs_Pixel:
-            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
             dpx = np.abs(arr_or_zero("PixelTrueDeltaX")); dpy = np.abs(arr_or_zero("PixelTrueDeltaY"))
             m2 = 0.5 * (dtx2 + dty2); mp = 0.5 * (dpx + dpy)
             if sel == 0: return np.abs(m2 - mp)
@@ -2617,7 +2615,7 @@ class CompareDialog(QtWidgets.QDialog):
             r3 = np.sqrt(dtx3 * dtx3 + dty3 * dty3); rp = np.sqrt(dpx * dpx + dpy * dpy)
             return np.abs(r3 - rp) if sel == 6 else (r3 - rp)
         if mode == Mode.TwoD3D_Combined:
-            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
             dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
             if sel == 0: return 0.25 * (dtx2 + dty2 + dtx3 + dty3)
             if sel == 1: return 0.5 * (dtx2 + dtx3)
