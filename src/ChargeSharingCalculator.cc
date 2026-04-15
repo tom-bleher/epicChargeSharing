@@ -320,7 +320,10 @@ ChargeSharingCalculator::Compute(const G4ThreeVector& hitPos, G4double energyDep
     fResult.geometry = BuildGridGeometry();
 
     const G4double edepInEV = energyDeposit / eV;
-    const G4double primaryElectrons = ionizationEnergy > 0.0 ? (edepInEV / ionizationEnergy) : 0.0;
+    const G4double meanElectrons = ionizationEnergy > 0.0 ? (edepInEV / ionizationEnergy) : 0.0;
+    // Fano-suppressed fluctuation: sigma = sqrt(F * N) instead of sqrt(N)
+    const G4double sigmaElectrons = std::sqrt(Constants::FANO_FACTOR * meanElectrons);
+    const G4double primaryElectrons = std::max(0.0, G4RandGauss::shoot(meanElectrons, sigmaElectrons));
     const G4double totalChargeElectrons = std::max(0.0, primaryElectrons * amplificationFactor);
 
     ComputeChargeFractions(hitPos, totalChargeElectrons, d0, elementaryCharge);
@@ -388,7 +391,9 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
     fResult.geometry = BuildGridGeometry();
 
     const G4double edepInEV = totalEnergyDeposit / eV;
-    const G4double primaryElectrons = ionizationEnergy > 0.0 ? (edepInEV / ionizationEnergy) : 0.0;
+    const G4double meanElectrons = ionizationEnergy > 0.0 ? (edepInEV / ionizationEnergy) : 0.0;
+    const G4double sigmaElectrons = std::sqrt(Constants::FANO_FACTOR * meanElectrons);
+    const G4double primaryElectrons = std::max(0.0, G4RandGauss::shoot(meanElectrons, sigmaElectrons));
     const G4double totalChargeElectrons = std::max(0.0, primaryElectrons * amplificationFactor);
     const G4double totalChargeCoulomb = totalChargeElectrons * elementaryCharge;
 

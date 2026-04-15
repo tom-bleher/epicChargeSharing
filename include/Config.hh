@@ -47,6 +47,7 @@ inline const G4double GRID_OFFSET = 0.0 * mm; // Grid origin offset
 
 // ─────────────────────────────── Physics ────────────────────────────────────
 inline constexpr G4double IONIZATION_ENERGY = 3.6; // eV per e-h pair (silicon at room temperature)
+inline constexpr G4double FANO_FACTOR = 0.115;     // Si Fano factor (Owens et al., reduces variance below Poisson)
 inline constexpr G4double GAIN = 20.0;             // AC-LGAD gain factor; typical range 8-25
 inline constexpr G4double D0 = 1.0;                // LogA reference distance d0 (um); controls charge spread width
 
@@ -54,8 +55,8 @@ inline constexpr G4double D0 = 1.0;                // LogA reference distance d0
 // Gain sigma bounds: typical AC-LGAD per-pixel gain variation range from lab measurements
 inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010; // Min gain noise (1%)
 inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050; // Max gain noise (5%)
-inline constexpr G4double NOISE_ELECTRON_COUNT = 1500.0; // Electronic noise (e-); EICROC0 bare: ~1625 e-
-inline constexpr G4double READOUT_THRESHOLD_SIGMA = 2.0; // Readout threshold (N × noise σ) for ThresholdAboveNoise mode
+inline constexpr G4double NOISE_ELECTRON_COUNT = 1250.0; // Electronic noise (e-); EICROC measured ~0.2 fC ≈ 1250 e-
+inline constexpr G4double READOUT_THRESHOLD_SIGMA = 2.0; // Readout threshold (N × noise σ); EICROC ~5 fC discrim ≈ 1.25σ at gain 20
 
 // ──────────────────── Event-Level Gain Fluctuation ──────────────────────────
 inline constexpr G4double GAIN_EXCESS_NOISE_FACTOR = 2.0;  // McIntyre F-factor for Si avalanche
