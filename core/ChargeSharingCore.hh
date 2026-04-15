@@ -67,7 +67,7 @@ constexpr double kOutOfBoundsFraction = std::numeric_limits<double>::quiet_NaN()
 
 // Linear model beta coefficients (1/um) from paper -- empirical fits to AC-LGAD data
 constexpr double kLinearBetaNarrow = 0.003;      // For pitch 100-200 um (steeper attenuation)
-constexpr double kLinearBetaWide = 0.001;        // For pitch 200-500 um (gentler attenuation)
+constexpr double kLinearBetaWide = 0.002;        // For pitch 200-500 um (Tornago et al. arXiv:2007.09528)
 constexpr double kLinearMinPitchUM = 100.0;      // Minimum supported AC-LGAD pitch
 constexpr double kLinearBoundaryPitchUM = 200.0; // Pitch threshold between narrow/wide beta regimes
 constexpr double kLinearMaxPitchUM = 500.0;      // Maximum supported AC-LGAD pitch
@@ -105,10 +105,10 @@ inline T clamp(T value, T lo, T hi) {
 /// near pad edges where charge sharing contrast is highest.
 /// @param dxMM Offset in X from hit to pixel center (mm).
 /// @param dyMM Offset in Y from hit to pixel center (mm).
-/// @param padHalfWidthMM Half of pad width in X (mm). Pass 0 to fall back to center distance.
-/// @param padHalfHeightMM Half of pad height in Y (mm). Pass 0 to fall back to center distance.
+/// @param padHalfWidthMM Half of pad width in X (mm). Pass 0 to fall back to center-to-center distance.
+/// @param padHalfHeightMM Half of pad height in Y (mm). Pass 0 to fall back to center-to-center distance.
 /// @return Distance to nearest pad edge in mm (>= 0).
-inline double calcDistanceToCenter(double dxMM, double dyMM,
+inline double calcDistanceToEdge(double dxMM, double dyMM,
                                    double padHalfWidthMM = 0.0, double padHalfHeightMM = 0.0) {
     if (padHalfWidthMM <= 0.0 && padHalfHeightMM <= 0.0) {
         // Legacy: distance to center (backward compatible)
@@ -173,7 +173,7 @@ inline double calcWeightLogA(double distanceMM, double alphaPadViewAngle, double
 }
 
 /// Calculate weight for LinA model: w_i = (1 - beta * d_i) * alpha_i
-/// @param distanceMM Distance from hit to pixel center (mm)
+/// @param distanceMM Distance from hit to nearest pad edge (mm)
 /// @param alphaPadViewAngle Pad view angle
 /// @param betaPerMicron Attenuation coefficient (1/um)
 inline double calcWeightLinA(double distanceMM, double alphaPadViewAngle, double betaPerMicron) {
@@ -198,7 +198,7 @@ inline double calcWeightLinA(double distanceMM, double alphaPadViewAngle, double
 /// weight is proportional to the signal fraction induced on this pad; call
 /// calculateNeighborhood() to obtain properly normalized fractions.
 /// @param model Signal model (LogA or LinA).
-/// @param distanceMM Distance from hit to pixel center (mm).
+/// @param distanceMM Distance from hit to nearest pad edge (mm).
 /// @param padWidthMM Pad width (mm).
 /// @param padHeightMM Pad height (mm).
 /// @param d0MM Reference distance for LogA model (mm).
@@ -388,7 +388,7 @@ inline NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int ce
 
             const double dx = hitX - pixel.centerX;
             const double dy = hitY - pixel.centerY;
-            pixel.distance = calcDistanceToCenter(dx, dy, padW / 2.0, padH / 2.0);
+            pixel.distance = calcDistanceToEdge(dx, dy, padW / 2.0, padH / 2.0);
             pixel.alpha = calcPadViewAngle(pixel.distance, padW, padH);
 
             pixel.weight =

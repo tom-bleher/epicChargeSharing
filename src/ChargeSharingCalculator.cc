@@ -867,7 +867,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
             const G4double dxToCenter = baseDx - (di * pixelSpacing);
             const G4double dyToCenter = baseDy - (dj * pixelSpacing);
-            const G4double distanceToEdge = csc::calcDistanceToCenter(dxToCenter, dyToCenter,
+            const G4double distanceToEdge = csc::calcDistanceToEdge(dxToCenter, dyToCenter,
                                                                       pixelSize / 2.0, pixelSize / 2.0);
             const G4double alpha = csc::calcPadViewAngle(distanceToEdge, pixelSize, pixelSize);
 
