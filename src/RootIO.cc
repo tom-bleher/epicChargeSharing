@@ -561,8 +561,13 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
         addDouble("DetectorThickness_mm", fGrid.detectorThickness);
     if (fGrid.interpadGap > 0.0)
         addDouble("InterpadGap_mm", fGrid.interpadGap);
-    if (fGrid.numBlocksPerSide > 0)
-        addInt("GridNumBlocksPerSide", fGrid.numBlocksPerSide);
+    {
+        G4int nBlocks = fGrid.numBlocksPerSide;
+        if (nBlocks <= 0 && fGrid.pixelSpacing > 0.0 && fGrid.detectorSize > 0.0)
+            nBlocks = static_cast<G4int>(fGrid.detectorSize / fGrid.pixelSpacing);
+        if (nBlocks > 0)
+            addInt("GridNumBlocksPerSide", nBlocks);
+    }
     if (fGrid.storeFullFractions && fGrid.fullGridSide > 0)
         addInt("FullGridSide", fGrid.fullGridSide);
     if (fGrid.neighborhoodRadius >= 0)
@@ -586,6 +591,8 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
     addDouble("NoisePixelGainSigmaMin", fNoise.gainSigmaMin);
     addDouble("NoisePixelGainSigmaMax", fNoise.gainSigmaMax);
     addDouble("NoiseElectronCount", fNoise.electronCount);
+    if (fNoise.readoutThresholdSigma > 0.0)
+        addDouble("ReadoutThresholdSigma", fNoise.readoutThresholdSigma);
 
     return entries;
 }

@@ -992,6 +992,7 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const {
     noise.gainSigmaMin = rtConfig.pixelGainSigmaMin;
     noise.gainSigmaMax = rtConfig.pixelGainSigmaMax;
     noise.electronCount = rtConfig.noiseElectronCount;
+    noise.readoutThresholdSigma = rtConfig.readoutThresholdSigma;
     publisher.SetNoiseMetadata(noise);
 
     // Beam parameters (for reproducibility)

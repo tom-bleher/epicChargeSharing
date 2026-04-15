@@ -435,6 +435,7 @@ public:
         G4double gainSigmaMin{0.0};
         G4double gainSigmaMax{0.0};
         G4double electronCount{0.0};
+        G4double readoutThresholdSigma{0.0};
     };
 
     struct SimulationMetadata {
