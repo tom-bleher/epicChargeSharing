@@ -15,6 +15,7 @@ Then feed to ddsim:
 import argparse
 import math
 import numpy as np
+import pyhepmc
 
 # Physics constants
 ELECTRON_MASS = 0.51099895e-3  # GeV
@@ -82,16 +83,6 @@ def pdg_splitting(rng):
             return x
 
 
-def write_hepmc3_event(f, event_num, particles):
-    """Write one HepMC3 ASCII event."""
-    # Header
-    f.write(f"E {event_num} 0 {len(particles)}\n")
-    f.write("U GEV MM\n")
-    # Particles: status 1=final, 4=beam
-    for i, (px, py, pz, e, pdg, status) in enumerate(particles):
-        f.write(f"P {i+1} 0 {pdg} {px:.10e} {py:.10e} {pz:.10e} {e:.10e} 0 {status}\n")
-
-
 def main():
     parser = argparse.ArgumentParser(description="Generate BH e+e- pairs for lumi testing")
     parser.add_argument("--nevents", type=int, default=100)
@@ -107,10 +98,7 @@ def main():
     Ep = abs(HADRON_PZ)
     gamma_e = Ee / ELECTRON_MASS
 
-    with open(args.output, "w") as f:
-        f.write("HepMC::Version 3.02.06\n")
-        f.write("HepMC::Asciiv3-START_EVENT_LISTING\n")
-
+    with pyhepmc.open(args.output, "w") as f:
         n_written = 0
         for iev in range(args.nevents):
             # Sample photon kinematics
@@ -141,7 +129,6 @@ def main():
             sz = math.cos(theta_gamma)
 
             # Propagate photon from IP to converter to get vertex position
-            # photon direction: (sx, sy, sz) with sz < 0
             if sz != 0:
                 t_prop = CONVERTER_Z / sz  # mm
                 vx = sx * t_prop
@@ -150,33 +137,41 @@ def main():
             else:
                 vx, vy, vz = 0, 0, CONVERTER_Z
 
-            particles = [
-                # Beam electron
-                (0.0, 0.0, ELECTRON_PZ, math.sqrt(ELECTRON_PZ**2 + ELECTRON_MASS**2), 11, 4),
-                # Beam proton
-                (0.0, 0.0, HADRON_PZ, math.sqrt(HADRON_PZ**2 + PROTON_MASS**2), 2212, 4),
-                # Final state electron (from conversion)
-                (p_electron * sx, p_electron * sy, p_electron * sz, E_electron, 11, 1),
-                # Final state positron (from conversion)
-                (p_positron * sx, p_positron * sy, p_positron * sz, E_positron, -11, 1),
-            ]
+            evt = pyhepmc.GenEvent(pyhepmc.Units.GEV, pyhepmc.Units.MM)
+            evt.event_number = n_written
 
-            # Write HepMC3 event with vertex at converter position
-            f.write(f"E {n_written} 0 4\n")
-            f.write("U GEV MM\n")
-            f.write(f"A 0 GenCrossSection -1 -1 0 0\n")
-            # Vertex at converter
-            f.write(f"V -1 0 [{vx:.6e},{vy:.6e},{vz:.6e},0]\n")
-            # Beam particles (incoming to vertex)
-            f.write(f"P 1 -1 11 0 0 {ELECTRON_PZ:.10e} {math.sqrt(ELECTRON_PZ**2 + ELECTRON_MASS**2):.10e} {ELECTRON_MASS:.10e} 4\n")
-            f.write(f"P 2 -1 2212 0 0 {HADRON_PZ:.10e} {math.sqrt(HADRON_PZ**2 + PROTON_MASS**2):.10e} {PROTON_MASS:.10e} 4\n")
+            # Vertex at converter position
+            v = pyhepmc.GenVertex(pyhepmc.FourVector(vx, vy, vz, 0))
+            evt.add_vertex(v)
+
+            # Beam particles (incoming)
+            beam_e = pyhepmc.GenParticle(
+                pyhepmc.FourVector(0, 0, ELECTRON_PZ, math.sqrt(ELECTRON_PZ**2 + ELECTRON_MASS**2)),
+                11, 4)
+            beam_e.generated_mass = ELECTRON_MASS
+            v.add_particle_in(beam_e)
+
+            beam_p = pyhepmc.GenParticle(
+                pyhepmc.FourVector(0, 0, HADRON_PZ, math.sqrt(HADRON_PZ**2 + PROTON_MASS**2)),
+                2212, 4)
+            beam_p.generated_mass = PROTON_MASS
+            v.add_particle_in(beam_p)
+
             # Final state e+e-
-            f.write(f"P 3 -1 11 {p_electron*sx:.10e} {p_electron*sy:.10e} {p_electron*sz:.10e} {E_electron:.10e} {ELECTRON_MASS:.10e} 1\n")
-            f.write(f"P 4 -1 -11 {p_positron*sx:.10e} {p_positron*sy:.10e} {p_positron*sz:.10e} {E_positron:.10e} {ELECTRON_MASS:.10e} 1\n")
+            elec = pyhepmc.GenParticle(
+                pyhepmc.FourVector(p_electron * sx, p_electron * sy, p_electron * sz, E_electron),
+                11, 1)
+            elec.generated_mass = ELECTRON_MASS
+            v.add_particle_out(elec)
 
+            posi = pyhepmc.GenParticle(
+                pyhepmc.FourVector(p_positron * sx, p_positron * sy, p_positron * sz, E_positron),
+                -11, 1)
+            posi.generated_mass = ELECTRON_MASS
+            v.add_particle_out(posi)
+
+            f.write(evt)
             n_written += 1
-
-        f.write("HepMC::Asciiv3-END_EVENT_LISTING\n")
 
     print(f"Generated {n_written} BH e+e- pair events -> {args.output}")
     print(f"  Energy range: [{args.Emin}, {args.Emax}] GeV")
