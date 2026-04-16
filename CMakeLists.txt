@@ -14,7 +14,7 @@ endif()
 # ============================================================================
 # Options
 # ============================================================================
-option(WITH_EDM4HEP  "Enable EDM4hep output format"               ON)
+option(WITH_EDM4HEP  "Enable EDM4hep output format for the standalone harness" OFF)
 option(BUILD_TESTING "Build unit tests"                            OFF)
 
 # ============================================================================
@@ -131,8 +131,12 @@ install(DIRECTORY macros/
 # Testing
 # ============================================================================
 if(BUILD_TESTING)
-    enable_testing()
-    add_subdirectory(tests)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+        enable_testing()
+        add_subdirectory(tests)
+    else()
+        message(STATUS "BUILD_TESTING=ON but tests/ not present; skipping.")
+    endif()
 endif()
 
 # ============================================================================
