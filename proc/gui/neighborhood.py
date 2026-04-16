@@ -295,8 +295,8 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
             self.branch_combo.addItem("|Qn - Qf|", "delta_nf")
 
         # Outlier mask options (discrete binary coloring)
-        if "Gauss3DMaskRemoved" in available:
-            self.branch_combo.addItem("Outlier mask (3D)", "mask_3d")
+        if "Gauss2DMaskRemoved" in available:
+            self.branch_combo.addItem("Outlier mask (2D Gauss)", "mask_2d")
         if "GaussRowMaskRemoved" in available:
             self.branch_combo.addItem("Outlier mask (row)", "mask_row")
         if "GaussColMaskRemoved" in available:
@@ -353,7 +353,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
           ("direct", key) for a direct branch key
           ("delta_abs", ("Qi", "Qf"))
           ("delta_signed", ("Qi", "Qf"))
-          ("mask", "mask_3d" | "mask_row" | "mask_col")
+          ("mask", "mask_2d" | "mask_row" | "mask_col")
         If selection missing, fallback to first available direct key.
         """
         sel = None
@@ -370,7 +370,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         if sel == "delta_nf":
             return ("delta_abs", ("Qn", "Qf"))
         # Mask selections
-        if sel in ("mask_3d", "mask_row", "mask_col"):
+        if sel in ("mask_2d", "mask_row", "mask_col"):
             return ("mask", sel)
         # Fallback: pick first available
         try:
@@ -427,8 +427,8 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
             branches += [a, b]
         elif mask_mode:
             # Determine necessary branches for masks
-            if mask_sel == "mask_3d":
-                branches.append("Gauss3DMaskRemoved")
+            if mask_sel == "mask_2d":
+                branches.append("Gauss2DMaskRemoved")
             elif mask_sel == "mask_row":
                 branches.append("GaussRowMaskRemoved")
             elif mask_sel == "mask_col":
@@ -490,8 +490,8 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                             N = dim_guess
                             R = N // 2
                             values = np.full(N * N, np.nan, dtype=float)
-                            if mask_sel == "mask_3d":
-                                mvec = np.asarray(arrs["Gauss3DMaskRemoved"][0], dtype=float)
+                            if mask_sel == "mask_2d":
+                                mvec = np.asarray(arrs["Gauss2DMaskRemoved"][0], dtype=float)
                                 k = 0
                                 for di in range(-R, R + 1):
                                     for dj in range(-R, R + 1):
@@ -792,13 +792,13 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                         a, b = "Qi", "Qf"
                     branches += [a, b]
                 elif mask_mode:
-                    if mask_sel == "mask_3d":
-                        branches.append("Gauss3DMaskRemoved")
+                    if mask_sel == "mask_2d":
+                        branches.append("Gauss2DMaskRemoved")
                     elif mask_sel == "mask_row":
                         branches.append("GaussRowMaskRemoved")
                     elif mask_sel == "mask_col":
                         branches.append("GaussColMaskRemoved")
-                    # Shape source for 2D/3D masks
+                    # Shape source for 2D Gauss/row/col masks
                     try:
                         available = set(self._tree.keys()) if self._tree is not None else set()
                     except Exception:
@@ -839,8 +839,8 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                                 N = dim_guess
                                 R = N // 2
                                 values = np.full(N * N, np.nan, dtype=float)
-                                if mask_sel == "mask_3d":
-                                    mvec = np.asarray(arrs["Gauss3DMaskRemoved"][0], dtype=float)
+                                if mask_sel == "mask_2d":
+                                    mvec = np.asarray(arrs["Gauss2DMaskRemoved"][0], dtype=float)
                                     k = 0
                                     for di in range(-R, R + 1):
                                         for dj in range(-R, R + 1):

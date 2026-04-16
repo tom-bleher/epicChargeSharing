@@ -254,25 +254,25 @@ class Geometry:
 
 
 class Mode:
-    TwoD_Abs = 0
-    TwoD_Signed = 1
-    ThreeD_Abs = 2
-    ThreeD_Signed = 3
-    TwoD_vs_Pixel = 4
-    ThreeD_vs_Pixel = 5
-    TwoD3D_Combined = 6
-    TwoD_vs_ThreeD = 7
+    RowCol_Abs = 0
+    RowCol_Signed = 1
+    Gauss2D_Abs = 2
+    Gauss2D_Signed = 3
+    RowCol_vs_Pixel = 4
+    Gauss2D_vs_Pixel = 5
+    RowCol_Gauss2D_Combined = 6
+    RowCol_vs_Gauss2D = 7
 
 
 MODE_LABELS = {
-    Mode.TwoD_Abs: "2D abs",
-    Mode.TwoD_Signed: "2D signed",
-    Mode.ThreeD_Abs: "3D abs",
-    Mode.ThreeD_Signed: "3D signed",
-    Mode.TwoD_vs_Pixel: "2D vs Pixel",
-    Mode.ThreeD_vs_Pixel: "3D vs Pixel",
-    Mode.TwoD3D_Combined: "2D+3D combined",
-    Mode.TwoD_vs_ThreeD: "2D vs 3D",
+    Mode.RowCol_Abs: "Row/Col abs",
+    Mode.RowCol_Signed: "Row/Col signed",
+    Mode.Gauss2D_Abs: "2D Gauss abs",
+    Mode.Gauss2D_Signed: "2D Gauss signed",
+    Mode.RowCol_vs_Pixel: "Row/Col vs Pixel",
+    Mode.Gauss2D_vs_Pixel: "2D Gauss vs Pixel",
+    Mode.RowCol_Gauss2D_Combined: "Row/Col + 2D Gauss",
+    Mode.RowCol_vs_Gauss2D: "Row/Col vs 2D Gauss",
 }
 
 
@@ -424,20 +424,20 @@ class PyColorGUI(QtWidgets.QMainWindow):
         self.file_path_b: str = ""
         self.geom = Geometry()
         self.geom_b = Geometry()
-        self.mode: int = Mode.TwoD_Abs
+        self.mode: int = Mode.RowCol_Abs
         self.metric_index: int = 0
         self.i0: int = -1
         self.j0: int = -1
-        self.hasRecon2D = False
-        self.hasRecon2DSigned = False
-        self.hasRecon3D = False
-        self.hasRecon3DSigned = False
+        self.hasReconRowCol = False
+        self.hasReconRowColSigned = False
+        self.hasReconGauss2D = False
+        self.hasReconGauss2DSigned = False
         self.hasPixelDeltas = False
         # Availability for file B
-        self.hasRecon2D_b = False
-        self.hasRecon2DSigned_b = False
-        self.hasRecon3D_b = False
-        self.hasRecon3DSigned_b = False
+        self.hasReconRowCol_b = False
+        self.hasReconRowColSigned_b = False
+        self.hasReconGauss2D_b = False
+        self.hasReconGauss2DSigned_b = False
         self.hasPixelDeltas_b = False
         self.aggregate_all: bool = False
         # Options state
@@ -1039,8 +1039,8 @@ class PyColorGUI(QtWidgets.QMainWindow):
 
     # ------------- Data helpers -------------
     def detect_branch_availability(self):
-        self.hasRecon2D = self.hasRecon2DSigned = False
-        self.hasRecon3D = self.hasRecon3DSigned = False
+        self.hasReconRowCol = self.hasReconRowColSigned = False
+        self.hasReconGauss2D = self.hasReconGauss2DSigned = False
         self.hasPixelDeltas = False
         try:
             hits = self.file["Hits"] if self.file is not None else None
@@ -1049,16 +1049,16 @@ class PyColorGUI(QtWidgets.QMainWindow):
         if hits is None:
             return
         branches = set(hits.keys())
-        self.hasRecon2D = ("ReconTrueDeltaX_2D" in branches) and ("ReconTrueDeltaY_2D" in branches)
-        # 2D signed uses the same base branches; abs takes |.| when plotting
-        self.hasRecon2DSigned = self.hasRecon2D
-        self.hasRecon3D = ("ReconTrueDeltaX_3D" in branches) and ("ReconTrueDeltaY_3D" in branches)
-        self.hasRecon3DSigned = ("ReconTrueDeltaX_3D_Signed" in branches) and ("ReconTrueDeltaY_3D_Signed" in branches)
+        self.hasReconRowCol = ("ReconTrueDeltaRowX" in branches) and ("ReconTrueDeltaColY" in branches)
+        # Row/Col signed uses the same base branches; abs takes |.| when plotting
+        self.hasReconRowColSigned = self.hasReconRowCol
+        self.hasReconGauss2D = ("ReconTrueDeltaX_2D" in branches) and ("ReconTrueDeltaY_2D" in branches)
+        self.hasReconGauss2DSigned = ("ReconTrueDeltaX_2D_Signed" in branches) and ("ReconTrueDeltaY_2D_Signed" in branches)
         self.hasPixelDeltas = ("PixelTrueDeltaX" in branches) and ("PixelTrueDeltaY" in branches)
 
     def detect_branch_availability_b(self):
-        self.hasRecon2D_b = self.hasRecon2DSigned_b = False
-        self.hasRecon3D_b = self.hasRecon3DSigned_b = False
+        self.hasReconRowCol_b = self.hasReconRowColSigned_b = False
+        self.hasReconGauss2D_b = self.hasReconGauss2DSigned_b = False
         self.hasPixelDeltas_b = False
         try:
             hits = self.file_b["Hits"] if self.file_b is not None else None
@@ -1067,10 +1067,10 @@ class PyColorGUI(QtWidgets.QMainWindow):
         if hits is None:
             return
         branches = set(hits.keys())
-        self.hasRecon2D_b = ("ReconTrueDeltaX_2D" in branches) and ("ReconTrueDeltaY_2D" in branches)
-        self.hasRecon2DSigned_b = self.hasRecon2D_b
-        self.hasRecon3D_b = ("ReconTrueDeltaX_3D" in branches) and ("ReconTrueDeltaY_3D" in branches)
-        self.hasRecon3DSigned_b = ("ReconTrueDeltaX_3D_Signed" in branches) and ("ReconTrueDeltaY_3D_Signed" in branches)
+        self.hasReconRowCol_b = ("ReconTrueDeltaRowX" in branches) and ("ReconTrueDeltaColY" in branches)
+        self.hasReconRowColSigned_b = self.hasReconRowCol_b
+        self.hasReconGauss2D_b = ("ReconTrueDeltaX_2D" in branches) and ("ReconTrueDeltaY_2D" in branches)
+        self.hasReconGauss2DSigned_b = ("ReconTrueDeltaX_2D_Signed" in branches) and ("ReconTrueDeltaY_2D_Signed" in branches)
         self.hasPixelDeltas_b = ("PixelTrueDeltaX" in branches) and ("PixelTrueDeltaY" in branches)
 
     def update_mode_availability(self):
@@ -1080,14 +1080,14 @@ class PyColorGUI(QtWidgets.QMainWindow):
             if cond:
                 valid_modes.append(m)
 
-        add_if(self.hasRecon2D, Mode.TwoD_Abs)
-        add_if(self.hasRecon2DSigned, Mode.TwoD_Signed)
-        add_if(self.hasRecon3D, Mode.ThreeD_Abs)
-        add_if(self.hasRecon3DSigned, Mode.ThreeD_Signed)
-        add_if(self.hasRecon2D and self.hasPixelDeltas, Mode.TwoD_vs_Pixel)
-        add_if(self.hasRecon3D and self.hasPixelDeltas, Mode.ThreeD_vs_Pixel)
-        add_if(self.hasRecon2D and self.hasRecon3D, Mode.TwoD_vs_ThreeD)
-        add_if(self.hasRecon2D and self.hasRecon3D, Mode.TwoD3D_Combined)
+        add_if(self.hasReconRowCol, Mode.RowCol_Abs)
+        add_if(self.hasReconRowColSigned, Mode.RowCol_Signed)
+        add_if(self.hasReconGauss2D, Mode.Gauss2D_Abs)
+        add_if(self.hasReconGauss2DSigned, Mode.Gauss2D_Signed)
+        add_if(self.hasReconRowCol and self.hasPixelDeltas, Mode.RowCol_vs_Pixel)
+        add_if(self.hasReconGauss2D and self.hasPixelDeltas, Mode.Gauss2D_vs_Pixel)
+        add_if(self.hasReconRowCol and self.hasReconGauss2D, Mode.RowCol_vs_Gauss2D)
+        add_if(self.hasReconRowCol and self.hasReconGauss2D, Mode.RowCol_Gauss2D_Combined)
 
         current_mode = self.mode_combo.currentData()
         self.mode_combo.blockSignals(True)
@@ -1102,73 +1102,73 @@ class PyColorGUI(QtWidgets.QMainWindow):
 
     def rebuild_metric_combo(self):
         metrics: List[Tuple[str, int]] = []
-        if self.mode == Mode.TwoD_Abs:
+        if self.mode == Mode.RowCol_Abs:
             metrics = [
                 ("|dx|", 0),
                 ("|dy|", 1),
                 ("(|dx|+|dy|)/2", 2),
-                ("r2D = sqrt(dx^2+dy^2)", 3),
+                ("r_rc = sqrt(dx^2+dy^2)", 3),
                 ("max(|dx|,|dy|)", 4),
             ]
-        elif self.mode == Mode.TwoD_Signed:
+        elif self.mode == Mode.RowCol_Signed:
             metrics = [
                 ("dx (signed)", 0),
                 ("dy (signed)", 1),
                 ("(dx+dy)/2 (signed)", 2),
             ]
-        elif self.mode == Mode.ThreeD_Abs:
+        elif self.mode == Mode.Gauss2D_Abs:
             metrics = [
-                ("|dx_3D|", 0),
-                ("|dy_3D|", 1),
-                ("(|dx_3D|+|dy_3D|)/2", 2),
-                ("r3D = sqrt(dx_3D^2+dy_3D^2)", 3),
-                ("max(|dx_3D|,|dy_3D|)", 4),
+                ("|dx_g2d|", 0),
+                ("|dy_g2d|", 1),
+                ("(|dx_g2d|+|dy_g2d|)/2", 2),
+                ("r_g2d = sqrt(dx_g2d^2+dy_g2d^2)", 3),
+                ("max(|dx_g2d|,|dy_g2d|)", 4),
             ]
-        elif self.mode == Mode.ThreeD_Signed:
+        elif self.mode == Mode.Gauss2D_Signed:
             metrics = [
-                ("dx_3D (signed)", 0),
-                ("dy_3D (signed)", 1),
-                ("(dx_3D+dy_3D)/2 (signed)", 2),
+                ("dx_g2d (signed)", 0),
+                ("dy_g2d (signed)", 1),
+                ("(dx_g2d+dy_g2d)/2 (signed)", 2),
             ]
-        elif self.mode == Mode.TwoD_vs_Pixel:
+        elif self.mode == Mode.RowCol_vs_Pixel:
             metrics = [
-                ("|mean_2D - mean_pix|", 0),
-                ("mean_2D - mean_pix (signed)", 1),
-                ("abs(|dx|-|dx_pix|)", 2),
-                ("|dx|-|dx_pix| (signed)", 3),
-                ("abs(|dy|-|dy_pix|)", 4),
-                ("|dy|-|dy_pix| (signed)", 5),
-                ("|r2D - r_pix|", 6),
-                ("r2D - r_pix (signed)", 7),
+                ("|mean_rc - mean_pix|", 0),
+                ("mean_rc - mean_pix (signed)", 1),
+                ("abs(|dx_rc|-|dx_pix|)", 2),
+                ("|dx_rc|-|dx_pix| (signed)", 3),
+                ("abs(|dy_rc|-|dy_pix|)", 4),
+                ("|dy_rc|-|dy_pix| (signed)", 5),
+                ("|r_rc - r_pix|", 6),
+                ("r_rc - r_pix (signed)", 7),
             ]
-        elif self.mode == Mode.ThreeD_vs_Pixel:
+        elif self.mode == Mode.Gauss2D_vs_Pixel:
             metrics = [
-                ("|mean_3D - mean_pix|", 0),
-                ("mean_3D - mean_pix (signed)", 1),
-                ("abs(|dx_3D|-|dx_pix|)", 2),
-                ("|dx_3D|-|dx_pix| (signed)", 3),
-                ("abs(|dy_3D|-|dy_pix|)", 4),
-                ("|dy_3D|-|dy_pix| (signed)", 5),
-                ("|r3D - r_pix|", 6),
-                ("r3D - r_pix (signed)", 7),
+                ("|mean_g2d - mean_pix|", 0),
+                ("mean_g2d - mean_pix (signed)", 1),
+                ("abs(|dx_g2d|-|dx_pix|)", 2),
+                ("|dx_g2d|-|dx_pix| (signed)", 3),
+                ("abs(|dy_g2d|-|dy_pix|)", 4),
+                ("|dy_g2d|-|dy_pix| (signed)", 5),
+                ("|r_g2d - r_pix|", 6),
+                ("r_g2d - r_pix (signed)", 7),
             ]
-        elif self.mode == Mode.TwoD3D_Combined:
+        elif self.mode == Mode.RowCol_Gauss2D_Combined:
             metrics = [
-                ("avg(|dx|,|dy|,|dx_3D|,|dy_3D|)", 0),
-                ("avg(|dx|,|dx_3D|)", 1),
-                ("avg(|dy|,|dy_3D|)", 2),
-                ("avg(r2D,r3D)", 3),
+                ("avg(|dx|,|dy|,|dx_g2d|,|dy_g2d|)", 0),
+                ("avg(|dx|,|dx_g2d|)", 1),
+                ("avg(|dy|,|dy_g2d|)", 2),
+                ("avg(r_rc,r_g2d)", 3),
             ]
-        elif self.mode == Mode.TwoD_vs_ThreeD:
+        elif self.mode == Mode.RowCol_vs_Gauss2D:
             metrics = [
-                ("|mean_3D - mean_2D|", 0),
-                ("mean_3D - mean_2D (signed)", 1),
-                ("abs(|dx_3D|-|dx|)", 2),
-                ("|dx_3D|-|dx| (signed)", 3),
-                ("abs(|dy_3D|-|dy|)", 4),
-                ("|dy_3D|-|dy| (signed)", 5),
-                ("|r3D - r2D|", 6),
-                ("r3D - r2D (signed)", 7),
+                ("|mean_g2d - mean_rc|", 0),
+                ("mean_g2d - mean_rc (signed)", 1),
+                ("abs(|dx_g2d|-|dx_rc|)", 2),
+                ("|dx_g2d|-|dx_rc| (signed)", 3),
+                ("abs(|dy_g2d|-|dy_rc|)", 4),
+                ("|dy_g2d|-|dy_rc| (signed)", 5),
+                ("|r_g2d - r_rc|", 6),
+                ("r_g2d - r_rc (signed)", 7),
             ]
         self.metric_combo.blockSignals(True)
         self.metric_combo.clear()
@@ -1224,22 +1224,22 @@ class PyColorGUI(QtWidgets.QMainWindow):
             return False
 
     def _branches_available_for_mode_in_both(self, mode: int) -> bool:
-        if mode == Mode.TwoD_Abs:
-            return self.hasRecon2D and self.hasRecon2D_b
-        if mode == Mode.TwoD_Signed:
-            return self.hasRecon2DSigned and self.hasRecon2DSigned_b
-        if mode == Mode.ThreeD_Abs:
-            return self.hasRecon3D and self.hasRecon3D_b
-        if mode == Mode.ThreeD_Signed:
-            return self.hasRecon3DSigned and self.hasRecon3DSigned_b
-        if mode == Mode.TwoD_vs_Pixel:
-            return (self.hasRecon2D and self.hasPixelDeltas) and (self.hasRecon2D_b and self.hasPixelDeltas_b)
-        if mode == Mode.ThreeD_vs_Pixel:
-            return (self.hasRecon3D and self.hasPixelDeltas) and (self.hasRecon3D_b and self.hasPixelDeltas_b)
-        if mode == Mode.TwoD_vs_ThreeD:
-            return (self.hasRecon2D and self.hasRecon3D) and (self.hasRecon2D_b and self.hasRecon3D_b)
-        if mode == Mode.TwoD3D_Combined:
-            return (self.hasRecon2D and self.hasRecon3D) and (self.hasRecon2D_b and self.hasRecon3D_b)
+        if mode == Mode.RowCol_Abs:
+            return self.hasReconRowCol and self.hasReconRowCol_b
+        if mode == Mode.RowCol_Signed:
+            return self.hasReconRowColSigned and self.hasReconRowColSigned_b
+        if mode == Mode.Gauss2D_Abs:
+            return self.hasReconGauss2D and self.hasReconGauss2D_b
+        if mode == Mode.Gauss2D_Signed:
+            return self.hasReconGauss2DSigned and self.hasReconGauss2DSigned_b
+        if mode == Mode.RowCol_vs_Pixel:
+            return (self.hasReconRowCol and self.hasPixelDeltas) and (self.hasReconRowCol_b and self.hasPixelDeltas_b)
+        if mode == Mode.Gauss2D_vs_Pixel:
+            return (self.hasReconGauss2D and self.hasPixelDeltas) and (self.hasReconGauss2D_b and self.hasPixelDeltas_b)
+        if mode == Mode.RowCol_vs_Gauss2D:
+            return (self.hasReconRowCol and self.hasReconGauss2D) and (self.hasReconRowCol_b and self.hasReconGauss2D_b)
+        if mode == Mode.RowCol_Gauss2D_Combined:
+            return (self.hasReconRowCol and self.hasReconGauss2D) and (self.hasReconRowCol_b and self.hasReconGauss2D_b)
         return False
 
     def on_compare(self):
@@ -1273,7 +1273,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         m = self.mode
         def mm(expr: str) -> str:
             return expr + " [mm]"
-        if m == Mode.TwoD_Abs:
+        if m == Mode.RowCol_Abs:
             if metric_index == 0:
                 return mm(r"$|x_{\mathrm{rec}}-x_{\mathrm{true}}|$")
             if metric_index == 1:
@@ -1283,29 +1283,29 @@ class PyColorGUI(QtWidgets.QMainWindow):
             if metric_index == 3:
                 return mm(r"$\sqrt{(x_{\mathrm{rec}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec}}-y_{\mathrm{true}})^2}$")
             return mm(r"$\max\{|x_{\mathrm{rec}}-x_{\mathrm{true}}|,|y_{\mathrm{rec}}-y_{\mathrm{true}}|\}$")
-        if m == Mode.TwoD_Signed:
+        if m == Mode.RowCol_Signed:
             if metric_index == 0:
                 return mm(r"$x_{\mathrm{rec}}-x_{\mathrm{true}}$")
             if metric_index == 1:
                 return mm(r"$y_{\mathrm{rec}}-y_{\mathrm{true}}$")
             return mm(r"$\frac{1}{2}((x_{\mathrm{rec}}-x_{\mathrm{true}})+(y_{\mathrm{rec}}-y_{\mathrm{true}}))$")
-        if m == Mode.ThreeD_Abs:
+        if m == Mode.Gauss2D_Abs:
             if metric_index == 0:
-                return mm(r"$|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|$")
+                return mm(r"$|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|$")
             if metric_index == 1:
-                return mm(r"$|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|$")
+                return mm(r"$|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|$")
             if metric_index == 2:
-                return mm(r"$\frac{1}{2}(|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|)$")
+                return mm(r"$\frac{1}{2}(|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|)$")
             if metric_index == 3:
-                return mm(r"$\sqrt{(x_{\mathrm{rec,3D}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,3D}}-y_{\mathrm{true}})^2}$")
-            return mm(r"$\max\{|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|,|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|\}$")
-        if m == Mode.ThreeD_Signed:
+                return mm(r"$\sqrt{(x_{\mathrm{rec,g2d}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,g2d}}-y_{\mathrm{true}})^2}$")
+            return mm(r"$\max\{|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|,|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|\}$")
+        if m == Mode.Gauss2D_Signed:
             if metric_index == 0:
-                return mm(r"$x_{\mathrm{rec,3D}}-x_{\mathrm{true}}$")
+                return mm(r"$x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}$")
             if metric_index == 1:
-                return mm(r"$y_{\mathrm{rec,3D}}-y_{\mathrm{true}}$")
-            return mm(r"$\frac{1}{2}((x_{\mathrm{rec,3D}}-x_{\mathrm{true}})+(y_{\mathrm{rec,3D}}-y_{\mathrm{true}}))$")
-        if m == Mode.TwoD_vs_Pixel:
+                return mm(r"$y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}$")
+            return mm(r"$\frac{1}{2}((x_{\mathrm{rec,g2d}}-x_{\mathrm{true}})+(y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}))$")
+        if m == Mode.RowCol_vs_Pixel:
             if metric_index == 0:
                 return mm(r"$\left|\frac{1}{2}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|y_{\mathrm{rec}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{px}}-x_{\mathrm{true}}|+|y_{\mathrm{px}}-y_{\mathrm{true}}|)\right|$")
             if metric_index == 1:
@@ -1321,58 +1321,58 @@ class PyColorGUI(QtWidgets.QMainWindow):
             if metric_index == 6:
                 return mm(r"$\left|\sqrt{(x_{\mathrm{rec}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{px}}-x_{\mathrm{true}})^2+(y_{\mathrm{px}}-y_{\mathrm{true}})^2}\right|$")
             return mm(r"$\sqrt{(x_{\mathrm{rec}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{px}}-x_{\mathrm{true}})^2+(y_{\mathrm{px}}-y_{\mathrm{true}})^2}$")
-        if m == Mode.ThreeD_vs_Pixel:
+        if m == Mode.Gauss2D_vs_Pixel:
             if metric_index == 0:
-                return mm(r"$\left|\frac{1}{2}(|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{px}}-x_{\mathrm{true}}|+|y_{\mathrm{px}}-y_{\mathrm{true}}|)\right|$")
+                return mm(r"$\left|\frac{1}{2}(|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{px}}-x_{\mathrm{true}}|+|y_{\mathrm{px}}-y_{\mathrm{true}}|)\right|$")
             if metric_index == 1:
-                return mm(r"$\frac{1}{2}(|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{px}}-x_{\mathrm{true}}|+|y_{\mathrm{px}}-y_{\mathrm{true}}|)$")
+                return mm(r"$\frac{1}{2}(|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{px}}-x_{\mathrm{true}}|+|y_{\mathrm{px}}-y_{\mathrm{true}}|)$")
             if metric_index == 2:
-                return mm(r"$\left||x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|-|x_{\mathrm{px}}-x_{\mathrm{true}}|\right|$")
+                return mm(r"$\left||x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|-|x_{\mathrm{px}}-x_{\mathrm{true}}|\right|$")
             if metric_index == 3:
-                return mm(r"$|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|-|x_{\mathrm{px}}-x_{\mathrm{true}}|$")
+                return mm(r"$|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|-|x_{\mathrm{px}}-x_{\mathrm{true}}|$")
             if metric_index == 4:
-                return mm(r"$\left||y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|-|y_{\mathrm{px}}-y_{\mathrm{true}}|\right|$")
+                return mm(r"$\left||y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|-|y_{\mathrm{px}}-y_{\mathrm{true}}|\right|$")
             if metric_index == 5:
-                return mm(r"$|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|-|y_{\mathrm{px}}-y_{\mathrm{true}}|$")
+                return mm(r"$|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|-|y_{\mathrm{px}}-y_{\mathrm{true}}|$")
             if metric_index == 6:
-                return mm(r"$\left|\sqrt{(x_{\mathrm{rec,3D}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,3D}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{px}}-x_{\mathrm{true}})^2+(y_{\mathrm{px}}-y_{\mathrm{true}})^2}\right|$")
-            return mm(r"$\sqrt{(x_{\mathrm{rec,3D}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,3D}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{px}}-x_{\mathrm{true}})^2+(y_{\mathrm{px}}-y_{\mathrm{true}})^2}$")
-        if m == Mode.TwoD3D_Combined:
+                return mm(r"$\left|\sqrt{(x_{\mathrm{rec,g2d}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,g2d}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{px}}-x_{\mathrm{true}})^2+(y_{\mathrm{px}}-y_{\mathrm{true}})^2}\right|$")
+            return mm(r"$\sqrt{(x_{\mathrm{rec,g2d}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,g2d}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{px}}-x_{\mathrm{true}})^2+(y_{\mathrm{px}}-y_{\mathrm{true}})^2}$")
+        if m == Mode.RowCol_Gauss2D_Combined:
             if metric_index == 0:
-                return mm(r"$\frac{1}{4}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|y_{\mathrm{rec}}-y_{\mathrm{true}}|+|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|)$")
+                return mm(r"$\frac{1}{4}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|y_{\mathrm{rec}}-y_{\mathrm{true}}|+|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|)$")
             if metric_index == 1:
-                return mm(r"$\frac{1}{2}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|)$")
+                return mm(r"$\frac{1}{2}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|)$")
             if metric_index == 2:
-                return mm(r"$\frac{1}{2}(|y_{\mathrm{rec}}-y_{\mathrm{true}}|+|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|)$")
-            return mm(r"$\frac{1}{2}(r_{2D}+r_{3D})$")
-        if m == Mode.TwoD_vs_ThreeD:
+                return mm(r"$\frac{1}{2}(|y_{\mathrm{rec}}-y_{\mathrm{true}}|+|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|)$")
+            return mm(r"$\frac{1}{2}(r_{\mathrm{rc}}+r_{\mathrm{g2d}})$")
+        if m == Mode.RowCol_vs_Gauss2D:
             if metric_index == 0:
-                return mm(r"$\left|\frac{1}{2}(|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|y_{\mathrm{rec}}-y_{\mathrm{true}}|)\right|$")
+                return mm(r"$\left|\frac{1}{2}(|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|y_{\mathrm{rec}}-y_{\mathrm{true}}|)\right|$")
             if metric_index == 1:
-                return mm(r"$\frac{1}{2}(|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|y_{\mathrm{rec}}-y_{\mathrm{true}}|)$")
+                return mm(r"$\frac{1}{2}(|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|+|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|)-\frac{1}{2}(|x_{\mathrm{rec}}-x_{\mathrm{true}}|+|y_{\mathrm{rec}}-y_{\mathrm{true}}|)$")
             if metric_index == 2:
-                return mm(r"$\left||x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|-|x_{\mathrm{rec}}-x_{\mathrm{true}}|\right|$")
+                return mm(r"$\left||x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|-|x_{\mathrm{rec}}-x_{\mathrm{true}}|\right|$")
             if metric_index == 3:
-                return mm(r"$|x_{\mathrm{rec,3D}}-x_{\mathrm{true}}|-|x_{\mathrm{rec}}-x_{\mathrm{true}}|$")
+                return mm(r"$|x_{\mathrm{rec,g2d}}-x_{\mathrm{true}}|-|x_{\mathrm{rec}}-x_{\mathrm{true}}|$")
             if metric_index == 4:
-                return mm(r"$\left||y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|-|y_{\mathrm{rec}}-y_{\mathrm{true}}|\right|$")
+                return mm(r"$\left||y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|-|y_{\mathrm{rec}}-y_{\mathrm{true}}|\right|$")
             if metric_index == 5:
-                return mm(r"$|y_{\mathrm{rec,3D}}-y_{\mathrm{true}}|-|y_{\mathrm{rec}}-y_{\mathrm{true}}|$")
+                return mm(r"$|y_{\mathrm{rec,g2d}}-y_{\mathrm{true}}|-|y_{\mathrm{rec}}-y_{\mathrm{true}}|$")
             if metric_index == 6:
-                return mm(r"$\left|\sqrt{(x_{\mathrm{rec,3D}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,3D}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{rec}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec}}-y_{\mathrm{true}})^2}\right|$")
-            return mm(r"$\sqrt{(x_{\mathrm{rec,3D}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,3D}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{rec}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec}}-y_{\mathrm{true}})^2}$")
+                return mm(r"$\left|\sqrt{(x_{\mathrm{rec,g2d}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,g2d}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{rec}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec}}-y_{\mathrm{true}})^2}\right|$")
+            return mm(r"$\sqrt{(x_{\mathrm{rec,g2d}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec,g2d}}-y_{\mathrm{true}})^2}-\sqrt{(x_{\mathrm{rec}}-x_{\mathrm{true}})^2+(y_{\mathrm{rec}}-y_{\mathrm{true}})^2}$")
         return mm("metric")
 
     # ------------- Color helpers -------------
     def _is_signed_metric(self, sel: int) -> bool:
         m = self.mode
-        if m in (Mode.TwoD_Signed, Mode.ThreeD_Signed):
+        if m in (Mode.RowCol_Signed, Mode.Gauss2D_Signed):
             return True
-        if m == Mode.TwoD_vs_Pixel and (sel % 2 == 1):
+        if m == Mode.RowCol_vs_Pixel and (sel % 2 == 1):
             return True
-        if m == Mode.ThreeD_vs_Pixel and (sel % 2 == 1):
+        if m == Mode.Gauss2D_vs_Pixel and (sel % 2 == 1):
             return True
-        if m == Mode.TwoD_vs_ThreeD and (sel % 2 == 1):
+        if m == Mode.RowCol_vs_Gauss2D and (sel % 2 == 1):
             return True
         return False
 
@@ -1589,21 +1589,21 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 pass
             return
 
-        need2D = (self.mode in (Mode.TwoD_Abs, Mode.TwoD_Signed, Mode.TwoD_vs_Pixel, Mode.TwoD3D_Combined, Mode.TwoD_vs_ThreeD))
-        need2DS = (self.mode == Mode.TwoD_Signed)
-        need3D = (self.mode in (Mode.ThreeD_Abs, Mode.ThreeD_Signed, Mode.ThreeD_vs_Pixel, Mode.TwoD3D_Combined, Mode.TwoD_vs_ThreeD))
-        need3DS = (self.mode == Mode.ThreeD_Signed)
-        needPix = (self.mode in (Mode.TwoD_vs_Pixel, Mode.ThreeD_vs_Pixel))
+        needRowCol = (self.mode in (Mode.RowCol_Abs, Mode.RowCol_Signed, Mode.RowCol_vs_Pixel, Mode.RowCol_Gauss2D_Combined, Mode.RowCol_vs_Gauss2D))
+        needRowColS = (self.mode == Mode.RowCol_Signed)
+        needGauss2D = (self.mode in (Mode.Gauss2D_Abs, Mode.Gauss2D_Signed, Mode.Gauss2D_vs_Pixel, Mode.RowCol_Gauss2D_Combined, Mode.RowCol_vs_Gauss2D))
+        needGauss2DS = (self.mode == Mode.Gauss2D_Signed)
+        needPix = (self.mode in (Mode.RowCol_vs_Pixel, Mode.Gauss2D_vs_Pixel))
 
         branches = ["TrueX", "TrueY", "isPixelHit"]
-        if need2D:
+        if needRowCol:
+            branches += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
+        if needRowColS:
+            branches += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
+        if needGauss2D:
             branches += ["ReconTrueDeltaX_2D", "ReconTrueDeltaY_2D"]
-        if need2DS:
-            branches += ["ReconTrueDeltaX_2D", "ReconTrueDeltaY_2D"]
-        if need3D:
-            branches += ["ReconTrueDeltaX_3D", "ReconTrueDeltaY_3D"]
-        if need3DS:
-            branches += ["ReconTrueDeltaX_3D_Signed", "ReconTrueDeltaY_3D_Signed"]
+        if needGauss2DS:
+            branches += ["ReconTrueDeltaX_2D_Signed", "ReconTrueDeltaY_2D_Signed"]
         if needPix:
             branches += ["PixelTrueDeltaX", "PixelTrueDeltaY"]
 
@@ -1649,9 +1649,9 @@ class PyColorGUI(QtWidgets.QMainWindow):
                     return np.zeros_like(x_hit, dtype=float)
                 return v
 
-            if self.mode == Mode.TwoD_Abs:
-                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
-                dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
+            if self.mode == Mode.RowCol_Abs:
+                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX"))
+                dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
                 if sel == 0:
                     base_z = dtx2
                 elif sel == 1:
@@ -1662,13 +1662,13 @@ class PyColorGUI(QtWidgets.QMainWindow):
                     base_z = np.sqrt(dtx2 * dtx2 + dty2 * dty2)
                 else:
                     base_z = np.maximum(dtx2, dty2)
-            elif self.mode == Mode.TwoD_Signed:
-                dtx2s = arr_or_zero("ReconTrueDeltaX_2D")
-                dty2s = arr_or_zero("ReconTrueDeltaY_2D")
+            elif self.mode == Mode.RowCol_Signed:
+                dtx2s = arr_or_zero("ReconTrueDeltaRowX")
+                dty2s = arr_or_zero("ReconTrueDeltaColY")
                 base_z = dtx2s if sel == 0 else (dty2s if sel == 1 else 0.5 * (dtx2s + dty2s))
-            elif self.mode == Mode.ThreeD_Abs:
-                dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D"))
-                dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+            elif self.mode == Mode.Gauss2D_Abs:
+                dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
+                dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
                 if sel == 0:
                     base_z = dtx3
                 elif sel == 1:
@@ -1679,13 +1679,13 @@ class PyColorGUI(QtWidgets.QMainWindow):
                     base_z = np.sqrt(dtx3 * dtx3 + dty3 * dty3)
                 else:
                     base_z = np.maximum(dtx3, dty3)
-            elif self.mode == Mode.ThreeD_Signed:
-                dtx3s = arr_or_zero("ReconTrueDeltaX_3D_Signed")
-                dty3s = arr_or_zero("ReconTrueDeltaY_3D_Signed")
+            elif self.mode == Mode.Gauss2D_Signed:
+                dtx3s = arr_or_zero("ReconTrueDeltaX_2D_Signed")
+                dty3s = arr_or_zero("ReconTrueDeltaY_2D_Signed")
                 base_z = dtx3s if sel == 0 else (dty3s if sel == 1 else 0.5 * (dtx3s + dty3s))
-            elif self.mode == Mode.TwoD_vs_Pixel:
-                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
-                dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
+            elif self.mode == Mode.RowCol_vs_Pixel:
+                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX"))
+                dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
                 dpx = np.abs(arr_or_zero("PixelTrueDeltaX"))
                 dpy = np.abs(arr_or_zero("PixelTrueDeltaY"))
                 m2 = 0.5 * (dtx2 + dty2)
@@ -1710,9 +1710,9 @@ class PyColorGUI(QtWidgets.QMainWindow):
                     r2 = np.sqrt(dtx2 * dtx2 + dty2 * dty2)
                     rp = np.sqrt(dpx * dpx + dpy * dpy)
                     base_z = (r2 - rp)
-            elif self.mode == Mode.ThreeD_vs_Pixel:
-                dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D"))
-                dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+            elif self.mode == Mode.Gauss2D_vs_Pixel:
+                dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
+                dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
                 dpx = np.abs(arr_or_zero("PixelTrueDeltaX"))
                 dpy = np.abs(arr_or_zero("PixelTrueDeltaY"))
                 m3 = 0.5 * (dtx3 + dty3)
@@ -1736,11 +1736,11 @@ class PyColorGUI(QtWidgets.QMainWindow):
                         base_z = np.abs(r3 - rp)
                     else:
                         base_z = (r3 - rp)
-            elif self.mode == Mode.TwoD_vs_ThreeD:
-                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
-                dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
-                dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D"))
-                dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+            elif self.mode == Mode.RowCol_vs_Gauss2D:
+                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX"))
+                dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+                dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
+                dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
                 m2 = 0.5 * (dtx2 + dty2)
                 m3 = 0.5 * (dtx3 + dty3)
                 if sel == 0:
@@ -1762,11 +1762,11 @@ class PyColorGUI(QtWidgets.QMainWindow):
                         base_z = np.abs(r3 - r2)
                     else:
                         base_z = (r3 - r2)
-            else:  # Mode.TwoD3D_Combined
-                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX"))
-                dty2 = np.abs(arr_or_zero("ReconTrueDeltaY"))
-                dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D"))
-                dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+            else:  # Mode.RowCol_Gauss2D_Combined
+                dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX"))
+                dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+                dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_2D"))
+                dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
                 if sel == 0:
                     base_z = 0.25 * (dtx2 + dty2 + dtx3 + dty3)
                 elif sel == 1:
@@ -1853,9 +1853,9 @@ class PyColorGUI(QtWidgets.QMainWindow):
             v = arrs.get(name)
             return v[mask] if v is not None else None
 
-        if self.mode == Mode.TwoD_Abs:
-            dtx2 = np.abs(safe_get("ReconTrueDeltaX_2D"))
-            dty2 = np.abs(safe_get("ReconTrueDeltaY_2D"))
+        if self.mode == Mode.RowCol_Abs:
+            dtx2 = np.abs(safe_get("ReconTrueDeltaRowX"))
+            dty2 = np.abs(safe_get("ReconTrueDeltaColY"))
             if sel == 0:
                 zvals = dtx2
             elif sel == 1:
@@ -1866,18 +1866,18 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 zvals = np.sqrt(dtx2 * dtx2 + dty2 * dty2)
             else:
                 zvals = np.maximum(dtx2, dty2)
-        elif self.mode == Mode.TwoD_Signed:
-            dtx2s = safe_get("ReconTrueDeltaX_2D")
-            dty2s = safe_get("ReconTrueDeltaY_2D")
+        elif self.mode == Mode.RowCol_Signed:
+            dtx2s = safe_get("ReconTrueDeltaRowX")
+            dty2s = safe_get("ReconTrueDeltaColY")
             if sel == 0:
                 zvals = dtx2s
             elif sel == 1:
                 zvals = dty2s
             else:
                 zvals = 0.5 * (dtx2s + dty2s)
-        elif self.mode == Mode.ThreeD_Abs:
-            dtx3 = np.abs(safe_get("ReconTrueDeltaX_3D"))
-            dty3 = np.abs(safe_get("ReconTrueDeltaY_3D"))
+        elif self.mode == Mode.Gauss2D_Abs:
+            dtx3 = np.abs(safe_get("ReconTrueDeltaX_2D"))
+            dty3 = np.abs(safe_get("ReconTrueDeltaY_2D"))
             if sel == 0:
                 zvals = dtx3
             elif sel == 1:
@@ -1888,18 +1888,18 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 zvals = np.sqrt(dtx3 * dtx3 + dty3 * dty3)
             else:
                 zvals = np.maximum(dtx3, dty3)
-        elif self.mode == Mode.ThreeD_Signed:
-            dtx3s = safe_get("ReconTrueDeltaX_3D_Signed")
-            dty3s = safe_get("ReconTrueDeltaY_3D_Signed")
+        elif self.mode == Mode.Gauss2D_Signed:
+            dtx3s = safe_get("ReconTrueDeltaX_2D_Signed")
+            dty3s = safe_get("ReconTrueDeltaY_2D_Signed")
             if sel == 0:
                 zvals = dtx3s
             elif sel == 1:
                 zvals = dty3s
             else:
                 zvals = 0.5 * (dtx3s + dty3s)
-        elif self.mode == Mode.TwoD_vs_Pixel:
-            dtx2 = np.abs(safe_get("ReconTrueDeltaX_2D"))
-            dty2 = np.abs(safe_get("ReconTrueDeltaY_2D"))
+        elif self.mode == Mode.RowCol_vs_Pixel:
+            dtx2 = np.abs(safe_get("ReconTrueDeltaRowX"))
+            dty2 = np.abs(safe_get("ReconTrueDeltaColY"))
             dpx = np.abs(safe_get("PixelTrueDeltaX"))
             dpy = np.abs(safe_get("PixelTrueDeltaY"))
             m2 = 0.5 * (dtx2 + dty2)
@@ -1923,9 +1923,9 @@ class PyColorGUI(QtWidgets.QMainWindow):
                     zvals = np.abs(r2 - rp)
                 else:
                     zvals = (r2 - rp)
-        elif self.mode == Mode.ThreeD_vs_Pixel:
-            dtx3 = np.abs(safe_get("ReconTrueDeltaX_3D"))
-            dty3 = np.abs(safe_get("ReconTrueDeltaY_3D"))
+        elif self.mode == Mode.Gauss2D_vs_Pixel:
+            dtx3 = np.abs(safe_get("ReconTrueDeltaX_2D"))
+            dty3 = np.abs(safe_get("ReconTrueDeltaY_2D"))
             dpx = np.abs(safe_get("PixelTrueDeltaX"))
             dpy = np.abs(safe_get("PixelTrueDeltaY"))
             m3 = 0.5 * (dtx3 + dty3)
@@ -1949,11 +1949,11 @@ class PyColorGUI(QtWidgets.QMainWindow):
                     zvals = np.abs(r3 - rp)
                 else:
                     zvals = (r3 - rp)
-        elif self.mode == Mode.TwoD3D_Combined:
-            dtx2 = np.abs(safe_get("ReconTrueDeltaX_2D"))
-            dty2 = np.abs(safe_get("ReconTrueDeltaY_2D"))
-            dtx3 = np.abs(safe_get("ReconTrueDeltaX_3D"))
-            dty3 = np.abs(safe_get("ReconTrueDeltaY_3D"))
+        elif self.mode == Mode.RowCol_Gauss2D_Combined:
+            dtx2 = np.abs(safe_get("ReconTrueDeltaRowX"))
+            dty2 = np.abs(safe_get("ReconTrueDeltaColY"))
+            dtx3 = np.abs(safe_get("ReconTrueDeltaX_2D"))
+            dty3 = np.abs(safe_get("ReconTrueDeltaY_2D"))
             if sel == 0:
                 zvals = 0.25 * (dtx2 + dty2 + dtx3 + dty3)
             elif sel == 1:
@@ -1964,11 +1964,11 @@ class PyColorGUI(QtWidgets.QMainWindow):
                 r2 = np.sqrt(dtx2 * dtx2 + dty2 * dty2)
                 r3 = np.sqrt(dtx3 * dtx3 + dty3 * dty3)
                 zvals = 0.5 * (r2 + r3)
-        elif self.mode == Mode.TwoD_vs_ThreeD:
-            dtx2 = np.abs(safe_get("ReconTrueDeltaX"))
-            dty2 = np.abs(safe_get("ReconTrueDeltaY"))
-            dtx3 = np.abs(safe_get("ReconTrueDeltaX_3D"))
-            dty3 = np.abs(safe_get("ReconTrueDeltaY_3D"))
+        elif self.mode == Mode.RowCol_vs_Gauss2D:
+            dtx2 = np.abs(safe_get("ReconTrueDeltaRowX"))
+            dty2 = np.abs(safe_get("ReconTrueDeltaColY"))
+            dtx3 = np.abs(safe_get("ReconTrueDeltaX_2D"))
+            dty3 = np.abs(safe_get("ReconTrueDeltaY_2D"))
             m2 = 0.5 * (dtx2 + dty2)
             m3 = 0.5 * (dtx3 + dty3)
             if sel == 0:
@@ -2281,7 +2281,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         A_row = float(max(1e-18, float(np.nanmax(q_row)) - B0_row))
         A_col = float(max(1e-18, float(np.nanmax(q_col)) - B0_col))
 
-        # 3D-like parameters from moments
+        # 2D Gaussian parameters from moments
         xs_grid = np.array([x_px + di*pitch for di in di_vals], dtype=float)
         ys_grid = np.array([y_px + dj*pitch for dj in dj_vals], dtype=float)
         Xg, Yg = np.meshgrid(xs_grid, ys_grid, indexing='ij')
@@ -2301,7 +2301,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
             mux = mu_row; muy = mu_col; sigx = sig_row; sigy = sig_col
         A = float(max(1e-18, float(np.nanmax(Fi)) - B0))
 
-        # Dialog with tabs for 2D/3D visuals
+        # Dialog with tabs for row/col and 2D grid visuals
         dlg = QtWidgets.QDialog(self)
         try:
             title = f"Event {evt_idx} fits"
@@ -2385,23 +2385,23 @@ class PyColorGUI(QtWidgets.QMainWindow):
         can2d.draw()
         tabs.addTab(w2d, "2D")
 
-        # 3D tab
-        w3d = QtWidgets.QWidget()
-        l3d = QtWidgets.QVBoxLayout(w3d)
-        fig3d = Figure(figsize=(10, 8.0), dpi=100)
-        can3d = FigureCanvas(fig3d)
-        l3d.addWidget(can3d)
-        ax11 = fig3d.add_subplot(2, 2, 1)
-        ax12 = fig3d.add_subplot(2, 2, 2)
-        ax21 = fig3d.add_subplot(2, 2, 3)
-        ax22 = fig3d.add_subplot(2, 2, 4)
+        # 2D grid tab
+        w_grid = QtWidgets.QWidget()
+        l_grid = QtWidgets.QVBoxLayout(w_grid)
+        fig_grid = Figure(figsize=(10, 8.0), dpi=100)
+        can_grid = FigureCanvas(fig_grid)
+        l_grid.addWidget(can_grid)
+        ax11 = fig_grid.add_subplot(2, 2, 1)
+        ax12 = fig_grid.add_subplot(2, 2, 2)
+        ax21 = fig_grid.add_subplot(2, 2, 3)
+        ax22 = fig_grid.add_subplot(2, 2, 4)
 
         xLo = x_px - (R + 0.5) * pitch
         xHi = x_px + (R + 0.5) * pitch
         yLo = y_px - (R + 0.5) * pitch
         yHi = y_px + (R + 0.5) * pitch
         im = ax11.imshow(Fi.T, origin='lower', extent=[xLo, xHi, yLo, yHi], aspect='equal', cmap='viridis')
-        fig3d.colorbar(im, ax=ax11, fraction=0.046, pad=0.04)
+        fig_grid.colorbar(im, ax=ax11, fraction=0.046, pad=0.04)
         try:
             ax11.set_title("Data with fit contours; F_i", color=(color_hex or None))
         except Exception:
@@ -2428,7 +2428,7 @@ class PyColorGUI(QtWidgets.QMainWindow):
         Zres = Fi - Zm
         rmax = float(np.max(np.abs(Zres))) if np.isfinite(Zres).any() else 1.0
         im2 = ax12.imshow(Zres.T, origin='lower', extent=[xLo, xHi, yLo, yHi], aspect='equal', cmap='coolwarm', vmin=-rmax, vmax=rmax)
-        fig3d.colorbar(im2, ax=ax12, fraction=0.046, pad=0.04)
+        fig_grid.colorbar(im2, ax=ax12, fraction=0.046, pad=0.04)
         try:
             ax12.set_title("Residuals (data - model)", color=(color_hex or None))
         except Exception:
@@ -2460,9 +2460,9 @@ class PyColorGUI(QtWidgets.QMainWindow):
         ax22.axvline(muy, color='r', ls='--', lw=1.0)
         ax22.legend(loc='upper right', fontsize=8)
 
-        fig3d.tight_layout()
-        can3d.draw()
-        tabs.addTab(w3d, "3D")
+        fig_grid.tight_layout()
+        can_grid.draw()
+        tabs.addTab(w_grid, "2D Grid")
 
         # Keep a reference so it persists
         try:
@@ -2546,20 +2546,20 @@ class CompareDialog(QtWidgets.QDialog):
         self.cbarA = self.cbarB = self.cbarD = None
 
     def _build_branches(self, mode: int) -> list:
-        need2D = (mode in (Mode.TwoD_Abs, Mode.TwoD_Signed, Mode.TwoD_vs_Pixel, Mode.TwoD3D_Combined, Mode.TwoD_vs_ThreeD))
-        need2DS = (mode == Mode.TwoD_Signed)
-        need3D = (mode in (Mode.ThreeD_Abs, Mode.ThreeD_Signed, Mode.ThreeD_vs_Pixel, Mode.TwoD3D_Combined, Mode.TwoD_vs_ThreeD))
-        need3DS = (mode == Mode.ThreeD_Signed)
-        needPix = (mode in (Mode.TwoD_vs_Pixel, Mode.ThreeD_vs_Pixel))
+        needRowCol = (mode in (Mode.RowCol_Abs, Mode.RowCol_Signed, Mode.RowCol_vs_Pixel, Mode.RowCol_Gauss2D_Combined, Mode.RowCol_vs_Gauss2D))
+        needRowColS = (mode == Mode.RowCol_Signed)
+        needGauss2D = (mode in (Mode.Gauss2D_Abs, Mode.Gauss2D_Signed, Mode.Gauss2D_vs_Pixel, Mode.RowCol_Gauss2D_Combined, Mode.RowCol_vs_Gauss2D))
+        needGauss2DS = (mode == Mode.Gauss2D_Signed)
+        needPix = (mode in (Mode.RowCol_vs_Pixel, Mode.Gauss2D_vs_Pixel))
         br = ["TrueX", "TrueY", "isPixelHit"]
-        if need2D:
+        if needRowCol:
+            br += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
+        if needRowColS:
+            br += ["ReconTrueDeltaRowX", "ReconTrueDeltaColY"]
+        if needGauss2D:
             br += ["ReconTrueDeltaX_2D", "ReconTrueDeltaY_2D"]
-        if need2DS:
-            br += ["ReconTrueDeltaX_2D", "ReconTrueDeltaY_2D"]
-        if need3D:
-            br += ["ReconTrueDeltaX_3D", "ReconTrueDeltaY_3D"]
-        if need3DS:
-            br += ["ReconTrueDeltaX_3D_Signed", "ReconTrueDeltaY_3D_Signed"]
+        if needGauss2DS:
+            br += ["ReconTrueDeltaX_2D_Signed", "ReconTrueDeltaY_2D_Signed"]
         if needPix:
             br += ["PixelTrueDeltaX", "PixelTrueDeltaY"]
         return br
@@ -2570,28 +2570,28 @@ class CompareDialog(QtWidgets.QDialog):
             if v is None:
                 return np.zeros_like(x_hit, dtype=float)
             return v
-        if mode == Mode.TwoD_Abs:
-            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
+        if mode == Mode.RowCol_Abs:
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
             if sel == 0: return dtx2
             if sel == 1: return dty2
             if sel == 2: return 0.5 * (dtx2 + dty2)
             if sel == 3: return np.sqrt(dtx2 * dtx2 + dty2 * dty2)
             return np.maximum(dtx2, dty2)
-        if mode == Mode.TwoD_Signed:
-            dtx2s = arr_or_zero("ReconTrueDeltaX_2D"); dty2s = arr_or_zero("ReconTrueDeltaY_2D")
+        if mode == Mode.RowCol_Signed:
+            dtx2s = arr_or_zero("ReconTrueDeltaRowX"); dty2s = arr_or_zero("ReconTrueDeltaColY")
             return dtx2s if sel == 0 else (dty2s if sel == 1 else 0.5 * (dtx2s + dty2s))
-        if mode == Mode.ThreeD_Abs:
-            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+        if mode == Mode.Gauss2D_Abs:
+            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
             if sel == 0: return dtx3
             if sel == 1: return dty3
             if sel == 2: return 0.5 * (dtx3 + dty3)
             if sel == 3: return np.sqrt(dtx3 * dtx3 + dty3 * dty3)
             return np.maximum(dtx3, dty3)
-        if mode == Mode.ThreeD_Signed:
-            dtx3s = arr_or_zero("ReconTrueDeltaX_3D_Signed"); dty3s = arr_or_zero("ReconTrueDeltaY_3D_Signed")
+        if mode == Mode.Gauss2D_Signed:
+            dtx3s = arr_or_zero("ReconTrueDeltaX_2D_Signed"); dty3s = arr_or_zero("ReconTrueDeltaY_2D_Signed")
             return dtx3s if sel == 0 else (dty3s if sel == 1 else 0.5 * (dtx3s + dty3s))
-        if mode == Mode.TwoD_vs_Pixel:
-            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
+        if mode == Mode.RowCol_vs_Pixel:
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
             dpx = np.abs(arr_or_zero("PixelTrueDeltaX")); dpy = np.abs(arr_or_zero("PixelTrueDeltaY"))
             m2 = 0.5 * (dtx2 + dty2); mp = 0.5 * (dpx + dpy)
             if sel == 0: return np.abs(m2 - mp)
@@ -2602,8 +2602,8 @@ class CompareDialog(QtWidgets.QDialog):
             if sel == 5: return (dty2 - dpy)
             r2 = np.sqrt(dtx2 * dtx2 + dty2 * dty2); rp = np.sqrt(dpx * dpx + dpy * dpy)
             return np.abs(r2 - rp) if sel == 6 else (r2 - rp)
-        if mode == Mode.ThreeD_vs_Pixel:
-            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+        if mode == Mode.Gauss2D_vs_Pixel:
+            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
             dpx = np.abs(arr_or_zero("PixelTrueDeltaX")); dpy = np.abs(arr_or_zero("PixelTrueDeltaY"))
             m3 = 0.5 * (dtx3 + dty3); mp = 0.5 * (dpx + dpy)
             if sel == 0: return np.abs(m3 - mp)
@@ -2614,17 +2614,17 @@ class CompareDialog(QtWidgets.QDialog):
             if sel == 5: return (dty3 - dpy)
             r3 = np.sqrt(dtx3 * dtx3 + dty3 * dty3); rp = np.sqrt(dpx * dpx + dpy * dpy)
             return np.abs(r3 - rp) if sel == 6 else (r3 - rp)
-        if mode == Mode.TwoD3D_Combined:
-            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
-            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+        if mode == Mode.RowCol_Gauss2D_Combined:
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
             if sel == 0: return 0.25 * (dtx2 + dty2 + dtx3 + dty3)
             if sel == 1: return 0.5 * (dtx2 + dtx3)
             if sel == 2: return 0.5 * (dty2 + dty3)
             r2 = np.sqrt(dtx2 * dtx2 + dty2 * dty2); r3 = np.sqrt(dtx3 * dtx3 + dty3 * dty3)
             return 0.5 * (r2 + r3)
-        if mode == Mode.TwoD_vs_ThreeD:
-            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaY"))
-            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_3D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_3D"))
+        if mode == Mode.RowCol_vs_Gauss2D:
+            dtx2 = np.abs(arr_or_zero("ReconTrueDeltaRowX")); dty2 = np.abs(arr_or_zero("ReconTrueDeltaColY"))
+            dtx3 = np.abs(arr_or_zero("ReconTrueDeltaX_2D")); dty3 = np.abs(arr_or_zero("ReconTrueDeltaY_2D"))
             m2 = 0.5 * (dtx2 + dty2); m3 = 0.5 * (dtx3 + dty3)
             if sel == 0: return np.abs(m3 - m2)
             if sel == 1: return (m3 - m2)
