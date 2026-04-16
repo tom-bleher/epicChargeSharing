@@ -1,141 +1,131 @@
-# chargeSharingRecon Plugin
+# AC-LGAD Charge Sharing EICrecon Plugin
 
-EICrecon plugin that applies charge-sharing reconstruction to silicon tracker hits. Reads `edm4hep::SimTrackerHit` collections, applies a charge diffusion model, and outputs reconstructed `edm4eic::TrackerHit` positions with improved spatial resolution.
+Out-of-tree `EICrecon_MY` plugin that provides AC-LGAD charge-sharing reconstruction for the B0 tracker and Luminosity Spectrometer. Reads `edm4hep::SimTrackerHit` collections, applies a physics-motivated AC-LGAD charge-sharing model (LogA / LinA), reconstructs sub-pixel positions by Gaussian fitting, and emits `edm4eic::TrackerHit` and `edm4eic::Measurement2D` collections.
 
-## Requirements
+This plugin is structured to follow the upstream `eic/EICrecon` conventions (`algorithms::Algorithm`, `JOmniFactory`, `plugin_*` CMake helpers, per-detector plugin libraries). The novel physics lives in the header-only library under `../core/` and is shared with the standalone Geant4 validation harness.
 
-- EIC software stack (eic-shell)
-- EICrecon with DD4hep, EDM4hep, EDM4eic support
+## Naming
+
+| Legacy symbol | New name |
+|---------------|----------|
+| `ChargeSharingReconstructor` | `LGADChargeSharingRecon` |
+| `ChargeSharingReconFactory` | `LGADChargeSharingRecon_factory` |
+| `ChargeSharingConfig` | `LGADChargeSharingReconConfig` |
+| `ChargeSharingClustering` | `LGADGaussianClustering` |
+| `ChargeSharingClustering_factory` | `LGADGaussianClustering_factory` |
+| `ChargeSharingClusteringConfig` | `LGADGaussianClusteringConfig` |
+| `ChargeSharingMonitor` | `LGADChargeSharingMonitor` |
+
+- Plugin-visible symbols: `eicrecon::` namespace.
+- Novel physics: `chargesharing::{core,fit}::` namespaces inside `core/include/chargesharing/{core,fit}/*.hh` (compiled static library `chargesharing::core`; shared with standalone harness).
+- All plugin-side headers use `.h`; the compiled `chargesharing_core` library keeps `.hh` for its public headers.
+
+## Per-detector plugins and collections
+
+| Plugin library | Input collection | Output collections |
+|----------------|------------------|--------------------|
+| `B0TRK_lgad_chargesharing.so` | `B0TrackerHits` | `B0TrackerChargeSharingHits`, `B0TrackerChargeSharingHitAssociations`, `B0TrackerClusterHits` |
+| `LumiSpec_lgad_chargesharing.so` | `LumiSpecTrackerHits` | `LumiSpecTrackerChargeSharingHits`, `LumiSpecTrackerChargeSharingHitAssociations` |
+| `LGAD_chargesharing_benchmark.so` | (reads the above) | histograms + TTree in `-Phistsfile=...` |
+
+LumiSpec does not currently get clustering; add a `LGADGaussianClustering_factory` registration in `src/detectors/LumiSpec/` when segmentation is ready.
 
 ## Build
 
-Build inside the eic-shell environment:
-
 ```bash
-# Enter eic-shell
 ./eic-shell
-
-# Configure and build
 cmake -S eicrecon -B build/eicrecon \
       -DCMAKE_INSTALL_PREFIX=$(pwd)/eicrecon/install
 cmake --build build/eicrecon --target install
 ```
 
-The plugin will be installed to `eicrecon/install/plugins/chargeSharingRecon.so`.
+Plugins are installed to `eicrecon/install/plugins/`.
 
-## Usage
-
-### Set Environment
+## Run
 
 ```bash
 export EICrecon_MY=$(pwd)/eicrecon/install
+eicrecon \
+    -Pplugins=B0TRK_lgad_chargesharing,LumiSpec_lgad_chargesharing,LGAD_chargesharing_benchmark \
+    -Phistsfile=lgad_hists.root \
+    -Ppodio:output_file=reco_output.edm4hep.root \
+    sim_output.edm4hep.root
 ```
 
-### Run with EICrecon
+## Core configuration
 
-Basic usage with default settings:
+The user-facing config has been trimmed to what is not derivable from DD4hep. Everything else (pixel pitch, pad size, grid offset, detector size/thickness, cell counts) is fetched from the `CartesianGridXY` / `CartesianGridXZ` segmentation in `init()`.
 
-```bash
-eicrecon -Pplugins=chargeSharingRecon \
-         -Ppodio:output_file=output.edm4hep.root \
-         input.edm4hep.root
-```
-
-### Full Reconstruction Chain Example
-
-```bash
-# 1. Run simulation with ddsim
-source $EPIC_PATH/bin/thisepic.sh
-ddsim --compactFile $DETECTOR_PATH/epic_craterlake.xml \
-      --numberOfEvents 1000 \
-      --enableGun \
-      --gun.particle "e-" \
-      --gun.energy "10*GeV" \
-      --outputFile sim_output.edm4hep.root \
-      --runType batch
-
-# 2. Run reconstruction with charge sharing plugin
-export EICrecon_MY=$(pwd)/eicrecon/install
-eicrecon -Pplugins=chargeSharingRecon \
-         -Ppodio:output_file=reco_output.edm4hep.root \
-         -Pjana:nevents=1000 \
-         sim_output.edm4hep.root
-```
-
-## Configuration Parameters
+### `LGADChargeSharingRecon`
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `readout` | string | - | DD4hep readout name for segmentation lookup |
-| `minEDep` | float | 0 | Energy deposition threshold (GeV) |
-| `neighborhoodRadius` | int | 2 | Neighborhood half-width (2 = 5×5 grid) |
-| `pixelSpacingMM` | float | 0.5 | Center-to-center pixel pitch (mm) |
-| `pixelSizeMM` | float | 0.15 | Pixel pad size (mm) |
-| `ionizationEnergyEV` | float | 3.6 | Energy per e-h pair in silicon (eV) |
-| `amplificationFactor` | float | 20.0 | AC-LGAD gain factor (typical range 8-25) |
-| `d0Micron` | float | 1.0 | Transverse charge cloud size d0 (µm) |
-| `noiseEnabled` | bool | true | Enable per-pixel gain variation and electronic noise |
-| `noiseElectronCount` | float | 500 | Electronic noise RMS (electrons) |
-| `emitNeighborDiagnostics` | bool | false | Output diagnostic neighbor data |
+| `signalModel` | int | 0 (LogA) | 0 = LogA, 1 = LinA |
+| `activePixelMode` | int | 0 | 0=Neighborhood, 1=RowCol, 2=RowCol3x3, 3=ChargeBlock2x2, 4=ChargeBlock3x3 |
+| `reconMethod` | int | 2 | 0=Centroid, 1=Gaussian1D, 2=Gaussian2D |
+| `readout` | string | - | DD4hep readout name |
+| `minEDepGeV` | float | 0 | Energy threshold |
+| `neighborhoodRadius` | int | 2 | Half-width (2 = 5x5 grid) |
+| `d0Micron` | double | 1.0 | LogA d0 |
+| `linearBetaPerMicron` | double | 0 | LinA beta (0 = auto from pitch) |
+| `ionizationEnergyEV` | double | 3.6 | e/h pair energy |
+| `amplificationFactor` | double | 20 | AC-LGAD gain |
+| `noiseEnabled` | bool | true | Noise injection |
+| `noiseElectronCount` | double | 500 | Electronic noise RMS |
 
-Geometry values are auto-populated from DD4hep `CartesianGridXY` segmentation when available.
+### `LGADGaussianClustering`
 
-## Input/Output Collections
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `readout` | string | - | DD4hep readout name |
+| `deltaT` | double | 1.0 ns | Time gate for union-find merge |
+| `reconMethod` | int | 2 | 0=Centroid, 1=Gaussian1D, 2=Gaussian2D |
+| `fitErrorPercent` | double | 5.0 | Fit uncertainty as % of max charge |
 
-| Direction | Collection Name | Type |
-|-----------|-----------------|------|
-| Input | `SiTrackerHits` (configurable) | `edm4hep::SimTrackerHit` |
-| Output | `ChargeSharingTrackerHits` | `edm4eic::TrackerHit` |
+## Pipeline
 
-## Supported Detectors
-
-The plugin registers factories for AC-LGAD detector subsystems:
-
-| Detector | Input Collection | Output Collection |
-|----------|-----------------|-------------------|
-| B0 Tracker | `B0TrackerHits` | `B0ChargeSharingTrackerHits` |
-| Lumi Spectrometer | `LumiSpecTrackerHits` | `LumiSpecTrackerChargeSharingHits` |
+```mermaid
+flowchart LR
+  subgraph B0TRK
+    b0sim[B0TrackerHits] --> b0recon[LGADChargeSharingRecon]
+    b0recon --> b0hits[B0TrackerChargeSharingHits]
+    b0recon --> b0assoc[...HitAssociations]
+    b0hits --> b0clus[LGADGaussianClustering]
+    b0clus --> b0meas[B0TrackerClusterHits]
+  end
+  subgraph LumiSpec
+    lumisim[LumiSpecTrackerHits] --> lumirecon[LGADChargeSharingRecon]
+    lumirecon --> lumihits[LumiSpecTrackerChargeSharingHits]
+    lumirecon --> lumiassoc[...HitAssociations]
+  end
+```
 
 ## Algorithm
 
-For each SimTrackerHit, the plugin:
+For each `SimTrackerHit`, `LGADChargeSharingRecon`:
 
-1. Identifies the nearest pixel from DD4hep segmentation geometry
-2. Computes charge fractions across a pixel neighborhood using an analytical pad-view-angle model (LogA or LinA, based on [Tornago et al.](https://doi.org/10.1016/j.nima.2021.165319))
-3. Optionally applies per-pixel gain variation and electronic noise
-4. Reconstructs the hit position via charge-weighted centroid or Gaussian fitting
-5. Outputs `TrackerHit` with improved spatial resolution
+1. Decodes the cell ID through the DD4hep segmentation decoder to locate the center pad.
+2. Computes per-pad charge fractions across a `(2*neighborhoodRadius+1)^2` neighborhood using the configured physics model (LogA logarithmic attenuation or LinA linear attenuation). See [Tornago et al.](https://doi.org/10.1016/j.nima.2021.165319).
+3. Optionally applies per-pixel gain variation and electronic noise.
+4. Reconstructs the sub-pad hit position (charge-weighted centroid, 1D Gaussian on row+column, or full 2D Gaussian).
+5. Emits a `TrackerHit` with the reconstructed position in global coordinates plus a diagonal position-error covariance, and an `MCRecoTrackerHitAssociation` linking back to the truth `SimTrackerHit`.
 
-## Monitoring Output
+`LGADGaussianClustering` then runs union-find over DD4hep neighbours within `deltaT` and emits `Measurement2D` per cluster, with cluster position extracted by the same Gaussian fit used by the reconstructor.
 
-The `ChargeSharingMonitor` processor compares reconstructed positions to truth and produces validation output.
+## Benchmark output
 
-### Histograms (per detector)
+Loading the `LGAD_chargesharing_benchmark` plugin produces validation histograms in the shared `-Phistsfile=...` TFile, under the `LGADChargeSharing/` directory:
 
 | Histogram | Description |
 |-----------|-------------|
-| `hResidualX` | X position residual (recon - truth) |
-| `hResidualY` | Y position residual (recon - truth) |
-| `hResidualR` | Radial residual |
-| `hRecoVsTrueX/Y` | Correlation between reco and true positions |
-| `hTrueXY` | 2D true hit positions |
-| `hRecoXY` | 2D reconstructed positions |
-| `hResidualVsTrueX/Y` | Residual vs position (for bias detection) |
+| `hResidualX` / `hResidualY` / `hResidualR` | Position residuals (reco - truth) |
+| `hRecoVsTrueX` / `hRecoVsTrueY` | Reco vs truth correlation |
+| `hTrueXY` / `hRecoXY` | 2D scatter plots |
+| `hResidualVsTrueX` / `hResidualVsTrueY` | Residual vs position (bias) |
 | `hEnergyDeposit` | Energy deposit distribution |
 
-### TTree Output
+A TTree named `hits` is also produced with per-hit `trueX/Y/Z`, `reconX/Y/Z`, `residualX/Y/R`, `edep`, `time`, `cellID`, `eventNumber`, `detectorIndex` branches.
 
-A TTree named `hits` is created with per-hit data matching the main simulation format:
+## Relationship to the standalone Geant4 harness
 
-| Branch | Type | Description |
-|--------|------|-------------|
-| `trueX/Y/Z` | double | True hit position (mm) |
-| `reconX/Y/Z` | double | Reconstructed position (mm) |
-| `residualX/Y/R` | double | Position residuals (mm) |
-| `edep` | double | Energy deposit (GeV) |
-| `time` | double | Hit time |
-| `cellID` | uint64 | Cell identifier |
-| `eventNumber` | int | Event number |
-| `detectorIndex` | int | Detector index (0=B0, 1=Lumi) |
-
-Output is written to the standard EICrecon output file (`eicrecon.root`)
+`../epicChargeSharing.cc`, `../include/`, `../src/` form a standalone Geant4 **validation harness**, not an ePIC simulator. ePIC production simulation uses `npsim`/`ddsim`. The standalone harness runs the exact same `core/` physics on parametric pad grids so that plugin behaviour can be cross-checked against a simplified environment.

@@ -35,9 +35,10 @@ ddsim --compactFile "$COMPACT" \
       --outputFile "$OUTDIR/lumi_sim.edm4hep.root"
 
 echo ""
-echo "=== Step 3: EICrecon with chargeSharingRecon ==="
+echo "=== Step 3: EICrecon with LumiSpec_lgad_chargesharing ==="
 export EICrecon_MY="$PLUGIN_DIR"
-eicrecon -Pplugins=chargeSharingRecon \
+eicrecon -Pplugins=LumiSpec_lgad_chargesharing,LGAD_chargesharing_benchmark \
+         -Pjana:plugin_path="${PLUGIN_DIR}/plugins" \
          -Pnthreads=1 \
          -Pjana:nevents="$NEVENTS" \
          -Ppodio:output_file="$OUTDIR/lumi_reco.edm4hep.root" \

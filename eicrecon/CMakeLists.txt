@@ -1,62 +1,50 @@
-cmake_minimum_required(VERSION 3.16)
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+#
+# Out-of-tree EICrecon plugin suite for AC-LGAD charge-sharing reconstruction
+# on the B0 tracker and Luminosity Spectrometer. Models the upstream
+# eic/EICrecon layout: a shared algorithm OBJECT library plus small
+# per-detector plugin libraries that register their factories via InitPlugin().
 
-project(chargeSharingRecon LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.24)
 
-# Add JANA cmake directory to module path (eic-shell installs to non-standard location)
+project(epic_lgad_chargesharing LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 list(APPEND CMAKE_PREFIX_PATH "$ENV{JANA_HOME}/lib/JANA/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-# Find EICrecon which brings in JANA, EDM4hep, EDM4eic, DD4hep, etc.
 find_package(EICrecon REQUIRED)
-find_package(DD4hep REQUIRED COMPONENTS DDCore)
+find_package(DD4hep   REQUIRED COMPONENTS DDCore DDRec)
+find_package(ROOT     REQUIRED COMPONENTS Core MathCore Minuit Minuit2 Hist Tree Matrix)
+find_package(Acts     REQUIRED COMPONENTS Core)
+find_package(EDM4HEP  REQUIRED)
+find_package(EDM4EIC  REQUIRED)
+find_package(podio    REQUIRED)
+find_package(fmt      REQUIRED)
 
-# Find ROOT for Gaussian fitting and monitoring histograms/trees
-find_package(ROOT REQUIRED COMPONENTS Core MathCore Minuit2 Hist Tree)
-find_package(Acts REQUIRED COMPONENTS Core)
+include(EICreconPluginShims)
 
-add_library(chargeSharingRecon SHARED
-    src/ChargeSharingReconPlugin.cc
-    src/ChargeSharingReconstructor.cc
-    src/ChargeSharingClustering.cc
-    src/ChargeSharingMonitor.cc
-)
+# Shared physics library (source of truth lives under ../core).
+if(NOT TARGET chargesharing::core)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../core
+                     ${CMAKE_CURRENT_BINARY_DIR}/core)
+endif()
 
-target_include_directories(chargeSharingRecon
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../core
-        ${EICrecon_INCLUDE_DIR}/EICrecon
-        # ROOT include dirs propagate automatically via ROOT::* target links
-)
+add_subdirectory(src/algorithms)
+add_subdirectory(src/detectors/B0TRK)
+add_subdirectory(src/detectors/LumiSpec)
+add_subdirectory(src/benchmarks/lgad_chargesharing)
 
-target_link_libraries(chargeSharingRecon
-    PRIVATE
-        ${JANA_LIBRARIES}
-        EDM4HEP::edm4hep
-        EDM4EIC::edm4eic
-        DD4hep::DDCore
-        ROOT::Core
-        ROOT::MathCore
-        ROOT::Minuit2
-        ROOT::Hist
-        ROOT::Tree
-        Acts::Core
-        fmt::fmt
-)
-
-# EICrecon headers need JANA version macros for podio datamodel glue selection
-target_compile_definitions(chargeSharingRecon PRIVATE
-    JANA_VERSION_MAJOR=${JANA_VERSION_MAJOR}
-    JANA_VERSION_MINOR=${JANA_VERSION_MINOR}
-    JANA_VERSION_PATCH=${JANA_VERSION_PATCH}
-)
-
-set_target_properties(chargeSharingRecon PROPERTIES
-    CXX_STANDARD 20
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-    PREFIX ""  # JANA plugins don't use 'lib' prefix
-)
-
-install(TARGETS chargeSharingRecon
-        LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/plugins)
-
+option(BUILD_TESTING "Build Catch2 unit tests" ON)
+if(BUILD_TESTING)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/algorithms/CMakeLists.txt")
+        enable_testing()
+        add_subdirectory(src/tests/algorithms)
+    else()
+        message(STATUS "BUILD_TESTING=ON but src/tests/algorithms/ not present; skipping.")
+    endif()
+endif()
