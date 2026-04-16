@@ -55,6 +55,10 @@ cmake_install.cmake
 *~
 *.mdcpaper/
 
+# EIC container symlink directories
+fieldmaps/
+calibrations/
+
 # macOS metadata
 .DS_Store
 
