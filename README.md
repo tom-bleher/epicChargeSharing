@@ -2,28 +2,60 @@
 
 [![License: LGPL-3.0-or-later](https://img.shields.io/badge/License-LGPL--3.0--or--later-blue.svg)](LICENSE)
 
-GEANT4-based simulation and reconstruction plugin for studying charge sharing position reconstruction in AC-LGAD detectors.
+AC-LGAD charge-sharing reconstruction for the ePIC detector. This repository ships two coordinated artifacts:
 
-## Overview
+1. A **production EICrecon plugin suite** (`eicrecon/`) that plugs into the ePIC reconstruction pipeline and provides `SimTrackerHit -> TrackerHit (+ MC association) -> Measurement2D` for the **B0 tracker** and **Luminosity Spectrometer**. This is what you load with `eicrecon -Pplugins=...`.
+2. A **standalone Geant4 validation harness** (`epicChargeSharing.cc` + `src/` + `include/`) that exercises the shared physics library on a parametric pad grid, independent of DD4hep geometry. This is *not* an ePIC simulator; production simulation is done with `ddsim` / `npsim` on the ePIC compact XML.
 
-epicChargeSharing simulates charge sharing in AC-LGAD sensors to provide reconstructed position.
+Both paths consume the same header-only physics core under `core/` (LogA / LinA charge-sharing models, Gaussian position fitting, noise injection). That way the plugin and the harness are guaranteed to stay numerically consistent.
 
-### Key Features
+## EICrecon plugin (production path)
 
-- **Analytical charge sharing models**: LogA (logarithmic attenuation) and LinA (linear attenuation)
-- **Noise simulation**: Per-pixel gain variations and additive electronic noise
-- **Position reconstruction**: Built-in 1D and 2D Gaussian fitting
-- **Multiple active pixel modes**: Neighborhood, row/column, and charge block configurations
-- **Multithreaded execution**: Automatic ROOT file merging across threads
-- **EIC integration**: Optional EDM4hep output and EICrecon plugin
+The plugin suite installs three `.so` libraries under `eicrecon/install/plugins/`:
 
-### Output
+| Plugin | Role |
+|--------|------|
+| `B0TRK_lgad_chargesharing.so` | B0 tracker: charge sharing + Gaussian clustering |
+| `LumiSpec_lgad_chargesharing.so` | LumiSpec tracker: charge sharing only |
+| `LGAD_chargesharing_benchmark.so` | Truth-residual histograms + TTree into `-Phistsfile=...` |
 
-The simulation produces `epicChargeSharing.root` containing:
-- `Hits` TTree with per-event hit data, charge fractions, and reconstructed positions
-- Typed run metadata in `Hits->GetUserInfo()` (no string parsing required)
+### Build
 
-## Quick Start
+```bash
+./eic-shell
+cmake -S eicrecon -B build/eicrecon \
+      -DCMAKE_INSTALL_PREFIX=$(pwd)/eicrecon/install
+cmake --build build/eicrecon --target install
+```
+
+### Run
+
+```bash
+export EICrecon_MY=$(pwd)/eicrecon/install
+eicrecon \
+    -Pplugins=B0TRK_lgad_chargesharing,LumiSpec_lgad_chargesharing,LGAD_chargesharing_benchmark \
+    -Pjana:plugin_path=$EICrecon_MY/plugins \
+    -Phistsfile=lgad_hists.root \
+    -Ppodio:output_file=reco_output.edm4hep.root \
+    sim_output.edm4hep.root
+```
+
+See [eicrecon/README.md](eicrecon/README.md) for the full per-parameter configuration table, per-detector output collection names, algorithm description, and benchmark TTree schema.
+
+### Inputs and outputs
+
+| Detector | Input `SimTrackerHit` | Output `TrackerHit` | Output `Measurement2D` |
+|----------|------------------------|---------------------|-------------------------|
+| B0TRK | `B0TrackerHits` | `B0TrackerChargeSharingHits` (+ `B0TrackerChargeSharingHitAssociations`) | `B0TrackerClusterHits` |
+| LumiSpec | `LumiSpecTrackerHits` | `LumiSpecTrackerChargeSharingHits` (+ `LumiSpecTrackerChargeSharingHitAssociations`) | *(not registered; add in `src/detectors/LumiSpec/` when segmentation is ready)* |
+
+## Standalone validation harness
+
+The standalone harness is a Geant4 application that drives the same `core/` physics on a parametric rectangular pad grid so you can cross-check plugin outputs against a simplified reference.
+
+Important: The standalone harness is **not** an ePIC simulator. For production simulation, use `ddsim` / `npsim` on `eic/epic`.
+
+### Quick start
 
 ```bash
 git clone https://github.com/tom-bleher/epicChargeSharing.git
@@ -34,177 +66,82 @@ make -j$(nproc)
 ./epicChargeSharing -m ../macros/run.mac
 ```
 
-## Requirements
+### Output
+
+The harness produces `epicChargeSharing.root` containing:
+- `Hits` TTree with per-event hit data, charge fractions, and reconstructed positions
+- Typed run metadata in `Hits->GetUserInfo()` (no string parsing required)
+
+EDM4hep output in the standalone harness is **off by default** (`-DWITH_EDM4HEP=OFF`). It can be re-enabled for cross-format validation, but the resulting CellIDs use a simplified `system:8|layer:4|x:16|y:16` encoding that is **not** wire-compatible with `ddsim` output. Never feed harness EDM4hep files into `eicrecon` with this plugin loaded -- use the plugin directly on `ddsim` output as described above.
+
+### Requirements
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| GEANT4 | 11.0+ | Monte Carlo simulation |
+| GEANT4 | 11.0+ | Harness Monte Carlo |
 | ROOT | 6.20+ | Data output and analysis |
-| Eigen3 | 3.3+ | Matrix operations for fitting |
-| CMake | 3.9+ | Build system |
+| Eigen3 | 3.3+ | Fit matrix operations |
+| CMake | 3.24+ | Build system |
 | C++ Compiler | C++20 | GCC 10+, Clang 10+, or MSVC 2019+ |
 
-Optional: EDM4hep for EIC integration (`-DWITH_EDM4HEP=ON`)
+EDM4hep / podio are only needed when `-DWITH_EDM4HEP=ON`.
 
-## Usage
-
-```bash
-# Batch mode (recommended)
-./epicChargeSharing -m macros/run.mac
-
-# Multithreaded (4 threads)
-./epicChargeSharing -m macros/run.mac -t 4
-
-# Interactive mode with visualization
-./epicChargeSharing
-```
-
-## Configuration
-
-Edit `include/Config.hh` to customize:
-- Detector geometry (pixel size, pitch, neighborhood radius)
-- Physics parameters (gain, ionization energy, hit size)
-- Charge sharing model (LogA, LinA)
-- Noise model (gain spread, electronic noise)
-- Fitting options (1D/2D Gaussian, uncertainty models)
-
-See the [documentation](https://tom-bleher.github.io/epicChargeSharing/) for details.
-
-## EDM4hep Output (Standalone)
-
-The standalone simulation can optionally write EDM4hep output files for validation and standalone analysis:
-
-```bash
-cmake -DWITH_EDM4HEP=ON -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc)
-./epicChargeSharing -m ../macros/run.mac
-# Produces: epicChargeSharing.edm4hep.root
-```
-
-**Important**: This output uses a simplified CellID encoding (`system:8|layer:4|x:16|y:16`) that is **not** identical to the DD4hep `BitFieldCoder` encoding used by `npsim`/`ddsim` in the EIC production pipeline. The standalone EDM4hep output is suitable for:
-
-- Validating charge sharing algorithms independently
-- Comparing standalone results with ROOT TTree output
-- Prototyping analysis workflows
-
-**For the EIC pipeline**, use the standard workflow instead:
-1. **Simulation**: `npsim` (which produces DD4hep-compatible CellIDs)
-2. **Reconstruction**: `eicrecon` with the `chargeSharingRecon` plugin (see below)
-
-The standalone EDM4hep output should not be fed directly into `eicrecon` without accounting for the different CellID encoding.
-
-## EICrecon Plugin
-
-The `chargeSharingRecon` plugin integrates charge-sharing reconstruction into the EIC software stack. It processes `edm4hep::SimTrackerHit` collections and outputs reconstructed `edm4eic::TrackerHit` positions with improved spatial resolution.
-
-### Supported Detectors
-
-| Detector | Input Collection | Output Collection |
-|----------|-----------------|-------------------|
-| B0 Tracker | `B0TrackerHits` | `B0ChargeSharingTrackerHits` |
-| Lumi Spectrometer | `LumiSpecTrackerHits` | `LumiSpecTrackerChargeSharingHits` |
-
-### Plugin Features
-
-- **DD4hep integration**: Automatic geometry extraction from `CartesianGridXY`/`CartesianGridXZ` segmentations
-- **Charge sharing models**: LogA (logarithmic) and LinA (linear) attenuation models
-- **Position reconstruction**: Charge-weighted centroid and 1D/2D Gaussian fitting
-- **Noise simulation**: Per-pixel gain variation and electronic noise injection
-- **Monitoring output**: Residual histograms, correlation plots, and per-hit TTree for validation
-
-### Quick Start
-
-```bash
-# Build inside eic-shell
-cmake -S eicrecon -B build/eicrecon -DCMAKE_INSTALL_PREFIX=$(pwd)/eicrecon/install
-cmake --build build/eicrecon --target install
-
-# Run reconstruction
-export EICrecon_MY=$(pwd)/eicrecon/install
-eicrecon -Pplugins=chargeSharingRecon -Ppodio:output_file=output.edm4hep.root input.edm4hep.root
-```
-
-See [eicrecon/README.md](eicrecon/README.md) for full configuration options and usage details.
-
-## Documentation
-
-Full documentation is published at <https://tom-bleher.github.io/epicChargeSharing/> and lives in the sibling [`epicChargeSharingDocs`](https://github.com/tom-bleher/epicChargeSharingDocs) repository.
-
-- [Getting Started](https://tom-bleher.github.io/epicChargeSharing/getting-started/installation/) — install dependencies and build the simulation
-- [User Guide](https://tom-bleher.github.io/epicChargeSharing/user-guide/running/) — running, configuration, output format, and analysis
-- [Physics](https://tom-bleher.github.io/epicChargeSharing/physics/charge-sharing-models/) — LogA / LinA models, noise, position reconstruction
-- [EICrecon Plugin](https://tom-bleher.github.io/epicChargeSharing/plugin/overview/) — building and running the `chargeSharingRecon` plugin
-- [Reference](https://tom-bleher.github.io/epicChargeSharing/reference/architecture/) — code architecture, build options, CI, glossary
-
-## Project Structure
+## Repository layout
 
 ```
 epicChargeSharing/
-├── include/          # Header files
-├── src/              # Source files
-├── core/             # Header-only physics core (shared with the plugin)
-├── macros/           # GEANT4 macro scripts
-├── eicrecon/         # EICrecon plugin for EIC integration
-├── farm/             # Python analysis and parameter sweep tools
-├── proc/             # ROOT macros and GUI for visualization
-└── tests/            # Unit tests (build with -DBUILD_TESTING=ON)
+├── core/                     # Header-only physics + Gaussian fitter (shared)
+│   └── include/chargesharing/{core,fit}/*.hh
+├── eicrecon/                 # Production EICrecon plugin suite
+│   ├── src/algorithms/       # LGADChargeSharingRecon + LGADGaussianClustering
+│   ├── src/factories/        # JOmniFactory wrappers
+│   ├── src/detectors/        # B0TRK/ + LumiSpec/ plugin libraries
+│   ├── src/benchmarks/       # LGADChargeSharingMonitor JEventProcessor
+│   └── src/tests/            # Catch2 unit tests
+├── include/ + src/ + epicChargeSharing.cc   # Standalone Geant4 validation harness
+├── macros/                   # Geant4 macros for the harness
+├── farm/                     # Python sweep tooling
+└── proc/                     # ROOT-based analysis GUIs
 ```
 
-User documentation lives in the sibling [`epicChargeSharingDocs`](https://github.com/tom-bleher/epicChargeSharingDocs) repository.
+## Documentation
 
-## Citation
-
-If you use this software, please cite it using the metadata in [CITATION.cff](CITATION.cff). GitHub provides formatted citations via the "Cite this repository" button.
-
-Reference: M. Tornago et al., [Nucl. Instrum. Meth. A 1003 (2021) 165319](https://doi.org/10.1016/j.nima.2021.165319)
+- [eicrecon/README.md](eicrecon/README.md) — plugin configuration, collection names, algorithm details
+- [Full docs](https://tom-bleher.github.io/epicChargeSharing/) — physics, CI, reference
+- Reference: M. Tornago et al., [Nucl. Instrum. Meth. A 1003 (2021) 165319](https://doi.org/10.1016/j.nima.2021.165319)
 
 ## Development
 
 ```bash
-# Run unit tests
-cmake -DBUILD_TESTING=ON ..
-make test_charge_sharing_core && ctest
+# Unit tests for the plugin (inside eic-shell)
+cmake -S eicrecon -B build/eicrecon -DBUILD_TESTING=ON
+cmake --build build/eicrecon
+ctest --test-dir build/eicrecon --output-on-failure
 
-# Static analysis (requires clang-tidy via brew install llvm)
+# Unit tests for the core physics (host)
+cmake -S . -B build -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+
+# Static analysis / formatting
 make tidy
-
-# Auto-format code
 make format
 ```
 
-Python analysis scripts require packages listed in `requirements.txt` (`pip install -r requirements.txt`).
+Python analysis scripts require the packages in `requirements.txt` (`pip install -r requirements.txt`).
 
 ## Contributing
 
-Contributions are welcome. Please follow these guidelines:
+- Follow the code style: PascalCase classes, camelCase methods, `m_snake_case` members, `snake_case` locals, `SCREAMING_SNAKE_CASE` constants.
+- Every source file must carry an SPDX `LGPL-3.0-or-later` header.
+- `make format` before committing; `make format-check` is enforced in CI.
 
-### Code Style
+Workflow: fork, branch, run `make tidy` + `make format-check`, run the relevant test suite, open a PR against `main`.
 
-- C++ naming: PascalCase classes, camelCase methods, `m_snake_case` members, `snake_case` locals, `SCREAMING_SNAKE_CASE` constants
-- All source files must carry an SPDX `LGPL-3.0-or-later` header
-- Run `make format` before submitting; `make format-check` is enforced in CI
+## Citation
 
-### Building and Testing
-
-```bash
-# Standalone simulation
-cmake --preset default && cmake --build build
-
-# Unit tests
-cmake --preset debug && ctest --test-dir build-debug --output-on-failure
-
-# EICrecon plugin (requires eic-shell)
-cmake -S eicrecon -B build/eicrecon -DCMAKE_INSTALL_PREFIX=$(pwd)/eicrecon/install
-cmake --build build/eicrecon --target install
-```
-
-### Workflow
-
-1. Fork the repository and create a feature branch
-2. Run `make tidy` and `make format-check` to check code quality
-3. Run unit tests (see above)
-4. Open a pull request against `main`
+Metadata lives in [CITATION.cff](CITATION.cff). GitHub renders a formatted citation via the "Cite this repository" button.
 
 ## Contact
 
-Email at [tombleher@tauex.tau.ac.il](mailto:tombleher@tauex.tau.ac.il) or open a [GitHub Issue](https://github.com/tom-bleher/epicChargeSharing/issues).
+Email [tombleher@tauex.tau.ac.il](mailto:tombleher@tauex.tau.ac.il) or open a [GitHub Issue](https://github.com/tom-bleher/epicChargeSharing/issues).
