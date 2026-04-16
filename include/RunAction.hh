@@ -170,21 +170,21 @@ private:
     std::vector<G4double> fNeighborhoodChargeFractionsCol;
     std::vector<G4double> fNeighborhoodChargeFractionsBlock;
     // Neighborhood charges
-    std::vector<G4double> fNeighborhoodCharge;
-    std::vector<G4double> fNeighborhoodChargeNew;
-    std::vector<G4double> fNeighborhoodChargeFinal;
+    std::vector<G4double> fNeighborhoodChargeInd;
+    std::vector<G4double> fNeighborhoodChargeAmp;
+    std::vector<G4double> fNeighborhoodChargeMeas;
     // Row-mode charges
-    std::vector<G4double> fNeighborhoodChargeRow;
-    std::vector<G4double> fNeighborhoodChargeNewRow;
-    std::vector<G4double> fNeighborhoodChargeFinalRow;
+    std::vector<G4double> fNeighborhoodChargeIndRow;
+    std::vector<G4double> fNeighborhoodChargeAmpRow;
+    std::vector<G4double> fNeighborhoodChargeMeasRow;
     // Col-mode charges
-    std::vector<G4double> fNeighborhoodChargeCol;
-    std::vector<G4double> fNeighborhoodChargeNewCol;
-    std::vector<G4double> fNeighborhoodChargeFinalCol;
+    std::vector<G4double> fNeighborhoodChargeIndCol;
+    std::vector<G4double> fNeighborhoodChargeAmpCol;
+    std::vector<G4double> fNeighborhoodChargeMeasCol;
     // Block-mode charges
-    std::vector<G4double> fNeighborhoodChargeBlock;
-    std::vector<G4double> fNeighborhoodChargeNewBlock;
-    std::vector<G4double> fNeighborhoodChargeFinalBlock;
+    std::vector<G4double> fNeighborhoodChargeIndBlock;
+    std::vector<G4double> fNeighborhoodChargeAmpBlock;
+    std::vector<G4double> fNeighborhoodChargeMeasBlock;
     // Common
     std::vector<G4double> fNeighborhoodDistance;
     std::vector<G4double> fNeighborhoodAlpha;
@@ -221,21 +221,21 @@ private:
     std::vector<G4double> fFullFiCol;
     std::vector<G4double> fFullFiBlock;
     // Full grid neighborhood charges
-    std::vector<G4double> fFullQi;
-    std::vector<G4double> fFullQn;
-    std::vector<G4double> fFullQf;
+    std::vector<G4double> fFullQ_ind;
+    std::vector<G4double> fFullQ_amp;
+    std::vector<G4double> fFullQ_meas;
     // Full grid row-mode charges
-    std::vector<G4double> fFullQiRow;
-    std::vector<G4double> fFullQnRow;
-    std::vector<G4double> fFullQfRow;
+    std::vector<G4double> fFullQ_indRow;
+    std::vector<G4double> fFullQ_ampRow;
+    std::vector<G4double> fFullQ_measRow;
     // Full grid col-mode charges
-    std::vector<G4double> fFullQiCol;
-    std::vector<G4double> fFullQnCol;
-    std::vector<G4double> fFullQfCol;
+    std::vector<G4double> fFullQ_indCol;
+    std::vector<G4double> fFullQ_ampCol;
+    std::vector<G4double> fFullQ_measCol;
     // Full grid block-mode charges
-    std::vector<G4double> fFullQiBlock;
-    std::vector<G4double> fFullQnBlock;
-    std::vector<G4double> fFullQfBlock;
+    std::vector<G4double> fFullQ_indBlock;
+    std::vector<G4double> fFullQ_ampBlock;
+    std::vector<G4double> fFullQ_measBlock;
     // Full grid geometry
     std::vector<G4double> fFullDistance;
     std::vector<G4double> fFullAlpha;

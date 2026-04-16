@@ -118,8 +118,8 @@ public:
     struct SingleHitResult {
         std::array<double, 3> nearestPixelCenterMM{};
         std::array<double, 3> reconstructedPositionMM{};
-        int pixelIndexI{0};
-        int pixelIndexJ{0};
+        int pixelRowIndex{0};
+        int pixelColIndex{0};
         double totalCollectedChargeC{0.0};
         std::vector<NeighborData> neighbors;
 

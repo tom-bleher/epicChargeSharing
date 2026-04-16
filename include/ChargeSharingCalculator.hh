@@ -76,7 +76,7 @@ public:
         G4double pixCenterY{std::numeric_limits<G4double>::quiet_NaN()};
     };
 
-    enum class ChargeMode { Patch, FullGrid };
+    enum class ChargeMode { Neighborhood, FullGrid };
 
     template <typename T>
     struct Grid2D {
@@ -174,20 +174,20 @@ public:
             signalFractionBlock.Resize(rows, cols, 0.0);
             // Neighborhood-based charges
             chargeInduced.Resize(rows, cols, 0.0);
-            chargeWithNoise.Resize(rows, cols, 0.0);
-            chargeFinal.Resize(rows, cols, 0.0);
+            chargeAmp.Resize(rows, cols, 0.0);
+            chargeMeas.Resize(rows, cols, 0.0);
             // Row-based charges
             chargeInducedRow.Resize(rows, cols, 0.0);
-            chargeWithNoiseRow.Resize(rows, cols, 0.0);
-            chargeFinalRow.Resize(rows, cols, 0.0);
+            chargeAmpRow.Resize(rows, cols, 0.0);
+            chargeMeasRow.Resize(rows, cols, 0.0);
             // Col-based charges
             chargeInducedCol.Resize(rows, cols, 0.0);
-            chargeWithNoiseCol.Resize(rows, cols, 0.0);
-            chargeFinalCol.Resize(rows, cols, 0.0);
+            chargeAmpCol.Resize(rows, cols, 0.0);
+            chargeMeasCol.Resize(rows, cols, 0.0);
             // Block-based charges
             chargeInducedBlock.Resize(rows, cols, 0.0);
-            chargeWithNoiseBlock.Resize(rows, cols, 0.0);
-            chargeFinalBlock.Resize(rows, cols, 0.0);
+            chargeAmpBlock.Resize(rows, cols, 0.0);
+            chargeMeasBlock.Resize(rows, cols, 0.0);
         }
 
         virtual void Clear() {
@@ -196,17 +196,17 @@ public:
             signalFractionCol.Clear();
             signalFractionBlock.Clear();
             chargeInduced.Clear();
-            chargeWithNoise.Clear();
-            chargeFinal.Clear();
+            chargeAmp.Clear();
+            chargeMeas.Clear();
             chargeInducedRow.Clear();
-            chargeWithNoiseRow.Clear();
-            chargeFinalRow.Clear();
+            chargeAmpRow.Clear();
+            chargeMeasRow.Clear();
             chargeInducedCol.Clear();
-            chargeWithNoiseCol.Clear();
-            chargeFinalCol.Clear();
+            chargeAmpCol.Clear();
+            chargeMeasCol.Clear();
             chargeInducedBlock.Clear();
-            chargeWithNoiseBlock.Clear();
-            chargeFinalBlock.Clear();
+            chargeAmpBlock.Clear();
+            chargeMeasBlock.Clear();
         }
 
         virtual void Zero() {
@@ -220,28 +220,28 @@ public:
                 signalFractionBlock.Fill(0.0);
             if (!chargeInduced.Empty())
                 chargeInduced.Fill(0.0);
-            if (!chargeWithNoise.Empty())
-                chargeWithNoise.Fill(0.0);
-            if (!chargeFinal.Empty())
-                chargeFinal.Fill(0.0);
+            if (!chargeAmp.Empty())
+                chargeAmp.Fill(0.0);
+            if (!chargeMeas.Empty())
+                chargeMeas.Fill(0.0);
             if (!chargeInducedRow.Empty())
                 chargeInducedRow.Fill(0.0);
-            if (!chargeWithNoiseRow.Empty())
-                chargeWithNoiseRow.Fill(0.0);
-            if (!chargeFinalRow.Empty())
-                chargeFinalRow.Fill(0.0);
+            if (!chargeAmpRow.Empty())
+                chargeAmpRow.Fill(0.0);
+            if (!chargeMeasRow.Empty())
+                chargeMeasRow.Fill(0.0);
             if (!chargeInducedCol.Empty())
                 chargeInducedCol.Fill(0.0);
-            if (!chargeWithNoiseCol.Empty())
-                chargeWithNoiseCol.Fill(0.0);
-            if (!chargeFinalCol.Empty())
-                chargeFinalCol.Fill(0.0);
+            if (!chargeAmpCol.Empty())
+                chargeAmpCol.Fill(0.0);
+            if (!chargeMeasCol.Empty())
+                chargeMeasCol.Fill(0.0);
             if (!chargeInducedBlock.Empty())
                 chargeInducedBlock.Fill(0.0);
-            if (!chargeWithNoiseBlock.Empty())
-                chargeWithNoiseBlock.Fill(0.0);
-            if (!chargeFinalBlock.Empty())
-                chargeFinalBlock.Fill(0.0);
+            if (!chargeAmpBlock.Empty())
+                chargeAmpBlock.Fill(0.0);
+            if (!chargeMeasBlock.Empty())
+                chargeMeasBlock.Fill(0.0);
         }
 
         [[nodiscard]] G4int Rows() const { return signalFraction.Rows(); }
@@ -254,20 +254,20 @@ public:
         Grid2D<G4double> signalFractionBlock; ///< F_i normalized by 4-pad block sum
         // Neighborhood-based charges
         Grid2D<G4double> chargeInduced;   ///< Induced charge before noise
-        Grid2D<G4double> chargeWithNoise; ///< Charge after adding noise
-        Grid2D<G4double> chargeFinal;     ///< Final processed charge
+        Grid2D<G4double> chargeAmp; ///< Charge after adding noise
+        Grid2D<G4double> chargeMeas;     ///< Final processed charge
         // Row-based charges
         Grid2D<G4double> chargeInducedRow;   ///< Row-based induced charge
-        Grid2D<G4double> chargeWithNoiseRow; ///< Row-based charge after noise
-        Grid2D<G4double> chargeFinalRow;     ///< Row-based final charge
+        Grid2D<G4double> chargeAmpRow; ///< Row-based charge after noise
+        Grid2D<G4double> chargeMeasRow;     ///< Row-based final charge
         // Col-based charges
         Grid2D<G4double> chargeInducedCol;   ///< Col-based induced charge
-        Grid2D<G4double> chargeWithNoiseCol; ///< Col-based charge after noise
-        Grid2D<G4double> chargeFinalCol;     ///< Col-based final charge
+        Grid2D<G4double> chargeAmpCol; ///< Col-based charge after noise
+        Grid2D<G4double> chargeMeasCol;     ///< Col-based final charge
         // Block-based charges
         Grid2D<G4double> chargeInducedBlock;   ///< Block-based induced charge
-        Grid2D<G4double> chargeWithNoiseBlock; ///< Block-based charge after noise
-        Grid2D<G4double> chargeFinalBlock;     ///< Block-based final charge
+        Grid2D<G4double> chargeAmpBlock; ///< Block-based charge after noise
+        Grid2D<G4double> chargeMeasBlock;     ///< Block-based final charge
     };
 
     struct FullGridCharges : ChargeMatrixSet {
@@ -309,31 +309,31 @@ public:
         Grid2D<G4double> pixelY;
     };
 
-    struct PatchInfo {
-        G4int row0{-1};
-        G4int col0{-1};
+    struct NeighborhoodGridBounds {
+        G4int rowMin{-1};
+        G4int colMin{-1};
         G4int nRows{0};
         G4int nCols{0};
 
-        [[nodiscard]] G4int Row1() const { return row0 + nRows; }
-        [[nodiscard]] G4int Col1() const { return col0 + nCols; }
-        [[nodiscard]] bool Valid() const { return row0 >= 0 && col0 >= 0 && nRows > 0 && nCols > 0; }
+        [[nodiscard]] G4int rowMax() const { return rowMin + nRows; }
+        [[nodiscard]] G4int colMax() const { return colMin + nCols; }
+        [[nodiscard]] bool Valid() const { return rowMin >= 0 && colMin >= 0 && nRows > 0 && nCols > 0; }
     };
 
     struct PatchGridCharges {
         void Reset() {
-            patch = PatchInfo{};
+            patch = NeighborhoodGridBounds{};
             charges.Clear();
         }
 
-        void Resize(const PatchInfo& info) {
+        void Resize(const NeighborhoodGridBounds& info) {
             patch = info;
             charges.Resize(info.nRows, info.nCols);
         }
 
         [[nodiscard]] bool Empty() const { return charges.Empty(); }
 
-        PatchInfo patch;
+        NeighborhoodGridBounds patch;
         ChargeMatrixSet charges;
     };
 
@@ -346,10 +346,10 @@ public:
             G4double fractionRow{0.0};   ///< Signal fraction (row denominator, for 1D row fits)
             G4double fractionCol{0.0};   ///< Signal fraction (column denominator, for 1D col fits)
             G4double fractionBlock{0.0}; ///< Signal fraction (4-pad block denominator)
-            G4double charge{0.0};        ///< Charge (neighborhood denominator)
-            G4double chargeRow{0.0};     ///< Charge (row denominator)
-            G4double chargeCol{0.0};     ///< Charge (col denominator)
-            G4double chargeBlock{0.0};   ///< Charge (block denominator)
+            G4double chargeInd{0.0};        ///< Induced charge (neighborhood denominator)
+            G4double chargeIndRow{0.0};     ///< Induced charge (row denominator)
+            G4double chargeIndCol{0.0};     ///< Induced charge (col denominator)
+            G4double chargeIndBlock{0.0};   ///< Induced charge (block denominator)
             /// \brief d_i: distance from hit point to pixel center.
             ///
             /// Note: GEANT4 uses millimeters as base length unit; this value is stored in
@@ -363,10 +363,10 @@ public:
         void Reset() {
             geometry = PixelGridGeometry{};
             hit = HitInfo{};
-            mode = ChargeMode::Patch;
+            mode = ChargeMode::Neighborhood;
             nearestPixelCenter = G4ThreeVector(0., 0., 0.);
-            pixelIndexI = 0;
-            pixelIndexJ = 0;
+            pixelRowIndex = 0;
+            pixelColIndex = 0;
             gridRadius = 0;
             gridSide = 1;
             totalCells = 0;
@@ -378,10 +378,10 @@ public:
 
         PixelGridGeometry geometry{};
         HitInfo hit{};
-        ChargeMode mode{ChargeMode::Patch};
+        ChargeMode mode{ChargeMode::Neighborhood};
         G4ThreeVector nearestPixelCenter{0., 0., 0.};
-        G4int pixelIndexI{0};
-        G4int pixelIndexJ{0};
+        G4int pixelRowIndex{0};
+        G4int pixelColIndex{0};
         G4int gridRadius{0};
         G4int gridSide{1};
         std::size_t totalCells{0};

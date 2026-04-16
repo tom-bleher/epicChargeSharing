@@ -172,7 +172,7 @@ inline double InferSpacingFromTree(TTree* t) {
 inline int InferRadiusFromTree(TTree* t) {
   if (!t) return -1;
   std::vector<double>* Qi_tmp = nullptr;
-  if (t->GetBranch("Qi")) t->SetBranchAddress("Qi", &Qi_tmp);
+  if (t->GetBranch("Q_ind")) t->SetBranchAddress("Q_ind", &Qi_tmp);
   Long64_t nToScan = std::min<Long64_t>(t->GetEntries(), 50000);
   for (Long64_t i = 0; i < nToScan; ++i) {
     t->GetEntry(i);
@@ -317,9 +317,9 @@ int plotFitGaus1DUnified(const FitGaus1DConfig& cfg) {
 
   // Determine charge branch
   std::string chosenCharge;
-  if (tree->GetBranch("Qf")) chosenCharge = "Qf";
+  if (tree->GetBranch("Q_meas")) chosenCharge = "Q_meas";
   else if (tree->GetBranch("Fi")) chosenCharge = "Fi";
-  else if (tree->GetBranch("Qi")) chosenCharge = "Qi";
+  else if (tree->GetBranch("Q_ind")) chosenCharge = "Q_ind";
   else {
     ::Error("plotFitGaus1DUnified", "No charge branch found");
     file->Close(); delete file;
@@ -397,8 +397,8 @@ int plotFitGaus1DUnified(const FitGaus1DConfig& cfg) {
   tree->SetBranchAddress("isPixelHit", &is_pixel_true);
   tree->SetBranchAddress(chosenCharge.c_str(), &Q);
 
-  const bool haveQiBranch = tree->GetBranch("Qi") != nullptr;
-  if (haveQiBranch) tree->SetBranchAddress("Qi", &QiVec);
+  const bool haveQiBranch = tree->GetBranch("Q_ind") != nullptr;
+  if (haveQiBranch) tree->SetBranchAddress("Q_ind", &QiVec);
 
   // Row/col saved params (only in replay mode)
   if (cfg.replayMode && cfg.plotRowCol) {
@@ -677,7 +677,7 @@ int plotFitGaus1DUnified(const FitGaus1DConfig& cfg) {
       // Qi overlay points
       TGraph gColQi;
       bool drewColQi = false;
-      if (cfg.plotQiOverlay && haveQiBranch && QiVec && chosenCharge != "Qi") {
+      if (cfg.plotQiOverlay && haveQiBranch && QiVec && chosenCharge != "Q_ind") {
         std::vector<std::pair<double,double>> pts;
         for (size_t k = 0; k < colIdx.size(); ++k) {
           int idx = colIdx[k];
@@ -752,7 +752,7 @@ int plotFitGaus1DUnified(const FitGaus1DConfig& cfg) {
       // Qi overlay points
       TGraph gRowQi;
       bool drewRowQi = false;
-      if (cfg.plotQiOverlay && haveQiBranch && QiVec && chosenCharge != "Qi") {
+      if (cfg.plotQiOverlay && haveQiBranch && QiVec && chosenCharge != "Q_ind") {
         std::vector<std::pair<double,double>> pts;
         for (size_t k = 0; k < rowIdx.size(); ++k) {
           int idx = rowIdx[k];

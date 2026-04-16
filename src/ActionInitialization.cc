@@ -53,8 +53,8 @@ RunAction* ActionInitialization::CreateRunAction() const {
 
     // Recon metadata (previously pushed via DetectorConstruction::SyncRunMetadata)
     const auto& rtConfig = ECS::RuntimeConfig::Instance();
-    const auto reconMethod = (rtConfig.activeMode == 1) ? Constants::ReconMethod::LinA
-                                                        : Constants::ReconMethod::LogA;
+    const auto reconMethod = (rtConfig.activeMode == 1) ? Constants::ChargeModel::LinA
+                                                        : Constants::ChargeModel::LogA;
     G4double linearBeta = std::numeric_limits<G4double>::quiet_NaN();
     if (rtConfig.activeMode == 1) {
         linearBeta = fDetector->GetLinearChargeModelBeta();

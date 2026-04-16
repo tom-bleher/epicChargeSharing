@@ -108,8 +108,8 @@ inline constexpr G4bool FIT_USE_VERTICAL_UNCERTAINTIES = true; // Enable weighte
 inline constexpr G4bool FIT_USE_QN_QI_ERRORS = false;          // Use Q_n/Q_i scaling
 
 // Input charge branch for fitting
-inline constexpr const char* FIT_CHARGE_BRANCH_1D = "Qf";
-inline constexpr const char* FIT_CHARGE_BRANCH_2D = "Qf";
+inline constexpr const char* FIT_CHARGE_BRANCH_1D = "Q_meas";
+inline constexpr const char* FIT_CHARGE_BRANCH_2D = "Q_meas";
 
 // ─────────────────────────────── 1D Fit Options ──────────────────────────────
 inline constexpr G4bool FIT_1D_SAVE_A = true;           // Save amplitude
@@ -135,8 +135,9 @@ inline constexpr G4bool FIT_2D_SAVE_THETA = false; // Save rotation angle
 // Type Definitions
 // ═══════════════════════════════════════════════════════════════════════════
 
-enum class SignalModel { LogA, LinA };
-enum class ReconMethod { LogA, LinA };
+enum class ChargeModel { LogA, LinA };
+using SignalModel = ChargeModel;
+using ReconMethod = ChargeModel;
 
 // Unified enum for runtime use (combines both 1D and 2D modes)
 enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3, ThresholdAboveNoise };
@@ -150,23 +151,24 @@ constexpr const char* ActivePixelModeName(ActivePixelMode m) {
                                                     : "ThresholdAboveNoise";
 }
 
-constexpr const char* SignalModelName(SignalModel m) {
-    return (m == SignalModel::LinA) ? "LinA" : "LogA";
+constexpr const char* SignalModelName(ChargeModel m) {
+    return (m == ChargeModel::LinA) ? "LinA" : "LogA";
 }
 
-using PosReconModel = ReconMethod; // Legacy alias
+using PosReconModel = ChargeModel;     // Legacy alias
+using ChargeReconModel = ChargeModel;  // Preferred alias
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Derived Settings (computed from ACTIVE_MODE)
 // ═══════════════════════════════════════════════════════════════════════════
 
-inline constexpr ReconMethod RECON_METHOD = (ACTIVE_MODE == Mode::LogA) ? ReconMethod::LogA : ReconMethod::LinA;
+inline constexpr ChargeModel RECON_METHOD = (ACTIVE_MODE == Mode::LogA) ? ChargeModel::LogA : ChargeModel::LinA;
 
-inline constexpr SignalModel SIGNAL_MODEL = (ACTIVE_MODE == Mode::LinA) ? SignalModel::LinA : SignalModel::LogA;
+inline constexpr ChargeModel SIGNAL_MODEL = (ACTIVE_MODE == Mode::LinA) ? ChargeModel::LinA : ChargeModel::LogA;
 
-inline constexpr G4bool USES_LINEAR_SIGNAL = (SIGNAL_MODEL == SignalModel::LinA);
+inline constexpr G4bool USES_LINEAR_SIGNAL = (SIGNAL_MODEL == ChargeModel::LinA);
 
-inline constexpr PosReconModel POS_RECON_MODEL = RECON_METHOD;
+inline constexpr ChargeReconModel POS_RECON_MODEL = RECON_METHOD;
 
 // Map 1D mode enum to unified enum
 constexpr ActivePixelMode ActivePixelModeFrom1D(ActivePixelMode1D m) {

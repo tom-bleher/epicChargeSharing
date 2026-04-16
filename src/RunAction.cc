@@ -104,9 +104,9 @@ void RunAction::EnsureBranchBuffersInitialized() {
             vec.reserve(desiredCapacity);
         };
         reserveVec(fNeighborhoodChargeFractions);
-        reserveVec(fNeighborhoodCharge);
-        reserveVec(fNeighborhoodChargeNew);
-        reserveVec(fNeighborhoodChargeFinal);
+        reserveVec(fNeighborhoodChargeInd);
+        reserveVec(fNeighborhoodChargeAmp);
+        reserveVec(fNeighborhoodChargeMeas);
         reserveVec(fNeighborhoodDistance);
         reserveVec(fNeighborhoodAlpha);
         reserveVec(fNeighborhoodPixelX);
@@ -116,9 +116,9 @@ void RunAction::EnsureBranchBuffersInitialized() {
 
     const G4double nan = std::numeric_limits<G4double>::quiet_NaN();
     ECS::ResizeAndFill(fNeighborhoodChargeFractions, fNeighborhoodCapacity, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
-    ECS::ResizeAndFill(fNeighborhoodCharge, fNeighborhoodCapacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeNew, fNeighborhoodCapacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinal, fNeighborhoodCapacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeInd, fNeighborhoodCapacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeAmp, fNeighborhoodCapacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeMeas, fNeighborhoodCapacity, nan);
     ECS::ResizeAndFill(fNeighborhoodDistance, fNeighborhoodCapacity, nan);
     ECS::ResizeAndFill(fNeighborhoodAlpha, fNeighborhoodCapacity, nan);
     ECS::ResizeAndFill(fNeighborhoodPixelX, fNeighborhoodCapacity, nan);
@@ -130,9 +130,9 @@ void RunAction::EnsureBranchBuffersInitialized() {
         EnsureFullFractionBuffer(fGridNumBlocksPerSide);
     } else {
         fFullFi.clear();
-        fFullQi.clear();
-        fFullQn.clear();
-        fFullQf.clear();
+        fFullQ_ind.clear();
+        fFullQ_amp.clear();
+        fFullQ_meas.clear();
         fFullDistance.clear();
         fFullAlpha.clear();
         fFullPixelXGrid.clear();
@@ -156,21 +156,21 @@ bool RunAction::EnsureFullFractionBuffer(G4int gridSide) {
         fFullFiCol.clear();
         fFullFiBlock.clear();
         // Neighborhood charges
-        fFullQi.clear();
-        fFullQn.clear();
-        fFullQf.clear();
+        fFullQ_ind.clear();
+        fFullQ_amp.clear();
+        fFullQ_meas.clear();
         // Row-mode charges
-        fFullQiRow.clear();
-        fFullQnRow.clear();
-        fFullQfRow.clear();
+        fFullQ_indRow.clear();
+        fFullQ_ampRow.clear();
+        fFullQ_measRow.clear();
         // Col-mode charges
-        fFullQiCol.clear();
-        fFullQnCol.clear();
-        fFullQfCol.clear();
+        fFullQ_indCol.clear();
+        fFullQ_ampCol.clear();
+        fFullQ_measCol.clear();
         // Block-mode charges
-        fFullQiBlock.clear();
-        fFullQnBlock.clear();
-        fFullQfBlock.clear();
+        fFullQ_indBlock.clear();
+        fFullQ_ampBlock.clear();
+        fFullQ_measBlock.clear();
         // Geometry
         fFullDistance.clear();
         fFullAlpha.clear();
@@ -194,21 +194,21 @@ bool RunAction::EnsureFullFractionBuffer(G4int gridSide) {
     ensure(fFullFiCol);
     ensure(fFullFiBlock);
     // Neighborhood charges
-    ensure(fFullQi);
-    ensure(fFullQn);
-    ensure(fFullQf);
+    ensure(fFullQ_ind);
+    ensure(fFullQ_amp);
+    ensure(fFullQ_meas);
     // Row-mode charges
-    ensure(fFullQiRow);
-    ensure(fFullQnRow);
-    ensure(fFullQfRow);
+    ensure(fFullQ_indRow);
+    ensure(fFullQ_ampRow);
+    ensure(fFullQ_measRow);
     // Col-mode charges
-    ensure(fFullQiCol);
-    ensure(fFullQnCol);
-    ensure(fFullQfCol);
+    ensure(fFullQ_indCol);
+    ensure(fFullQ_ampCol);
+    ensure(fFullQ_measCol);
     // Block-mode charges
-    ensure(fFullQiBlock);
-    ensure(fFullQnBlock);
-    ensure(fFullQfBlock);
+    ensure(fFullQ_indBlock);
+    ensure(fFullQ_ampBlock);
+    ensure(fFullQ_measBlock);
     // Geometry
     ensure(fFullDistance);
     ensure(fFullAlpha);
@@ -386,18 +386,18 @@ void RunAction::ConfigureCoreBranches(TTree* tree) {
                                                         .chargeFractionsRow = &fNeighborhoodChargeFractionsRow,
                                                         .chargeFractionsCol = &fNeighborhoodChargeFractionsCol,
                                                         .chargeFractionsBlock = &fNeighborhoodChargeFractionsBlock,
-                                                        .charge = &fNeighborhoodCharge,
-                                                        .chargeNew = &fNeighborhoodChargeNew,
-                                                        .chargeFinal = &fNeighborhoodChargeFinal,
-                                                        .chargeRow = &fNeighborhoodChargeRow,
-                                                        .chargeNewRow = &fNeighborhoodChargeNewRow,
-                                                        .chargeFinalRow = &fNeighborhoodChargeFinalRow,
-                                                        .chargeCol = &fNeighborhoodChargeCol,
-                                                        .chargeNewCol = &fNeighborhoodChargeNewCol,
-                                                        .chargeFinalCol = &fNeighborhoodChargeFinalCol,
-                                                        .chargeBlock = &fNeighborhoodChargeBlock,
-                                                        .chargeNewBlock = &fNeighborhoodChargeNewBlock,
-                                                        .chargeFinalBlock = &fNeighborhoodChargeFinalBlock,
+                                                        .chargeInd = &fNeighborhoodChargeInd,
+                                                        .chargeAmp = &fNeighborhoodChargeAmp,
+                                                        .chargeMeas = &fNeighborhoodChargeMeas,
+                                                        .chargeIndRow = &fNeighborhoodChargeIndRow,
+                                                        .chargeAmpRow = &fNeighborhoodChargeAmpRow,
+                                                        .chargeMeasRow = &fNeighborhoodChargeMeasRow,
+                                                        .chargeIndCol = &fNeighborhoodChargeIndCol,
+                                                        .chargeAmpCol = &fNeighborhoodChargeAmpCol,
+                                                        .chargeMeasCol = &fNeighborhoodChargeMeasCol,
+                                                        .chargeIndBlock = &fNeighborhoodChargeIndBlock,
+                                                        .chargeAmpBlock = &fNeighborhoodChargeAmpBlock,
+                                                        .chargeMeasBlock = &fNeighborhoodChargeMeasBlock,
                                                         .pixelX = &fNeighborhoodPixelX,
                                                         .pixelY = &fNeighborhoodPixelY,
                                                         .distance = &fNeighborhoodDistance,
@@ -644,21 +644,21 @@ void RunAction::PrepareNeighborhoodStorage(std::size_t requestedCells) {
     ECS::ResizeAndFill(fNeighborhoodChargeFractionsCol, capacity, sentinelFrac);
     ECS::ResizeAndFill(fNeighborhoodChargeFractionsBlock, capacity, sentinelFrac);
     // Neighborhood charges
-    ECS::ResizeAndFill(fNeighborhoodCharge, capacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeNew, capacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinal, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeInd, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeAmp, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeMeas, capacity, nan);
     // Row-mode charges
-    ECS::ResizeAndFill(fNeighborhoodChargeRow, capacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeNewRow, capacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinalRow, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeIndRow, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeAmpRow, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeMeasRow, capacity, nan);
     // Col-mode charges
-    ECS::ResizeAndFill(fNeighborhoodChargeCol, capacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeNewCol, capacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinalCol, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeIndCol, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeAmpCol, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeMeasCol, capacity, nan);
     // Block-mode charges
-    ECS::ResizeAndFill(fNeighborhoodChargeBlock, capacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeNewBlock, capacity, nan);
-    ECS::ResizeAndFill(fNeighborhoodChargeFinalBlock, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeIndBlock, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeAmpBlock, capacity, nan);
+    ECS::ResizeAndFill(fNeighborhoodChargeMeasBlock, capacity, nan);
     // Geometry
     ECS::ResizeAndFill(fNeighborhoodDistance, capacity, nan);
     ECS::ResizeAndFill(fNeighborhoodAlpha, capacity, nan);
@@ -676,17 +676,17 @@ void RunAction::PopulateNeighborhoodFromRecord(const EventRecord& record) {
     };
 
     // Neighborhood-mode noisy charges
-    copyCharges(record.neighborChargesNew, fNeighborhoodChargeNew);
-    copyCharges(record.neighborChargesFinal, fNeighborhoodChargeFinal);
+    copyCharges(record.neighborChargesAmp, fNeighborhoodChargeAmp);
+    copyCharges(record.neighborChargesMeas, fNeighborhoodChargeMeas);
     // Row-mode noisy charges
-    copyCharges(record.neighborChargesNewRow, fNeighborhoodChargeNewRow);
-    copyCharges(record.neighborChargesFinalRow, fNeighborhoodChargeFinalRow);
+    copyCharges(record.neighborChargesAmpRow, fNeighborhoodChargeAmpRow);
+    copyCharges(record.neighborChargesMeasRow, fNeighborhoodChargeMeasRow);
     // Col-mode noisy charges
-    copyCharges(record.neighborChargesNewCol, fNeighborhoodChargeNewCol);
-    copyCharges(record.neighborChargesFinalCol, fNeighborhoodChargeFinalCol);
+    copyCharges(record.neighborChargesAmpCol, fNeighborhoodChargeAmpCol);
+    copyCharges(record.neighborChargesMeasCol, fNeighborhoodChargeMeasCol);
     // Block-mode noisy charges
-    copyCharges(record.neighborChargesNewBlock, fNeighborhoodChargeNewBlock);
-    copyCharges(record.neighborChargesFinalBlock, fNeighborhoodChargeFinalBlock);
+    copyCharges(record.neighborChargesAmpBlock, fNeighborhoodChargeAmpBlock);
+    copyCharges(record.neighborChargesMeasBlock, fNeighborhoodChargeMeasBlock);
 
     std::size_t activeCells = 0;
     for (const auto& cell : record.neighborCells) {
@@ -703,11 +703,11 @@ void RunAction::PopulateNeighborhoodFromRecord(const EventRecord& record) {
         fNeighborhoodChargeFractionsCol[idx] = cell.fractionCol;
         fNeighborhoodChargeFractionsBlock[idx] = cell.fractionBlock;
         // Neighborhood charge
-        fNeighborhoodCharge[idx] = cell.charge;
+        fNeighborhoodChargeInd[idx] = cell.chargeInd;
         // Mode-specific charges
-        fNeighborhoodChargeRow[idx] = cell.chargeRow;
-        fNeighborhoodChargeCol[idx] = cell.chargeCol;
-        fNeighborhoodChargeBlock[idx] = cell.chargeBlock;
+        fNeighborhoodChargeIndRow[idx] = cell.chargeIndRow;
+        fNeighborhoodChargeIndCol[idx] = cell.chargeIndCol;
+        fNeighborhoodChargeIndBlock[idx] = cell.chargeIndBlock;
         // Geometry
         fNeighborhoodPixelX[idx] = cell.center.x();
         fNeighborhoodPixelY[idx] = cell.center.y();
@@ -757,21 +757,21 @@ void RunAction::PopulateFullFractionsFromRecord(const EventRecord& record) {
     copyOrZero(record.fullFiCol, fFullFiCol);
     copyOrZero(record.fullFiBlock, fFullFiBlock);
     // Neighborhood charges
-    copyOrZero(record.fullQi, fFullQi);
-    copyOrZero(record.fullQn, fFullQn);
-    copyOrZero(record.fullQf, fFullQf);
+    copyOrZero(record.fullQ_ind, fFullQ_ind);
+    copyOrZero(record.fullQ_amp, fFullQ_amp);
+    copyOrZero(record.fullQ_meas, fFullQ_meas);
     // Row-mode charges
-    copyOrZero(record.fullQiRow, fFullQiRow);
-    copyOrZero(record.fullQnRow, fFullQnRow);
-    copyOrZero(record.fullQfRow, fFullQfRow);
+    copyOrZero(record.fullQ_indRow, fFullQ_indRow);
+    copyOrZero(record.fullQ_ampRow, fFullQ_ampRow);
+    copyOrZero(record.fullQ_measRow, fFullQ_measRow);
     // Col-mode charges
-    copyOrZero(record.fullQiCol, fFullQiCol);
-    copyOrZero(record.fullQnCol, fFullQnCol);
-    copyOrZero(record.fullQfCol, fFullQfCol);
+    copyOrZero(record.fullQ_indCol, fFullQ_indCol);
+    copyOrZero(record.fullQ_ampCol, fFullQ_ampCol);
+    copyOrZero(record.fullQ_measCol, fFullQ_measCol);
     // Block-mode charges
-    copyOrZero(record.fullQiBlock, fFullQiBlock);
-    copyOrZero(record.fullQnBlock, fFullQnBlock);
-    copyOrZero(record.fullQfBlock, fFullQfBlock);
+    copyOrZero(record.fullQ_indBlock, fFullQ_indBlock);
+    copyOrZero(record.fullQ_ampBlock, fFullQ_ampBlock);
+    copyOrZero(record.fullQ_measBlock, fFullQ_measBlock);
     // Geometry
     copyOrZero(record.fullDistance, fFullDistance);
     copyOrZero(record.fullAlpha, fFullAlpha);
@@ -849,9 +849,9 @@ void RunAction::SetNeighborhoodRadiusMeta(G4int radius) {
 
     fNeighborhoodCapacity = 0;
     fNeighborhoodChargeFractions.clear();
-    fNeighborhoodCharge.clear();
-    fNeighborhoodChargeNew.clear();
-    fNeighborhoodChargeFinal.clear();
+    fNeighborhoodChargeInd.clear();
+    fNeighborhoodChargeAmp.clear();
+    fNeighborhoodChargeMeas.clear();
     fNeighborhoodDistance.clear();
     fNeighborhoodAlpha.clear();
     fNeighborhoodPixelX.clear();
@@ -916,18 +916,18 @@ void RunAction::ConfigureFullFractionBranch(G4bool enable) {
                                                           .fiRow = &fFullFiRow,
                                                           .fiCol = &fFullFiCol,
                                                           .fiBlock = &fFullFiBlock,
-                                                          .qi = &fFullQi,
-                                                          .qn = &fFullQn,
-                                                          .qf = &fFullQf,
-                                                          .qiRow = &fFullQiRow,
-                                                          .qnRow = &fFullQnRow,
-                                                          .qfRow = &fFullQfRow,
-                                                          .qiCol = &fFullQiCol,
-                                                          .qnCol = &fFullQnCol,
-                                                          .qfCol = &fFullQfCol,
-                                                          .qiBlock = &fFullQiBlock,
-                                                          .qnBlock = &fFullQnBlock,
-                                                          .qfBlock = &fFullQfBlock,
+                                                          .qInd = &fFullQ_ind,
+                                                          .qAmp = &fFullQ_amp,
+                                                          .qMeas = &fFullQ_meas,
+                                                          .qIndRow = &fFullQ_indRow,
+                                                          .qAmpRow = &fFullQ_ampRow,
+                                                          .qMeasRow = &fFullQ_measRow,
+                                                          .qIndCol = &fFullQ_indCol,
+                                                          .qAmpCol = &fFullQ_ampCol,
+                                                          .qMeasCol = &fFullQ_measCol,
+                                                          .qIndBlock = &fFullQ_indBlock,
+                                                          .qAmpBlock = &fFullQ_ampBlock,
+                                                          .qMeasBlock = &fFullQ_measBlock,
                                                           .distance = &fFullDistance,
                                                           .alpha = &fFullAlpha,
                                                           .pixelX = &fFullPixelXGrid,

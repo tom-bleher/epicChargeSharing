@@ -58,7 +58,7 @@ public:
     void RegisterFirstContact(const G4ThreeVector& pos, G4double time) {
         fFirstContactPos = pos;
         fFirstContactTime = time;
-        fHasFirstContactPos = true;
+        fFirstContactPosValid = true;
     }
 
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);
@@ -116,10 +116,10 @@ private:
 
     G4ThreeVector fFirstContactPos;
     G4double fFirstContactTime{0.0};
-    G4bool fHasFirstContactPos{false};
+    G4bool fFirstContactPosValid{false};
 
-    G4int fPixelIndexI{-1};
-    G4int fPixelIndexJ{-1};
+    G4int fPixelRowIndex{-1};
+    G4int fPixelColIndex{-1};
     G4double fPixelTrueDeltaX{0.};
     G4double fPixelTrueDeltaY{0.};
     G4bool fHitWithinDetector{false};
@@ -134,19 +134,19 @@ private:
     ChargeSharingCalculator fChargeSharing;
     G4int fNearestPixelGlobalId{-1};
     NeighborhoodLayout fNeighborhoodLayout;
-    std::vector<G4double> fNeighborhoodChargeNew;
-    std::vector<G4double> fNeighborhoodChargeFinal;
+    std::vector<G4double> fNeighborhoodChargeAmp;
+    std::vector<G4double> fNeighborhoodChargeMeas;
     // Row-mode noisy charges
-    std::vector<G4double> fNeighborhoodChargeNewRow;
-    std::vector<G4double> fNeighborhoodChargeFinalRow;
+    std::vector<G4double> fNeighborhoodChargeAmpRow;
+    std::vector<G4double> fNeighborhoodChargeMeasRow;
     // Col-mode noisy charges
-    std::vector<G4double> fNeighborhoodChargeNewCol;
-    std::vector<G4double> fNeighborhoodChargeFinalCol;
+    std::vector<G4double> fNeighborhoodChargeAmpCol;
+    std::vector<G4double> fNeighborhoodChargeMeasCol;
     // Block-mode noisy charges
-    std::vector<G4double> fNeighborhoodChargeNewBlock;
-    std::vector<G4double> fNeighborhoodChargeFinalBlock;
-    G4bool fEmitDistanceAlphaOutputs{false};
-    G4bool fComputeFullFractions{false};
+    std::vector<G4double> fNeighborhoodChargeAmpBlock;
+    std::vector<G4double> fNeighborhoodChargeMeasBlock;
+    G4bool fOutputDistanceAlpha{false};
+    G4bool fStoreFullGridFractions{false};
     std::unique_ptr<G4GenericMessenger> fMessenger;
 
     // Per-step energy deposit vectors (populated from SteppingAction each event)

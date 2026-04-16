@@ -67,7 +67,7 @@ def load_data(root_file):
     with uproot.open(root_file) as f:
         tree = f["Hits"]
         return tree.arrays(
-            ["Fi", "Qi", "Qn", "Qf", "NeighborhoodPixelX", "NeighborhoodPixelY",
+            ["Fi", "Q_ind", "Q_amp", "Q_meas", "NeighborhoodPixelX", "NeighborhoodPixelY",
              "TrueX", "TrueY", "PixelX", "PixelY", "EnergyDeposited", "NeighborhoodSize",
              "NearestPixelI", "NearestPixelJ", "isPixelHit", "hitWithinDetector"],
             library="ak",
@@ -81,7 +81,7 @@ def draw_event(ax, orig_idx, branches, meta, title=None):
     pad_frac = meta["pixel_size"] / pitch
 
     fi = ak.to_numpy(branches["Fi"][orig_idx])
-    qf = ak.to_numpy(branches["Qf"][orig_idx])
+    qf = ak.to_numpy(branches["Q_meas"][orig_idx])
     true_x = float(branches["TrueX"][orig_idx])
     true_y = float(branches["TrueY"][orig_idx])
     pix_x = ak.to_numpy(branches["NeighborhoodPixelX"][orig_idx])
@@ -274,7 +274,7 @@ def main():
                     ax = axes[row, col]
                     data = all_data[sigma]
                     n_active = int(np.count_nonzero(
-                        ak.to_numpy(data["Qf"][evt_idx]) != 0
+                        ak.to_numpy(data["Q_meas"][evt_idx]) != 0
                     ))
                     draw_event(ax, evt_idx, data, meta, title=None)
                     # Small active-pixel count inside the grid

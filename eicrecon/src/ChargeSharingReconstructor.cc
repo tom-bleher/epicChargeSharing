@@ -529,8 +529,8 @@ ChargeSharingReconstructor::processSingleHit(const SingleHitInput& input) const 
     }
 
     result.nearestPixelCenterMM = nearest.center;
-    result.pixelIndexI = nearest.indexI;
-    result.pixelIndexJ = nearest.indexJ;
+    result.pixelRowIndex = nearest.indexI;
+    result.pixelColIndex = nearest.indexJ;
 
     const double hitX = input.hitPositionMM[0];
     const double hitY = input.hitPositionMM[1];

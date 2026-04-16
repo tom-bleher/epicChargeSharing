@@ -17,9 +17,9 @@ Workflow per position:
 5. Generate PDF of N individual Gaussian fits (Q_i vs d)
 6. Generate charge neighborhood PDFs colored by:
    - Fi: Signal fraction (F_i)
-   - Qi: Induced charge (Q_i)
-   - Qn: Charge with noise (Q_n)
-   - Qf: Final charge (Q_f)
+   - Q_ind: Induced charge (Q_i)
+   - Q_amp: Charge with noise (Q_n)
+   - Q_meas: Final charge (Q_f)
    - distance: Distance from hit to pixel center
 7. Fit ReconTrueDeltaX distribution to get sigma_f
 8. Extract F_i values
@@ -132,13 +132,13 @@ DEFAULT_BETA = 0.001
 # Charge neighborhood visualization types
 # Maps user-friendly names to (dataKind, chargeBranch) pairs for the ROOT macro
 # - dataKind: "fraction" (shows Fi values), "coulomb" (shows charge values), "distance" (shows distance to hit)
-# - chargeBranch: ROOT branch name to use ("Fi", "Qi", "Qn", "Qf")
+# - chargeBranch: ROOT branch name to use ("Fi", "Q_ind", "Q_amp", "Q_meas")
 NEIGHBORHOOD_TYPES = {
-    "Fi": ("fraction", "Fi"),     # Signal fraction (from Fi branch)
-    "Qi": ("coulomb", "Qi"),      # Induced charge (from Qi branch)
-    "Qn": ("coulomb", "Qn"),      # Charge with noise (from Qn branch)
-    "Qf": ("coulomb", "Qf"),      # Final charge (from Qf branch)
-    "distance": ("distance", "Qn"),  # Distance to hit (uses Qn for valid cell detection)
+    "Fi": ("fraction", "Fi"),         # Signal fraction (from Fi branch)
+    "Q_ind": ("coulomb", "Q_ind"),  # Induced charge (from Q_ind branch)
+    "Q_amp": ("coulomb", "Q_amp"),    # Charge with noise (from Q_amp branch)
+    "Q_meas": ("coulomb", "Q_meas"),      # Final charge (from Q_meas branch)
+    "distance": ("distance", "Q_amp"),  # Distance to hit (uses Q_amp for valid cell detection)
 }
 
 # Default positions to sweep (computed from Config.hh geometry)
@@ -612,7 +612,7 @@ def generate_gaussian_fits_pdf(
 def generate_neighborhood_pdf(
     root_file: Path,
     output_pdf: Path,
-    quantity: str = "Qn",
+    quantity: str = "Q_amp",
     n_pages: int = 100,
     root_executable: str = "root",
 ) -> Optional[Path]:
@@ -621,7 +621,7 @@ def generate_neighborhood_pdf(
     Args:
         root_file: Path to the ROOT file
         output_pdf: Path for the output PDF
-        quantity: One of "Fi", "Qi", "Qn", "Qf", "distance"
+        quantity: One of "Fi", "Q_ind", "Q_amp", "Q_meas", "distance"
         n_pages: Number of events to include
         root_executable: Path to ROOT executable
 
@@ -634,9 +634,9 @@ def generate_neighborhood_pdf(
 
     # Map quantity to dataKind and chargeBranch
     if quantity not in NEIGHBORHOOD_TYPES:
-        print(f"[WARN] Unknown neighborhood type '{quantity}', defaulting to 'Qn'")
+        print(f"[WARN] Unknown neighborhood type '{quantity}', defaulting to 'Q_amp'")
         print(f"[INFO] Available types: {list(NEIGHBORHOOD_TYPES.keys())}")
-        quantity = "Qn"
+        quantity = "Q_amp"
 
     data_kind, charge_branch = NEIGHBORHOOD_TYPES[quantity]
 
@@ -684,7 +684,7 @@ def generate_all_neighborhood_pdfs(
     Args:
         root_file: Path to the ROOT file
         output_dir: Directory for output PDFs
-        quantities: List of quantities to generate (default: Fi, Qi, Qn, Qf, distance)
+        quantities: List of quantities to generate (default: Fi, Q_ind, Q_amp, Q_meas, distance)
         n_pages: Number of events per PDF
         root_executable: Path to ROOT executable
 
@@ -692,7 +692,7 @@ def generate_all_neighborhood_pdfs(
         Dictionary mapping quantity name to output PDF path (or None if failed)
     """
     if quantities is None:
-        quantities = ["Fi", "Qi", "Qn", "Qf", "distance"]
+        quantities = ["Fi", "Q_ind", "Q_amp", "Q_meas", "distance"]
 
     output_dir.mkdir(parents=True, exist_ok=True)
     results = {}

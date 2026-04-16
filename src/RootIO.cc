@@ -60,7 +60,7 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
         {.name = "TrueY", .addr = buffers.trueY, .leaf = "TrueY/D"},
         {.name = "PixelX", .addr = buffers.pixelX, .leaf = "PixelX/D"},
         {.name = "PixelY", .addr = buffers.pixelY, .leaf = "PixelY/D"},
-        {.name = "Edep", .addr = buffers.edep, .leaf = "Edep/D"},
+        {.name = "EnergyDeposited", .addr = buffers.edep, .leaf = "EnergyDeposited/D"},
         {.name = "PixelTrueDeltaX", .addr = buffers.pixelTrueDeltaX, .leaf = "PixelTrueDeltaX/D"},
         {.name = "PixelTrueDeltaY", .addr = buffers.pixelTrueDeltaY, .leaf = "PixelTrueDeltaY/D"},
         {.name = "PrimaryMomentumX", .addr = buffers.primaryMomentumX, .leaf = "PrimaryMomentumX/D"},
@@ -115,29 +115,29 @@ void BranchConfigurator::ConfigureVectorBranches(TTree* tree, const VectorBuffer
         case Config::ActivePixelMode::Neighborhood:
         case Config::ActivePixelMode::ThresholdAboveNoise:
             addBranch("Fi", buffers.chargeFractions);
-            addBranch("Qi", buffers.charge);
-            addBranch("Qn", buffers.chargeNew);
-            addBranch("Qf", buffers.chargeFinal);
+            addBranch("Q_ind", buffers.chargeInd);
+            addBranch("Q_amp", buffers.chargeAmp);
+            addBranch("Q_meas", buffers.chargeMeas);
             break;
 
         case Config::ActivePixelMode::RowCol:
         case Config::ActivePixelMode::RowCol3x3:
             addBranch("FiRow", buffers.chargeFractionsRow);
             addBranch("FiCol", buffers.chargeFractionsCol);
-            addBranch("QiRow", buffers.chargeRow);
-            addBranch("QnRow", buffers.chargeNewRow);
-            addBranch("QfRow", buffers.chargeFinalRow);
-            addBranch("QiCol", buffers.chargeCol);
-            addBranch("QnCol", buffers.chargeNewCol);
-            addBranch("QfCol", buffers.chargeFinalCol);
+            addBranch("Q_indRow", buffers.chargeIndRow);
+            addBranch("Q_ampRow", buffers.chargeAmpRow);
+            addBranch("Q_measRow", buffers.chargeMeasRow);
+            addBranch("Q_indCol", buffers.chargeIndCol);
+            addBranch("Q_ampCol", buffers.chargeAmpCol);
+            addBranch("Q_measCol", buffers.chargeMeasCol);
             break;
 
         case Config::ActivePixelMode::ChargeBlock2x2:
         case Config::ActivePixelMode::ChargeBlock3x3:
             addBranch("FiBlock", buffers.chargeFractionsBlock);
-            addBranch("QiBlock", buffers.chargeBlock);
-            addBranch("QnBlock", buffers.chargeNewBlock);
-            addBranch("QfBlock", buffers.chargeFinalBlock);
+            addBranch("Q_indBlock", buffers.chargeIndBlock);
+            addBranch("Q_ampBlock", buffers.chargeAmpBlock);
+            addBranch("Q_measBlock", buffers.chargeMeasBlock);
             break;
     }
 }
@@ -190,29 +190,29 @@ bool BranchConfigurator::ConfigureFullGridBranches(TTree* tree, const FullGridBu
         case Config::ActivePixelMode::Neighborhood:
         case Config::ActivePixelMode::ThresholdAboveNoise:
             addBranch("FiGrid", buffers.fi);
-            addBranch("QiGrid", buffers.qi);
-            addBranch("QnGrid", buffers.qn);
-            addBranch("QfGrid", buffers.qf);
+            addBranch("Q_indGrid", buffers.qInd);
+            addBranch("Q_ampGrid", buffers.qAmp);
+            addBranch("Q_measGrid", buffers.qMeas);
             break;
 
         case Config::ActivePixelMode::RowCol:
         case Config::ActivePixelMode::RowCol3x3:
             addBranch("FiRowGrid", buffers.fiRow);
             addBranch("FiColGrid", buffers.fiCol);
-            addBranch("QiRowGrid", buffers.qiRow);
-            addBranch("QnRowGrid", buffers.qnRow);
-            addBranch("QfRowGrid", buffers.qfRow);
-            addBranch("QiColGrid", buffers.qiCol);
-            addBranch("QnColGrid", buffers.qnCol);
-            addBranch("QfColGrid", buffers.qfCol);
+            addBranch("Q_indRowGrid", buffers.qIndRow);
+            addBranch("Q_ampRowGrid", buffers.qAmpRow);
+            addBranch("Q_measRowGrid", buffers.qMeasRow);
+            addBranch("Q_indColGrid", buffers.qIndCol);
+            addBranch("Q_ampColGrid", buffers.qAmpCol);
+            addBranch("Q_measColGrid", buffers.qMeasCol);
             break;
 
         case Config::ActivePixelMode::ChargeBlock2x2:
         case Config::ActivePixelMode::ChargeBlock3x3:
             addBranch("FiBlockGrid", buffers.fiBlock);
-            addBranch("QiBlockGrid", buffers.qiBlock);
-            addBranch("QnBlockGrid", buffers.qnBlock);
-            addBranch("QfBlockGrid", buffers.qfBlock);
+            addBranch("Q_indBlockGrid", buffers.qIndBlock);
+            addBranch("Q_ampBlockGrid", buffers.qAmpBlock);
+            addBranch("Q_measBlockGrid", buffers.qMeasBlock);
             break;
     }
 
@@ -290,21 +290,21 @@ void TreeFiller::PrepareNeighborhoodStorage(std::size_t requestedCells) {
     ResizeAndFill(fNeighborhoodChargeFractionsCol, capacity, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
     ResizeAndFill(fNeighborhoodChargeFractionsBlock, capacity, Constants::OUT_OF_BOUNDS_FRACTION_SENTINEL);
     // Neighborhood charges
-    ResizeAndFill(fNeighborhoodCharge, capacity, nan);
-    ResizeAndFill(fNeighborhoodChargeNew, capacity, nan);
-    ResizeAndFill(fNeighborhoodChargeFinal, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeInd, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeAmp, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeMeas, capacity, nan);
     // Row-mode charges
-    ResizeAndFill(fNeighborhoodChargeRow, capacity, nan);
-    ResizeAndFill(fNeighborhoodChargeNewRow, capacity, nan);
-    ResizeAndFill(fNeighborhoodChargeFinalRow, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeIndRow, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeAmpRow, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeMeasRow, capacity, nan);
     // Col-mode charges
-    ResizeAndFill(fNeighborhoodChargeCol, capacity, nan);
-    ResizeAndFill(fNeighborhoodChargeNewCol, capacity, nan);
-    ResizeAndFill(fNeighborhoodChargeFinalCol, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeIndCol, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeAmpCol, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeMeasCol, capacity, nan);
     // Block-mode charges
-    ResizeAndFill(fNeighborhoodChargeBlock, capacity, nan);
-    ResizeAndFill(fNeighborhoodChargeNewBlock, capacity, nan);
-    ResizeAndFill(fNeighborhoodChargeFinalBlock, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeIndBlock, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeAmpBlock, capacity, nan);
+    ResizeAndFill(fNeighborhoodChargeMeasBlock, capacity, nan);
     // Geometry
     ResizeAndFill(fNeighborhoodDistance, capacity, nan);
     ResizeAndFill(fNeighborhoodAlpha, capacity, nan);
@@ -321,15 +321,15 @@ void TreeFiller::PopulateNeighborhoodFromRecord(const EventRecord& record) {
             std::copy_n(source.begin(), n, target.begin());
     };
 
-    copySpan(record.neighborChargesNew, fNeighborhoodChargeNew);
-    copySpan(record.neighborChargesFinal, fNeighborhoodChargeFinal);
+    copySpan(record.neighborChargesAmp, fNeighborhoodChargeAmp);
+    copySpan(record.neighborChargesMeas, fNeighborhoodChargeMeas);
     // Row/Col/Block mode noisy charges
-    copySpan(record.neighborChargesNewRow, fNeighborhoodChargeNewRow);
-    copySpan(record.neighborChargesFinalRow, fNeighborhoodChargeFinalRow);
-    copySpan(record.neighborChargesNewCol, fNeighborhoodChargeNewCol);
-    copySpan(record.neighborChargesFinalCol, fNeighborhoodChargeFinalCol);
-    copySpan(record.neighborChargesNewBlock, fNeighborhoodChargeNewBlock);
-    copySpan(record.neighborChargesFinalBlock, fNeighborhoodChargeFinalBlock);
+    copySpan(record.neighborChargesAmpRow, fNeighborhoodChargeAmpRow);
+    copySpan(record.neighborChargesMeasRow, fNeighborhoodChargeMeasRow);
+    copySpan(record.neighborChargesAmpCol, fNeighborhoodChargeAmpCol);
+    copySpan(record.neighborChargesMeasCol, fNeighborhoodChargeMeasCol);
+    copySpan(record.neighborChargesAmpBlock, fNeighborhoodChargeAmpBlock);
+    copySpan(record.neighborChargesMeasBlock, fNeighborhoodChargeMeasBlock);
 
     std::size_t activeCells = 0;
     for (const auto& cell : record.neighborCells) {
@@ -345,13 +345,13 @@ void TreeFiller::PopulateNeighborhoodFromRecord(const EventRecord& record) {
         fNeighborhoodChargeFractionsCol[idx] = cell.fractionCol;
         fNeighborhoodChargeFractionsBlock[idx] = cell.fractionBlock;
         // Neighborhood charge
-        fNeighborhoodCharge[idx] = cell.charge;
+        fNeighborhoodChargeInd[idx] = cell.chargeInd;
         // Row-mode charge (base charge from row fraction; noise applied later if needed)
-        fNeighborhoodChargeRow[idx] = cell.chargeRow;
+        fNeighborhoodChargeIndRow[idx] = cell.chargeIndRow;
         // Col-mode charge
-        fNeighborhoodChargeCol[idx] = cell.chargeCol;
+        fNeighborhoodChargeIndCol[idx] = cell.chargeIndCol;
         // Block-mode charge
-        fNeighborhoodChargeBlock[idx] = cell.chargeBlock;
+        fNeighborhoodChargeIndBlock[idx] = cell.chargeIndBlock;
         // Geometry
         fNeighborhoodPixelX[idx] = cell.center.x();
         fNeighborhoodPixelY[idx] = cell.center.y();
@@ -394,21 +394,21 @@ void TreeFiller::PopulateFullFractionsFromRecord(const EventRecord& record) {
     copyOrZero(record.fullFiCol, fFullFiCol);
     copyOrZero(record.fullFiBlock, fFullFiBlock);
     // Neighborhood charges
-    copyOrZero(record.fullQi, fFullQi);
-    copyOrZero(record.fullQn, fFullQn);
-    copyOrZero(record.fullQf, fFullQf);
+    copyOrZero(record.fullQ_ind, fFullQ_ind);
+    copyOrZero(record.fullQ_amp, fFullQ_amp);
+    copyOrZero(record.fullQ_meas, fFullQ_meas);
     // Row-mode charges
-    copyOrZero(record.fullQiRow, fFullQiRow);
-    copyOrZero(record.fullQnRow, fFullQnRow);
-    copyOrZero(record.fullQfRow, fFullQfRow);
+    copyOrZero(record.fullQ_indRow, fFullQ_indRow);
+    copyOrZero(record.fullQ_ampRow, fFullQ_ampRow);
+    copyOrZero(record.fullQ_measRow, fFullQ_measRow);
     // Col-mode charges
-    copyOrZero(record.fullQiCol, fFullQiCol);
-    copyOrZero(record.fullQnCol, fFullQnCol);
-    copyOrZero(record.fullQfCol, fFullQfCol);
+    copyOrZero(record.fullQ_indCol, fFullQ_indCol);
+    copyOrZero(record.fullQ_ampCol, fFullQ_ampCol);
+    copyOrZero(record.fullQ_measCol, fFullQ_measCol);
     // Block-mode charges
-    copyOrZero(record.fullQiBlock, fFullQiBlock);
-    copyOrZero(record.fullQnBlock, fFullQnBlock);
-    copyOrZero(record.fullQfBlock, fFullQfBlock);
+    copyOrZero(record.fullQ_indBlock, fFullQ_indBlock);
+    copyOrZero(record.fullQ_ampBlock, fFullQ_ampBlock);
+    copyOrZero(record.fullQ_measBlock, fFullQ_measBlock);
     // Geometry
     copyOrZero(record.fullDistance, fFullDistance);
     copyOrZero(record.fullAlpha, fFullAlpha);
@@ -430,21 +430,21 @@ bool TreeFiller::EnsureFullFractionBuffer(G4int gridSide) {
         fFullFiCol.clear();
         fFullFiBlock.clear();
         // Neighborhood charges
-        fFullQi.clear();
-        fFullQn.clear();
-        fFullQf.clear();
+        fFullQ_ind.clear();
+        fFullQ_amp.clear();
+        fFullQ_meas.clear();
         // Row-mode charges
-        fFullQiRow.clear();
-        fFullQnRow.clear();
-        fFullQfRow.clear();
+        fFullQ_indRow.clear();
+        fFullQ_ampRow.clear();
+        fFullQ_measRow.clear();
         // Col-mode charges
-        fFullQiCol.clear();
-        fFullQnCol.clear();
-        fFullQfCol.clear();
+        fFullQ_indCol.clear();
+        fFullQ_ampCol.clear();
+        fFullQ_measCol.clear();
         // Block-mode charges
-        fFullQiBlock.clear();
-        fFullQnBlock.clear();
-        fFullQfBlock.clear();
+        fFullQ_indBlock.clear();
+        fFullQ_ampBlock.clear();
+        fFullQ_measBlock.clear();
         // Geometry
         fFullDistance.clear();
         fFullAlpha.clear();
@@ -468,21 +468,21 @@ bool TreeFiller::EnsureFullFractionBuffer(G4int gridSide) {
     ensure(fFullFiCol);
     ensure(fFullFiBlock);
     // Neighborhood charges
-    ensure(fFullQi);
-    ensure(fFullQn);
-    ensure(fFullQf);
+    ensure(fFullQ_ind);
+    ensure(fFullQ_amp);
+    ensure(fFullQ_meas);
     // Row-mode charges
-    ensure(fFullQiRow);
-    ensure(fFullQnRow);
-    ensure(fFullQfRow);
+    ensure(fFullQ_indRow);
+    ensure(fFullQ_ampRow);
+    ensure(fFullQ_measRow);
     // Col-mode charges
-    ensure(fFullQiCol);
-    ensure(fFullQnCol);
-    ensure(fFullQfCol);
+    ensure(fFullQ_indCol);
+    ensure(fFullQ_ampCol);
+    ensure(fFullQ_measCol);
     // Block-mode charges
-    ensure(fFullQiBlock);
-    ensure(fFullQnBlock);
-    ensure(fFullQfBlock);
+    ensure(fFullQ_indBlock);
+    ensure(fFullQ_ampBlock);
+    ensure(fFullQ_measBlock);
     // Geometry
     ensure(fFullDistance);
     ensure(fFullAlpha);

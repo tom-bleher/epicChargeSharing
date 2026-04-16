@@ -66,38 +66,38 @@ struct EventRecord {
     EventSummaryData summary;
     std::span<const ChargeSharingCalculator::Result::NeighborCell> neighborCells;
     std::span<const ChargeSharingCalculator::Result::NeighborCell> chargeBlock;
-    std::span<const G4double> neighborChargesNew;
-    std::span<const G4double> neighborChargesFinal;
+    std::span<const G4double> neighborChargesAmp;
+    std::span<const G4double> neighborChargesMeas;
     // Row-mode neighborhood noisy charges
-    std::span<const G4double> neighborChargesNewRow;
-    std::span<const G4double> neighborChargesFinalRow;
+    std::span<const G4double> neighborChargesAmpRow;
+    std::span<const G4double> neighborChargesMeasRow;
     // Col-mode neighborhood noisy charges
-    std::span<const G4double> neighborChargesNewCol;
-    std::span<const G4double> neighborChargesFinalCol;
+    std::span<const G4double> neighborChargesAmpCol;
+    std::span<const G4double> neighborChargesMeasCol;
     // Block-mode neighborhood noisy charges
-    std::span<const G4double> neighborChargesNewBlock;
-    std::span<const G4double> neighborChargesFinalBlock;
+    std::span<const G4double> neighborChargesAmpBlock;
+    std::span<const G4double> neighborChargesMeasBlock;
     // Full grid fractions
     std::span<const G4double> fullFi;
     std::span<const G4double> fullFiRow;   ///< Signal fractions with row denominator
     std::span<const G4double> fullFiCol;   ///< Signal fractions with column denominator
     std::span<const G4double> fullFiBlock; ///< Signal fractions with 4-pad block denominator
     // Full grid neighborhood-mode charges
-    std::span<const G4double> fullQi;
-    std::span<const G4double> fullQn;
-    std::span<const G4double> fullQf;
+    std::span<const G4double> fullQ_ind;
+    std::span<const G4double> fullQ_amp;
+    std::span<const G4double> fullQ_meas;
     // Full grid row-mode charges
-    std::span<const G4double> fullQiRow;
-    std::span<const G4double> fullQnRow;
-    std::span<const G4double> fullQfRow;
+    std::span<const G4double> fullQ_indRow;
+    std::span<const G4double> fullQ_ampRow;
+    std::span<const G4double> fullQ_measRow;
     // Full grid col-mode charges
-    std::span<const G4double> fullQiCol;
-    std::span<const G4double> fullQnCol;
-    std::span<const G4double> fullQfCol;
+    std::span<const G4double> fullQ_indCol;
+    std::span<const G4double> fullQ_ampCol;
+    std::span<const G4double> fullQ_measCol;
     // Full grid block-mode charges
-    std::span<const G4double> fullQiBlock;
-    std::span<const G4double> fullQnBlock;
-    std::span<const G4double> fullQfBlock;
+    std::span<const G4double> fullQ_indBlock;
+    std::span<const G4double> fullQ_ampBlock;
+    std::span<const G4double> fullQ_measBlock;
     // Full grid geometry
     std::span<const G4double> fullDistance;
     std::span<const G4double> fullAlpha;
@@ -105,8 +105,8 @@ struct EventRecord {
     std::span<const G4double> fullPixelY;
     ChargeSharingCalculator::PixelGridGeometry geometry;
     ChargeSharingCalculator::HitInfo hit;
-    ChargeSharingCalculator::ChargeMode mode{ChargeSharingCalculator::ChargeMode::Patch};
-    ChargeSharingCalculator::PatchInfo patchInfo;
+    ChargeSharingCalculator::ChargeMode mode{ChargeSharingCalculator::ChargeMode::Neighborhood};
+    ChargeSharingCalculator::NeighborhoodGridBounds neighborhoodGridBounds;
     G4int fullGridRows{0};
     G4int fullGridCols{0};
     G4int nearestPixelI{-1};
@@ -159,18 +159,18 @@ public:
         std::vector<G4double>* chargeFractionsRow{nullptr};   ///< Row-denominator fractions
         std::vector<G4double>* chargeFractionsCol{nullptr};   ///< Column-denominator fractions
         std::vector<G4double>* chargeFractionsBlock{nullptr}; ///< Block-denominator fractions
-        std::vector<G4double>* charge{nullptr};
-        std::vector<G4double>* chargeNew{nullptr};
-        std::vector<G4double>* chargeFinal{nullptr};
+        std::vector<G4double>* chargeInd{nullptr};
+        std::vector<G4double>* chargeAmp{nullptr};
+        std::vector<G4double>* chargeMeas{nullptr};
         std::vector<G4double>* chargeRow{nullptr};        ///< Charge based on row fraction
-        std::vector<G4double>* chargeNewRow{nullptr};     ///< Noisy charge based on row fraction
-        std::vector<G4double>* chargeFinalRow{nullptr};   ///< Final charge based on row fraction
+        std::vector<G4double>* chargeAmpRow{nullptr};     ///< Noisy charge based on row fraction
+        std::vector<G4double>* chargeMeasRow{nullptr};   ///< Final charge based on row fraction
         std::vector<G4double>* chargeCol{nullptr};        ///< Charge based on col fraction
-        std::vector<G4double>* chargeNewCol{nullptr};     ///< Noisy charge based on col fraction
-        std::vector<G4double>* chargeFinalCol{nullptr};   ///< Final charge based on col fraction
-        std::vector<G4double>* chargeBlock{nullptr};      ///< Charge based on block fraction
-        std::vector<G4double>* chargeNewBlock{nullptr};   ///< Noisy charge based on block fraction
-        std::vector<G4double>* chargeFinalBlock{nullptr}; ///< Final charge based on block fraction
+        std::vector<G4double>* chargeAmpCol{nullptr};     ///< Noisy charge based on col fraction
+        std::vector<G4double>* chargeMeasCol{nullptr};   ///< Final charge based on col fraction
+        std::vector<G4double>* chargeIndBlock{nullptr};      ///< Charge based on block fraction
+        std::vector<G4double>* chargeAmpBlock{nullptr};   ///< Noisy charge based on block fraction
+        std::vector<G4double>* chargeMeasBlock{nullptr}; ///< Final charge based on block fraction
         std::vector<G4double>* pixelX{nullptr};
         std::vector<G4double>* pixelY{nullptr};
         std::vector<G4double>* distance{nullptr};
@@ -183,18 +183,18 @@ public:
         std::vector<G4double>* fiRow{nullptr};   ///< Row-denominator fractions
         std::vector<G4double>* fiCol{nullptr};   ///< Column-denominator fractions
         std::vector<G4double>* fiBlock{nullptr}; ///< Block-denominator fractions
-        std::vector<G4double>* qi{nullptr};
-        std::vector<G4double>* qn{nullptr};
-        std::vector<G4double>* qf{nullptr};
-        std::vector<G4double>* qiRow{nullptr};   ///< Charge based on row fraction
-        std::vector<G4double>* qnRow{nullptr};   ///< Noisy charge based on row fraction
-        std::vector<G4double>* qfRow{nullptr};   ///< Final charge based on row fraction
-        std::vector<G4double>* qiCol{nullptr};   ///< Charge based on col fraction
-        std::vector<G4double>* qnCol{nullptr};   ///< Noisy charge based on col fraction
-        std::vector<G4double>* qfCol{nullptr};   ///< Final charge based on col fraction
-        std::vector<G4double>* qiBlock{nullptr}; ///< Charge based on block fraction
-        std::vector<G4double>* qnBlock{nullptr}; ///< Noisy charge based on block fraction
-        std::vector<G4double>* qfBlock{nullptr}; ///< Final charge based on block fraction
+        std::vector<G4double>* qInd{nullptr};
+        std::vector<G4double>* qAmp{nullptr};
+        std::vector<G4double>* qMeas{nullptr};
+        std::vector<G4double>* qIndRow{nullptr};   ///< Charge based on row fraction
+        std::vector<G4double>* qAmpRow{nullptr};    ///< Noisy charge based on row fraction
+        std::vector<G4double>* qMeasRow{nullptr};     ///< Final charge based on row fraction
+        std::vector<G4double>* qIndCol{nullptr};   ///< Charge based on col fraction
+        std::vector<G4double>* qAmpCol{nullptr};    ///< Noisy charge based on col fraction
+        std::vector<G4double>* qMeasCol{nullptr};     ///< Final charge based on col fraction
+        std::vector<G4double>* qIndBlock{nullptr}; ///< Charge based on block fraction
+        std::vector<G4double>* qAmpBlock{nullptr};  ///< Noisy charge based on block fraction
+        std::vector<G4double>* qMeasBlock{nullptr};   ///< Final charge based on block fraction
         std::vector<G4double>* distance{nullptr};
         std::vector<G4double>* alpha{nullptr};
         std::vector<G4double>* pixelX{nullptr};
@@ -285,20 +285,20 @@ public:
     std::vector<G4double>& ChargeFractionsRow() { return fNeighborhoodChargeFractionsRow; }
     std::vector<G4double>& ChargeFractionsCol() { return fNeighborhoodChargeFractionsCol; }
     std::vector<G4double>& ChargeFractionsBlock() { return fNeighborhoodChargeFractionsBlock; }
-    std::vector<G4double>& Charge() { return fNeighborhoodCharge; }
-    std::vector<G4double>& ChargeNew() { return fNeighborhoodChargeNew; }
-    std::vector<G4double>& ChargeFinal() { return fNeighborhoodChargeFinal; }
+    std::vector<G4double>& ChargeInd() { return fNeighborhoodChargeInd; }
+    std::vector<G4double>& ChargeAmp() { return fNeighborhoodChargeAmp; }
+    std::vector<G4double>& ChargeMeas() { return fNeighborhoodChargeMeas; }
     // Vector accessors - RowCol mode
-    std::vector<G4double>& ChargeRow() { return fNeighborhoodChargeRow; }
-    std::vector<G4double>& ChargeNewRow() { return fNeighborhoodChargeNewRow; }
-    std::vector<G4double>& ChargeFinalRow() { return fNeighborhoodChargeFinalRow; }
-    std::vector<G4double>& ChargeCol() { return fNeighborhoodChargeCol; }
-    std::vector<G4double>& ChargeNewCol() { return fNeighborhoodChargeNewCol; }
-    std::vector<G4double>& ChargeFinalCol() { return fNeighborhoodChargeFinalCol; }
+    std::vector<G4double>& ChargeIndRow() { return fNeighborhoodChargeIndRow; }
+    std::vector<G4double>& ChargeAmpRow() { return fNeighborhoodChargeAmpRow; }
+    std::vector<G4double>& ChargeMeasRow() { return fNeighborhoodChargeMeasRow; }
+    std::vector<G4double>& ChargeIndCol() { return fNeighborhoodChargeIndCol; }
+    std::vector<G4double>& ChargeAmpCol() { return fNeighborhoodChargeAmpCol; }
+    std::vector<G4double>& ChargeMeasCol() { return fNeighborhoodChargeMeasCol; }
     // Vector accessors - Block mode
-    std::vector<G4double>& ChargeBlock() { return fNeighborhoodChargeBlock; }
-    std::vector<G4double>& ChargeNewBlock() { return fNeighborhoodChargeNewBlock; }
-    std::vector<G4double>& ChargeFinalBlock() { return fNeighborhoodChargeFinalBlock; }
+    std::vector<G4double>& ChargeIndBlock() { return fNeighborhoodChargeIndBlock; }
+    std::vector<G4double>& ChargeAmpBlock() { return fNeighborhoodChargeAmpBlock; }
+    std::vector<G4double>& ChargeMeasBlock() { return fNeighborhoodChargeMeasBlock; }
     // Vector accessors - common
     std::vector<G4double>& Distance() { return fNeighborhoodDistance; }
     std::vector<G4double>& Alpha() { return fNeighborhoodAlpha; }
@@ -311,20 +311,20 @@ public:
     std::vector<G4double>& FullFiRow() { return fFullFiRow; }
     std::vector<G4double>& FullFiCol() { return fFullFiCol; }
     std::vector<G4double>& FullFiBlock() { return fFullFiBlock; }
-    std::vector<G4double>& FullQi() { return fFullQi; }
-    std::vector<G4double>& FullQn() { return fFullQn; }
-    std::vector<G4double>& FullQf() { return fFullQf; }
+    std::vector<G4double>& FullQ_ind() { return fFullQ_ind; }
+    std::vector<G4double>& FullQ_amp() { return fFullQ_amp; }
+    std::vector<G4double>& FullQ_meas() { return fFullQ_meas; }
     // Full grid accessors - RowCol mode
-    std::vector<G4double>& FullQiRow() { return fFullQiRow; }
-    std::vector<G4double>& FullQnRow() { return fFullQnRow; }
-    std::vector<G4double>& FullQfRow() { return fFullQfRow; }
-    std::vector<G4double>& FullQiCol() { return fFullQiCol; }
-    std::vector<G4double>& FullQnCol() { return fFullQnCol; }
-    std::vector<G4double>& FullQfCol() { return fFullQfCol; }
+    std::vector<G4double>& FullQ_indRow() { return fFullQ_indRow; }
+    std::vector<G4double>& FullQ_ampRow() { return fFullQ_ampRow; }
+    std::vector<G4double>& FullQ_measRow() { return fFullQ_measRow; }
+    std::vector<G4double>& FullQ_indCol() { return fFullQ_indCol; }
+    std::vector<G4double>& FullQ_ampCol() { return fFullQ_ampCol; }
+    std::vector<G4double>& FullQ_measCol() { return fFullQ_measCol; }
     // Full grid accessors - Block mode
-    std::vector<G4double>& FullQiBlock() { return fFullQiBlock; }
-    std::vector<G4double>& FullQnBlock() { return fFullQnBlock; }
-    std::vector<G4double>& FullQfBlock() { return fFullQfBlock; }
+    std::vector<G4double>& FullQ_indBlock() { return fFullQ_indBlock; }
+    std::vector<G4double>& FullQ_ampBlock() { return fFullQ_ampBlock; }
+    std::vector<G4double>& FullQ_measBlock() { return fFullQ_measBlock; }
     // Full grid accessors - common
     std::vector<G4double>& FullDistance() { return fFullDistance; }
     std::vector<G4double>& FullAlpha() { return fFullAlpha; }
@@ -356,18 +356,18 @@ private:
     std::vector<G4double> fNeighborhoodChargeFractionsRow;
     std::vector<G4double> fNeighborhoodChargeFractionsCol;
     std::vector<G4double> fNeighborhoodChargeFractionsBlock;
-    std::vector<G4double> fNeighborhoodCharge;
-    std::vector<G4double> fNeighborhoodChargeNew;
-    std::vector<G4double> fNeighborhoodChargeFinal;
-    std::vector<G4double> fNeighborhoodChargeRow;
-    std::vector<G4double> fNeighborhoodChargeNewRow;
-    std::vector<G4double> fNeighborhoodChargeFinalRow;
-    std::vector<G4double> fNeighborhoodChargeCol;
-    std::vector<G4double> fNeighborhoodChargeNewCol;
-    std::vector<G4double> fNeighborhoodChargeFinalCol;
-    std::vector<G4double> fNeighborhoodChargeBlock;
-    std::vector<G4double> fNeighborhoodChargeNewBlock;
-    std::vector<G4double> fNeighborhoodChargeFinalBlock;
+    std::vector<G4double> fNeighborhoodChargeInd;
+    std::vector<G4double> fNeighborhoodChargeAmp;
+    std::vector<G4double> fNeighborhoodChargeMeas;
+    std::vector<G4double> fNeighborhoodChargeIndRow;
+    std::vector<G4double> fNeighborhoodChargeAmpRow;
+    std::vector<G4double> fNeighborhoodChargeMeasRow;
+    std::vector<G4double> fNeighborhoodChargeIndCol;
+    std::vector<G4double> fNeighborhoodChargeAmpCol;
+    std::vector<G4double> fNeighborhoodChargeMeasCol;
+    std::vector<G4double> fNeighborhoodChargeIndBlock;
+    std::vector<G4double> fNeighborhoodChargeAmpBlock;
+    std::vector<G4double> fNeighborhoodChargeMeasBlock;
     std::vector<G4double> fNeighborhoodDistance;
     std::vector<G4double> fNeighborhoodAlpha;
     std::vector<G4double> fNeighborhoodPixelX;
@@ -375,10 +375,10 @@ private:
     std::vector<G4int> fNeighborhoodPixelID;
 
     std::vector<G4double> fFullFi, fFullFiRow, fFullFiCol, fFullFiBlock;
-    std::vector<G4double> fFullQi, fFullQn, fFullQf;
-    std::vector<G4double> fFullQiRow, fFullQnRow, fFullQfRow;
-    std::vector<G4double> fFullQiCol, fFullQnCol, fFullQfCol;
-    std::vector<G4double> fFullQiBlock, fFullQnBlock, fFullQfBlock;
+    std::vector<G4double> fFullQ_ind, fFullQ_amp, fFullQ_meas;
+    std::vector<G4double> fFullQ_indRow, fFullQ_ampRow, fFullQ_measRow;
+    std::vector<G4double> fFullQ_indCol, fFullQ_ampCol, fFullQ_measCol;
+    std::vector<G4double> fFullQ_indBlock, fFullQ_ampBlock, fFullQ_measBlock;
     std::vector<G4double> fFullDistance, fFullAlpha;
     std::vector<G4double> fFullPixelXGrid, fFullPixelYGrid;
     G4int fFullGridSide{0};

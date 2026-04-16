@@ -41,7 +41,7 @@ void SteppingAction::Reset() {
 void SteppingAction::CacheVolumes() {
     // Lazy initialization pattern from Geant4 B1 example
     // Only called once per run, not per step
-    if (fVolumesCached)
+    if (fVolumesInitialized)
         return;
 
     auto* lvStore = G4LogicalVolumeStore::GetInstance();
@@ -50,7 +50,7 @@ void SteppingAction::CacheVolumes() {
         fLogicBlock = lvStore->GetVolume("logicBlock", false);
         fLogicCube = lvStore->GetVolume("logicCube", false);
     }
-    fVolumesCached = true;
+    fVolumesInitialized = true;
 }
 
 void SteppingAction::TrackVolumeInteractions(const G4Step* step) {

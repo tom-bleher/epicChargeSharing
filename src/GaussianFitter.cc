@@ -119,11 +119,11 @@ static int InferRadiusFromTree(TTree* tree, const std::string& preferredBranch) 
     bool bound = false;
     if (!preferredBranch.empty() && bind(preferredBranch.c_str())) {
         bound = true;
-    } else if (bind("Qf")) {
+    } else if (bind("Q_meas")) {
         bound = true;
     } else if (bind("Fi")) {
         bound = true;
-    } else if (bind("Qi")) {
+    } else if (bind("Q_ind")) {
         bound = true;
     }
     if (!bound)
@@ -154,7 +154,7 @@ static std::string ResolveChargeBranch(TTree* tree, const std::string& requested
         return requestedBranch;
 
     for (const char* name :
-         {"Qf", "QfBlock", "QfRow", "QfCol", "Fi", "FiBlock", "FiRow", "FiCol", "Qi", "QiBlock", "QiRow", "QiCol"}) {
+         {"Q_meas", "Q_measBlock", "Q_measRow", "Q_measCol", "Fi", "FiBlock", "FiRow", "FiCol", "Q_ind", "Q_indBlock", "Q_indRow", "Q_indCol"}) {
         if (hasBranch(name))
             return name;
     }

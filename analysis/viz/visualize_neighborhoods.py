@@ -68,7 +68,7 @@ def load_data(root_file):
     with uproot.open(root_file) as f:
         tree = f["Hits"]
         branches = tree.arrays(
-            ["Fi", "Qi", "Qn", "Qf", "NeighborhoodPixelX", "NeighborhoodPixelY",
+            ["Fi", "Q_ind", "Q_amp", "Q_meas", "NeighborhoodPixelX", "NeighborhoodPixelY",
              "TrueX", "TrueY", "PixelX", "PixelY", "EnergyDeposited", "NeighborhoodSize",
              "NearestPixelI", "NearestPixelJ", "isPixelHit", "hitWithinDetector"],
             library="ak",
@@ -84,7 +84,7 @@ def draw_event(ax, orig_idx, branches, meta):
     pad_frac = pad_size / pitch  # true physical fraction (e.g. 0.2)
 
     fi = ak.to_numpy(branches["Fi"][orig_idx])
-    qf = ak.to_numpy(branches["Qf"][orig_idx])
+    qf = ak.to_numpy(branches["Q_meas"][orig_idx])
     true_x = float(branches["TrueX"][orig_idx])
     true_y = float(branches["TrueY"][orig_idx])
     pix_x = ak.to_numpy(branches["NeighborhoodPixelX"][orig_idx])

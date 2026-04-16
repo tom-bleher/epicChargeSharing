@@ -109,7 +109,7 @@ private:
     // Cached volume pointers for fast comparison (initialized lazily)
     const G4LogicalVolume* fLogicBlock = nullptr; ///< Pixel aluminum volume
     const G4LogicalVolume* fLogicCube = nullptr;  ///< Silicon bulk volume
-    G4bool fVolumesCached = false;                ///< Whether volumes have been cached
+    G4bool fVolumesInitialized = false;           ///< Whether volumes have been initialized
 };
 
 } // namespace ECS

@@ -257,7 +257,7 @@ void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
     const G4int radius = std::max(0, fNeighborhoodRadius);
     const G4int patchDim = 2 * radius + 1;
 
-    const PatchInfo info{.row0 = 0, .col0 = 0, .nRows = patchDim, .nCols = patchDim};
+    const NeighborhoodGridBounds info{.rowMin = 0, .colMin = 0, .nRows = patchDim, .nCols = patchDim};
     fResult.patch.Resize(info);
     fResult.patch.charges.Zero();
 
@@ -273,9 +273,9 @@ void ChargeSharingCalculator::PopulatePatchFromNeighbors(G4int numBlocksPerSide)
         fResult.patch.charges.signalFractionRow(localRow, localCol) = cell.fractionRow;
         fResult.patch.charges.signalFractionCol(localRow, localCol) = cell.fractionCol;
         fResult.patch.charges.signalFractionBlock(localRow, localCol) = cell.fractionBlock;
-        fResult.patch.charges.chargeInduced(localRow, localCol) = cell.charge;
-        fResult.patch.charges.chargeWithNoise(localRow, localCol) = cell.charge;
-        fResult.patch.charges.chargeFinal(localRow, localCol) = cell.charge;
+        fResult.patch.charges.chargeInduced(localRow, localCol) = cell.chargeInd;
+        fResult.patch.charges.chargeAmp(localRow, localCol) = cell.chargeInd;
+        fResult.patch.charges.chargeMeas(localRow, localCol) = cell.chargeInd;
     }
 }
 
@@ -304,7 +304,7 @@ ChargeSharingCalculator::Compute(const G4ThreeVector& hitPos, G4double energyDep
     }
     fNeedsReset = true;
 
-    fResult.mode = fComputeFullGridFractions ? ChargeMode::FullGrid : ChargeMode::Patch;
+    fResult.mode = fComputeFullGridFractions ? ChargeMode::FullGrid : ChargeMode::Neighborhood;
     fResult.gridRadius = fNeighborhoodRadius;
     fResult.gridSide = fGridDim;
     fResult.totalCells = static_cast<std::size_t>(fGridDim) * static_cast<std::size_t>(fGridDim);
@@ -313,8 +313,8 @@ ChargeSharingCalculator::Compute(const G4ThreeVector& hitPos, G4double energyDep
     fResult.hit.trueX = hitPos.x();
     fResult.hit.trueY = hitPos.y();
     fResult.hit.trueZ = hitPos.z();
-    fResult.hit.pixRow = fResult.pixelIndexI;
-    fResult.hit.pixCol = fResult.pixelIndexJ;
+    fResult.hit.pixRow = fResult.pixelRowIndex;
+    fResult.hit.pixCol = fResult.pixelColIndex;
     fResult.hit.pixCenterX = fResult.nearestPixelCenter.x();
     fResult.hit.pixCenterY = fResult.nearestPixelCenter.y();
     fResult.geometry = BuildGridGeometry();
@@ -375,7 +375,7 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
     }
     fNeedsReset = true;
 
-    fResult.mode = fComputeFullGridFractions ? ChargeMode::FullGrid : ChargeMode::Patch;
+    fResult.mode = fComputeFullGridFractions ? ChargeMode::FullGrid : ChargeMode::Neighborhood;
     fResult.gridRadius = fNeighborhoodRadius;
     fResult.gridSide = fGridDim;
     fResult.totalCells = static_cast<std::size_t>(fGridDim) * static_cast<std::size_t>(fGridDim);
@@ -384,8 +384,8 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
     fResult.hit.trueX = centroid.x();
     fResult.hit.trueY = centroid.y();
     fResult.hit.trueZ = centroid.z();
-    fResult.hit.pixRow = fResult.pixelIndexI;
-    fResult.hit.pixCol = fResult.pixelIndexJ;
+    fResult.hit.pixRow = fResult.pixelRowIndex;
+    fResult.hit.pixCol = fResult.pixelColIndex;
     fResult.hit.pixCenterX = fResult.nearestPixelCenter.x();
     fResult.hit.pixCenterY = fResult.nearestPixelCenter.y();
     fResult.geometry = BuildGridGeometry();
@@ -429,8 +429,8 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
 
     const G4int minIndexX = fDetector->GetMinIndexX();
     const G4int minIndexY = fDetector->GetMinIndexY();
-    const G4int centerI_0based = fResult.pixelIndexI - minIndexX;
-    const G4int centerJ_0based = fResult.pixelIndexJ - minIndexY;
+    const G4int centerI_0based = fResult.pixelRowIndex - minIndexX;
+    const G4int centerJ_0based = fResult.pixelColIndex - minIndexY;
 
     // 4. Accumulate per-step fractions (convex combination)
     // accFrac[i] = sum_s (edep_s / totalEdep) * fraction_i(pos_s)
@@ -563,7 +563,7 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
             }
 
             cell.fraction = frac;
-            cell.charge = frac * totalChargeCoulomb;
+            cell.chargeInd = frac * totalChargeCoulomb;
 
             cell.fractionRow = accFractionRow(row, col);
             cell.fractionCol = accFractionCol(row, col);
@@ -572,9 +572,9 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
                                   dj >= blockCornerDj && dj < blockCornerDj + blockSize);
             cell.fractionBlock = inBlock ? (fNeighborhoodWeights(row, col) * invBlockSum) : 0.0;
 
-            cell.chargeRow = cell.fractionRow * totalChargeCoulomb;
-            cell.chargeCol = cell.fractionCol * totalChargeCoulomb;
-            cell.chargeBlock = cell.fractionBlock * totalChargeCoulomb;
+            cell.chargeIndRow = cell.fractionRow * totalChargeCoulomb;
+            cell.chargeIndCol = cell.fractionCol * totalChargeCoulomb;
+            cell.chargeIndBlock = cell.fractionBlock * totalChargeCoulomb;
 
             fResult.cells.push_back(cell);
             if (inBlock) {
@@ -616,8 +616,8 @@ void ChargeSharingCalculator::ReserveBuffers() {
 
 G4ThreeVector ChargeSharingCalculator::CalcNearestPixel(const G4ThreeVector& pos) {
     const auto location = fDetector->FindNearestPixel(pos);
-    fResult.pixelIndexI = location.indexI;
-    fResult.pixelIndexJ = location.indexJ;
+    fResult.pixelRowIndex = location.indexI;
+    fResult.pixelColIndex = location.indexJ;
     return location.center;
 }
 
@@ -660,8 +660,8 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     // Convert to 0-based by subtracting the minimum index.
     const G4int minIndexX = fDetector->GetMinIndexX();
     const G4int minIndexY = fDetector->GetMinIndexY();
-    const G4int centerI_0based = fResult.pixelIndexI - minIndexX;
-    const G4int centerJ_0based = fResult.pixelIndexJ - minIndexY;
+    const G4int centerI_0based = fResult.pixelRowIndex - minIndexX;
+    const G4int centerJ_0based = fResult.pixelColIndex - minIndexY;
 
     const auto coreResult =
         csc::calculateNeighborhood(hitPos.x(), hitPos.y(), centerI_0based, centerJ_0based,
@@ -751,7 +751,7 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
         // Main fraction from core (handles active pixel mode denominator)
         cell.fraction = pixel.fraction;
-        cell.charge = pixel.fraction * totalChargeCoulomb;
+        cell.chargeInd = pixel.fraction * totalChargeCoulomb;
 
         // Per-row/per-col fractions via Eigen normalization (backward-compatible)
         const int gridRow = pixel.di + radius;
@@ -772,9 +772,9 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
                               pixel.dj >= blockCornerDj && pixel.dj < blockCornerDj + blockSize);
         cell.fractionBlock = inBlock ? (pixel.weight * invBlockSum) : 0.0;
 
-        cell.chargeRow = cell.fractionRow * totalChargeCoulomb;
-        cell.chargeCol = cell.fractionCol * totalChargeCoulomb;
-        cell.chargeBlock = cell.fractionBlock * totalChargeCoulomb;
+        cell.chargeIndRow = cell.fractionRow * totalChargeCoulomb;
+        cell.chargeIndCol = cell.fractionCol * totalChargeCoulomb;
+        cell.chargeIndBlock = cell.fractionBlock * totalChargeCoulomb;
 
         fResult.cells.push_back(cell);
 
@@ -864,11 +864,11 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
     for (G4int localI = 0; localI < rows; ++localI) {
         const G4int gridI = localI + minIndexX;
-        const G4int di = gridI - fResult.pixelIndexI;
+        const G4int di = gridI - fResult.pixelRowIndex;
 
         for (G4int localJ = 0; localJ < cols; ++localJ) {
             const G4int gridJ = localJ + minIndexY;
-            const G4int dj = gridJ - fResult.pixelIndexJ;
+            const G4int dj = gridJ - fResult.pixelColIndex;
 
             const G4double dxToCenter = baseDx - (di * pixelSpacing);
             const G4double dyToCenter = baseDy - (dj * pixelSpacing);
@@ -904,8 +904,8 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
     const bool include3x3 = (activePixelMode == Constants::ActivePixelMode::RowCol3x3);
 
     // Get center pixel indices (the hit pixel)
-    const G4int centerI = fResult.pixelIndexI;
-    const G4int centerJ = fResult.pixelIndexJ;
+    const G4int centerI = fResult.pixelRowIndex;
+    const G4int centerJ = fResult.pixelColIndex;
 
     // Helper lambda to check if pixel (i,j) is in the included region for RowCol modes
     auto isInRowColRegion = [&](G4int i, G4int j) -> bool {
@@ -1122,23 +1122,23 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
 
             // Store neighborhood-mode charges
             fResult.full.chargeInduced(i, j) = qi;
-            fResult.full.chargeWithNoise(i, j) = qn;
-            fResult.full.chargeFinal(i, j) = qf;
+            fResult.full.chargeAmp(i, j) = qn;
+            fResult.full.chargeMeas(i, j) = qf;
 
             // Store row-mode charges
             fResult.full.chargeInducedRow(i, j) = qiRow;
-            fResult.full.chargeWithNoiseRow(i, j) = qnRow;
-            fResult.full.chargeFinalRow(i, j) = qfRow;
+            fResult.full.chargeAmpRow(i, j) = qnRow;
+            fResult.full.chargeMeasRow(i, j) = qfRow;
 
             // Store col-mode charges
             fResult.full.chargeInducedCol(i, j) = qiCol;
-            fResult.full.chargeWithNoiseCol(i, j) = qnCol;
-            fResult.full.chargeFinalCol(i, j) = qfCol;
+            fResult.full.chargeAmpCol(i, j) = qnCol;
+            fResult.full.chargeMeasCol(i, j) = qfCol;
 
             // Store block-mode charges
             fResult.full.chargeInducedBlock(i, j) = qiBlock;
-            fResult.full.chargeWithNoiseBlock(i, j) = qnBlock;
-            fResult.full.chargeFinalBlock(i, j) = qfBlock;
+            fResult.full.chargeAmpBlock(i, j) = qnBlock;
+            fResult.full.chargeMeasBlock(i, j) = qfBlock;
         }
     }
 
@@ -1150,19 +1150,19 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
         const G4double threshold = thresholdSigma * sigmaNoise;
         for (G4int i = 0; i < rows; ++i) {
             for (G4int j = 0; j < cols; ++j) {
-                if (fResult.full.chargeFinal(i, j) < threshold) {
+                if (fResult.full.chargeMeas(i, j) < threshold) {
                     fResult.full.chargeInduced(i, j) = 0.0;
-                    fResult.full.chargeWithNoise(i, j) = 0.0;
-                    fResult.full.chargeFinal(i, j) = 0.0;
+                    fResult.full.chargeAmp(i, j) = 0.0;
+                    fResult.full.chargeMeas(i, j) = 0.0;
                     fResult.full.chargeInducedRow(i, j) = 0.0;
-                    fResult.full.chargeWithNoiseRow(i, j) = 0.0;
-                    fResult.full.chargeFinalRow(i, j) = 0.0;
+                    fResult.full.chargeAmpRow(i, j) = 0.0;
+                    fResult.full.chargeMeasRow(i, j) = 0.0;
                     fResult.full.chargeInducedCol(i, j) = 0.0;
-                    fResult.full.chargeWithNoiseCol(i, j) = 0.0;
-                    fResult.full.chargeFinalCol(i, j) = 0.0;
+                    fResult.full.chargeAmpCol(i, j) = 0.0;
+                    fResult.full.chargeMeasCol(i, j) = 0.0;
                     fResult.full.chargeInducedBlock(i, j) = 0.0;
-                    fResult.full.chargeWithNoiseBlock(i, j) = 0.0;
-                    fResult.full.chargeFinalBlock(i, j) = 0.0;
+                    fResult.full.chargeAmpBlock(i, j) = 0.0;
+                    fResult.full.chargeMeasBlock(i, j) = 0.0;
                 }
             }
         }
