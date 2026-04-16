@@ -182,16 +182,18 @@ struct GaussFit1DResult {
 
 /// @brief Result of a 2D Gaussian + baseline fit to a pixel cluster charge map.
 ///
-/// The fitted model is A * exp(-0.5*((x-muX)/sigmaX)^2 - 0.5*((y-muY)/sigmaY)^2) + B.
-/// No cross-term (rotation) is included; the axes are aligned with pixel rows/columns.
+/// The fitted model is A * exp(-0.5*(u²/sigmaX² + v²/sigmaY²)) + B,
+/// where u = (x-muX)cos(theta) + (y-muY)sin(theta),
+///       v = -(x-muX)sin(theta) + (y-muY)cos(theta).
 struct GaussFit2DResult {
     bool converged{false};                     ///< True if the minimizer converged
     double A{constants::kInvalidValue};        ///< Peak amplitude above baseline (charge units)
     double muX{constants::kInvalidValue};      ///< Reconstructed hit position X (mm)
     double muY{constants::kInvalidValue};      ///< Reconstructed hit position Y (mm)
-    double sigmaX{constants::kInvalidValue};   ///< Gaussian width along X (mm)
-    double sigmaY{constants::kInvalidValue};   ///< Gaussian width along Y (mm)
+    double sigmaX{constants::kInvalidValue};   ///< Gaussian width along major axis (mm)
+    double sigmaY{constants::kInvalidValue};   ///< Gaussian width along minor axis (mm)
     double B{constants::kInvalidValue};        ///< Constant baseline offset (charge units)
+    double theta{0.0};                         ///< Rotation angle of Gaussian axes (radians, [-pi/2, pi/2])
     double chi2{constants::kInvalidValue};     ///< Chi-square of the fit
     double ndf{constants::kInvalidValue};      ///< Number of degrees of freedom
     double muXError{constants::kInvalidValue}; ///< 1-sigma uncertainty on muX from fit covariance (mm)
@@ -228,8 +230,10 @@ inline double gauss1DPlusB(double* x, double* p) {
     return A * std::exp(-0.5 * dx * dx) + B;
 }
 
-/// 2D Gaussian with constant offset:
-/// A * exp(-0.5 * ((x-mux)^2/sigx^2 + (y-muy)^2/sigy^2)) + B
+/// 2D Gaussian with rotation and constant offset:
+/// A * exp(-0.5 * (u^2/sigx^2 + v^2/sigy^2)) + B
+/// where u = (x-mux)*cos(theta) + (y-muy)*sin(theta)
+///       v = -(x-mux)*sin(theta) + (y-muy)*cos(theta)
 inline double gauss2DPlusB(double* xy, double* p) {
     const double A = p[0];
     const double muX = p[1];
@@ -237,9 +241,14 @@ inline double gauss2DPlusB(double* xy, double* p) {
     const double sigX = p[3];
     const double sigY = p[4];
     const double B = p[5];
-    const double dx = (xy[0] - muX) / sigX;
-    const double dy = (xy[1] - muY) / sigY;
-    return A * std::exp(-0.5 * (dx * dx + dy * dy)) + B;
+    const double theta = p[6];
+    const double cosT = std::cos(theta);
+    const double sinT = std::sin(theta);
+    const double dxRaw = xy[0] - muX;
+    const double dyRaw = xy[1] - muY;
+    const double u = ( dxRaw * cosT + dyRaw * sinT) / sigX;
+    const double v = (-dxRaw * sinT + dyRaw * cosT) / sigY;
+    return A * std::exp(-0.5 * (u * u + v * v)) + B;
 }
 
 // ============================================================================
@@ -471,10 +480,10 @@ struct GaussFit2DConfig {
     double noiseElectronSigma{0.0}; ///< Additive electronic noise floor in charge units (Coulombs)
 };
 
-/// @brief Fit a 2D Gaussian + baseline to a pixel cluster charge map to extract (X, Y) hit position.
+/// @brief Fit a rotated 2D Gaussian + baseline to a pixel cluster charge map to extract (X, Y) hit position.
 ///
 /// Uses ROOT's Minuit2 (Fumili2, falling back to Migrad) to minimize chi-square.
-/// The Gaussian is axis-aligned (no rotation parameter). Requires at least 5 pixels.
+/// The Gaussian includes a rotation angle theta. Requires at least 6 pixels (7 parameters).
 ///
 /// @param xPositions X coordinates of pixel centers (mm).
 /// @param yPositions Y coordinates of pixel centers (mm).
@@ -487,7 +496,7 @@ inline GaussFit2DResult fitGaussian2D(const std::vector<double>& xPositions, con
     GaussFit2DResult result;
 
     const size_t nPts = xPositions.size();
-    if (nPts != yPositions.size() || nPts != charges.size() || nPts < 5) {
+    if (nPts != yPositions.size() || nPts != charges.size() || nPts < 6) {
         return result;
     }
 
@@ -566,12 +575,13 @@ inline GaussFit2DResult fitGaussian2D(const std::vector<double>& xPositions, con
     const double yMin = *yMinIt - margin;
     const double yMax = *yMaxIt + margin;
 
-    // Set up TF2 for fitting
-    thread_local TF2 fitFunc("fitGauss2D", gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 6);
+    // Set up TF2 for fitting (7 params: A, muX, muY, sigX, sigY, B, theta)
+    thread_local TF2 fitFunc("fitGauss2D", gauss2DPlusB, -1e9, 1e9, -1e9, 1e9, 7);
     fitFunc.SetRange(xMin, yMin, xMax, yMax);
 
     const double amplitudeMax = std::max(constants::kMinAmplitude, 2.0 * qMax);
     const double baselineMax = std::max(constants::kMinAmplitude, qMax);
+    constexpr double kHalfPi = M_PI / 2.0;
 
     // Set up ROOT Fitter
     ROOT::Math::WrappedMultiTF1 wrapped(fitFunc, 2);
@@ -595,12 +605,14 @@ inline GaussFit2DResult fitGaussian2D(const std::vector<double>& xPositions, con
     fitter.Config().ParSettings(3).SetLimits(config.sigmaLo, config.sigmaHi);
     fitter.Config().ParSettings(4).SetLimits(config.sigmaLo, config.sigmaHi);
     fitter.Config().ParSettings(5).SetLimits(-baselineMax, baselineMax);
+    fitter.Config().ParSettings(6).SetLimits(-kHalfPi, kHalfPi);
     fitter.Config().ParSettings(0).SetValue(A0);
     fitter.Config().ParSettings(1).SetValue(muX0);
     fitter.Config().ParSettings(2).SetValue(muY0);
     fitter.Config().ParSettings(3).SetValue(sigX0);
     fitter.Config().ParSettings(4).SetValue(sigY0);
     fitter.Config().ParSettings(5).SetValue(B0);
+    fitter.Config().ParSettings(6).SetValue(0.0);
 
     bool ok = fitter.Fit(data);
     if (!ok) {
@@ -619,6 +631,7 @@ inline GaussFit2DResult fitGaussian2D(const std::vector<double>& xPositions, con
         result.sigmaX = fitter.Result().Parameter(3);
         result.sigmaY = fitter.Result().Parameter(4);
         result.B = fitter.Result().Parameter(5);
+        result.theta = fitter.Result().Parameter(6);
         result.chi2 = fitter.Result().Chi2();
         result.ndf = fitter.Result().Ndf();
         result.muXError = fitter.Result().Error(1);
