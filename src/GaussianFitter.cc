@@ -68,6 +68,7 @@ constexpr bool SAVE_2D_MUY = Constants::FIT_2D_SAVE_MUY;
 constexpr bool SAVE_2D_SIGX = Constants::FIT_2D_SAVE_SIGX;
 constexpr bool SAVE_2D_SIGY = Constants::FIT_2D_SAVE_SIGY;
 constexpr bool SAVE_2D_B = Constants::FIT_2D_SAVE_B;
+constexpr bool SAVE_2D_THETA = Constants::FIT_2D_SAVE_THETA;
 } // namespace Config
 
 // ============================================================================
@@ -606,6 +607,7 @@ int FitGaussian2D(const char* filename) {
     const bool saveParamSigx = Config::SAVE_2D_SIGX;
     const bool saveParamSigy = Config::SAVE_2D_SIGY;
     const bool saveParamB = Config::SAVE_2D_B;
+    const bool saveParamTheta = Config::SAVE_2D_THETA;
 
     auto file = std::unique_ptr<TFile>(TFile::Open(filename, "UPDATE"));
     if (!file || file->IsZombie()) {
@@ -666,33 +668,35 @@ int FitGaussian2D(const char* filename) {
     tree->SetBranchAddress(chosenCharge.c_str(), &Q);
 
     const double INVALID_VALUE = std::numeric_limits<double>::quiet_NaN();
-    double x_rec_3d = INVALID_VALUE;
-    double y_rec_3d = INVALID_VALUE;
-    double rec_hit_delta_x_3d_signed = INVALID_VALUE;
-    double rec_hit_delta_y_3d_signed = INVALID_VALUE;
-    double gauss3d_A = INVALID_VALUE;
-    double gauss3d_mux = INVALID_VALUE;
-    double gauss3d_muy = INVALID_VALUE;
-    double gauss3d_sigx = INVALID_VALUE;
-    double gauss3d_sigy = INVALID_VALUE;
-    double gauss3d_B = INVALID_VALUE;
-    double gauss3d_chi2 = INVALID_VALUE;
-    double gauss3d_ndf = INVALID_VALUE;
-    double gauss3d_prob = INVALID_VALUE;
+    double x_rec_2d = INVALID_VALUE;
+    double y_rec_2d = INVALID_VALUE;
+    double rec_hit_delta_x_2d_signed = INVALID_VALUE;
+    double rec_hit_delta_y_2d_signed = INVALID_VALUE;
+    double gauss2d_A = INVALID_VALUE;
+    double gauss2d_mux = INVALID_VALUE;
+    double gauss2d_muy = INVALID_VALUE;
+    double gauss2d_sigx = INVALID_VALUE;
+    double gauss2d_sigy = INVALID_VALUE;
+    double gauss2d_B = INVALID_VALUE;
+    double gauss2d_theta = INVALID_VALUE;
+    double gauss2d_chi2 = INVALID_VALUE;
+    double gauss2d_ndf = INVALID_VALUE;
+    double gauss2d_prob = INVALID_VALUE;
 
-    TBranch* br_x_rec = EnsureAndResetBranch(tree, "ReconX_2D", &x_rec_3d);
-    TBranch* br_y_rec = EnsureAndResetBranch(tree, "ReconY_2D", &y_rec_3d);
-    TBranch* br_dx_signed = EnsureAndResetBranch(tree, "ReconTrueDeltaX_2D", &rec_hit_delta_x_3d_signed);
-    TBranch* br_dy_signed = EnsureAndResetBranch(tree, "ReconTrueDeltaY_2D", &rec_hit_delta_y_3d_signed);
-    TBranch* br_A = saveParamA ? EnsureAndResetBranch(tree, "Gauss2D_A", &gauss3d_A) : nullptr;
-    TBranch* br_mux = saveParamMux ? EnsureAndResetBranch(tree, "Gauss2D_mux", &gauss3d_mux) : nullptr;
-    TBranch* br_muy = saveParamMuy ? EnsureAndResetBranch(tree, "Gauss2D_muy", &gauss3d_muy) : nullptr;
-    TBranch* br_sigx = saveParamSigx ? EnsureAndResetBranch(tree, "Gauss2D_sigx", &gauss3d_sigx) : nullptr;
-    TBranch* br_sigy = saveParamSigy ? EnsureAndResetBranch(tree, "Gauss2D_sigy", &gauss3d_sigy) : nullptr;
-    TBranch* br_B = saveParamB ? EnsureAndResetBranch(tree, "Gauss2D_B", &gauss3d_B) : nullptr;
-    TBranch* br_chi2 = EnsureAndResetBranch(tree, "Gauss2D_Chi2", &gauss3d_chi2);
-    TBranch* br_ndf = EnsureAndResetBranch(tree, "Gauss2D_Ndf", &gauss3d_ndf);
-    TBranch* br_prob = EnsureAndResetBranch(tree, "Gauss2D_Prob", &gauss3d_prob);
+    TBranch* br_x_rec = EnsureAndResetBranch(tree, "ReconX_2D", &x_rec_2d);
+    TBranch* br_y_rec = EnsureAndResetBranch(tree, "ReconY_2D", &y_rec_2d);
+    TBranch* br_dx_signed = EnsureAndResetBranch(tree, "ReconTrueDeltaX_2D", &rec_hit_delta_x_2d_signed);
+    TBranch* br_dy_signed = EnsureAndResetBranch(tree, "ReconTrueDeltaY_2D", &rec_hit_delta_y_2d_signed);
+    TBranch* br_A = saveParamA ? EnsureAndResetBranch(tree, "Gauss2D_A", &gauss2d_A) : nullptr;
+    TBranch* br_mux = saveParamMux ? EnsureAndResetBranch(tree, "Gauss2D_mux", &gauss2d_mux) : nullptr;
+    TBranch* br_muy = saveParamMuy ? EnsureAndResetBranch(tree, "Gauss2D_muy", &gauss2d_muy) : nullptr;
+    TBranch* br_sigx = saveParamSigx ? EnsureAndResetBranch(tree, "Gauss2D_sigx", &gauss2d_sigx) : nullptr;
+    TBranch* br_sigy = saveParamSigy ? EnsureAndResetBranch(tree, "Gauss2D_sigy", &gauss2d_sigy) : nullptr;
+    TBranch* br_B = saveParamB ? EnsureAndResetBranch(tree, "Gauss2D_B", &gauss2d_B) : nullptr;
+    TBranch* br_theta = saveParamTheta ? EnsureAndResetBranch(tree, "Gauss2D_theta", &gauss2d_theta) : nullptr;
+    TBranch* br_chi2 = EnsureAndResetBranch(tree, "Gauss2D_Chi2", &gauss2d_chi2);
+    TBranch* br_ndf = EnsureAndResetBranch(tree, "Gauss2D_Ndf", &gauss2d_ndf);
+    TBranch* br_prob = EnsureAndResetBranch(tree, "Gauss2D_Prob", &gauss2d_prob);
 
     const Long64_t nEntries = tree->GetEntries();
     Long64_t nProcessed = 0;
@@ -731,6 +735,7 @@ int FitGaussian2D(const char* filename) {
     std::vector<double> out_sigx(nEntries, INVALID_VALUE);
     std::vector<double> out_sigy(nEntries, INVALID_VALUE);
     std::vector<double> out_B(nEntries, INVALID_VALUE);
+    std::vector<double> out_theta(nEntries, INVALID_VALUE);
     std::vector<double> out_chi2(nEntries, INVALID_VALUE);
     std::vector<double> out_ndf(nEntries, INVALID_VALUE);
     std::vector<double> out_prob(nEntries, INVALID_VALUE);
@@ -820,6 +825,7 @@ int FitGaussian2D(const char* filename) {
                 out_sigx[i] = fitResult.sigmaX;
                 out_sigy[i] = fitResult.sigmaY;
                 out_B[i] = fitResult.B;
+                out_theta[i] = fitResult.theta;
                 out_chi2[i] = fitResult.chi2;
                 out_ndf[i] = (fitResult.ndf > 0) ? fitResult.ndf : INVALID_VALUE;
                 out_prob[i] = (fitResult.ndf > 0)
@@ -854,6 +860,7 @@ int FitGaussian2D(const char* filename) {
                     out_sigx[i] = cfit::estimateSigma(Xf, Zf, B0, pixelSpacing, sigLoBound, sigHiBound);
                     out_sigy[i] = cfit::estimateSigma(Yf, Zf, B0, pixelSpacing, sigLoBound, sigHiBound);
                     out_B[i] = B0;
+                    out_theta[i] = 0.0;
                     nFitted.fetch_add(1, std::memory_order_relaxed);
                 }
             }
@@ -865,19 +872,20 @@ int FitGaussian2D(const char* filename) {
     // Write outputs
     for (Long64_t i = 0; i < nEntries; ++i) {
         tree->GetEntry(i);
-        x_rec_3d = out_x_rec[i];
-        y_rec_3d = out_y_rec[i];
-        rec_hit_delta_x_3d_signed = out_dx_s[i];
-        rec_hit_delta_y_3d_signed = out_dy_s[i];
-        gauss3d_A = out_A[i];
-        gauss3d_mux = out_mux[i];
-        gauss3d_muy = out_muy[i];
-        gauss3d_sigx = out_sigx[i];
-        gauss3d_sigy = out_sigy[i];
-        gauss3d_B = out_B[i];
-        gauss3d_chi2 = out_chi2[i];
-        gauss3d_ndf = out_ndf[i];
-        gauss3d_prob = out_prob[i];
+        x_rec_2d = out_x_rec[i];
+        y_rec_2d = out_y_rec[i];
+        rec_hit_delta_x_2d_signed = out_dx_s[i];
+        rec_hit_delta_y_2d_signed = out_dy_s[i];
+        gauss2d_A = out_A[i];
+        gauss2d_mux = out_mux[i];
+        gauss2d_muy = out_muy[i];
+        gauss2d_sigx = out_sigx[i];
+        gauss2d_sigy = out_sigy[i];
+        gauss2d_B = out_B[i];
+        gauss2d_theta = out_theta[i];
+        gauss2d_chi2 = out_chi2[i];
+        gauss2d_ndf = out_ndf[i];
+        gauss2d_prob = out_prob[i];
 
         br_x_rec->Fill();
         br_y_rec->Fill();
@@ -895,6 +903,8 @@ int FitGaussian2D(const char* filename) {
             br_sigy->Fill();
         if (br_B)
             br_B->Fill();
+        if (br_theta)
+            br_theta->Fill();
         br_chi2->Fill();
         br_ndf->Fill();
         br_prob->Fill();
