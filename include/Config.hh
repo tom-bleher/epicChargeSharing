@@ -36,10 +36,10 @@ inline constexpr Mode ACTIVE_MODE = Mode::LogA;
 // ───────────────────────────── Detector Geometry ────────────────────────────
 inline const G4double DETECTOR_SIZE = 30.0 * mm;   // Sensor side length
 inline const G4double DETECTOR_WIDTH = 0.05 * mm;  // Silicon thickness
-inline const G4double PIXEL_SIZE = 0.10 * mm;      // Pixel pad size (BNL B0/lumi: 100 um electrode)
+inline const G4double PIXEL_SIZE = 0.15 * mm;      // Pixel pad size (AC-LGAD: 150 um electrode on 500 um pitch)
 inline const G4double PIXEL_PITCH = 0.5 * mm;      // Pixel spacing (pitch)
 inline constexpr G4int NEIGHBORHOOD_RADIUS = 2;    // Charge sharing radius
-inline const G4double PIXEL_THICKNESS = 0.02 * mm; // Pixel depth/thickness
+inline const G4double PIXEL_THICKNESS = 0.001 * mm; // Al electrode thickness (~1 um, real AC-LGAD)
 
 // DD4hep-style grid offset: position = index * pitch + offset
 // Set to 0.0 for centered grid (indices can be negative), or non-zero to shift grid origin
@@ -56,7 +56,7 @@ inline constexpr G4double D0 = 1.0;                // LogA reference distance d0
 inline constexpr G4double PIXEL_GAIN_SIGMA_MIN = 0.010; // Min gain noise (1%)
 inline constexpr G4double PIXEL_GAIN_SIGMA_MAX = 0.050; // Max gain noise (5%)
 inline constexpr G4double NOISE_ELECTRON_COUNT = 1250.0; // Electronic noise (e-); EICROC measured ~0.2 fC ≈ 1250 e-
-inline constexpr G4double READOUT_THRESHOLD_SIGMA = 2.0; // Readout threshold (N × noise σ); EICROC ~5 fC discrim ≈ 1.25σ at gain 20
+inline constexpr G4double READOUT_THRESHOLD_SIGMA = 2.5; // Readout threshold (N × noise σ); EICROC ~5 fC discrim ≈ 1.25σ at gain 20
 
 // ──────────────────── Event-Level Gain Fluctuation ──────────────────────────
 inline constexpr G4double GAIN_EXCESS_NOISE_FACTOR = 2.0;  // McIntyre F-factor for Si avalanche
@@ -206,7 +206,7 @@ static_assert(!IS_CHARGE_BLOCK_MODE || FIT_GAUS_2D,
 inline const G4double WORLD_SIZE = 5.0 * cm;
 inline const G4double DETECTOR_Z_POSITION = -1.0 * cm;
 
-inline const G4double MAX_STEP_SIZE = 20.0 * micrometer;
+inline const G4double MAX_STEP_SIZE = 5.0 * micrometer;
 inline const G4double PRIMARY_PARTICLE_Z_POSITION = 0.0 * cm;
 
 inline const G4double GEOMETRY_TOLERANCE = 1.0 * um;

@@ -47,8 +47,7 @@ void RuntimeConfig::DefineCommands() {
     fNoiseMessenger->DeclareProperty("electronCount", noiseElectronCount, "Electronic noise RMS (electrons)")
         .SetRange("electronCount >= 0");
     fNoiseMessenger->DeclareProperty("thresholdSigma", readoutThresholdSigma,
-                                     "Readout threshold in units of noise sigma (ThresholdAboveNoise mode)")
-        .SetRange("thresholdSigma >= 0");
+                                     "Readout threshold in units of noise sigma (ThresholdAboveNoise mode)");
 
     // Fitting commands
     fFitMessenger = std::make_unique<G4GenericMessenger>(this, "/ecs/fit/", "Fit parameter configuration");
