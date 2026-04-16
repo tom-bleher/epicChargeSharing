@@ -51,7 +51,7 @@
  * @date 2025
  */
 #include "ChargeSharingCalculator.hh"
-#include "ChargeSharingCore.hh"
+#include "chargesharing/core/ChargeSharingCore.hh"
 
 #include "Config.hh"
 #include "DetectorConstruction.hh"
@@ -68,7 +68,7 @@
 #include <limits>
 #include <mutex>
 
-namespace csc = epic::chargesharing::core;
+namespace csc = ::chargesharing::core;
 
 namespace {
 std::once_flag gInvalidD0WarningFlag;

@@ -5,16 +5,16 @@
 /// @brief Compiled Gaussian fitting routines for position reconstruction.
 ///
 /// This file orchestrates parallel Gaussian fitting over TTree entries,
-/// delegating the actual fitting algorithms to core/GaussianFit.hh.
+/// delegating the actual fitting algorithms to chargesharing::fit::GaussianFit.
 /// This follows the same delegation pattern as ChargeSharingCalculator.cc
-/// delegating to core/ChargeSharingCore.hh.
+/// delegating to chargesharing::core::ChargeSharingCore.
 ///
 /// Compile-time flags come from Config.hh; physics parameters that can be
 /// overridden via macro commands are read from RuntimeConfig at run time.
 
 #include "GaussianFitter.hh"
 #include "Config.hh"
-#include "GaussianFit.hh"
+#include "chargesharing/fit/GaussianFit.hh"
 #include "RuntimeConfig.hh"
 
 #include <Math/MinimizerOptions.h>
@@ -42,7 +42,7 @@
 
 namespace ECS::Fit {
 
-namespace cfit = epic::chargesharing::fit;
+namespace cfit = ::chargesharing::fit;
 
 // ============================================================================
 // Compile-time configuration flags from Config.hh
@@ -392,7 +392,7 @@ int FitGaussian1D(const char* filename) {
     std::vector<double> out_col_ndf(nEntries, INVALID_VALUE);
     std::vector<double> out_col_prob(nEntries, INVALID_VALUE);
 
-    // Parallel fitting (delegates to core/GaussianFit.hh)
+    // Parallel fitting (delegates to chargesharing::fit)
     std::vector<int> indices(nEntries);
     std::iota(indices.begin(), indices.end(), 0);
     ROOT::TThreadExecutor exec;

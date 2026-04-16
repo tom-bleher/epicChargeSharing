@@ -35,6 +35,11 @@ if(WITH_EDM4HEP)
 endif()
 
 # ============================================================================
+# Shared physics/fit library
+# ============================================================================
+add_subdirectory(core)
+
+# ============================================================================
 # Main target
 # ============================================================================
 add_executable(epicChargeSharing
@@ -54,10 +59,11 @@ add_executable(epicChargeSharing
     src/EDM4hepIO.cc
 )
 
-target_include_directories(epicChargeSharing PRIVATE include core)
+target_include_directories(epicChargeSharing PRIVATE include)
 
 target_link_libraries(epicChargeSharing
     PRIVATE
+        chargesharing::core
         # Geant4_LIBRARIES is already a list of Geant4::* imported targets
         # assembled by find_package() for the specific ui/vis drivers available.
         ${Geant4_LIBRARIES}
@@ -137,7 +143,10 @@ find_program(CLANG_TIDY_EXE NAMES clang-tidy
 find_program(CLANG_FORMAT_EXE NAMES clang-format
     HINTS /opt/homebrew/opt/llvm/bin /usr/local/opt/llvm/bin)
 
-file(GLOB_RECURSE _all_sources src/*.cc include/*.hh include/*.h epicChargeSharing.cc)
+file(GLOB_RECURSE _all_sources
+    src/*.cc include/*.hh include/*.h
+    core/src/*.cc core/include/*.hh
+    epicChargeSharing.cc)
 
 if(CLANG_TIDY_EXE)
     add_custom_target(tidy
