@@ -1,6 +1,25 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 
+// =============================================================================
+// STANDALONE HARNESS ONLY -- DO NOT include from EICrecon plugin code.
+//
+// This header is a self-contained reimplementation of DD4hep's BitFieldCoder
+// used by the standalone Geant4 validation harness (epicChargeSharing.cc).
+// The EICrecon plugin under ../eicrecon/ must obtain the decoder from the
+// live segmentation via m_seg.decoder() instead; including this header from
+// plugin code is a build-system and runtime bug.
+//
+// Plugin targets define EICRECON_PLUGIN_BUILD via target_compile_definitions
+// (see eicrecon/src/algorithms/CMakeLists.txt and
+// eicrecon/cmake/EICreconPluginShims.cmake) so this header hard-fails the
+// compile if it is ever pulled in from plugin-side code.
+// =============================================================================
+#if defined(EICRECON_PLUGIN_BUILD)
+#error "BitFieldCoder.hh is for the standalone Geant4 harness only; \
+plugin code must use the live DD4hep segmentation decoder via m_seg.decoder()."
+#endif
+
 /// \file BitFieldCoder.hh
 /// \brief Standalone reimplementation of DD4hep's BitFieldCoder.
 ///
