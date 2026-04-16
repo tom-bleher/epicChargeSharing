@@ -76,6 +76,9 @@ private:
     void ApplyParticlePosition(const G4ThreeVector& position);
     void GenerateRandomPos();
 
+    void ApplyPreset(const G4String& name);
+    void SyncToRuntimeConfig() const;
+
     std::unique_ptr<G4ParticleGun> fParticleGun;
     DetectorConstruction* fDetector{nullptr};
 
@@ -84,6 +87,17 @@ private:
     G4double fFixedX{0.0};
     G4double fFixedY{0.0};
     G4double fBeamOvershoot{0.0};  ///< Fraction of detector half-size to extend random sampling beyond edges
+
+    // Energy range: when fEnergyMax > fEnergyMin, sample uniformly per event
+    G4double fEnergyMin{0.0};
+    G4double fEnergyMax{0.0};
+
+    // Angular range: theta from beam axis (-z), in radians
+    G4double fThetaMin{0.0};
+    G4double fThetaMax{0.0};
+
+    G4String fPresetName{"default"};
+
     mutable std::once_flag fFixedPositionWarningFlag;
     mutable SamplingWindow fSamplingWindow;
     mutable G4bool fSamplingWindowValid{false};

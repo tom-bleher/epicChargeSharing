@@ -1,0 +1,13 @@
+# Lumi spectrometer: BH e+e- at 1-17.5 GeV, 10-50 mrad incidence
+/control/verbose 0
+/run/verbose 0
+/event/verbose 0
+/tracking/verbose 0
+
+/run/initialize
+
+/ecs/gun/preset lumi
+/ecs/fit/gaus1D false
+/ecs/fit/gaus2D true
+
+/run/beamOn 100000

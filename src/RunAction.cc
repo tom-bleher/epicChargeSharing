@@ -1003,6 +1003,11 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const {
     beam.fixedXMM = rtConfig.fixedX / CLHEP::mm;
     beam.fixedYMM = rtConfig.fixedY / CLHEP::mm;
     beam.beamOvershoot = rtConfig.beamOvershoot;
+    beam.energyMinGeV = rtConfig.energyMin / CLHEP::GeV;
+    beam.energyMaxGeV = rtConfig.energyMax / CLHEP::GeV;
+    beam.thetaMinMrad = rtConfig.thetaMin / CLHEP::mrad;
+    beam.thetaMaxMrad = rtConfig.thetaMax / CLHEP::mrad;
+    beam.presetName = rtConfig.presetName;
     publisher.SetBeamMetadata(beam);
 
     return publisher;

@@ -548,6 +548,16 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
     }
     if (fBeam.beamOvershoot > 0.0)
         addDouble("BeamOvershoot", fBeam.beamOvershoot);
+    if (fBeam.energyMaxGeV > fBeam.energyMinGeV) {
+        addDouble("BeamEnergyMin_GeV", fBeam.energyMinGeV);
+        addDouble("BeamEnergyMax_GeV", fBeam.energyMaxGeV);
+    }
+    if (fBeam.thetaMaxMrad > 0.0) {
+        addDouble("BeamThetaMin_mrad", fBeam.thetaMinMrad);
+        addDouble("BeamThetaMax_mrad", fBeam.thetaMaxMrad);
+    }
+    if (!fBeam.presetName.empty() && fBeam.presetName != "default")
+        addString("BeamPreset", fBeam.presetName);
 
     // Grid parameters (doubles and ints)
     if (fGrid.pixelSize > 0.0)

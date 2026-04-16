@@ -90,6 +90,11 @@ public:
     G4double fixedX{-150.0 * CLHEP::micrometer};
     G4double fixedY{0.0};
     G4double beamOvershoot{0.0};
+    G4double energyMin{0.0};       ///< Min energy for uniform per-event sampling (0 = fixed)
+    G4double energyMax{0.0};       ///< Max energy for uniform per-event sampling
+    G4double thetaMin{0.0};        ///< Min polar angle from beam axis (rad)
+    G4double thetaMax{0.0};        ///< Max polar angle from beam axis (rad)
+    G4String presetName{"default"}; ///< Active gun preset name
 
     // ---- Fitting ----
     G4double fitErrorPercentOfMax{Constants::FIT_ERROR_PERCENT_OF_MAX};

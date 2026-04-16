@@ -1,0 +1,13 @@
+# B0 tracker: forward protons at 50-250 GeV, 6-22 mrad incidence
+/control/verbose 0
+/run/verbose 0
+/event/verbose 0
+/tracking/verbose 0
+
+/run/initialize
+
+/ecs/gun/preset b0
+/ecs/fit/gaus1D false
+/ecs/fit/gaus2D true
+
+/run/beamOn 100000

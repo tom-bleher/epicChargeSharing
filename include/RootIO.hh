@@ -451,6 +451,11 @@ public:
         G4double fixedXMM{0.0};
         G4double fixedYMM{0.0};
         G4double beamOvershoot{0.0};
+        G4double energyMinGeV{0.0};
+        G4double energyMaxGeV{0.0};
+        G4double thetaMinMrad{0.0};
+        G4double thetaMaxMrad{0.0};
+        std::string presetName;
     };
 
     void SetGridMetadata(const GridMetadata& m) { fGrid = m; }

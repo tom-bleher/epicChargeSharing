@@ -21,6 +21,7 @@
 #include "Randomize.hh"
 
 #include <algorithm>
+#include <cmath>
 #include <mutex>
 #include <sstream>
 
@@ -70,6 +71,23 @@ PrimaryGenerator::PrimaryGenerator(DetectorConstruction* detector)
 
 void PrimaryGenerator::GeneratePrimaries(G4Event* event) {
     GenerateRandomPos();
+
+    // Per-event energy sampling (uniform in [min, max])
+    if (fEnergyMax > fEnergyMin) {
+        const G4double energy = fEnergyMin + G4UniformRand() * (fEnergyMax - fEnergyMin);
+        fParticleGun->SetParticleEnergy(energy);
+    }
+
+    // Per-event angular sampling (theta from -z axis, uniform phi)
+    if (fThetaMax > 0.0) {
+        const G4double theta = fThetaMin + G4UniformRand() * (fThetaMax - fThetaMin);
+        const G4double phi = CLHEP::twopi * G4UniformRand();
+        const G4ThreeVector dir(std::sin(theta) * std::cos(phi),
+                                std::sin(theta) * std::sin(phi),
+                                -std::cos(theta));
+        fParticleGun->SetParticleMomentumDirection(dir);
+    }
+
     fParticleGun->GeneratePrimaryVertex(event);
 }
 
@@ -90,12 +108,7 @@ void PrimaryGenerator::ConfigureParticleGun() {
                << kDefaultMomentumDirection.y() << ", " << kDefaultMomentumDirection.z() << ")" << G4endl;
     }
 
-    // Sync beam parameters to RuntimeConfig for metadata publishing
-    auto& rtConfig = ECS::RuntimeConfig::Instance();
-    if (particle) rtConfig.particleName = particle->GetParticleName();
-    rtConfig.fixedX = fFixedX;
-    rtConfig.fixedY = fFixedY;
-    rtConfig.beamOvershoot = fBeamOvershoot;
+    SyncToRuntimeConfig();
 }
 
 void PrimaryGenerator::ConfigureMessenger() {
@@ -122,6 +135,36 @@ void PrimaryGenerator::ConfigureMessenger() {
         "Fraction of detector half-size to extend random sampling beyond edges (0 = full detector, 0.1 = 10% overshoot).");
     overshootCmd.SetStates(G4State_PreInit, G4State_Idle);
     overshootCmd.SetToBeBroadcasted(true);
+
+    auto& energyMinCmd = fMessenger->DeclarePropertyWithUnit(
+        "energyMin", "GeV", fEnergyMin,
+        "Minimum energy for per-event uniform sampling (0 = use fixed /gun/energy).");
+    energyMinCmd.SetStates(G4State_PreInit, G4State_Idle);
+    energyMinCmd.SetToBeBroadcasted(true);
+
+    auto& energyMaxCmd = fMessenger->DeclarePropertyWithUnit(
+        "energyMax", "GeV", fEnergyMax,
+        "Maximum energy for per-event uniform sampling (must be > energyMin to activate).");
+    energyMaxCmd.SetStates(G4State_PreInit, G4State_Idle);
+    energyMaxCmd.SetToBeBroadcasted(true);
+
+    auto& thetaMinCmd = fMessenger->DeclarePropertyWithUnit(
+        "thetaMin", "mrad", fThetaMin,
+        "Minimum polar angle from beam axis for per-event angular sampling.");
+    thetaMinCmd.SetStates(G4State_PreInit, G4State_Idle);
+    thetaMinCmd.SetToBeBroadcasted(true);
+
+    auto& thetaMaxCmd = fMessenger->DeclarePropertyWithUnit(
+        "thetaMax", "mrad", fThetaMax,
+        "Maximum polar angle from beam axis (must be > 0 to activate angular sampling).");
+    thetaMaxCmd.SetStates(G4State_PreInit, G4State_Idle);
+    thetaMaxCmd.SetToBeBroadcasted(true);
+
+    fMessenger->DeclareMethod("preset", &PrimaryGenerator::ApplyPreset)
+        .SetGuidance("Apply a detector preset: b0, lumi, or default")
+        .SetParameterName("name", false)
+        .SetStates(G4State_PreInit, G4State_Idle)
+        .SetToBeBroadcasted(true);
 }
 
 G4double PrimaryGenerator::CalculateSafeMargin() const {
@@ -222,4 +265,72 @@ void PrimaryGenerator::ApplyParticlePosition(const G4ThreeVector& position) {
 void PrimaryGenerator::GenerateRandomPos() {
     fSamplingWindowValid = false;
     ApplyParticlePosition(SamplePrimaryVertex());
+}
+
+void PrimaryGenerator::ApplyPreset(const G4String& name) {
+    G4ParticleTable* const table = G4ParticleTable::GetParticleTable();
+
+    if (name == "b0") {
+        // B0 tracker: forward protons, 50-250 GeV, 6-22 mrad incidence
+        fParticleGun->SetParticleDefinition(table->FindParticle("proton"));
+        fEnergyMin = 50.0 * GeV;
+        fEnergyMax = 250.0 * GeV;
+        fThetaMin = 6.0 * mrad;
+        fThetaMax = 22.0 * mrad;
+        fUseFixedPosition = false;
+        fBeamOvershoot = 0.1;
+        fPresetName = "b0";
+
+        G4cout << "[PrimaryGenerator] Preset b0: proton, 50-250 GeV, 6-22 mrad" << G4endl;
+
+    } else if (name == "lumi") {
+        // Lumi spectrometer: BH pair e+/e-, 1-17.5 GeV, 10-50 mrad incidence
+        fParticleGun->SetParticleDefinition(table->FindParticle("e-"));
+        fEnergyMin = 1.0 * GeV;
+        fEnergyMax = 17.5 * GeV;
+        fThetaMin = 10.0 * mrad;
+        fThetaMax = 50.0 * mrad;
+        fUseFixedPosition = false;
+        fBeamOvershoot = 0.1;
+        fPresetName = "lumi";
+
+        G4cout << "[PrimaryGenerator] Preset lumi: e-, 1-17.5 GeV, 10-50 mrad" << G4endl;
+
+    } else if (name == "default") {
+        // Reset to defaults
+        fParticleGun->SetParticleDefinition(table->FindParticle("e-"));
+        fParticleGun->SetParticleEnergy(ECS::RuntimeConfig::Instance().particleEnergy);
+        fParticleGun->SetParticleMomentumDirection(kDefaultMomentumDirection);
+        fEnergyMin = 0.0;
+        fEnergyMax = 0.0;
+        fThetaMin = 0.0;
+        fThetaMax = 0.0;
+        fUseFixedPosition = false;
+        fBeamOvershoot = 0.0;
+        fPresetName = "default";
+
+        G4cout << "[PrimaryGenerator] Preset default: e-, "
+               << ECS::RuntimeConfig::Instance().particleEnergy / GeV << " GeV, perpendicular" << G4endl;
+
+    } else {
+        G4Exception("PrimaryGenerator::ApplyPreset", "UnknownPreset", JustWarning,
+                     ("Unknown preset '" + name + "'. Available: b0, lumi, default").c_str());
+        return;
+    }
+
+    SyncToRuntimeConfig();
+}
+
+void PrimaryGenerator::SyncToRuntimeConfig() const {
+    auto& rtConfig = ECS::RuntimeConfig::Instance();
+    const G4ParticleDefinition* particle = fParticleGun->GetParticleDefinition();
+    if (particle) rtConfig.particleName = particle->GetParticleName();
+    rtConfig.fixedX = fFixedX;
+    rtConfig.fixedY = fFixedY;
+    rtConfig.beamOvershoot = fBeamOvershoot;
+    rtConfig.energyMin = fEnergyMin;
+    rtConfig.energyMax = fEnergyMax;
+    rtConfig.thetaMin = fThetaMin;
+    rtConfig.thetaMax = fThetaMax;
+    rtConfig.presetName = fPresetName;
 }
