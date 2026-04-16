@@ -412,7 +412,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         cmap_name = self.cmap_combo.currentData()
 
         # Read one event worth of data
-        branches = ["TrueX", "TrueY", "PixelX", "PixelY", "Edep", "isPixelHit"]
+        branches = ["TrueX", "TrueY", "PixelX", "PixelY", "EnergyDeposited", "isPixelHit"]
         mask_mode = (kind == "mask")
         mask_sel = spec if mask_mode else None
         shape_key = None
@@ -465,7 +465,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
         trueY = scalar("TrueY")
         pixelX = scalar("PixelX")
         pixelY = scalar("PixelY")
-        edep = scalar("Edep")
+        edep = scalar("EnergyDeposited")
         try:
             is_pixel_hit = bool(arrs["isPixelHit"][0])
         except Exception:
@@ -779,7 +779,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 evt = start_evt + page
                 if evt >= self._n_entries:
                     break
-                branches = ["TrueX", "TrueY", "PixelX", "PixelY", "Edep"]
+                branches = ["TrueX", "TrueY", "PixelX", "PixelY", "EnergyDeposited"]
                 mask_mode = (kind == "mask")
                 mask_sel = spec if mask_mode else None
                 shape_key = None
@@ -822,7 +822,7 @@ class ChargeNeighborhoodGUI(QtWidgets.QMainWindow):
                 trueY = scalar("TrueY")
                 pixelX = scalar("PixelX")
                 pixelY = scalar("PixelY")
-                edep = scalar("Edep")
+                edep = scalar("EnergyDeposited")
                 signed_values = False
                 if mask_mode:
                     if shape_key is None:

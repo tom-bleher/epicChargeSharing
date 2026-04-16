@@ -26,7 +26,7 @@ from typing import Optional, Tuple
 
 # Configuration
 # Resolve repository root relative to this script so the tool works anywhere
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"
 BASE_MAC = REPO_ROOT / "macros" / "run.mac"
@@ -308,7 +308,7 @@ def run_post_analysis(output_dir: Path):
     # Import and run Fi_x.py
     try:
         print("\n[INFO] Running Fi_x.py analysis...")
-        from farm import Fi_x
+        from analysis.fitting import Fi_x
         Fi_x.main(["--input-dir", str(output_dir)])
         print("[OK] Fi_x.py completed successfully")
     except Exception as e:
@@ -317,7 +317,7 @@ def run_post_analysis(output_dir: Path):
     # Import and run sigma_f_x.py
     try:
         print("\n[INFO] Running sigma_f_x.py analysis...")
-        from farm import sigma_f_x
+        from analysis.fitting import sigma_f_x
         sigma_f_x.main(output_dir)
         print("[OK] sigma_f_x.py completed successfully")
     except Exception as e:

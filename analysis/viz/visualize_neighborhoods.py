@@ -69,7 +69,7 @@ def load_data(root_file):
         tree = f["Hits"]
         branches = tree.arrays(
             ["Fi", "Qi", "Qn", "Qf", "NeighborhoodPixelX", "NeighborhoodPixelY",
-             "TrueX", "TrueY", "PixelX", "PixelY", "Edep", "NeighborhoodSize",
+             "TrueX", "TrueY", "PixelX", "PixelY", "EnergyDeposited", "NeighborhoodSize",
              "NearestPixelI", "NearestPixelJ", "isPixelHit", "hitWithinDetector"],
             library="ak",
         )
@@ -89,7 +89,7 @@ def draw_event(ax, orig_idx, branches, meta):
     true_y = float(branches["TrueY"][orig_idx])
     pix_x = ak.to_numpy(branches["NeighborhoodPixelX"][orig_idx])
     pix_y = ak.to_numpy(branches["NeighborhoodPixelY"][orig_idx])
-    edep = float(branches["Edep"][orig_idx])
+    edep = float(branches["EnergyDeposited"][orig_idx])
 
     # The neighborhood may be incomplete (< GRID_SIDE^2 pixels) near detector edges.
     # Reshape into full grid, padding missing pixels with NaN.
@@ -199,7 +199,7 @@ def main():
     print(f"Loading {root_file}...")
     meta = read_metadata(root_file)
     branches = load_data(root_file)
-    n_total = len(branches["Edep"])
+    n_total = len(branches["EnergyDeposited"])
 
     # Build list of valid event indices (skip nsize==0 and NaN events)
     nsize = ak.to_numpy(branches["NeighborhoodSize"])

@@ -161,9 +161,9 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
 def main(argv: Iterable[str]) -> int:
     args = parse_args(argv)
     script_path = Path(__file__).resolve()
-    project_root = script_path.parents[1]
-    macro_path = project_root / "proc" / "fit" / "plotFitGaus1DReplayQiFit.C"
-    plot_1d_macro_path = project_root / "proc" / "fit" / "plotFitGaus1D.C"
+    project_root = script_path.parents[2]
+    macro_path = project_root / "analysis" / "fitting" / "plotFitGaus1DReplayQiFit.C"
+    plot_1d_macro_path = project_root / "analysis" / "fitting" / "plotFitGaus1D.C"
     gaussian_fits_dir = project_root / "gaussian_fits"
 
     missing_datasets = [d for d in args.datasets if d not in DATASET_CONFIG]

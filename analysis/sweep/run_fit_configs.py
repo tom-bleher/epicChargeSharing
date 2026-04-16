@@ -35,9 +35,9 @@ import matplotlib.pyplot as plt
 # Configuration
 # ============================================================================
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CONFIG_FILE = REPO_ROOT / "include" / "Config.hh"
-SWEEP_SCRIPT = REPO_ROOT / "farm" / "sweep_x.py"
+SWEEP_SCRIPT = REPO_ROOT / "analysis" / "sweep" / "sweep_x.py"
 DEFAULT_OUTPUT_BASE = REPO_ROOT / "sweep_fit_configs"
 
 

@@ -256,7 +256,7 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   tree->SetBranchStatus("*", 0);
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
   enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY");
-  enableIf("Edep"); enableIf("isPixelHit");
+  enableIf("EnergyDeposited"); enableIf("isPixelHit");
   // Standard branch naming conventions
   enableIf("Qf"); enableIf("Qn"); enableIf("Qi"); enableIf("Fi");
   // Support "Block" naming convention (ChargeBlock mode)
@@ -269,7 +269,7 @@ void plotChargeNeighborhood5x5(const char* rootFilePath = "epicChargeSharing.roo
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
   if (tree->GetBranch("PixelX")) tree->SetBranchAddress("PixelX", &pixelX);
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
-  if (tree->GetBranch("Edep")) tree->SetBranchAddress("Edep", &edep);
+  if (tree->GetBranch("EnergyDeposited")) tree->SetBranchAddress("EnergyDeposited", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
 
   // Set branch addresses based on denominator mode (try mode-specific first, then fallback)
@@ -749,7 +749,7 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
 
   tree->SetBranchStatus("*", 0);
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
-  enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY"); enableIf("Edep"); enableIf("isPixelHit");
+  enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY"); enableIf("EnergyDeposited"); enableIf("isPixelHit");
   // Standard naming conventions: Qi, Qf, Fi with Block and RowCol modes
   enableIf("Qi"); enableIf("Qf"); enableIf("Fi");
   enableIf("QiBlock"); enableIf("QfBlock"); enableIf("FiBlock");
@@ -758,7 +758,7 @@ void plotChargeNeighborhoodMean5x5(const char* rootFilePath = "epicChargeSharing
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
   if (tree->GetBranch("PixelX")) tree->SetBranchAddress("PixelX", &pixelX);
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
-  if (tree->GetBranch("Edep"))  tree->SetBranchAddress("Edep", &edep);
+  if (tree->GetBranch("EnergyDeposited"))  tree->SetBranchAddress("EnergyDeposited", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
   // Set branch addresses (try mode-specific first, then fallbacks)
   if (tree->GetBranch("Qi")) tree->SetBranchAddress("Qi", &Qi);
@@ -1075,7 +1075,7 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
   tree->SetBranchStatus("*", 0);
   auto enableIf = [&](const char* b){ if (tree->GetBranch(b)) tree->SetBranchStatus(b, 1); };
   enableIf("TrueX"); enableIf("TrueY"); enableIf("PixelX"); enableIf("PixelY");
-  enableIf("Edep"); enableIf("isPixelHit");
+  enableIf("EnergyDeposited"); enableIf("isPixelHit");
   // Standard naming conventions: Fi, Qi, Qn, Qf with Block and Row/Col suffixes
   enableIf("Qi"); enableIf("Qn"); enableIf("Qf"); enableIf("Fi");
   enableIf("QiBlock"); enableIf("QnBlock"); enableIf("QfBlock"); enableIf("FiBlock");
@@ -1085,7 +1085,7 @@ int plotChargeNeighborhood5x5_pages(const char* rootFilePath = "epicChargeSharin
   if (tree->GetBranch("TrueY")) tree->SetBranchAddress("TrueY", &trueY);
   if (tree->GetBranch("PixelX")) tree->SetBranchAddress("PixelX", &pixelX);
   if (tree->GetBranch("PixelY")) tree->SetBranchAddress("PixelY", &pixelY);
-  if (tree->GetBranch("Edep")) tree->SetBranchAddress("Edep", &edep);
+  if (tree->GetBranch("EnergyDeposited")) tree->SetBranchAddress("EnergyDeposited", &edep);
   if (tree->GetBranch("isPixelHit")) tree->SetBranchAddress("isPixelHit", &isPixelHit);
   // Standard naming conventions for charge branches (Block and Row/Col suffixes)
   if (tree->GetBranch("Qi")) tree->SetBranchAddress("Qi", &Qi);

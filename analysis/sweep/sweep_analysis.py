@@ -94,7 +94,7 @@ except ImportError:
 # Configuration
 # =============================================================================
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FARM_DIR = Path(__file__).resolve().parent
 SRC_FILE = REPO_ROOT / "src" / "PrimaryGenerator.cc"
 CONFIG_FILE = REPO_ROOT / "include" / "Config.hh"
@@ -118,8 +118,8 @@ BUILD_DIR = REPO_ROOT / "build"
 EXECUTABLE = BUILD_DIR / "epicChargeSharing"
 RUN_MAC = (BUILD_DIR / "run.mac") if (BUILD_DIR / "run.mac").exists() else (REPO_ROOT / "macros" / "run.mac")
 DEFAULT_OUTPUT_BASE = REPO_ROOT / "sweep_analysis_runs"
-MACRO_PATH = REPO_ROOT / "proc" / "plotFitGaus1D.C"
-NEIGHBORHOOD_MACRO_PATH = REPO_ROOT / "proc" / "grid" / "plotChargeNeighborhood.C"
+MACRO_PATH = REPO_ROOT / "analysis" / "fitting" / "plotFitGaus1D.C"
+NEIGHBORHOOD_MACRO_PATH = REPO_ROOT / "analysis" / "viz" / "plotChargeNeighborhood.C"
 DEFAULT_CONFIG_FILE = FARM_DIR / "sweep_config.yaml"
 
 # Charge sharing model options
