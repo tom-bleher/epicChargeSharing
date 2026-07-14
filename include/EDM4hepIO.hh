@@ -166,6 +166,10 @@ private:
     /// \brief Create MCParticle for the primary.
     edm4hep::MutableMCParticle FillMCParticle(edm4hep::MCParticleCollection& particles, const EventRecord& record);
 
+    /// \brief Create one MCParticle + SimTrackerHit per depositing track (primary and secondaries).
+    void FillTrackContributions(edm4hep::SimTrackerHitCollection& hits, edm4hep::MCParticleCollection& particles,
+                                const EventRecord& record);
+
     /// \brief Create EventHeader.
     void FillEventHeader(edm4hep::EventHeaderCollection& headers, std::uint64_t eventNumber, int runNumber);
 

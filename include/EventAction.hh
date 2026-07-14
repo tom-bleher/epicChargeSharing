@@ -40,7 +40,7 @@ class SteppingAction;
 /// - Determines hit position from first contact or geometric center
 /// - Classifies hits as pixel or silicon based on contact volume
 /// - Computes charge sharing fractions across pixel neighborhood
-/// - Reconstructs position using configured model (LogA/LinA)
+/// - Reconstructs position from the LogA charge-sharing model
 /// - Populates ROOT tree branches via RunAction
 ///
 /// The charge sharing computation uses the ChargeSharingCalculator
@@ -155,6 +155,14 @@ private:
     std::vector<G4double> fStepY;
     std::vector<G4double> fStepZ;
     std::vector<G4double> fStepTimes;
+    std::vector<G4int> fStepTrackIDs;
+
+    /// Per-track deposit aggregates with folded ancestry (populated each event)
+    std::vector<ECS::IO::TrackContributionData> fTrackContributions;
+
+    /// Fill fTrackContributions and the summary's ancestor purity / dominant-
+    /// ancestor deposit centroid from the SteppingAction's per-track records.
+    void ComputeAncestorTruth(ECS::IO::EventSummaryData& summary);
 };
 
 } // namespace ECS

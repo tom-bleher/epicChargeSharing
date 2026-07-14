@@ -54,8 +54,6 @@ RunAction::RunAction()
 
       fNeighborhoodLayout(Constants::NEIGHBORHOOD_RADIUS),
 
-      fChargeSharingBeta(std::numeric_limits<G4double>::quiet_NaN()),
-
       fStoreFullFractions(ECS::RuntimeConfig::Instance().storeFullGrid),
 
       fEDM4hepWriter(IO::MakeEDM4hepWriter())
@@ -63,9 +61,6 @@ RunAction::RunAction()
 {
     fActivePixelMode = static_cast<Constants::ActivePixelMode>(
         ECS::RuntimeConfig::Instance().activePixelMode);
-    fPosReconModel = (ECS::RuntimeConfig::Instance().activeMode == 1)
-                         ? Constants::PosReconModel::LinA
-                         : Constants::PosReconModel::LogA;
     if (fEDM4hepWriter && fEDM4hepWriter->IsEnabled()) {
         fWriteEDM4hep = true;
     }
@@ -320,8 +315,7 @@ void RunAction::InitializeRootOutputs(const ThreadContext& context, const G4Stri
     rootFile->cd();
 
     const std::string treeTitle = std::string("AC-LGAD charge sharing hits (")
-        + Config::ActivePixelModeName(Config::ACTIVE_PIXEL_MODE) + ", "
-        + Config::SignalModelName(Config::SIGNAL_MODEL) + ")";
+        + Config::ActivePixelModeName(Config::ACTIVE_PIXEL_MODE) + ", LogA)";
     auto* tree = new TTree("Hits", treeTitle.c_str());
     tree->SetDirectory(rootFile);
     tree->SetAutoSave(0);
@@ -372,10 +366,15 @@ void RunAction::ConfigureCoreBranches(TTree* tree) {
                                                         .primaryMomentumZ = &fPrimaryMomentumZ,
                                                         .hitTime = &fHitTime,
                                                         .pathLength = &fPathLength,
-                                                        .eventGain = &fEventGain};
+                                                        .eventGain = &fEventGain,
+                                                        .ancestorPurity = &fAncestorPurity,
+                                                        .primaryDepositX = &fPrimaryDepositX,
+                                                        .primaryDepositY = &fPrimaryDepositY,
+                                                        .primaryDepositZ = &fPrimaryDepositZ};
 
     const IO::BranchConfigurator::ClassificationBuffers classification{.isPixelHit = &fIsPixelHit,
                                                                        .hitWithinDetector = &fHitWithinDetector,
+                                                                       .isMixedEvent = &fIsMixedEvent,
                                                                        .neighborhoodActiveCells =
                                                                            &fNeighborhoodActiveCells,
                                                                        .nearestPixelI = &fNearestPixelI,
@@ -406,8 +405,7 @@ void RunAction::ConfigureCoreBranches(TTree* tree) {
 
     // Delegate to BranchConfigurator
     const auto mode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
-    const auto reconModel = static_cast<ECS::Config::PosReconModel>(fPosReconModel);
-    fBranchConfigurator.ConfigureCoreBranches(tree, scalars, classification, vectors, mode, reconModel);
+    fBranchConfigurator.ConfigureCoreBranches(tree, scalars, classification, vectors, mode);
 
     // Per-step energy deposit branches (Landau fluctuation data)
     const IO::BranchConfigurator::StepBuffers steps{.nSteps = &fNSteps,
@@ -415,7 +413,8 @@ void RunAction::ConfigureCoreBranches(TTree* tree) {
                                                      .x = &fStepX,
                                                      .y = &fStepY,
                                                      .z = &fStepZ,
-                                                     .time = &fStepTime};
+                                                     .time = &fStepTime,
+                                                     .trackID = &fStepTrackID};
     IO::BranchConfigurator::ConfigureStepBranches(tree, steps);
 }
 
@@ -614,6 +613,11 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record) {
     fHitTime = record.summary.hitTime;
     fPathLength = record.summary.pathLength;
     fEventGain = record.summary.eventGain;
+    fAncestorPurity = record.summary.ancestorPurity;
+    fPrimaryDepositX = record.summary.primaryDepositX;
+    fPrimaryDepositY = record.summary.primaryDepositY;
+    fPrimaryDepositZ = record.summary.primaryDepositZ;
+    fIsMixedEvent = record.summary.isMixedEvent;
     fFirstContactIsPixel = record.summary.firstContactIsPixel;
     fGeometricIsPixel = record.summary.geometricIsPixel;
     fIsPixelHit = record.summary.isPixelHitCombined;
@@ -630,6 +634,7 @@ void RunAction::UpdateSummaryScalars(const EventRecord& record) {
     fStepY.assign(record.stepY.begin(), record.stepY.end());
     fStepZ.assign(record.stepZ.begin(), record.stepZ.end());
     fStepTime.assign(record.stepTime.begin(), record.stepTime.end());
+    fStepTrackID.assign(record.stepTrackID.begin(), record.stepTrackID.end());
 }
 
 void RunAction::PrepareNeighborhoodStorage(std::size_t requestedCells) {
@@ -860,15 +865,7 @@ void RunAction::SetNeighborhoodRadiusMeta(G4int radius) {
     fNeighborhoodActiveCells = 0;
 }
 
-void RunAction::SetPosReconMetadata(Constants::PosReconModel model, G4double betaPerMicron, G4double pitch) {
-    fPosReconModel = model;
-    // Beta is only used when LinA signal model is active
-    if (ECS::RuntimeConfig::Instance().activeMode == 1 && std::isfinite(betaPerMicron)) {
-        fChargeSharingBeta = betaPerMicron;
-    } else {
-        fChargeSharingBeta = std::numeric_limits<G4double>::quiet_NaN();
-    }
-
+void RunAction::SetChargeSharingPitchMeta(G4double pitch) {
     if (pitch > 0.0) {
         fChargeSharingPitch = pitch;
     }
@@ -972,12 +969,7 @@ ECS::IO::MetadataPublisher RunAction::BuildMetadataPublisher() const {
 
     // Charge sharing model metadata
     ECS::IO::MetadataPublisher::ModelMetadata model;
-    model.signalModel = (ECS::RuntimeConfig::Instance().activeMode == 1)
-                            ? Constants::SignalModel::LinA
-                            : Constants::SignalModel::LogA;
-    model.model = static_cast<ECS::Config::PosReconModel>(fPosReconModel);
     model.activePixelMode = static_cast<ECS::Config::ActivePixelMode>(fActivePixelMode);
-    model.beta = fChargeSharingBeta;
     publisher.SetModelMetadata(model);
 
     // Physics constants metadata (from runtime config for sweep support)

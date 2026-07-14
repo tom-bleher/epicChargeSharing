@@ -55,10 +55,38 @@ struct EventSummaryData {
     G4double pathLength{0.0};       ///< Path length through sensitive volume (Geant4 units: mm)
     G4double eventGain{0.0};        ///< Sampled event-level gain (includes saturation + fluctuation)
     G4int nSteps{0};                ///< Number of Geant4 steps in sensitive volume
+    G4double ancestorPurity{0.0};   ///< Dominant primary ancestor's fraction of the deposited energy
+    G4double primaryDepositX{0.0};  ///< Edep-weighted deposit centroid of the dominant ancestor (mm)
+    G4double primaryDepositY{0.0};
+    G4double primaryDepositZ{0.0};
+    G4bool isMixedEvent{false};     ///< More than one primary ancestor deposited energy
     G4bool firstContactIsPixel{false};
     G4bool geometricIsPixel{false};
     G4bool isPixelHitCombined{false};
     G4bool hitWithinDetector{false}; ///< True if hit position maps to a valid pixel (not clamped from outside grid)
+};
+
+/// \brief One Geant4 track's aggregated deposit, for particle-resolved output.
+///
+/// Plain-data mirror of SteppingAction::TrackContribution plus derived truth
+/// fields, so IO code stays decoupled from Geant4 action classes.
+struct TrackContributionData {
+    int trackID{0};
+    int parentTrackID{0};   ///< 0 for primaries
+    int primaryTrackID{0};  ///< Generated ancestor after folding parent IDs
+    int pdg{0};
+    int pixelI{-1};         ///< Nearest pixel row of the first deposit
+    int pixelJ{-1};         ///< Nearest pixel column of the first deposit
+    double charge{0.0};     ///< PDG charge (units of e)
+    double mass{0.0};       ///< Rest mass (Geant4 units: MeV)
+    double edep{0.0};       ///< Summed deposit (Geant4 units: MeV)
+    double posX{0.0};       ///< First deposit position (mm)
+    double posY{0.0};
+    double posZ{0.0};
+    double momX{0.0};       ///< Momentum at first deposit (Geant4 units: MeV)
+    double momY{0.0};
+    double momZ{0.0};
+    double time{0.0};       ///< Global time of first deposit (ns)
 };
 
 /// \brief Complete event record for ROOT tree filling.
@@ -118,6 +146,9 @@ struct EventRecord {
     std::span<const G4double> stepY;
     std::span<const G4double> stepZ;
     std::span<const G4double> stepTime;
+    std::span<const G4int> stepTrackID;
+    // Per-track deposit aggregates (primary + secondaries)
+    std::span<const TrackContributionData> trackContributions;
     G4int totalGridCells{0};
     G4bool includeDistanceAlpha{false};
 };
@@ -143,11 +174,16 @@ public:
         G4double* hitTime{nullptr};
         G4double* pathLength{nullptr};
         G4double* eventGain{nullptr};
+        G4double* ancestorPurity{nullptr};
+        G4double* primaryDepositX{nullptr};
+        G4double* primaryDepositY{nullptr};
+        G4double* primaryDepositZ{nullptr};
     };
 
     struct ClassificationBuffers {
         G4bool* isPixelHit{nullptr};
         G4bool* hitWithinDetector{nullptr};
+        G4bool* isMixedEvent{nullptr};
         G4int* neighborhoodActiveCells{nullptr};
         G4int* nearestPixelI{nullptr};
         G4int* nearestPixelJ{nullptr};
@@ -162,10 +198,10 @@ public:
         std::vector<G4double>* chargeInd{nullptr};
         std::vector<G4double>* chargeAmp{nullptr};
         std::vector<G4double>* chargeMeas{nullptr};
-        std::vector<G4double>* chargeRow{nullptr};        ///< Charge based on row fraction
+        std::vector<G4double>* chargeIndRow{nullptr};     ///< Charge based on row fraction
         std::vector<G4double>* chargeAmpRow{nullptr};     ///< Noisy charge based on row fraction
         std::vector<G4double>* chargeMeasRow{nullptr};   ///< Final charge based on row fraction
-        std::vector<G4double>* chargeCol{nullptr};        ///< Charge based on col fraction
+        std::vector<G4double>* chargeIndCol{nullptr};     ///< Charge based on col fraction
         std::vector<G4double>* chargeAmpCol{nullptr};     ///< Noisy charge based on col fraction
         std::vector<G4double>* chargeMeasCol{nullptr};   ///< Final charge based on col fraction
         std::vector<G4double>* chargeIndBlock{nullptr};      ///< Charge based on block fraction
@@ -209,14 +245,13 @@ public:
         std::vector<G4double>* y{nullptr};
         std::vector<G4double>* z{nullptr};
         std::vector<G4double>* time{nullptr};
+        std::vector<G4int>* trackID{nullptr};
     };
 
     void ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars, const ClassificationBuffers& classification,
                                const VectorBuffers& vectors,
-                               Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood,
-                               Config::PosReconModel reconModel = Config::PosReconModel::LogA);
-    static void ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers,
-                                        Config::PosReconModel reconModel = Config::PosReconModel::LogA);
+                               Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
+    static void ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers);
     static void ConfigureClassificationBranches(TTree* tree, const ClassificationBuffers& buffers);
     static void ConfigureVectorBranches(TTree* tree, const VectorBuffers& buffers,
                                         Config::ActivePixelMode mode = Config::ActivePixelMode::Neighborhood);
@@ -419,10 +454,7 @@ public:
     };
 
     struct ModelMetadata {
-        Config::SignalModel signalModel{Config::SignalModel::LogA}; ///< Signal sharing model
-        Config::PosReconModel model{Config::PosReconModel::LogA};   ///< Reconstruction method
         Config::ActivePixelMode activePixelMode{Config::ActivePixelMode::Neighborhood};
-        G4double beta{0.0}; ///< Linear signal model beta parameter (per micron)
     };
 
     struct PhysicsMetadata {
@@ -478,9 +510,6 @@ public:
     static void WriteEntriesToUserInfo(TTree* tree, const EntryList& entries);
 
 private:
-    static std::string ModelToString(Config::PosReconModel model);
-    static std::string SignalModelToString(Config::SignalModel model);
-
     GridMetadata fGrid;
     ModelMetadata fModel;
     PhysicsMetadata fPhysics;

@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""Visualize charge neighborhood grids for every event, highlighting threshold-activated pixels."""
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+"""Visualize charge neighborhood grids for every event, highlighting threshold-activated pixels.
 
-import sys
+Secondary deposits (Geant4 steps from tracks other than the primary) are marked
+with orange crosses when the file carries the StepTrackID branch.
+"""
+
+import argparse
 import numpy as np
 import uproot
 import awkward as ak
@@ -67,16 +73,17 @@ def read_metadata(root_file):
 def load_data(root_file):
     with uproot.open(root_file) as f:
         tree = f["Hits"]
-        branches = tree.arrays(
-            ["Fi", "Q_ind", "Q_amp", "Q_meas", "NeighborhoodPixelX", "NeighborhoodPixelY",
-             "TrueX", "TrueY", "PixelX", "PixelY", "EnergyDeposited", "NeighborhoodSize",
-             "NearestPixelI", "NearestPixelJ", "isPixelHit", "hitWithinDetector"],
-            library="ak",
-        )
-    return branches
+        names = ["Fi", "Q_ind", "Q_amp", "Q_meas", "NeighborhoodPixelX", "NeighborhoodPixelY",
+                 "TrueX", "TrueY", "PixelX", "PixelY", "EnergyDeposited", "NeighborhoodSize",
+                 "NearestPixelI", "NearestPixelJ", "isPixelHit", "hitWithinDetector"]
+        # Step-level truth (secondary deposits) exists only in newer files
+        step_names = ["StepX", "StepY", "StepTrackID"]
+        has_steps = all(n in tree.keys() for n in step_names)
+        branches = tree.arrays(names + (step_names if has_steps else []), library="ak")
+    return branches, has_steps
 
 
-def draw_event(ax, orig_idx, branches, meta):
+def draw_event(ax, orig_idx, branches, meta, has_steps=False, title_fontsize=4.5, marker_scale=1.0):
     """Draw a single event's 5x5 neighborhood grid on the given axes."""
     nsize = int(branches["NeighborhoodSize"][orig_idx])
     pitch = meta["pitch"]
@@ -164,8 +171,22 @@ def draw_event(ax, orig_idx, branches, meta):
     # Mark true hit position relative to grid
     hit_ix = (true_x - x_vals[0]) / pitch_x
     hit_iy = (true_y - y_vals[0]) / pitch_y
-    ax.plot(hit_ix, hit_iy, marker="+", color="lime", markersize=6,
-            markeredgewidth=1.2, zorder=5)
+    ax.plot(hit_ix, hit_iy, marker="+", color="lime", markersize=6 * marker_scale,
+            markeredgewidth=1.2 * marker_scale, zorder=5)
+
+    # Mark secondary deposits (steps from tracks other than the primary, track 1).
+    # Drawn above the true-hit marker: deltas usually start within microns of
+    # the primary trajectory, so they would otherwise hide underneath the "+".
+    n_secondary_steps = 0
+    if has_steps:
+        tid = ak.to_numpy(branches["StepTrackID"][orig_idx])
+        sec = tid != 1
+        n_secondary_steps = int(np.count_nonzero(sec))
+        if n_secondary_steps > 0:
+            sx = (ak.to_numpy(branches["StepX"][orig_idx])[sec] - x_vals[0]) / pitch_x
+            sy = (ak.to_numpy(branches["StepY"][orig_idx])[sec] - y_vals[0]) / pitch_y
+            ax.plot(sx, sy, ls="none", marker="x", color="darkorange",
+                    markersize=3.5 * marker_scale, markeredgewidth=0.9 * marker_scale, zorder=6)
 
     # --- Red border on sides that have missing pixels ---
     if is_edge:
@@ -186,19 +207,28 @@ def draw_event(ax, orig_idx, branches, meta):
     ax.set_yticks([])
 
     label = f"#{orig_idx}  {n_active}px  {edep:.3f}keV"
+    if n_secondary_steps > 0:
+        label += f"  {n_secondary_steps}sec"
     if is_edge:
         label += "  EDGE"
-    ax.set_title(label, fontsize=4.5, pad=1)
+    ax.set_title(label, fontsize=title_fontsize, pad=1 + 2 * (marker_scale - 1))
 
 
 def main():
-    root_file = sys.argv[1] if len(sys.argv) > 1 else "build/epicChargeSharing.root"
-    out_pdf = sys.argv[2] if len(sys.argv) > 2 else "neighborhood_grids.pdf"
-    max_events = int(sys.argv[3]) if len(sys.argv) > 3 else None
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root_file", nargs="?", default="build/epicChargeSharing.root")
+    parser.add_argument("out_pdf", nargs="?", default="neighborhood_grids.pdf")
+    parser.add_argument("max_events", nargs="?", type=int, default=None)
+    parser.add_argument("--secondaries-only", action="store_true",
+                        help="only draw events where a secondary track deposited energy")
+    parser.add_argument("--big", action="store_true",
+                        help="one event per page (presentation size) instead of small multiples")
+    args = parser.parse_args()
+    root_file, out_pdf, max_events = args.root_file, args.out_pdf, args.max_events
 
     print(f"Loading {root_file}...")
     meta = read_metadata(root_file)
-    branches = load_data(root_file)
+    branches, has_steps = load_data(root_file)
     n_total = len(branches["EnergyDeposited"])
 
     # Build list of valid event indices (skip nsize==0 and NaN events)
@@ -207,6 +237,13 @@ def main():
     # Also skip NaN events (nsize>0 but data is NaN — shouldn't happen, but guard)
     fi_first = ak.to_numpy(branches["Fi"][:, 0])
     valid_mask &= ~np.isnan(fi_first)
+
+    if args.secondaries_only:
+        if not has_steps:
+            raise SystemExit("--secondaries-only requires the StepTrackID branch (newer files)")
+        has_secondary = np.array(
+            [bool(np.any(ak.to_numpy(tids) != 1)) for tids in branches["StepTrackID"]])
+        valid_mask &= has_secondary
 
     valid_indices = np.where(valid_mask)[0]
     n_valid = len(valid_indices)
@@ -239,52 +276,64 @@ def main():
         f"pitch={meta['pitch']}mm, pad={meta['pixel_size']}mm "
         f"({meta['pixel_size']/meta['pitch']*100:.0f}% fill)   "
         f"Blue = above threshold  |  + = true hit"
+        + ("  |  x = secondary deposit" if has_steps else "")
     )
 
     with PdfPages(out_pdf) as pdf:
-        # --- Normal event pages ---
-        for page in range(n_pages):
-            start = page * EVENTS_PER_PAGE
-            end = min(start + EVENTS_PER_PAGE, n_normal)
-            page_indices = normal_indices[start:end]
+        if args.big:
+            # --- Presentation mode: one event per page ---
+            for k, orig_idx in enumerate(normal_indices):
+                fig, ax = plt.subplots(figsize=(6.5, 6.8))
+                fig.suptitle(page_title, fontsize=6.5, y=0.97)
+                draw_event(ax, int(orig_idx), branches, meta, has_steps,
+                           title_fontsize=11, marker_scale=2.5)
+                pdf.savefig(fig, dpi=150)
+                plt.close(fig)
+            print(f"  {len(normal_indices)} single-event pages")
+        else:
+            # --- Normal event pages ---
+            for page in range(n_pages):
+                start = page * EVENTS_PER_PAGE
+                end = min(start + EVENTS_PER_PAGE, n_normal)
+                page_indices = normal_indices[start:end]
 
+                fig, axes = plt.subplots(EVENTS_PER_COL, EVENTS_PER_ROW,
+                                         figsize=(11, 8.5),
+                                         gridspec_kw={"hspace": 0.4, "wspace": 0.15})
+                fig.suptitle(page_title, fontsize=7, y=0.98)
+
+                for i, ax in enumerate(axes.flat):
+                    if i < len(page_indices):
+                        draw_event(ax, int(page_indices[i]), branches, meta, has_steps)
+                    else:
+                        ax.set_visible(False)
+
+                pdf.savefig(fig, dpi=150)
+                plt.close(fig)
+
+                if (page + 1) % 100 == 0 or page == n_pages - 1:
+                    pct = 100 * (page + 1) / n_pages
+                    print(f"  Page {page+1}/{n_pages} ({pct:.0f}%)", flush=True)
+
+            # --- Dedicated edge page (incomplete neighborhoods) ---
+            edge_to_show = edge_indices_all[:EVENTS_PER_PAGE]
             fig, axes = plt.subplots(EVENTS_PER_COL, EVENTS_PER_ROW,
                                      figsize=(11, 8.5),
                                      gridspec_kw={"hspace": 0.4, "wspace": 0.15})
-            fig.suptitle(page_title, fontsize=7, y=0.98)
+            fig.suptitle(
+                f"EDGE EVENTS — Incomplete neighborhoods (< {expected_size} pixels)   "
+                f"({n_edge} total in file, showing {len(edge_to_show)})",
+                fontsize=7, y=0.98,
+            )
 
             for i, ax in enumerate(axes.flat):
-                if i < len(page_indices):
-                    draw_event(ax, int(page_indices[i]), branches, meta)
+                if i < len(edge_to_show):
+                    draw_event(ax, int(edge_to_show[i]), branches, meta, has_steps)
                 else:
                     ax.set_visible(False)
 
             pdf.savefig(fig, dpi=150)
             plt.close(fig)
-
-            if (page + 1) % 100 == 0 or page == n_pages - 1:
-                pct = 100 * (page + 1) / n_pages
-                print(f"  Page {page+1}/{n_pages} ({pct:.0f}%)", flush=True)
-
-        # --- Dedicated edge page (incomplete neighborhoods) ---
-        edge_to_show = edge_indices_all[:EVENTS_PER_PAGE]
-        fig, axes = plt.subplots(EVENTS_PER_COL, EVENTS_PER_ROW,
-                                 figsize=(11, 8.5),
-                                 gridspec_kw={"hspace": 0.4, "wspace": 0.15})
-        fig.suptitle(
-            f"EDGE EVENTS — Incomplete neighborhoods (< {expected_size} pixels)   "
-            f"({n_edge} total in file, showing {len(edge_to_show)})",
-            fontsize=7, y=0.98,
-        )
-
-        for i, ax in enumerate(axes.flat):
-            if i < len(edge_to_show):
-                draw_event(ax, int(edge_to_show[i]), branches, meta)
-            else:
-                ax.set_visible(False)
-
-        pdf.savefig(fig, dpi=150)
-        plt.close(fig)
 
     print(f"Done: {out_pdf}")
 

@@ -33,18 +33,16 @@ namespace ECS::IO {
 
 void BranchConfigurator::ConfigureCoreBranches(TTree* tree, const ScalarBuffers& scalars,
                                                const ClassificationBuffers& classification,
-                                               const VectorBuffers& vectors, Config::ActivePixelMode mode,
-                                               Config::PosReconModel reconModel) {
+                                               const VectorBuffers& vectors, Config::ActivePixelMode mode) {
     if (!tree)
         return;
-    ConfigureScalarBranches(tree, scalars, reconModel);
+    ConfigureScalarBranches(tree, scalars);
     ConfigureClassificationBranches(tree, classification);
     ConfigureVectorBranches(tree, vectors, mode);
     ConfigureNeighborhoodBranches(tree, vectors.pixelID);
 }
 
-void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers,
-                                                 [[maybe_unused]] Config::PosReconModel reconModel) {
+void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffers& buffers) {
     if (!tree)
         return;
 
@@ -55,7 +53,7 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
     };
 
     // Core branches (always present)
-    const std::array<BranchDef, 13> coreBranches{{
+    const std::array<BranchDef, 17> coreBranches{{
         {.name = "TrueX", .addr = buffers.trueX, .leaf = "TrueX/D"},
         {.name = "TrueY", .addr = buffers.trueY, .leaf = "TrueY/D"},
         {.name = "PixelX", .addr = buffers.pixelX, .leaf = "PixelX/D"},
@@ -69,6 +67,10 @@ void BranchConfigurator::ConfigureScalarBranches(TTree* tree, const ScalarBuffer
         {.name = "HitTime", .addr = buffers.hitTime, .leaf = "HitTime/D"},
         {.name = "PathLength", .addr = buffers.pathLength, .leaf = "PathLength/D"},
         {.name = "EventGain", .addr = buffers.eventGain, .leaf = "EventGain/D"},
+        {.name = "AncestorPurity", .addr = buffers.ancestorPurity, .leaf = "AncestorPurity/D"},
+        {.name = "PrimaryDepositX", .addr = buffers.primaryDepositX, .leaf = "PrimaryDepositX/D"},
+        {.name = "PrimaryDepositY", .addr = buffers.primaryDepositY, .leaf = "PrimaryDepositY/D"},
+        {.name = "PrimaryDepositZ", .addr = buffers.primaryDepositZ, .leaf = "PrimaryDepositZ/D"},
     }};
 
     for (const auto& def : coreBranches) {
@@ -84,6 +86,8 @@ void BranchConfigurator::ConfigureClassificationBranches(TTree* tree, const Clas
         tree->Branch("isPixelHit", buffers.isPixelHit, "isPixelHit/O");
     if (buffers.hitWithinDetector)
         tree->Branch("hitWithinDetector", buffers.hitWithinDetector, "hitWithinDetector/O");
+    if (buffers.isMixedEvent)
+        tree->Branch("IsMixedEvent", buffers.isMixedEvent, "IsMixedEvent/O");
     if (buffers.neighborhoodActiveCells)
         tree->Branch("NeighborhoodSize", buffers.neighborhoodActiveCells, "NeighborhoodSize/I");
     if (buffers.nearestPixelI)
@@ -162,6 +166,7 @@ void BranchConfigurator::ConfigureStepBranches(TTree* tree, const StepBuffers& b
     addVec("StepY", buffers.y);
     addVec("StepZ", buffers.z);
     addVec("StepTime", buffers.time);
+    addVec("StepTrackID", buffers.trackID);
 }
 
 bool BranchConfigurator::ConfigureFullGridBranches(TTree* tree, const FullGridBuffers& buffers,
@@ -495,20 +500,6 @@ bool TreeFiller::EnsureFullFractionBuffer(G4int gridSide) {
 // MetadataPublisher
 // ============================================================================
 
-std::string MetadataPublisher::ModelToString(Config::PosReconModel model) {
-    switch (model) {
-        case Config::PosReconModel::LinA:
-            return "LinA";
-        case Config::PosReconModel::LogA:
-        default:
-            return "LogA";
-    }
-}
-
-std::string MetadataPublisher::SignalModelToString(Config::SignalModel model) {
-    return Config::SignalModelName(model);
-}
-
 static std::string ActivePixelModeToString(Config::ActivePixelMode mode) {
     return Config::ActivePixelModeName(mode);
 }
@@ -584,13 +575,8 @@ MetadataPublisher::EntryList MetadataPublisher::CollectEntries() const {
         addInt("NeighborhoodRadius", fGrid.neighborhoodRadius);
 
     // Model parameters (strings for enums, doubles for numeric)
-    addString("SignalModel", SignalModelToString(fModel.signalModel));
-    addString("ReconMethod", ModelToString(fModel.model));
+    addString("SignalModel", "LogA");
     addString("ActivePixelMode", ActivePixelModeToString(fModel.activePixelMode));
-    // Beta is only used when LinA signal model is active
-    if (fModel.signalModel == Config::SignalModel::LinA && std::isfinite(fModel.beta)) {
-        addDouble("ChargeSharingLinearBeta_per_um", fModel.beta);
-    }
 
     // Physics parameters (doubles)
     addDouble("ChargeSharingReferenceD0_microns", fPhysics.d0);

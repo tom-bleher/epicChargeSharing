@@ -30,13 +30,6 @@
  * - d_i is the distance from the hit point to the pixel center
  * - alpha_i is the pad angle of view (paper: α_i)
  *
- * ### Linear Attenuation Model (LinA)
- *
- * The paper also defines a linear attenuation model:
- *   w_i = (1 - beta * d_i) * alpha_i
- *
- * Where beta is the attenuation factor (1/um) and d_i is expressed in µm.
- *
  * ## Fraction Calculation
  * For all models, the charge fraction F_i is computed as:
  *   F_i = w_i / Sum_j(w_j)
@@ -65,15 +58,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <mutex>
+#include <unordered_map>
 
 namespace csc = ::chargesharing::core;
 
 namespace {
 std::once_flag gInvalidD0WarningFlag;
 std::once_flag gInvalidActivePixelModeFlag;
-std::once_flag gInvalidActiveModeFlag;
 std::once_flag gChargeBlockWithout2DFlag;
 
 /// Validate activePixelMode G4int before casting to enum.
@@ -105,27 +99,6 @@ Constants::ActivePixelMode validatedActivePixelMode() {
     return mode;
 }
 
-/// Validate activeMode G4int (0=LogA, 1=LinA).
-/// Returns true for linear (1), false for logarithmic (0).
-/// Falls back to LogA on out-of-range values.
-bool validatedUseLinear() {
-    const G4int raw = ECS::RuntimeConfig::Instance().activeMode;
-    if (raw != 0 && raw != 1) {
-        std::call_once(gInvalidActiveModeFlag, [raw]() {
-            G4Exception("ChargeSharingCalculator", "InvalidActiveMode", JustWarning,
-                        G4String("activeMode=" + std::to_string(raw) +
-                                 " invalid (expected 0=LogA or 1=LinA); falling back to LogA.").c_str());
-        });
-        return false;
-    }
-    return raw == 1;
-}
-
-/// Map standalone signal model flag to core enum
-csc::SignalModel mapSignalModel(bool useLinear) {
-    return useLinear ? csc::SignalModel::LinA : csc::SignalModel::LogA;
-}
-
 /// Map standalone ActivePixelMode to core enum
 csc::ActivePixelMode mapActivePixelMode(Constants::ActivePixelMode mode) {
     switch (mode) {
@@ -155,9 +128,6 @@ csc::ActivePixelMode mapActivePixelMode(Constants::ActivePixelMode mode) {
 // neighboring pads. The ValidateD0 method ensures D0 is positive and
 // finite to avoid numerical instabilities (division by zero, log of negative).
 //
-// The ChargeModelParams helper centralizes the logic for selecting between
-// LogA and LinA models, computing the beta attenuation coefficient based
-// on pixel pitch.
 // ============================================================================
 
 /// @brief Validate and prepare D0 parameters for charge sharing calculation.
@@ -180,14 +150,6 @@ ChargeSharingCalculator::D0Params ChargeSharingCalculator::ValidateD0(G4double d
     }
 
     params.lengthMM = params.micron * micrometer;
-    return params;
-}
-
-ChargeSharingCalculator::ChargeModelParams
-ChargeSharingCalculator::GetChargeModelParams(G4double /*pixelSpacing*/) const {
-    ChargeModelParams params{};
-    params.useLinear = validatedUseLinear();
-    params.beta = params.useLinear && fDetector ? fDetector->GetLinearChargeModelBeta() : 0.0;
     return params;
 }
 
@@ -403,8 +365,6 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
     const G4int numBlocksPerSide = fDetector->GetNumBlocksPerSide();
 
     const D0Params d0p = ValidateD0(d0, "ChargeSharingCalculator::ComputeFromSteps");
-    const ChargeModelParams model = GetChargeModelParams(pixelSpacing);
-
     const int radius = std::max(0, fNeighborhoodRadius);
     const int gridDim = (2 * radius) + 1;
     const G4bool recordDistanceAlpha = fEmitDistanceAlpha;
@@ -413,7 +373,6 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
                                 activePixelMode == Constants::ActivePixelMode::RowCol3x3);
 
     csc::NeighborhoodConfig coreConfig;
-    coreConfig.signalModel = mapSignalModel(model.useLinear);
     coreConfig.activeMode = mapActivePixelMode(activePixelMode);
     coreConfig.radius = radius;
     coreConfig.pixelSizeMM = pixelSize;
@@ -421,7 +380,6 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
     coreConfig.pixelSpacingMM = pixelSpacing;
     coreConfig.pixelSpacingYMM = pixelSpacing;
     coreConfig.d0Micron = d0p.micron;
-    coreConfig.betaPerMicron = model.beta;
     coreConfig.numPixelsX = numBlocksPerSide;
     coreConfig.numPixelsY = numBlocksPerSide;
     coreConfig.minIndexX = 0;
@@ -429,68 +387,122 @@ ChargeSharingCalculator::ComputeFromSteps(const std::vector<StepInput>& steps, G
 
     const G4int minIndexX = fDetector->GetMinIndexX();
     const G4int minIndexY = fDetector->GetMinIndexY();
-    const G4int centerI_0based = fResult.pixelRowIndex - minIndexX;
-    const G4int centerJ_0based = fResult.pixelColIndex - minIndexY;
 
-    // 4. Accumulate per-step fractions (convex combination)
-    // accFrac[i] = sum_s (edep_s / totalEdep) * fraction_i(pos_s)
-    if (fNeighborhoodWeights.Rows() != gridDim || fNeighborhoodWeights.Cols() != gridDim) {
-        fNeighborhoodWeights.Resize(gridDim, gridDim, 0.0);
-    } else {
-        fNeighborhoodWeights.Fill(0.0);
-    }
-
-    // Accumulated fraction grids
-    Grid2D<G4double> accFraction(gridDim, gridDim);
-    Grid2D<G4double> accFractionRow(gridDim, gridDim);
-    Grid2D<G4double> accFractionCol(gridDim, gridDim);
-
-    // Store per-pixel metadata from the centroid-based calculation (for distance/alpha output)
-    // We'll compute this from the first step's core result and update with centroid later
+    // 4. Accumulate per-step fractions (convex combination), each deposit
+    // spread around ITS OWN nearest pad. Accumulation is over a sparse map of
+    // global pads, so charge from deposits far from the main blob (delta rays,
+    // other secondaries) is preserved instead of being truncated by a single
+    // pre-chosen window. The output patch is anchored afterwards on the pad
+    // with the highest accumulated charge; only charge landing outside that
+    // patch is dropped from the record.
     struct PixelMeta {
         G4int globalIndex{-1};
         G4double centerX{0.0}, centerY{0.0};
         G4double distance{0.0}, alpha{0.0};
         bool seen{false};
     };
-    Grid2D<PixelMeta> pixelMeta(gridDim, gridDim);
+    struct PadAccumulator {
+        G4double fraction{0.0};
+        G4double fractionRow{0.0};
+        G4double fractionCol{0.0};
+        G4double weight{0.0};
+        PixelMeta meta{};
+    };
+    auto packKey = [](G4int i, G4int j) {
+        return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(i)) << 32) |
+               static_cast<std::uint32_t>(j);
+    };
+    std::unordered_map<std::uint64_t, PadAccumulator> padMap;
+    padMap.reserve(steps.size() * static_cast<std::size_t>(gridDim) * static_cast<std::size_t>(gridDim));
 
     for (const auto& step : steps) {
         const G4double stepFrac = step.edep / totalEnergyDeposit;
 
+        const auto location = fDetector->FindNearestPixel(step.position);
+        const G4int stepCenterI = location.indexI - minIndexX;
+        const G4int stepCenterJ = location.indexJ - minIndexY;
+
         const auto coreResult = csc::calculateNeighborhood(
-            step.position.x(), step.position.y(), centerI_0based, centerJ_0based,
-            fResult.nearestPixelCenter.x(), fResult.nearestPixelCenter.y(), coreConfig);
+            step.position.x(), step.position.y(), stepCenterI, stepCenterJ,
+            location.center.x(), location.center.y(), coreConfig);
 
         for (const auto& pixel : coreResult.pixels) {
             if (!pixel.inBounds)
                 continue;
-            const int row = pixel.di + radius;
-            const int col = pixel.dj + radius;
 
-            accFraction(row, col) += pixel.fraction * stepFrac;
-            fNeighborhoodWeights(row, col) += pixel.weight * stepFrac;
+            auto& acc = padMap[packKey(stepCenterI + pixel.di, stepCenterJ + pixel.dj)];
+            acc.fraction += pixel.fraction * stepFrac;
+            acc.weight += pixel.weight * stepFrac;
 
             // Row/col fractions need per-step row/col normalization
             // For RowCol modes, fraction == fractionRow == fractionCol in core
             if (useRowColMode) {
-                accFractionRow(row, col) += pixel.fraction * stepFrac;
-                accFractionCol(row, col) += pixel.fraction * stepFrac;
+                acc.fractionRow += pixel.fraction * stepFrac;
+                acc.fractionCol += pixel.fraction * stepFrac;
             } else {
-                accFractionRow(row, col) += pixel.fractionRow * stepFrac;
-                accFractionCol(row, col) += pixel.fractionCol * stepFrac;
+                acc.fractionRow += pixel.fractionRow * stepFrac;
+                acc.fractionCol += pixel.fractionCol * stepFrac;
             }
 
             // Record pixel metadata from first step that sees this pixel
-            auto& meta = pixelMeta(row, col);
-            if (!meta.seen) {
-                meta.globalIndex = pixel.globalIndex;
-                meta.centerX = pixel.centerX;
-                meta.centerY = pixel.centerY;
-                meta.distance = pixel.distance;
-                meta.alpha = pixel.alpha;
-                meta.seen = true;
+            if (!acc.meta.seen) {
+                acc.meta.globalIndex = pixel.globalIndex;
+                acc.meta.centerX = pixel.centerX;
+                acc.meta.centerY = pixel.centerY;
+                acc.meta.distance = pixel.distance;
+                acc.meta.alpha = pixel.alpha;
+                acc.meta.seen = true;
             }
+        }
+    }
+
+    // Anchor the output patch on the pad with the highest accumulated charge
+    // (falls back to the centroid's pad when nothing accumulated).
+    G4int anchorI = fResult.pixelRowIndex - minIndexX;
+    G4int anchorJ = fResult.pixelColIndex - minIndexY;
+    G4double bestFraction = -1.0;
+    for (const auto& [key, acc] : padMap) {
+        if (acc.fraction > bestFraction) {
+            bestFraction = acc.fraction;
+            anchorI = static_cast<G4int>(static_cast<std::int32_t>(key >> 32));
+            anchorJ = static_cast<G4int>(static_cast<std::int32_t>(key & 0xFFFFFFFFu));
+        }
+    }
+    if (bestFraction > 0.0) {
+        const auto& anchor = padMap.at(packKey(anchorI, anchorJ));
+        fResult.pixelRowIndex = anchorI + minIndexX;
+        fResult.pixelColIndex = anchorJ + minIndexY;
+        fResult.nearestPixelCenter =
+            G4ThreeVector(anchor.meta.centerX, anchor.meta.centerY, fResult.nearestPixelCenter.z());
+        fResult.hit.pixRow = fResult.pixelRowIndex;
+        fResult.hit.pixCol = fResult.pixelColIndex;
+        fResult.hit.pixCenterX = fResult.nearestPixelCenter.x();
+        fResult.hit.pixCenterY = fResult.nearestPixelCenter.y();
+    }
+
+    // Materialize the anchored patch from the sparse map.
+    if (fNeighborhoodWeights.Rows() != gridDim || fNeighborhoodWeights.Cols() != gridDim) {
+        fNeighborhoodWeights.Resize(gridDim, gridDim, 0.0);
+    } else {
+        fNeighborhoodWeights.Fill(0.0);
+    }
+    Grid2D<G4double> accFraction(gridDim, gridDim);
+    Grid2D<G4double> accFractionRow(gridDim, gridDim);
+    Grid2D<G4double> accFractionCol(gridDim, gridDim);
+    Grid2D<PixelMeta> pixelMeta(gridDim, gridDim);
+
+    for (int di = -radius; di <= radius; ++di) {
+        for (int dj = -radius; dj <= radius; ++dj) {
+            const auto it = padMap.find(packKey(anchorI + di, anchorJ + dj));
+            if (it == padMap.end())
+                continue;
+            const int row = di + radius;
+            const int col = dj + radius;
+            accFraction(row, col) = it->second.fraction;
+            accFractionRow(row, col) = it->second.fractionRow;
+            accFractionCol(row, col) = it->second.fractionCol;
+            fNeighborhoodWeights(row, col) = it->second.weight;
+            pixelMeta(row, col) = it->second.meta;
         }
     }
 
@@ -629,8 +641,6 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     const G4double totalChargeCoulomb = totalChargeElectrons * elementaryCharge;
 
     const D0Params d0p = ValidateD0(d0, "ChargeSharingCalculator::ComputeChargeFractions");
-    const ChargeModelParams model = GetChargeModelParams(pixelSpacing);
-
     const int radius = std::max(0, fNeighborhoodRadius);
     const int gridDim = (2 * radius) + 1;
     const G4bool recordDistanceAlpha = fEmitDistanceAlpha;
@@ -640,7 +650,6 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
 
     // Build core neighborhood config and delegate physics computation
     csc::NeighborhoodConfig coreConfig;
-    coreConfig.signalModel = mapSignalModel(model.useLinear);
     coreConfig.activeMode = mapActivePixelMode(activePixelMode);
     coreConfig.radius = radius;
     coreConfig.pixelSizeMM = pixelSize;
@@ -648,7 +657,6 @@ void ChargeSharingCalculator::ComputeChargeFractions(const G4ThreeVector& hitPos
     coreConfig.pixelSpacingMM = pixelSpacing;
     coreConfig.pixelSpacingYMM = pixelSpacing;
     coreConfig.d0Micron = d0p.micron;
-    coreConfig.betaPerMicron = model.beta;
     coreConfig.numPixelsX = numBlocksPerSide;
     coreConfig.numPixelsY = numBlocksPerSide;
     // Convert bounds to 0-based to match the 0-based center index below
@@ -839,9 +847,8 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
     fResult.geometry.pitchX = pixelSpacing;
     fResult.geometry.pitchY = pixelSpacing;
 
-    // Validated D0 and charge model parameters
+    // Validated LogA parameter
     const D0Params d0p = ValidateD0(d0, "ChargeSharingCalculator::ComputeFullGridFractions");
-    const ChargeModelParams chargeModel = GetChargeModelParams(pixelSpacing);
 
     const G4double hitX = hitPos.x();
     const G4double hitY = hitPos.y();
@@ -877,12 +884,7 @@ void ChargeSharingCalculator::ComputeFullGridFractions(const G4ThreeVector& hitP
             const G4double alpha = csc::calcPadViewAngle(distanceToEdge, pixelSize, pixelSize);
 
             // Delegate weight calculation to core (handles guard logic internally)
-            G4double weight = NAN;
-            if (chargeModel.useLinear) {
-                weight = csc::calcWeightLinA(distanceToEdge, alpha, chargeModel.beta);
-            } else {
-                weight = csc::calcWeightLogA(distanceToEdge, alpha, d0p.lengthMM);
-            }
+            const G4double weight = csc::calcWeightLogA(distanceToEdge, alpha, d0p.lengthMM);
 
             // DD4hep formula: position = index * pitch + offset
             const G4double pixelCenterX = detectorPos.x() + Constants::IndexToPosition(gridI, pixelSpacing, gridOffset);

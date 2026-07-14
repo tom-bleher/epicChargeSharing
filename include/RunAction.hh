@@ -83,7 +83,7 @@ public:
     void SetDetectorGridParameters(G4double pixelSize, G4double pixelSpacing, G4double gridOffset, G4double detSize,
                                    G4int numBlocksPerSide);
     void SetNeighborhoodRadiusMeta(G4int radius);
-    void SetPosReconMetadata(Constants::PosReconModel model, G4double betaPerMicron, G4double pitch);
+    void SetChargeSharingPitchMeta(G4double pitch);
     void SetChargeSharingDistanceAlphaMeta(G4bool enabled);
     void SetGridPixelCenters(const std::vector<G4ThreeVector>& centers);
     void ConfigureFullFractionBranch(G4bool enable);
@@ -150,6 +150,10 @@ private:
     G4double fHitTime{0.0};
     G4double fPathLength{0.0};
     G4double fEventGain{0.0};
+    G4double fAncestorPurity{0.0};
+    G4double fPrimaryDepositX{0.0};
+    G4double fPrimaryDepositY{0.0};
+    G4double fPrimaryDepositZ{0.0};
     G4int fNSteps{0};
 
     // Per-step energy deposit branch buffers
@@ -158,11 +162,13 @@ private:
     std::vector<G4double> fStepY;
     std::vector<G4double> fStepZ;
     std::vector<G4double> fStepTime;
+    std::vector<G4int> fStepTrackID;
 
     G4bool fFirstContactIsPixel{false};
     G4bool fGeometricIsPixel{false};
     G4bool fIsPixelHit{false};
     G4bool fHitWithinDetector{false};
+    G4bool fIsMixedEvent{false};
 
     // Neighborhood fractions
     std::vector<G4double> fNeighborhoodChargeFractions;
@@ -204,9 +210,7 @@ private:
     G4int fGridNumBlocksPerSide{0};
     G4int fGridNeighborhoodRadius{0};
 
-    Constants::PosReconModel fPosReconModel{};
     Constants::ActivePixelMode fActivePixelMode{};
-    G4double fChargeSharingBeta{0.0};
     G4double fChargeSharingPitch{0.0};
     G4bool fEmitDistanceAlphaMeta{false};
     G4bool fStoreFullFractions{false};

@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <span>
 
 namespace {
@@ -165,6 +166,7 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     fStepY.clear();
     fStepZ.clear();
     fStepTimes.clear();
+    fStepTrackIDs.clear();
     if (fSteppingAction) {
         for (const auto& s : fSteppingAction->GetStepDeposits()) {
             fStepEdeps.push_back(s.edep);
@@ -172,6 +174,7 @@ void EventAction::EndOfEventAction(const G4Event* event) {
             fStepY.push_back(s.position.y());
             fStepZ.push_back(s.position.z());
             fStepTimes.push_back(s.time);
+            fStepTrackIDs.push_back(s.trackID);
         }
     }
 
@@ -186,11 +189,15 @@ void EventAction::EndOfEventAction(const G4Event* event) {
     record.summary.pathLength = pathLength;
     record.summary.eventGain = eventGain;
     record.summary.nSteps = static_cast<G4int>(fStepEdeps.size());
+    ComputeAncestorTruth(record.summary);
     record.stepEdep = std::span<const G4double>(fStepEdeps.data(), fStepEdeps.size());
     record.stepX = std::span<const G4double>(fStepX.data(), fStepX.size());
     record.stepY = std::span<const G4double>(fStepY.data(), fStepY.size());
     record.stepZ = std::span<const G4double>(fStepZ.data(), fStepZ.size());
     record.stepTime = std::span<const G4double>(fStepTimes.data(), fStepTimes.size());
+    record.stepTrackID = std::span<const G4int>(fStepTrackIDs.data(), fStepTrackIDs.size());
+    record.trackContributions =
+        std::span<const ECS::IO::TrackContributionData>(fTrackContributions.data(), fTrackContributions.size());
     record.nearestPixelI = fPixelRowIndex;
     record.nearestPixelJ = fPixelColIndex;
     record.nearestPixelGlobalId = fNearestPixelGlobalId;
@@ -230,6 +237,80 @@ void EventAction::EndOfEventAction(const G4Event* event) {
         G4RunManager::GetRunManager()->GetCurrentRun() ? G4RunManager::GetRunManager()->GetCurrentRun()->GetRunID() : 0;
 
     fRunAction->FillTree(record, eventId, runId);
+}
+
+void EventAction::ComputeAncestorTruth(ECS::IO::EventSummaryData& summary) {
+    fTrackContributions.clear();
+    summary.ancestorPurity = 0.0;
+    summary.isMixedEvent = false;
+    summary.primaryDepositX = 0.0;
+    summary.primaryDepositY = 0.0;
+    summary.primaryDepositZ = 0.0;
+    if (!fSteppingAction) {
+        return;
+    }
+
+    // Deposit sums per generated ancestor: an ancestor's response includes its
+    // Geant4 daughters (delta rays etc.), so their charge is real signal, not
+    // background. Attribution is purely link-based - no time enters anywhere.
+    struct AncestorSums {
+        G4double edep{0.0};
+        G4ThreeVector edepWeightedPos;
+    };
+    std::map<G4int, AncestorSums> ancestors;
+
+    for (const auto& track : fSteppingAction->GetTrackContributions()) {
+        const G4int primaryTrackID = fSteppingAction->FoldToPrimaryTrack(track.trackID);
+
+        ECS::IO::TrackContributionData data{};
+        data.trackID = track.trackID;
+        data.parentTrackID = track.parentID;
+        data.primaryTrackID = primaryTrackID;
+        data.pdg = track.pdg;
+        data.charge = track.charge;
+        data.mass = track.mass;
+        data.edep = track.edep;
+        data.posX = track.firstDepositPos.x();
+        data.posY = track.firstDepositPos.y();
+        data.posZ = track.firstDepositPos.z();
+        data.momX = track.momentumAtFirstDeposit.x();
+        data.momY = track.momentumAtFirstDeposit.y();
+        data.momZ = track.momentumAtFirstDeposit.z();
+        data.time = track.firstDepositTime;
+        if (fDetector) {
+            const auto location = fDetector->FindNearestPixel(track.firstDepositPos);
+            data.pixelI = location.indexI;
+            data.pixelJ = location.indexJ;
+        }
+        fTrackContributions.push_back(data);
+
+        auto& sums = ancestors[primaryTrackID];
+        sums.edep += track.edep;
+        sums.edepWeightedPos += track.edepWeightedPos;
+    }
+
+    if (ancestors.empty()) {
+        return;
+    }
+
+    G4double totalEdep = 0.0;
+    const AncestorSums* dominant = nullptr;
+    for (const auto& [trackID, sums] : ancestors) {
+        totalEdep += sums.edep;
+        if (dominant == nullptr || sums.edep > dominant->edep) {
+            dominant = &sums;
+        }
+    }
+    if (!(totalEdep > 0.0) || !(dominant->edep > 0.0)) {
+        return;
+    }
+
+    summary.ancestorPurity = dominant->edep / totalEdep;
+    summary.isMixedEvent = ancestors.size() > 1;
+    const G4ThreeVector centroid = dominant->edepWeightedPos / dominant->edep;
+    summary.primaryDepositX = centroid.x();
+    summary.primaryDepositY = centroid.y();
+    summary.primaryDepositZ = centroid.z();
 }
 
 const G4ThreeVector& EventAction::DetermineHitPosition() const {

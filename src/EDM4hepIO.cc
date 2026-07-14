@@ -19,6 +19,7 @@
 #include "G4SystemOfUnits.hh"
 
 #include <iostream>
+#include <map>
 #include <stdexcept>
 
 namespace ECS::IO {
@@ -139,10 +140,18 @@ bool EDM4hepWriter::WriteEvent(const EventRecord& record, std::uint64_t eventNum
         edm4hep::MCParticleCollection mcParticles;
         edm4hep::EventHeaderCollection eventHeaders;
 
-        // Populate collections from EventRecord
+        // Populate collections from EventRecord. When per-track contributions
+        // are available, every depositing Geant4 track (primary and
+        // secondaries) gets its own MCParticle and SimTrackerHit, mirroring
+        // the structure ddsim produces. Otherwise (e.g. a miss with no
+        // deposit) fall back to the single primary summary.
         FillEventHeader(eventHeaders, eventNumber, runNumber);
-        auto particle = FillMCParticle(mcParticles, record);
-        FillSimTrackerHit(simHits, particle, record);
+        if (record.trackContributions.empty()) {
+            auto particle = FillMCParticle(mcParticles, record);
+            FillSimTrackerHit(simHits, particle, record);
+        } else {
+            FillTrackContributions(simHits, mcParticles, record);
+        }
 
         // Create a Frame and add collections
         podio::Frame frame;
@@ -232,6 +241,82 @@ void EDM4hepWriter::FillSimTrackerHit(edm4hep::SimTrackerHitCollection& hits, co
 
     // Link to MCParticle
     hit.setParticle(particle);
+}
+
+void EDM4hepWriter::FillTrackContributions(edm4hep::SimTrackerHitCollection& hits,
+                                           edm4hep::MCParticleCollection& particles, const EventRecord& record) {
+    // Pass 1: one MCParticle per depositing track. Primaries (parent 0) carry
+    // generator status 1; Geant4 secondaries carry 0, matching ddsim.
+    std::map<int, edm4hep::MutableMCParticle> particleByTrackID;
+    for (const auto& track : record.trackContributions) {
+        auto particle = particles.create();
+        particle.setPDG(track.pdg);
+        particle.setGeneratorStatus(track.parentTrackID == 0 ? 1 : 0);
+        particle.setSimulatorStatus(0);
+        particle.setCharge(static_cast<float>(track.charge));
+        particle.setMass(static_cast<float>(track.mass / CLHEP::GeV));
+        if (track.parentTrackID == 0) {
+            // Preserve the legacy single-particle semantics for the primary:
+            // vertex at the summary hit position, generated (gun) momentum.
+            particle.setVertex({record.summary.hitX, record.summary.hitY, record.summary.hitZ});
+            particle.setMomentum({static_cast<float>(record.summary.primaryMomentumX / CLHEP::GeV),
+                                  static_cast<float>(record.summary.primaryMomentumY / CLHEP::GeV),
+                                  static_cast<float>(record.summary.primaryMomentumZ / CLHEP::GeV)});
+            particle.setTime(0.0f);
+        } else {
+            particle.setVertex({track.posX, track.posY, track.posZ});
+            particle.setMomentum({static_cast<float>(track.momX / CLHEP::GeV),
+                                  static_cast<float>(track.momY / CLHEP::GeV),
+                                  static_cast<float>(track.momZ / CLHEP::GeV)});
+            particle.setTime(static_cast<float>(track.time));
+        }
+        particleByTrackID.emplace(track.trackID, particle);
+    }
+
+    // Pass 2: parent links. Non-depositing intermediate parents have no
+    // MCParticle, so secondaries link to their folded generated ancestor.
+    for (const auto& track : record.trackContributions) {
+        if (track.parentTrackID == 0) {
+            continue;
+        }
+        auto childIt = particleByTrackID.find(track.trackID);
+        auto ancestorIt = particleByTrackID.find(track.primaryTrackID);
+        if (childIt != particleByTrackID.end() && ancestorIt != particleByTrackID.end() &&
+            track.primaryTrackID != track.trackID) {
+            childIt->second.addToParents(ancestorIt->second);
+        }
+    }
+
+    // Pass 3: one SimTrackerHit per depositing track, at its first deposit.
+    for (const auto& track : record.trackContributions) {
+        auto hit = hits.create();
+        const bool isPrimary = track.parentTrackID == 0;
+        if (isPrimary) {
+            // Legacy semantics for the primary: first-contact position/time,
+            // summary energy fields stay per-track below.
+            hit.setCellID(EncodeCellID(record.nearestPixelI, record.nearestPixelJ));
+            hit.setPosition({record.summary.hitX, record.summary.hitY, record.summary.hitZ});
+            hit.setTime(static_cast<float>(record.summary.hitTime));
+            hit.setPathLength(static_cast<float>(record.summary.pathLength));
+            hit.setMomentum({static_cast<float>(record.summary.primaryMomentumX / CLHEP::GeV),
+                             static_cast<float>(record.summary.primaryMomentumY / CLHEP::GeV),
+                             static_cast<float>(record.summary.primaryMomentumZ / CLHEP::GeV)});
+        } else {
+            hit.setCellID(EncodeCellID(track.pixelI, track.pixelJ));
+            hit.setPosition({track.posX, track.posY, track.posZ});
+            hit.setTime(static_cast<float>(track.time));
+            hit.setPathLength(0.0f);
+            hit.setMomentum({static_cast<float>(track.momX / CLHEP::GeV),
+                             static_cast<float>(track.momY / CLHEP::GeV),
+                             static_cast<float>(track.momZ / CLHEP::GeV)});
+        }
+        hit.setEDep(static_cast<float>(track.edep / CLHEP::GeV));
+        hit.setQuality(0);
+        const auto particleIt = particleByTrackID.find(track.trackID);
+        if (particleIt != particleByTrackID.end()) {
+            hit.setParticle(particleIt->second);
+        }
+    }
 }
 
 /// @brief Encode pixel indices into a CellID using DD4hep BitFieldCoder format.

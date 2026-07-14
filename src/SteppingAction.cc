@@ -19,9 +19,11 @@
 #include "EventAction.hh"
 #include "G4LogicalVolume.hh"
 #include "G4LogicalVolumeStore.hh"
+#include "G4ParticleDefinition.hh"
 #include "G4Step.hh"
 #include "G4StepPoint.hh"
 #include "G4SystemOfUnits.hh"
+#include "G4Track.hh"
 #include "G4VTouchable.hh"
 
 namespace ECS {
@@ -36,6 +38,32 @@ void SteppingAction::Reset() {
     fPathLengthInSensitive = 0.0;
     fTotalEdep = 0.0;
     fStepDeposits.clear();
+    fTrackContributions.clear();
+    fContributionIndex.clear();
+    fTrackParents.clear();
+    fLastAncestryTrackID = -1;
+}
+
+void SteppingAction::RecordTrackAncestry(const G4Step* step) {
+    const G4Track* track = step->GetTrack();
+    const G4int trackID = track->GetTrackID();
+    if (trackID == fLastAncestryTrackID) [[likely]] {
+        return;
+    }
+    fLastAncestryTrackID = trackID;
+    fTrackParents.emplace(trackID, track->GetParentID());
+}
+
+G4int SteppingAction::FoldToPrimaryTrack(G4int trackID) const {
+    // Bounded walk protects against malformed (cyclic) ancestry.
+    for (std::size_t depth = 0; depth < 1024; ++depth) {
+        const auto it = fTrackParents.find(trackID);
+        if (it == fTrackParents.end() || it->second == 0) {
+            break;
+        }
+        trackID = it->second;
+    }
+    return trackID;
 }
 
 void SteppingAction::CacheVolumes() {
@@ -128,11 +156,32 @@ void SteppingAction::AccumulateEdep(const G4Step* step) {
         return;
 
     fTotalEdep += edep;
+    const G4Track* track = step->GetTrack();
+    const G4int trackID = track->GetTrackID();
     const G4ThreeVector midpoint = 0.5 * (prePoint->GetPosition() + step->GetPostStepPoint()->GetPosition());
-    fStepDeposits.push_back({midpoint, edep, prePoint->GetGlobalTime()});
+    fStepDeposits.push_back({midpoint, edep, prePoint->GetGlobalTime(), trackID});
+
+    const auto [it, inserted] = fContributionIndex.emplace(trackID, fTrackContributions.size());
+    if (inserted) {
+        TrackContribution contribution{};
+        contribution.trackID = trackID;
+        contribution.parentID = track->GetParentID();
+        const auto* definition = track->GetDefinition();
+        contribution.pdg = definition->GetPDGEncoding();
+        contribution.charge = definition->GetPDGCharge();
+        contribution.mass = definition->GetPDGMass();
+        contribution.firstDepositPos = midpoint;
+        contribution.momentumAtFirstDeposit = prePoint->GetMomentum();
+        contribution.firstDepositTime = prePoint->GetGlobalTime();
+        fTrackContributions.push_back(contribution);
+    }
+    auto& contribution = fTrackContributions[it->second];
+    contribution.edep += edep;
+    contribution.edepWeightedPos += edep * midpoint;
 }
 
 void SteppingAction::UserSteppingAction(const G4Step* step) {
+    RecordTrackAncestry(step);
     TrackVolumeInteractions(step);
     AccumulatePathLength(step);
     AccumulateEdep(step);

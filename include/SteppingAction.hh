@@ -17,6 +17,7 @@
 #include "G4ThreeVector.hh"
 #include "globals.hh"
 
+#include <unordered_map>
 #include <vector>
 
 class G4Step;
@@ -71,10 +72,36 @@ public:
         G4ThreeVector position;  ///< Pre-step point position in sensitive volume
         G4double edep{0.0};      ///< Energy deposited in this step (Geant4 units)
         G4double time{0.0};      ///< Global time at pre-step point (ns)
+        G4int trackID{0};        ///< Geant4 track that made this deposit
+    };
+
+    /// \brief Aggregate of one track's deposits in the sensitive volume.
+    ///
+    /// Every Geant4 track (primary or secondary) that deposits energy in the
+    /// silicon gets one entry, so charge can be attributed to particles without
+    /// any time-based logic.
+    struct TrackContribution {
+        G4int trackID{0};
+        G4int parentID{0};                 ///< 0 for primaries
+        G4int pdg{0};
+        G4double charge{0.0};              ///< PDG charge (units of e)
+        G4double mass{0.0};                ///< Rest mass (Geant4 units)
+        G4double edep{0.0};                ///< Summed deposit (Geant4 units)
+        G4ThreeVector edepWeightedPos;     ///< Sum of edep * position (divide by edep)
+        G4ThreeVector firstDepositPos;     ///< Position of first deposit step
+        G4ThreeVector momentumAtFirstDeposit; ///< Track momentum at first deposit (Geant4 units)
+        G4double firstDepositTime{0.0};    ///< Global time of first deposit (ns)
     };
 
     /// \brief Get per-step energy deposits in the sensitive volume.
     [[nodiscard]] const std::vector<StepDeposit>& GetStepDeposits() const { return fStepDeposits; }
+
+    /// \brief Get per-track deposit aggregates (primaries and secondaries).
+    [[nodiscard]] const std::vector<TrackContribution>& GetTrackContributions() const { return fTrackContributions; }
+
+    /// \brief Fold a track to its primary ancestor by walking recorded parent IDs.
+    /// Returns the track itself when it is a primary or its ancestry is unknown.
+    [[nodiscard]] G4int FoldToPrimaryTrack(G4int trackID) const;
 
     /// \brief Get total energy deposited in the sensitive volume (replaces G4PSEnergyDeposit scorer).
     [[nodiscard]] G4double GetTotalEdep() const { return fTotalEdep; }
@@ -100,11 +127,18 @@ private:
     /// \brief Accumulate energy deposit and record per-step data in sensitive volume.
     void AccumulateEdep(const G4Step* step);
 
+    /// \brief Record trackID -> parentID for every track seen this event.
+    void RecordTrackAncestry(const G4Step* step);
+
     EventAction* fEventAction;
     FirstContactType fFirstContactType = FirstContactType::None;
     G4double fPathLengthInSensitive{0.0}; ///< Accumulated path in sensitive volume
     G4double fTotalEdep{0.0};             ///< Total energy deposit in sensitive volume
     std::vector<StepDeposit> fStepDeposits; ///< Per-step deposits for Landau studies
+    std::vector<TrackContribution> fTrackContributions;      ///< One entry per depositing track
+    std::unordered_map<G4int, std::size_t> fContributionIndex; ///< trackID -> fTrackContributions index
+    std::unordered_map<G4int, G4int> fTrackParents;           ///< trackID -> parentID (all tracks)
+    G4int fLastAncestryTrackID{-1};       ///< Skip repeated map lookups within one track
 
     // Cached volume pointers for fast comparison (initialized lazily)
     const G4LogicalVolume* fLogicBlock = nullptr; ///< Pixel aluminum volume
