@@ -1,3 +1,7 @@
+// NOTE: derived work — license pending upstream clarification (dhevang/Analysis_epic).
+// Copyright (C) Dhevan Gangadharan (dhevang/Analysis_epic) and contributors;
+// local modifications 2024-2026 Tom Bleher, Igor Korover.
+// Verify upstream licensing before redistribution.
 #include "HepMC3/GenEvent.h"
 #include "HepMC3/ReaderAscii.h"
 #include "HepMC3/WriterAscii.h"

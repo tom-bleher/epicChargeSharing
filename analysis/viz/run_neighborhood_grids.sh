@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 # Generate neighborhood grid PDFs for each threshold sweep file
 # Run from build_docker/ inside the container
 

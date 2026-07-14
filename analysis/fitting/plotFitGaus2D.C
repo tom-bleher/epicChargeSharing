@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 // ROOT macro: plotFitGaus2D.C
 // Produces a multi-page PDF previewing 2D Gaussian fits with enhanced
 // diagnostics for visual assessment of fit quality:

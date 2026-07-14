@@ -1,8 +1,13 @@
 # AC-LGAD Charge Sharing EICrecon Plugin
 
-Out-of-tree `EICrecon_MY` plugin that provides AC-LGAD charge-sharing reconstruction for the B0 tracker and Luminosity Spectrometer. Reads `edm4hep::SimTrackerHit` collections, applies a physics-motivated AC-LGAD charge-sharing model (LogA / LinA), reconstructs sub-pixel positions by Gaussian fitting, and emits `edm4eic::TrackerHit` and `edm4eic::Measurement2D` collections.
+Out-of-tree `EICrecon_MY` plugin that provides AC-LGAD charge-sharing reconstruction for the B0 tracker and Luminosity Spectrometer. Reads `edm4hep::SimTrackerHit` collections, applies the physics-motivated LogA AC-LGAD charge-sharing model, reconstructs sub-pixel positions by Gaussian fitting, and emits `edm4eic::TrackerHit` and `edm4eic::Measurement2D` collections.
 
-This plugin is structured to follow the upstream `eic/EICrecon` conventions (`algorithms::Algorithm`, `JOmniFactory`, `plugin_*` CMake helpers, per-detector plugin libraries). The novel physics lives in the header-only library under `../core/` and is shared with the standalone Geant4 validation harness.
+This plugin is structured to follow the upstream `eic/EICrecon` conventions (`algorithms::Algorithm`, `JOmniFactory`, `plugin_*` CMake helpers, per-detector plugin libraries). The novel physics lives in the compiled static library under `../core/` and is shared with the standalone Geant4 validation harness.
+
+> **Status: prototype.** Interfaces are being reworked toward upstream's
+> staged digitization (shared per-pad hits as a digi stage, position
+> estimation as a clustering stage). Known open items are listed in the
+> top-level [README](../README.md).
 
 ## Naming
 
@@ -60,14 +65,12 @@ The user-facing config has been trimmed to what is not derivable from DD4hep. Ev
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `signalModel` | int | 0 (LogA) | 0 = LogA, 1 = LinA |
 | `activePixelMode` | int | 0 | 0=Neighborhood, 1=RowCol, 2=RowCol3x3, 3=ChargeBlock2x2, 4=ChargeBlock3x3 |
 | `reconMethod` | int | 2 | 0=Centroid, 1=Gaussian1D, 2=Gaussian2D |
 | `readout` | string | - | DD4hep readout name |
 | `minEDepGeV` | float | 0 | Energy threshold |
 | `neighborhoodRadius` | int | 2 | Half-width (2 = 5x5 grid) |
 | `d0Micron` | double | 1.0 | LogA d0 |
-| `linearBetaPerMicron` | double | 0 | LinA beta (0 = auto from pitch) |
 | `ionizationEnergyEV` | double | 3.6 | e/h pair energy |
 | `amplificationFactor` | double | 20 | AC-LGAD gain |
 | `noiseEnabled` | bool | true | Noise injection |
@@ -105,7 +108,7 @@ flowchart LR
 For each `SimTrackerHit`, `LGADChargeSharingRecon`:
 
 1. Decodes the cell ID through the DD4hep segmentation decoder to locate the center pad.
-2. Computes per-pad charge fractions across a `(2*neighborhoodRadius+1)^2` neighborhood using the configured physics model (LogA logarithmic attenuation or LinA linear attenuation). See [Tornago et al.](https://doi.org/10.1016/j.nima.2021.165319).
+2. Computes per-pad charge fractions across a `(2*neighborhoodRadius+1)^2` neighborhood using logarithmic attenuation (LogA). See [Tornago et al.](https://doi.org/10.1016/j.nima.2021.165319).
 3. Optionally applies per-pixel gain variation and electronic noise.
 4. Reconstructs the sub-pad hit position (charge-weighted centroid, 1D Gaussian on row+column, or full 2D Gaussian).
 5. Emits a `TrackerHit` with the reconstructed position in global coordinates plus a diagonal position-error covariance, and an `MCRecoTrackerHitAssociation` linking back to the truth `SimTrackerHit`.

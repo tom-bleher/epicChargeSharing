@@ -12,7 +12,6 @@
 #include "RunAction.hh"
 #include "SteppingAction.hh"
 #include "RuntimeConfig.hh"
-#include <limits>
 
 ActionInitialization::ActionInitialization(DetectorConstruction* detector) : fDetector(detector) {}
 
@@ -51,15 +50,7 @@ RunAction* ActionInitialization::CreateRunAction() const {
     runAction->SetNeighborhoodRadiusMeta(fDetector->GetNeighborhoodRadius());
     runAction->SetGridPixelCenters(fDetector->GetPixelCenters());
 
-    // Recon metadata (previously pushed via DetectorConstruction::SyncRunMetadata)
-    const auto& rtConfig = ECS::RuntimeConfig::Instance();
-    const auto reconMethod = (rtConfig.activeMode == 1) ? Constants::ChargeModel::LinA
-                                                        : Constants::ChargeModel::LogA;
-    G4double linearBeta = std::numeric_limits<G4double>::quiet_NaN();
-    if (rtConfig.activeMode == 1) {
-        linearBeta = fDetector->GetLinearChargeModelBeta();
-    }
-    runAction->SetPosReconMetadata(reconMethod, linearBeta, fDetector->GetPixelSpacing());
+    runAction->SetChargeSharingPitchMeta(fDetector->GetPixelSpacing());
 
     return runAction;
 }

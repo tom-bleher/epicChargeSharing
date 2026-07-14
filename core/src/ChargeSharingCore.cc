@@ -9,15 +9,6 @@
 
 namespace chargesharing::core {
 
-const NeighborPixel* NeighborhoodResult::getPixel(int di, int dj) const {
-    for (const auto& p : pixels) {
-        if (p.di == di && p.dj == dj && p.inBounds) {
-            return &p;
-        }
-    }
-    return nullptr;
-}
-
 std::vector<const NeighborPixel*> NeighborhoodResult::getCenterRow() const {
     std::vector<const NeighborPixel*> row;
     for (const auto& p : pixels) {
@@ -96,8 +87,7 @@ NeighborhoodResult calculateNeighborhood(double hitX, double hitY, int centerI, 
             pixel.distance = calcDistanceToEdge(dx, dy, padW / 2.0, padH / 2.0);
             pixel.alpha = calcPadViewAngle(pixel.distance, padW, padH);
 
-            pixel.weight =
-                calcWeight(config.signalModel, pixel.distance, padW, padH, d0MM, config.betaPerMicron, pitchX);
+            pixel.weight = calcWeightLogA(pixel.distance, pixel.alpha, d0MM);
 
             result.pixels.push_back(pixel);
         }

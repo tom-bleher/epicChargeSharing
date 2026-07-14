@@ -215,7 +215,9 @@ void LGADChargeSharingRecon::init() {
             try {
                 m_geom.detectorThicknessMM =
                     detector->constantAsDouble(detConstants.siliconThickness) / dd4hep::mm;
-            } catch (const std::exception&) {
+            } catch (const std::exception& ex) {
+                debug("Optional constant '{}' not available ({}); keeping default thickness.",
+                      detConstants.siliconThickness, ex.what());
             }
         }
         if (!detConstants.pixelSize.empty()) {
@@ -225,14 +227,18 @@ void LGADChargeSharingRecon::init() {
                     m_geom.pixelSizeXMM = p;
                     m_geom.pixelSizeYMM = p;
                 }
-            } catch (const std::exception&) {
+            } catch (const std::exception& ex) {
+                debug("Optional constant '{}' not available ({}); keeping segmentation pitch.",
+                      detConstants.pixelSize, ex.what());
             }
         }
         if (!detConstants.copperThickness.empty()) {
             try {
                 m_geom.pixelThicknessMM =
                     detector->constantAsDouble(detConstants.copperThickness) / dd4hep::mm;
-            } catch (const std::exception&) {
+            } catch (const std::exception& ex) {
+                debug("Optional constant '{}' not available ({}); keeping default pixel thickness.",
+                      detConstants.copperThickness, ex.what());
             }
         }
 
@@ -242,6 +248,9 @@ void LGADChargeSharingRecon::init() {
                 m_geom.detectorThicknessMM = volumeThickness;
             } else {
                 applyDetectorFallbacks(m_cfg.readout, m_geom);
+                debug("Sensor thickness not derivable from DD4hep volume (got {} mm); "
+                      "using hard-coded fallback {} mm for readout '{}'.",
+                      volumeThickness, m_geom.detectorThicknessMM, m_cfg.readout);
             }
         }
     } catch (const std::exception& ex) {
@@ -398,7 +407,6 @@ LGADChargeSharingRecon::processSingleHitImpl(const SingleHitInput& input) const 
     const double hitY = input.hitPositionMM[1];
 
     core::NeighborhoodConfig neighborCfg;
-    neighborCfg.signalModel = m_cfg.signalModel;
     neighborCfg.activeMode = m_cfg.activePixelMode;
     neighborCfg.radius = m_cfg.neighborhoodRadius;
     neighborCfg.pixelSizeMM = m_geom.pixelSizeXMM;
@@ -406,7 +414,6 @@ LGADChargeSharingRecon::processSingleHitImpl(const SingleHitInput& input) const 
     neighborCfg.pixelSpacingMM = m_geom.pixelSpacingXMM;
     neighborCfg.pixelSpacingYMM = m_geom.pixelSpacingYMM;
     neighborCfg.d0Micron = m_cfg.d0Micron;
-    neighborCfg.betaPerMicron = m_cfg.linearBetaPerMicron;
     neighborCfg.numPixelsX = m_geom.pixelsPerSide;
     neighborCfg.numPixelsY = m_geom.pixelsPerSide;
     neighborCfg.minIndexX = m_geom.hasBoundsX() ? m_geom.minIndexX : 0;
@@ -427,9 +434,6 @@ LGADChargeSharingRecon::processSingleHitImpl(const SingleHitInput& input) const 
                 chargeC = m_noise_model.applyNoise(chargeC);
             }
             pixel.charge = chargeC;
-            pixel.chargeRow = pixel.fractionRow * totalChargeCoulombs;
-            pixel.chargeCol = pixel.fractionCol * totalChargeCoulombs;
-            pixel.chargeBlock = pixel.fractionBlock * totalChargeCoulombs;
         }
     }
 

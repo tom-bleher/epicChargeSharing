@@ -47,7 +47,7 @@ using LGADChargeSharingReconAlgorithm = algorithms::Algorithm<
 ///
 /// Replaces the digi + position-reconstruction steps for detectors (B0TRK,
 /// LumiSpec) that do not have a pulse/ADC chain upstream. Uses the shared
-/// header-only LogA / LinA models under chargesharing::core plus
+/// the LogA model under chargesharing::core plus
 /// Gaussian fitting from chargesharing::fit for sub-pad position
 /// extraction.
 ///

@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 # Sweep readout threshold from 2.0σ to 4.0σ, 10k events each
 # Run from the build directory
 

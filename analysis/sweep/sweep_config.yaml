@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 # Sweep Analysis Configuration
 # See sweep_analysis.py for usage. CLI arguments override these values.
 
@@ -5,17 +7,9 @@
 # Set to null to auto-compute from Config.hh geometry (gap region, 25 µm steps)
 positions: null
 
-# Charge sharing model: LogA or LinA
-# Set to null to use current Config.hh setting
-charge_model: LogA
-
 # Denominator mode: Neighborhood, ChargeBlock, or RowCol
 # Set to null to use current Config.hh setting
 denominator_mode: Neighborhood
-
-# Beta coefficient for linear model (only used with LinA)
-# Set to null to use current Config.hh setting
-beta: null
 
 # Number of events for Gaussian fit PDFs and neighborhood visualizations
 n_events: 100

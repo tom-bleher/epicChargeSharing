@@ -11,7 +11,6 @@ namespace eicrecon {
 
 using ::chargesharing::core::ActivePixelMode;
 using ::chargesharing::core::ReconMethod;
-using ::chargesharing::core::SignalModel;
 
 /// Configuration for LGADChargeSharingRecon.
 ///
@@ -20,9 +19,6 @@ using ::chargesharing::core::SignalModel;
 /// field names) is derived from DD4hep inside the algorithm's init() and
 /// cached on the private Geometry state.
 struct LGADChargeSharingReconConfig {
-    /// Charge-sharing physics model: LogA (logarithmic) or LinA (linear).
-    SignalModel signalModel{SignalModel::LogA};
-
     /// Denominator selection for charge-fraction normalization.
     ActivePixelMode activePixelMode{ActivePixelMode::Neighborhood};
 
@@ -40,9 +36,6 @@ struct LGADChargeSharingReconConfig {
 
     /// LogA model: transverse hit size d0 (microns).
     double d0Micron{1.0};
-
-    /// LinA model: attenuation coefficient (1/um). 0 = auto-select from pitch.
-    double linearBetaPerMicron{0.0};
 
     /// Silicon e/h pair ionization energy (eV).
     double ionizationEnergyEV{3.6};

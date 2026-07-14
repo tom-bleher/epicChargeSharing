@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# NOTE: adapted work — license pending upstream clarification (dhevang/Analysis_epic).
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+# Based on Dhevan Gangadharan's lumi_particles.cxx (dhevang/Analysis_epic);
+# see attribution below. Verify upstream licensing before redistribution.
 """Generate Bethe-Heitler bremsstrahlung e+e- pairs for lumi spectrometer testing.
 
 Produces a HepMC3 ASCII file with converted BH photons (e+e- pairs) at the

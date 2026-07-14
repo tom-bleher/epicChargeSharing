@@ -8,7 +8,7 @@
 
 namespace chargesharing::core {
 
-NoiseModel::NoiseModel() : m_generator(std::random_device{}()) {}
+NoiseModel::NoiseModel() : m_generator(kDefaultSeed) {}
 
 NoiseModel::NoiseModel(unsigned int seed) : m_generator(seed) {}
 

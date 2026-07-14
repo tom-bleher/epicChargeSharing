@@ -33,6 +33,7 @@ CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 *.cmake
+!eicrecon/cmake/*.cmake
 !CMakeLists.txt
 !*Config.cmake
 

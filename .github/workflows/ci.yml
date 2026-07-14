@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+#
+# CI for both artifacts in this repository, run inside the eic-shell (eic_xl)
+# container via CVMFS, following the org-standard recipe used by eic/epic and
+# eic/EICrecon (cvmfs-contrib/github-action-cvmfs + eic/run-cvmfs-osg-eic-shell).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eicrecon-plugin:
+    name: EICrecon plugin (${{ matrix.release }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["eic_xl:nightly", "eic_xl:26.04.0-stable"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cvmfs-contrib/github-action-cvmfs@v4
+      - uses: eic/run-cvmfs-osg-eic-shell@v1
+        with:
+          platform-release: ${{ matrix.release }}
+          run: |
+            cmake -S eicrecon -B build/eicrecon \
+                  -DCMAKE_INSTALL_PREFIX=$PWD/eicrecon/install
+            cmake --build build/eicrecon -j$(nproc) --target install
+            ctest --test-dir build/eicrecon --output-on-failure
+
+  standalone-harness:
+    name: Geant4 harness (${{ matrix.release }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["eic_xl:nightly"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cvmfs-contrib/github-action-cvmfs@v4
+      - uses: eic/run-cvmfs-osg-eic-shell@v1
+        with:
+          platform-release: ${{ matrix.release }}
+          run: |
+            cmake -S . -B build/harness -DCMAKE_BUILD_TYPE=Release
+            cmake --build build/harness -j$(nproc)
+
+  # NOTE: a clang-format gate (make format-check) is intentionally not enabled
+  # yet: the tree predates the .clang-format config (imported verbatim from
+  # eic/EICrecon) and needs a one-time dedicated reformat commit first. Enable
+  # this job in the same PR as that reformat.
+  #
+  # format-check:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: |
+  #         sudo apt-get update -q && sudo apt-get install -y -q clang-format
+  #         git ls-files '*.cc' '*.hh' '*.h' | xargs clang-format --dry-run --Werror

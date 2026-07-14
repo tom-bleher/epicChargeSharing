@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 #
-# chargesharing_core: shared physics library for charge-sharing model (LogA/LinA),
+# chargesharing_core: shared physics library for the LogA charge-sharing model,
 # noise injection, and Gaussian position reconstruction. Consumed by both the
 # standalone Geant4 simulation (epicChargeSharing) and the EICrecon plugin
 # (chargeSharingRecon).

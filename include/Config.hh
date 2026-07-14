@@ -26,13 +26,6 @@ namespace Constants {
 // (see RuntimeConfig.hh for the full list of runtime-tunable parameters).
 //
 // ─────────────────────────────── Mode Selection ─────────────────────────────
-// Choose reconstruction mode: LogA or LinA
-//   LogA - Logarithmic attenuation model
-//   LinA - Linear attenuation model
-enum class Mode { LogA, LinA };
-
-inline constexpr Mode ACTIVE_MODE = Mode::LogA;
-
 // ───────────────────────────── Detector Geometry ────────────────────────────
 inline const G4double DETECTOR_SIZE = 30.0 * mm;   // Sensor side length
 inline const G4double DETECTOR_WIDTH = 0.05 * mm;  // Silicon thickness
@@ -64,9 +57,6 @@ inline constexpr G4double GAIN_SATURATION_CHARGE = 30000.0; // Saturation onset 
 inline constexpr G4bool   GAIN_FLUCTUATION_ENABLED = true;  // Enable event-level gain fluctuation
 
 // ───────────────────────────── Linear Model ─────────────────────────────────
-// LinA attenuation coefficient beta in 1/um
-inline constexpr G4double LINEAR_CHARGE_MODEL_BETA = 0.002;
-
 // ──────────────────────────── Particle Gun ──────────────────────────────────
 // Use fixed position (true) or random sampling (false) for primary particles
 inline constexpr G4bool USE_FIXED_POSITION = false;
@@ -135,10 +125,6 @@ inline constexpr G4bool FIT_2D_SAVE_THETA = false; // Save rotation angle
 // Type Definitions
 // ═══════════════════════════════════════════════════════════════════════════
 
-enum class ChargeModel { LogA, LinA };
-using SignalModel = ChargeModel;
-using ReconMethod = ChargeModel;
-
 // Unified enum for runtime use (combines both 1D and 2D modes)
 enum class ActivePixelMode { Neighborhood, RowCol, RowCol3x3, ChargeBlock2x2, ChargeBlock3x3, ThresholdAboveNoise };
 
@@ -151,24 +137,9 @@ constexpr const char* ActivePixelModeName(ActivePixelMode m) {
                                                     : "ThresholdAboveNoise";
 }
 
-constexpr const char* SignalModelName(ChargeModel m) {
-    return (m == ChargeModel::LinA) ? "LinA" : "LogA";
-}
-
-using PosReconModel = ChargeModel;     // Legacy alias
-using ChargeReconModel = ChargeModel;  // Preferred alias
-
 // ═══════════════════════════════════════════════════════════════════════════
-// Derived Settings (computed from ACTIVE_MODE)
+// Derived Settings
 // ═══════════════════════════════════════════════════════════════════════════
-
-inline constexpr ChargeModel RECON_METHOD = (ACTIVE_MODE == Mode::LogA) ? ChargeModel::LogA : ChargeModel::LinA;
-
-inline constexpr ChargeModel SIGNAL_MODEL = (ACTIVE_MODE == Mode::LinA) ? ChargeModel::LinA : ChargeModel::LogA;
-
-inline constexpr G4bool USES_LINEAR_SIGNAL = (SIGNAL_MODEL == ChargeModel::LinA);
-
-inline constexpr ChargeReconModel POS_RECON_MODEL = RECON_METHOD;
 
 // Map 1D mode enum to unified enum
 constexpr ActivePixelMode ActivePixelModeFrom1D(ActivePixelMode1D m) {

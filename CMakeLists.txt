@@ -169,7 +169,7 @@ if(CLANG_FORMAT_EXE)
 endif()
 
 find_package(Doxygen QUIET)
-if(DOXYGEN_FOUND)
+if(DOXYGEN_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/docs/Doxyfile")
     add_custom_target(docs
         COMMAND ${DOXYGEN_EXECUTABLE} ${PROJECT_SOURCE_DIR}/docs/Doxyfile
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/docs

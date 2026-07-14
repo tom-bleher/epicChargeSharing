@@ -42,9 +42,12 @@ python3 "${TEST_DIR}/lumi/gen_lumi_bh.py" \
 
 echo ""
 echo "=== Step 2: ddsim simulation ==="
+# The minimal test compact defines no tracker_region_* constants, so the
+# truth-trimming user particle handler must be disabled (keeps all MC truth).
 ddsim --compactFile "$COMPACT" \
       --numberOfEvents "$NEVENTS" \
       --inputFiles "$OUTDIR/lumi_bh.hepmc" \
+      --part.userParticleHandler='' \
       --outputFile "$OUTDIR/lumi_sim.edm4hep.root"
 
 echo ""

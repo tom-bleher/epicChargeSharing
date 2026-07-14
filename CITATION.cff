@@ -7,9 +7,9 @@ authors:
   - family-names: "Korover"
     given-names: "Igor"
     orcid: "https://orcid.org/0009-0005-8988-693X"
-title: "epicChargeSharing: GEANT4 Simulation for Charge Sharing in AC-LGAD Detectors"
-version: 1.0.0
-date-released: 2025-01-01
+title: "epicChargeSharing: AC-LGAD Charge-Sharing Reconstruction for ePIC (EICrecon plugin + Geant4 validation harness)"
+version: 1.1.0
+date-released: 2026-07-10
 url: "https://github.com/tom-bleher/epicChargeSharing"
 repository-code: "https://github.com/tom-bleher/epicChargeSharing"
 license: LGPL-3.0-or-later

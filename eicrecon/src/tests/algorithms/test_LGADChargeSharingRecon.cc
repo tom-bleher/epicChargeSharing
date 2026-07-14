@@ -23,7 +23,6 @@ using eicrecon::LGADChargeSharingRecon;
 using eicrecon::LGADChargeSharingReconConfig;
 using ::chargesharing::core::ActivePixelMode;
 using ::chargesharing::core::ReconMethod;
-using ::chargesharing::core::SignalModel;
 
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
@@ -55,20 +54,16 @@ LGADChargeSharingRecon::Geometry makeTestGeometry() {
 
 /// Build a LGADChargeSharingRecon with injected geometry. Noise is disabled
 /// so that results are deterministic.
-std::unique_ptr<LGADChargeSharingRecon> makeAlgorithm(ReconMethod method,
-                                                     int radius = 2,
-                                                     SignalModel model = SignalModel::LogA) {
+std::unique_ptr<LGADChargeSharingRecon> makeAlgorithm(ReconMethod method, int radius = 2) {
     auto algo = std::make_unique<LGADChargeSharingRecon>("test_lgad_recon");
     algo->level(algorithms::LogLevel::kError);
 
     LGADChargeSharingReconConfig cfg;
-    cfg.signalModel = model;
     cfg.activePixelMode = ActivePixelMode::Neighborhood;
     cfg.reconMethod = method;
     cfg.readout = "TestReadout";
     cfg.neighborhoodRadius = radius;
     cfg.d0Micron = 1.0;
-    cfg.linearBetaPerMicron = 0.0;
     cfg.ionizationEnergyEV = 3.6;
     cfg.amplificationFactor = 20.0;
     cfg.noiseEnabled = false;
@@ -196,17 +191,4 @@ TEST_CASE("LGADChargeSharingRecon: centroid fallback when neighborhood is degene
     CHECK_THAT(res.reconstructedPositionMM[1],
                WithinAbs(res.nearestPixelCenterMM[1], 1e-6));
     CHECK_FALSE(res.fit2D.converged);
-}
-
-TEST_CASE("LGADChargeSharingRecon: LinA model also produces normalized fractions",
-          "[lgad][recon][model]") {
-    auto algo = makeAlgorithm(ReconMethod::Centroid, /*radius=*/2, SignalModel::LinA);
-    auto in = makeHitAt(-0.01, 0.02);
-    const auto res = algo->processSingleHit(in);
-
-    double fsum = 0.0;
-    for (const auto& n : res.neighbors) {
-        fsum += n.fraction;
-    }
-    REQUIRE_THAT(fsum, WithinAbs(1.0, 1e-6));
 }

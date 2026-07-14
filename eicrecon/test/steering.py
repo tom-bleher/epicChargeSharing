@@ -1,3 +1,7 @@
+# NOTE: adapted work — license pending upstream clarification (dhevang/Analysis_epic).
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
+# Portions adapted from Dhevan Gangadharan's Analysis_epic (steeringGun.py);
+# see attribution below. Verify upstream licensing before redistribution.
 """ddsim steering configuration for charge sharing tests.
 
 Adapted from Dhevan Gangadharan's steeringGun.py (dhevang/Analysis_epic).

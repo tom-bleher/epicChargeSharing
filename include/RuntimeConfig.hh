@@ -50,7 +50,6 @@ public:
     RuntimeConfig& operator=(RuntimeConfig&&) = delete;
 
     // ---- Mode Selection ----
-    G4int activeMode{static_cast<G4int>(Constants::ACTIVE_MODE)};           // 0=LogA, 1=LinA
     G4int activePixelMode{static_cast<G4int>(Constants::ACTIVE_PIXEL_MODE)}; // 0-5, see ActivePixelMode enum
 
     // ---- Detector Geometry ----
@@ -69,7 +68,6 @@ public:
     G4double ionizationEnergy{Constants::IONIZATION_ENERGY};
     G4double gain{Constants::GAIN};
     G4double d0{Constants::D0};
-    G4double linearBeta{Constants::LINEAR_CHARGE_MODEL_BETA};
 
     // ---- Event-Level Gain Fluctuation ----
     G4double gainExcessNoiseFactor{Constants::GAIN_EXCESS_NOISE_FACTOR};

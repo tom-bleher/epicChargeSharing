@@ -13,7 +13,6 @@
 #   /ecs/physics/d0 1.0
 #   /ecs/physics/gain 20.0
 #   /ecs/physics/ionizationEnergy 3.6
-#   /ecs/physics/linearBeta 0.002
 #
 # Noise:
 #   /ecs/noise/electronCount 1250

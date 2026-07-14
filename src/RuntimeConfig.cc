@@ -26,8 +26,6 @@ void RuntimeConfig::DefineCommands() {
         .SetRange("ionizationEnergy > 0");
     fPhysicsMessenger->DeclareProperty("gain", gain, "AC-LGAD gain factor").SetRange("gain > 0");
     fPhysicsMessenger->DeclareProperty("d0", d0, "LogA reference distance d0 (um)").SetRange("d0 > 0");
-    fPhysicsMessenger->DeclareProperty("linearBeta", linearBeta, "LinA attenuation coefficient beta (1/um)")
-        .SetRange("linearBeta >= 0");
     fPhysicsMessenger->DeclareProperty("gainExcessNoiseFactor", gainExcessNoiseFactor,
         "McIntyre excess noise factor F for avalanche gain fluctuation").SetRange("gainExcessNoiseFactor > 0");
     fPhysicsMessenger->DeclareProperty("gainSaturationCharge", gainSaturationCharge,
@@ -61,10 +59,8 @@ void RuntimeConfig::DefineCommands() {
 
     // Mode commands
     fModeMessenger =
-        std::make_unique<G4GenericMessenger>(this, "/ecs/mode/", "Signal model and active pixel mode selection");
+        std::make_unique<G4GenericMessenger>(this, "/ecs/mode/", "Active pixel mode selection");
 
-    fModeMessenger->DeclareProperty("signalModel", activeMode,
-                                    "Signal model: 0=LogA (logarithmic), 1=LinA (linear)");
     fModeMessenger->DeclareProperty(
         "activePixelMode", activePixelMode,
         "Active pixel mode: 0=Neighborhood, 1=RowCol, 2=RowCol3x3, 3=ChargeBlock2x2, 4=ChargeBlock3x3, "

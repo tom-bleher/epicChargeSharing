@@ -7,6 +7,12 @@ plugin_add(${PLUGIN_NAME})
 plugin_glob_all(${PLUGIN_NAME})
 plugin_add_dd4hep(${PLUGIN_NAME})
 plugin_add_event_model(${PLUGIN_NAME})
+# Out-of-tree builds consume EICrecon service headers (services/log/...) from
+# the installed include tree rather than the in-tree src/ directory.
+plugin_include_directories(${PLUGIN_NAME} SYSTEM PRIVATE
+    ${EICrecon_INCLUDE_DIR}
+    ${EICrecon_INCLUDE_DIR}/EICrecon
+)
 plugin_link_libraries(${PLUGIN_NAME}
     ROOT::Core
     ROOT::Hist

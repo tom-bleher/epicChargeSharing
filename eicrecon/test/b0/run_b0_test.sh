@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 # B0 tracker charge sharing test chain:
 # 1. Generate forward protons into B0 acceptance
 # 2. Simulate with ddsim through full DD4hep geometry
@@ -30,9 +32,12 @@ python3 "${SCRIPT_DIR}/gen_b0_particles.py" \
 
 echo ""
 echo "=== Step 2: ddsim simulation ==="
+# The minimal test compact defines no tracker_region_* constants, so the
+# truth-trimming user particle handler must be disabled (keeps all MC truth).
 ddsim --compactFile "$COMPACT" \
       --numberOfEvents "$NEVENTS" \
       --inputFiles "$OUTDIR/b0_gen.hepmc" \
+      --part.userParticleHandler='' \
       --outputFile "$OUTDIR/b0_sim.edm4hep.root"
 
 echo ""

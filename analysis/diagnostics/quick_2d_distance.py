@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 """Quick analysis: ReconTrueDistance_2D = sqrt(dx² + dy²) with Rayleigh fit."""
 
 import numpy as np

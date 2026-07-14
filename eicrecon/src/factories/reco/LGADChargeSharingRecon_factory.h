@@ -38,12 +38,9 @@ private:
 
     // Enum-backed integer parameters. We store the raw int alongside the config
     // enum so that the JANA CLI can set them, then cast in Configure().
-    int m_signal_model_value{static_cast<int>(SignalModel::LogA)};
     int m_active_pixel_mode_value{static_cast<int>(ActivePixelMode::Neighborhood)};
     int m_recon_method_value{static_cast<int>(ReconMethod::Gaussian2D)};
 
-    ParameterRef<int> m_signal_model{this, "signalModel", m_signal_model_value,
-                                     "Signal model: 0=LogA (logarithmic), 1=LinA (linear)"};
     ParameterRef<int> m_active_pixel_mode{
         this, "activePixelMode", m_active_pixel_mode_value,
         "Active pixel mode: 0=Neighborhood, 1=RowCol, 2=RowCol3x3, 3=ChargeBlock2x2, 4=ChargeBlock3x3"};
@@ -59,8 +56,6 @@ private:
 
     ParameterRef<double> m_d0_micron{this, "d0Micron", config().d0Micron,
                                      "LogA model: transverse hit size d0 (um)"};
-    ParameterRef<double> m_linear_beta{this, "linearBetaPerMicron", config().linearBetaPerMicron,
-                                       "LinA model: attenuation coefficient (1/um), 0 = auto from pitch"};
     ParameterRef<double> m_ionization_energy{this, "ionizationEnergyEV", config().ionizationEnergyEV,
                                              "Silicon e/h pair ionization energy (eV)"};
     ParameterRef<double> m_amplification{this, "amplificationFactor", config().amplificationFactor,
@@ -72,7 +67,6 @@ private:
 
 public:
     void Configure() {
-        config().signalModel = static_cast<SignalModel>(m_signal_model_value);
         config().activePixelMode = static_cast<ActivePixelMode>(m_active_pixel_mode_value);
         config().reconMethod = static_cast<ReconMethod>(m_recon_method_value);
 

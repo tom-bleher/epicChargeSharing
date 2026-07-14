@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 """Analyze threshold sweep: fit Gaussian to ReconTrueDelta X/Y, plot resolution vs threshold sigma."""
 
 import sys

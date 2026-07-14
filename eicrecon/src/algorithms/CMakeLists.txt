@@ -19,6 +19,7 @@ target_include_directories(lgad_chargesharing_algorithms PUBLIC
 
 target_link_libraries(lgad_chargesharing_algorithms PUBLIC
     chargesharing::core
+    algorithms::core
     EDM4HEP::edm4hep
     EDM4EIC::edm4eic
     podio::podio

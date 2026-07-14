@@ -38,7 +38,6 @@ class DetectorConstruction;
 ///
 /// The calculator supports the terminology of Tornago et al.:
 /// - **LogA**: Logarithmic attenuation model (paper Eq. (\ref{eq:masterformula}))
-/// - **LinA**: Linear attenuation model (paper Eq. (\ref{eq:LA}))
 ///
 /// For each event, the calculator:
 /// 1. Finds the nearest pad to the hit position
@@ -442,14 +441,7 @@ private:
         static constexpr G4double kMinD0 = 1e-6; ///< Minimum D0 in micrometers
     };
 
-    /// \brief Validated charge model parameters.
-    struct ChargeModelParams {
-        G4bool useLinear{false}; ///< True for Linear model
-        G4double beta{0.0};      ///< Attenuation coefficient in 1/um (Linear only)
-    };
-
     static D0Params ValidateD0(G4double d0Raw, const char* callerName);
-    [[nodiscard]] ChargeModelParams GetChargeModelParams(G4double pixelSpacing) const;
 
     void ReserveBuffers();
     G4ThreeVector CalcNearestPixel(const G4ThreeVector& pos);

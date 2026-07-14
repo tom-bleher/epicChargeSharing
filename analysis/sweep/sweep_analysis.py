@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2024-2026 Tom Bleher, Igor Korover
 """
 Unified sweep analysis pipeline.
 
@@ -10,7 +12,7 @@ This script combines the functionality of:
 - Fi_x.py: Extract F_i values per position
 
 Workflow per position:
-1. Configure simulation parameters (charge model, active pixel mode, beta)
+1. Configure the active pixel mode
 2. Modify PrimaryGenerator.cc to set fFixedX
 3. Build and run simulation
 4. Save ROOT file with position-based name
@@ -25,9 +27,8 @@ Workflow per position:
 8. Extract F_i values
 
 Simulation configuration options:
-- Charge sharing model: LogA (logarithmic, Tornago Eq.4), LinA (linear, Tornago Eq.6)
+- LogA charge sharing (logarithmic, Tornago Eq.4)
 - Active pixel mode: Neighborhood (all pixels), ChargeBlock2x2/3x3 (highest F_i), RowCol/RowCol3x3 (cross pattern)
-- Beta attenuation coefficient for linear model
 
 Final outputs:
 - Plot of sigma_F vs d
@@ -45,11 +46,8 @@ Usage examples:
     # Run with CLI overrides (CLI args take precedence over config)
     python sweep_analysis.py run --positions 0,50,-50,100,-100
 
-    # Run with LogA charge model and ChargeBlock active pixel mode
-    python sweep_analysis.py run --charge-model LogA --active-pixel-mode ChargeBlock2x2
-
-    # Run with linear model and custom beta
-    python sweep_analysis.py run --charge-model LinA --beta 0.005
+    # Run with ChargeBlock active pixel mode
+    python sweep_analysis.py run --active-pixel-mode ChargeBlock2x2
 
     # Analyze existing ROOT files using config
     python sweep_analysis.py analyze /path/to/root/files --config sweep_config.yaml
@@ -122,12 +120,7 @@ MACRO_PATH = REPO_ROOT / "analysis" / "fitting" / "plotFitGaus1D.C"
 NEIGHBORHOOD_MACRO_PATH = REPO_ROOT / "analysis" / "viz" / "plotChargeNeighborhood.C"
 DEFAULT_CONFIG_FILE = FARM_DIR / "sweep_config.yaml"
 
-# Charge sharing model options
-CHARGE_MODELS = ["LogA", "LinA"]
 ACTIVE_PIXEL_MODES = ["Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", "RowCol3x3"]
-
-# Default beta value for linear model
-DEFAULT_BETA = 0.001
 
 # Charge neighborhood visualization types
 # Maps user-friendly names to (dataKind, chargeBranch) pairs for the ROOT macro
@@ -283,9 +276,7 @@ def run_cmd(cmd: List[str], cwd: Optional[Path] = None, capture: bool = True) ->
 class SweepConfig:
     """Configuration loaded from YAML file."""
     positions: List[float] = field(default_factory=lambda: DEFAULT_POSITIONS.copy())
-    charge_model: Optional[str] = None
     active_pixel_mode: Optional[str] = None
-    beta: Optional[float] = None
     n_events: int = 200
     pixel_id: Optional[int] = None
 
@@ -318,12 +309,8 @@ def load_config(config_path: Optional[Path] = None) -> SweepConfig:
 
     if "positions" in yaml_data and yaml_data["positions"] is not None:
         config.positions = [float(x) for x in yaml_data["positions"]]
-    if "charge_model" in yaml_data:
-        config.charge_model = yaml_data["charge_model"]
     if "active_pixel_mode" in yaml_data:
         config.active_pixel_mode = yaml_data["active_pixel_mode"]
-    if "beta" in yaml_data:
-        config.beta = yaml_data["beta"]
     if "n_events" in yaml_data:
         config.n_events = int(yaml_data["n_events"])
     if "pixel_id" in yaml_data:
@@ -338,30 +325,20 @@ def load_config(config_path: Optional[Path] = None) -> SweepConfig:
 
 # Regex patterns for updating Config.hh
 # Note: Config.hh uses unqualified type names (inside Constants namespace)
-CONFIG_POS_RECON_MODEL_REGEX = re.compile(
-    r"^(\s*inline\s+constexpr\s+PosReconModel\s+POS_RECON_MODEL\s*=\s*)(?:ECS::Config::)?(?:Constants::)?PosReconModel::\w+\s*;"
-)
 CONFIG_ACTIVE_PIXEL_MODE_REGEX = re.compile(
     r"^(\s*inline\s+constexpr\s+ActivePixelMode\s+ACTIVE_PIXEL_MODE\s*=\s*)(?:ECS::Config::)?(?:Constants::)?ActivePixelMode::\w+\s*;"
-)
-CONFIG_BETA_REGEX = re.compile(
-    r"^(\s*inline\s+constexpr\s+G4double\s+LINEAR_CHARGE_MODEL_BETA\s*=\s*)[\d.]+\s*;"
 )
 
 
 def update_config_hh(
     source_text: str,
-    charge_model: Optional[str] = None,
     active_pixel_mode: Optional[str] = None,
-    beta: Optional[float] = None,
 ) -> str:
     """Update simulation parameters in Config.hh source.
 
     Args:
         source_text: Current content of Config.hh
-        charge_model: One of "LogA", "LinA" (or None to keep current)
         active_pixel_mode: One of "Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", "RowCol3x3" (or None to keep current)
-        beta: Beta attenuation coefficient for linear model (or None to keep current)
 
     Returns:
         Updated Config.hh content
@@ -373,26 +350,12 @@ def update_config_hh(
     for line in lines:
         new_line = line
 
-        # Update POS_RECON_MODEL
-        if charge_model is not None:
-            m = CONFIG_POS_RECON_MODEL_REGEX.match(line)
-            if m:
-                new_line = f"{m.group(1)}PosReconModel::{charge_model};"
-                changes.append(f"POS_RECON_MODEL = {charge_model}")
-
         # Update ACTIVE_PIXEL_MODE
         if active_pixel_mode is not None:
             m = CONFIG_ACTIVE_PIXEL_MODE_REGEX.match(line)
             if m:
                 new_line = f"{m.group(1)}ActivePixelMode::{active_pixel_mode};"
                 changes.append(f"ACTIVE_PIXEL_MODE = {active_pixel_mode}")
-
-        # Update BETA
-        if beta is not None:
-            m = CONFIG_BETA_REGEX.match(line)
-            if m:
-                new_line = f"{m.group(1)}{beta};"
-                changes.append(f"LINEAR_CHARGE_MODEL_BETA = {beta}")
 
         new_lines.append(new_line)
 
@@ -406,29 +369,16 @@ def get_current_config_settings(source_text: str) -> Dict[str, str]:
     """Extract current configuration settings from Config.hh.
 
     Returns:
-        Dictionary with keys: charge_model, active_pixel_mode, beta
+        Dictionary containing active_pixel_mode when found.
     """
     settings = {}
 
     for line in source_text.splitlines():
-        m = CONFIG_POS_RECON_MODEL_REGEX.match(line)
-        if m:
-            # Extract model name from the line
-            match = re.search(r"PosReconModel::(\w+)", line)
-            if match:
-                settings["charge_model"] = match.group(1)
-
         m = CONFIG_ACTIVE_PIXEL_MODE_REGEX.match(line)
         if m:
             match = re.search(r"ActivePixelMode::(\w+)", line)
             if match:
                 settings["active_pixel_mode"] = match.group(1)
-
-        m = CONFIG_BETA_REGEX.match(line)
-        if m:
-            match = re.search(r"=\s*([\d.]+)", line)
-            if match:
-                settings["beta"] = match.group(1)
 
     return settings
 
@@ -1940,9 +1890,7 @@ def run_full_pipeline(
     skip_gaussian_fits: bool = False,
     skip_sigma_f: bool = False,
     skip_fi: bool = False,
-    charge_model: Optional[str] = None,
     active_pixel_mode: Optional[str] = None,
-    beta: Optional[float] = None,
 ) -> List[PositionResult]:
     """Run the complete analysis pipeline.
 
@@ -1956,9 +1904,7 @@ def run_full_pipeline(
         skip_gaussian_fits: Skip generating Gaussian fits PDFs
         skip_sigma_f: Skip sigma_f extraction
         skip_fi: Skip F_i extraction
-        charge_model: Charge sharing model ("LogA" or "LinA")
         active_pixel_mode: Signal fraction mode ("Neighborhood", "ChargeBlock2x2", "ChargeBlock3x3", "RowCol", or "RowCol3x3")
-        beta: Beta attenuation coefficient for linear model
     """
     results: List[PositionResult] = []
 
@@ -1978,16 +1924,14 @@ def run_full_pipeline(
         original_config_text = read_file_text(CONFIG_FILE)
         config_updated = False
 
-        if any([charge_model, active_pixel_mode, beta]):
+        if active_pixel_mode:
             print("\n[INFO] Updating simulation configuration...")
             current_settings = get_current_config_settings(original_config_text)
             print(f"[INFO] Current settings: {current_settings}")
 
             new_config_text = update_config_hh(
                 original_config_text,
-                charge_model=charge_model,
                 active_pixel_mode=active_pixel_mode,
-                beta=beta,
             )
 
             if new_config_text != original_config_text:
@@ -2427,29 +2371,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     # Simulation configuration arguments
     full_parser.add_argument(
-        "--charge-model",
-        type=str,
-        choices=CHARGE_MODELS,
-        default=None,
-        help="Charge sharing model: LogA (logarithmic attenuation, Tornago Eq.4) "
-             "or LinA (linear attenuation, Tornago Eq.6). "
-             "If not specified, uses current Config.hh setting.",
-    )
-    full_parser.add_argument(
         "--active-pixel-mode",
         type=str,
         choices=ACTIVE_PIXEL_MODES,
         default=None,
         help="Active pixel mode for charge fraction calculation: "
              "Neighborhood (all pixels), ChargeBlock2x2/3x3 (4/9 highest F_i), or RowCol/RowCol3x3 (cross pattern). "
-             "If not specified, uses current Config.hh setting.",
-    )
-    full_parser.add_argument(
-        "--beta",
-        type=float,
-        default=None,
-        help="Beta attenuation coefficient for linear charge model. "
-             "Only used when --charge-model=LinA. "
              "If not specified, uses current Config.hh setting.",
     )
 
@@ -2540,9 +2467,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             # Merge CLI and config
             n_fit_events = args.n_fit_events if args.n_fit_events != 200 else config.n_events
             pixel_id = args.pixel_id if args.pixel_id is not None else config.pixel_id
-            charge_model = args.charge_model if args.charge_model else config.charge_model
             active_pixel_mode = args.active_pixel_mode if args.active_pixel_mode else config.active_pixel_mode
-            beta = args.beta if args.beta is not None else config.beta
 
             run_full_pipeline(
                 positions=positions,
@@ -2554,9 +2479,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 skip_gaussian_fits=args.skip_gaussian_fits,
                 skip_sigma_f=args.skip_sigma_f,
                 skip_fi=args.skip_fi,
-                charge_model=charge_model,
                 active_pixel_mode=active_pixel_mode,
-                beta=beta,
             )
 
         elif args.command == "analyze":

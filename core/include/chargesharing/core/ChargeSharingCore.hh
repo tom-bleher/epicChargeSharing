@@ -4,7 +4,7 @@
 /// @file ChargeSharingCore.hh
 /// @brief Core charge sharing algorithms shared between simulation and reconstruction.
 ///
-/// This header provides the charge sharing model calculations (LogA/LinA)
+/// This header provides the LogA charge sharing model calculations
 /// that are used both by the Geant4 simulation and the EICrecon plugin.
 
 #ifndef CHARGESHARING_CORE_CHARGESHARINGCORE_HH
@@ -17,16 +17,6 @@
 #include <vector>
 
 namespace chargesharing::core {
-
-// ============================================================================
-// Signal Model Selection
-// ============================================================================
-
-/// @brief Signal sharing model selecting the charge-weight functional form.
-///
-/// LogA uses a logarithmic attenuation model calibrated to BNL AC-LGAD test-beam data.
-/// LinA uses a linear attenuation model parameterized by pitch-dependent beta.
-enum class SignalModel { LogA, LinA };
 
 /// @brief Active pixel selection mode controlling which pixels form the normalization denominator.
 ///
@@ -57,38 +47,10 @@ enum class ReconMethod {
 
 namespace constants {
 constexpr double kMillimeterPerMicron = 1.0e-3;
-constexpr double kMicronPerMillimeter = 1.0e3;
 constexpr double kGuardFactor = 1.0 + 1e-6;     // Prevents log(0) singularity when distance == d0, with minimal bias
 constexpr double kMinD0Micron = 1e-6;           // Floor for d0 to avoid division by zero in log(d/d0)
 constexpr double kOutOfBoundsFraction = std::numeric_limits<double>::quiet_NaN(); // Sentinel: pixel outside detector bounds
-
-// Linear model beta coefficients (1/um) from paper -- empirical fits to AC-LGAD data
-constexpr double kLinearBetaNarrow = 0.003;      // For pitch 100-200 um (steeper attenuation)
-constexpr double kLinearBetaWide = 0.002;        // For pitch 200-500 um (Tornago et al. arXiv:2007.09528)
-constexpr double kLinearMinPitchUM = 100.0;      // Minimum supported AC-LGAD pitch
-constexpr double kLinearBoundaryPitchUM = 200.0; // Pitch threshold between narrow/wide beta regimes
-constexpr double kLinearMaxPitchUM = 500.0;      // Maximum supported AC-LGAD pitch
 } // namespace constants
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-/// Get quiet NaN for invalid values
-inline double nan() {
-    return std::numeric_limits<double>::quiet_NaN();
-}
-
-/// Check if value is finite
-inline bool isFinite(double v) {
-    return std::isfinite(v);
-}
-
-/// Clamp value to range
-template <typename T>
-inline T clamp(T value, T lo, T hi) {
-    return std::max(lo, std::min(value, hi));
-}
 
 // ============================================================================
 // Charge Model Calculations
@@ -134,19 +96,6 @@ inline double calcPadViewAngle(double edgeDistMM, double padWidthMM, double padH
     return std::atan(numerator / denominator);
 }
 
-/// Get linear model beta coefficient based on pixel pitch
-/// @param pitchMM Pixel pitch in mm
-inline double getLinearBeta(double pitchMM) {
-    const double pitchUM = pitchMM * constants::kMicronPerMillimeter;
-    if (pitchUM >= constants::kLinearMinPitchUM && pitchUM <= constants::kLinearBoundaryPitchUM) {
-        return constants::kLinearBetaNarrow;
-    }
-    if (pitchUM > constants::kLinearBoundaryPitchUM && pitchUM <= constants::kLinearMaxPitchUM) {
-        return constants::kLinearBetaWide;
-    }
-    return constants::kLinearBetaNarrow;
-}
-
 /// Calculate weight for LogA model: w_i = alpha_i / ln(d_i/d0)
 /// @param distanceMM Distance from hit to nearest pad edge (mm)
 /// @param alphaPadViewAngle Pad view angle (radians)
@@ -165,50 +114,6 @@ inline double calcWeightLogA(double distanceMM, double alphaPadViewAngle, double
         return 0.0;
     }
     return alphaPadViewAngle / logValue;
-}
-
-/// Calculate weight for LinA model: w_i = (1 - beta * d_i) * alpha_i
-/// @param distanceMM Distance from hit to nearest pad edge (mm)
-/// @param alphaPadViewAngle Pad view angle
-/// @param betaPerMicron Attenuation coefficient (1/um)
-inline double calcWeightLinA(double distanceMM, double alphaPadViewAngle, double betaPerMicron) {
-    const double distanceUM = distanceMM * constants::kMicronPerMillimeter;
-    const double attenuation = std::max(0.0, 1.0 - betaPerMicron * distanceUM);
-    const double weight = attenuation * alphaPadViewAngle;
-    if (!(std::isfinite(weight) && weight >= 0.0)) {
-        static thread_local bool warned = false;
-        if (!warned) {
-            std::cerr << "[ChargeSharingCore] Warning: calcWeightLinA returned non-finite/negative weight=" << weight
-                      << " (distance=" << distanceMM << ", beta=" << betaPerMicron << ")\n";
-            warned = true;
-        }
-        return 0.0;
-    }
-    return weight;
-}
-
-/// @brief Calculate the unnormalized charge sharing weight for a single pixel.
-///
-/// Dispatches to LogA or LinA depending on the model selection. The returned
-/// weight is proportional to the signal fraction induced on this pad; call
-/// calculateNeighborhood() to obtain properly normalized fractions.
-/// @param model Signal model (LogA or LinA).
-/// @param distanceMM Distance from hit to nearest pad edge (mm).
-/// @param padWidthMM Pad width (mm).
-/// @param padHeightMM Pad height (mm).
-/// @param d0MM Reference distance for LogA model (mm).
-/// @param betaPerMicron Attenuation coefficient for LinA (1/um), or 0 to auto-select from pitch.
-/// @param pitchMM Pixel pitch used when betaPerMicron is 0 (mm).
-/// @return Unnormalized weight (dimensionless, non-negative).
-inline double calcWeight(SignalModel model, double distanceMM, double padWidthMM, double padHeightMM, double d0MM,
-                         double betaPerMicron = 0.0, double pitchMM = 0.0) {
-    const double alpha = calcPadViewAngle(distanceMM, padWidthMM, padHeightMM);
-
-    if (model == SignalModel::LinA) {
-        const double beta = (betaPerMicron > 0.0) ? betaPerMicron : getLinearBeta(pitchMM);
-        return calcWeightLinA(distanceMM, alpha, beta);
-    }
-    return calcWeightLogA(distanceMM, alpha, d0MM);
 }
 
 // ============================================================================
@@ -237,10 +142,6 @@ struct NeighborPixel {
     double fractionCol{0.0};   ///< Fraction using col-only denominator
     double fractionBlock{0.0}; ///< Fraction using block denominator
 
-    // Mode-specific charges (fraction * totalCharge)
-    double chargeRow{0.0};   ///< Charge using row fraction
-    double chargeCol{0.0};   ///< Charge using col fraction
-    double chargeBlock{0.0}; ///< Charge using block fraction
 };
 
 /// @brief Complete result of a neighborhood charge-sharing calculation.
@@ -256,9 +157,6 @@ struct NeighborhoodResult {
     double centerPixelY{0.0};
     double totalWeight{0.0};
 
-    /// Get pixel at grid offset (di, dj), returns nullptr if not found
-    const NeighborPixel* getPixel(int di, int dj) const;
-
     /// Get center row slice (di varies, dj=0)
     std::vector<const NeighborPixel*> getCenterRow() const;
 
@@ -273,9 +171,8 @@ struct NeighborhoodResult {
 /// @brief Configuration parameters for the neighborhood charge-sharing calculation.
 ///
 /// Groups detector geometry (pad size, pitch, pixel count) and model parameters
-/// (d0, beta, radius) needed by calculateNeighborhood().
+/// (d0 and radius) needed by calculateNeighborhood().
 struct NeighborhoodConfig {
-    SignalModel signalModel{SignalModel::LogA};
     ActivePixelMode activeMode{ActivePixelMode::Neighborhood};
     int radius{2};               ///< Neighborhood half-width (2 = 5x5)
     double pixelSizeMM{0.15};    ///< Pad size (mm)
@@ -283,7 +180,6 @@ struct NeighborhoodConfig {
     double pixelSpacingMM{0.5};  ///< Pixel pitch (mm)
     double pixelSpacingYMM{0.5}; ///< Pixel pitch Y (mm), 0 = same as X
     double d0Micron{1.0};        ///< LogA d0 parameter (um)
-    double betaPerMicron{0.0};   ///< LinA beta (1/um), 0 = auto
     int numPixelsX{0};           ///< Total pixels in X (for bounds), 0 = unbounded
     int numPixelsY{0};           ///< Total pixels in Y (for bounds), 0 = unbounded
     int minIndexX{0};            ///< Minimum valid DD4hep index in X (can be negative)

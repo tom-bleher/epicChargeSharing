@@ -99,17 +99,25 @@ def _load_residual_rms_from_hist(uproot, path: Path, detector: str):
     return rmsX, rmsY, min(nX, nY)
 
 
+# Match the monitor's hResidualX/Y histogram range: entries beyond it land in
+# overflow there and are excluded from the histogram RMS, so the TTree path
+# uses the same window to stay consistent. Hits outside are reported as tail.
+CORE_WINDOW_MM = 0.5
+
+
 def _robust_rms_mm(values):
-    """Return the (mean, rms) of an array in mm, computed with numpy."""
+    """Return (mean, rms, n_core, n_tail) in mm within +-CORE_WINDOW_MM."""
     import numpy as np
 
-    if len(values) == 0:
-        return float("nan"), float("nan")
     arr = np.asarray(values, dtype=float)
     arr = arr[np.isfinite(arr)]
     if len(arr) == 0:
-        return float("nan"), float("nan")
-    return float(arr.mean()), float(arr.std(ddof=0))
+        return float("nan"), float("nan"), 0, 0
+    core = arr[np.abs(arr) <= CORE_WINDOW_MM]
+    n_tail = len(arr) - len(core)
+    if len(core) == 0:
+        return float("nan"), float("nan"), 0, n_tail
+    return float(core.mean()), float(core.std(ddof=0)), len(core), n_tail
 
 
 def validate(path: Path, detector: str, max_rms_x_um: float, max_rms_y_um: float,
@@ -131,10 +139,11 @@ def validate(path: Path, detector: str, max_rms_x_um: float, max_rms_y_um: float
     if tree_data is not None:
         rx, ry = tree_data
         n = min(len(rx), len(ry))
-        meanX, rmsX_mm = _robust_rms_mm(rx)
-        meanY, rmsY_mm = _robust_rms_mm(ry)
+        meanX, rmsX_mm, n_coreX, n_tailX = _robust_rms_mm(rx)
+        meanY, rmsY_mm, n_coreY, n_tailY = _robust_rms_mm(ry)
         rmsX_um = rmsX_mm * 1000.0
         rmsY_um = rmsY_mm * 1000.0
+        n_tail = max(n_tailX, n_tailY)
         source = "TTree"
     else:
         hist = _load_residual_rms_from_hist(uproot, path, detector)
@@ -145,9 +154,12 @@ def validate(path: Path, detector: str, max_rms_x_um: float, max_rms_y_um: float
         meanX = meanY = float("nan")
         rmsX_um = rmsX_mm * 1000.0
         rmsY_um = rmsY_mm * 1000.0
+        n_tail = 0
         source = "hists"
 
     print(f"  entries ({source}):       {n}")
+    print(f"  core window (mm):        +-{CORE_WINDOW_MM} "
+          f"({n_tail} tail hit(s) outside, excluded from RMS)")
     print(f"  residualX (um) mean/rms: {meanX*1000:+.2f} / {rmsX_um:.2f}")
     print(f"  residualY (um) mean/rms: {meanY*1000:+.2f} / {rmsY_um:.2f}")
     print(f"  thresholds (um):         <= {max_rms_x_um} (X), <= {max_rms_y_um} (Y)")

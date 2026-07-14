@@ -36,6 +36,12 @@ struct NoiseConfig {
 /// are NOT thread-safe; each thread must own its own NoiseModel.
 class NoiseModel {
 public:
+    /// Fixed default seed: reconstruction output must be reproducible across
+    /// runs (EICrecon requirement), so the default constructor must never
+    /// draw entropy from std::random_device. Use setSeed()/the seeded
+    /// constructor for statistically independent replicas.
+    static constexpr unsigned int kDefaultSeed = 20260710U;
+
     NoiseModel();
     explicit NoiseModel(unsigned int seed);
 

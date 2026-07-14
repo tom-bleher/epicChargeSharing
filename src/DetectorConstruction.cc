@@ -41,7 +41,6 @@ DetectorConstruction::DetectorConstruction()
     // Override defaults from runtime config
     const auto& rtConfig = ECS::RuntimeConfig::Instance();
     fNeighborhoodRadius = rtConfig.neighborhoodRadius;
-    fLinearChargeModelBeta = rtConfig.linearBeta;
     SetupMessenger();
 }
 

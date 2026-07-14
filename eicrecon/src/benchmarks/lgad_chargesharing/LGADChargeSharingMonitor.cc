@@ -21,6 +21,9 @@ constexpr const char* kMonitorDirName = "LGADChargeSharing";
 
 LGADChargeSharingMonitor::LGADChargeSharingMonitor() {
     SetTypeName(NAME_OF_THIS);
+    // ProcessSequential(const JEvent&) is only dispatched in ExpertMode; the
+    // JANA default (LegacyMode) calls the no-op Process() and fills nothing.
+    SetCallbackStyle(CallbackStyle::ExpertMode);
 }
 
 void LGADChargeSharingMonitor::Init() {
@@ -145,15 +148,17 @@ void LGADChargeSharingMonitor::ProcessSequential(const JEvent& event) {
         if (recoHits == nullptr || simHits == nullptr)
             continue;
 
-        std::map<uint64_t, const edm4hep::SimTrackerHit*> simHitMap;
+        // podio iteration yields temporary handle objects, so store the (cheap)
+        // handle by value; a stored pointer would dangle after each iteration.
+        std::map<uint64_t, edm4hep::SimTrackerHit> simHitMap;
         for (const auto& simHit : *simHits) {
-            simHitMap[simHit.getCellID()] = &simHit;
+            simHitMap.emplace(simHit.getCellID(), simHit);
         }
 
         for (const auto& recoHit : *recoHits) {
             auto it = simHitMap.find(recoHit.getCellID());
             if (it != simHitMap.end()) {
-                fillData(det.displayName, recoHit, *(it->second));
+                fillData(det.displayName, recoHit, it->second);
             }
         }
     }
